@@ -17,6 +17,12 @@ final class MediaLibraryStore: ObservableObject {
     @Published private(set) var recent: [TVChannel] = []
     @Published private(set) var positions: [String: Double] = [:]
     @Published private(set) var current: TVChannel?
+    @Published private(set) var localFileName: String?
+    @Published private(set) var captionText = ""
+
+    private var currentLocalFile: URL?
+    private var captionCues: [CaptionCue] = []
+    private var captionObserver: Any?
 
     let player = AVPlayer()
     @Published private(set) var playbackSpeed: Float = 1.0
@@ -39,13 +45,19 @@ final class MediaLibraryStore: ObservableObject {
         ) { [weak self] _ in
             self?.savePosition()
         }
+        captionObserver = player.addPeriodicTimeObserver(
+            forInterval: CMTime(seconds: 0.2, preferredTimescale: 600),
+            queue: .main
+        ) { [weak self] _ in
+            self?.refreshCaptions()
+        }
     }
 
     deinit {
-        if let timeObserver {
-            player.removeTimeObserver(timeObserver)
-        }
+        if let timeObserver { player.removeTimeObserver(timeObserver) }
+        if let captionObserver { player.removeTimeObserver(captionObserver) }
         statusObservation?.invalidate()
+        LocalMediaStager.discard(currentLocalFile)
     }
 
     func importChannels(_ input: [TVChannel]) {
@@ -75,6 +87,11 @@ final class MediaLibraryStore: ObservableObject {
         guard MediaAddress.valid(channel.url), let url = URL(string: channel.url) else { return }
         savePosition()
         player.pause()
+        player.replaceCurrentItem(with: nil)
+        LocalMediaStager.discard(currentLocalFile)
+        currentLocalFile = nil
+        localFileName = nil
+        clearCaptions()
         statusObservation?.invalidate()
         current = channel
         recent.removeAll { $0.url == channel.url }
@@ -94,6 +111,41 @@ final class MediaLibraryStore: ObservableObject {
         player.replaceCurrentItem(with: item)
         player.playImmediately(atRate: playbackSpeed)
         persist()
+    }
+
+    func playLocalFile(_ file: URL, name: String) {
+        savePosition()
+        player.pause()
+        player.replaceCurrentItem(with: nil)
+        LocalMediaStager.discard(currentLocalFile)
+        currentLocalFile = file
+        localFileName = name
+        current = nil
+        clearCaptions()
+        statusObservation?.invalidate()
+        player.replaceCurrentItem(with: AVPlayerItem(url: file))
+        player.playImmediately(atRate: playbackSpeed)
+        // Local sandbox files are intentionally NOT added to persistent library/history.
+    }
+
+    func setCaptions(_ cues: [CaptionCue]) {
+        captionCues = Array(cues.prefix(5_000))
+        refreshCaptions()
+    }
+
+    func clearCaptions() {
+        captionCues = []
+        captionText = ""
+    }
+
+    private func refreshCaptions() {
+        let now = player.currentTime().seconds
+        guard now.isFinite else {
+            captionText = ""
+            return
+        }
+        let text = captionCues.first(where: { now >= $0.start && now < $0.end })?.text ?? ""
+        if text != captionText { captionText = text }
     }
 
     func savePosition() {
@@ -117,6 +169,10 @@ final class MediaLibraryStore: ObservableObject {
     func clear() {
         player.pause()
         player.replaceCurrentItem(with: nil)
+        LocalMediaStager.discard(currentLocalFile)
+        currentLocalFile = nil
+        localFileName = nil
+        clearCaptions()
         statusObservation?.invalidate()
         current = nil
         channels = []
