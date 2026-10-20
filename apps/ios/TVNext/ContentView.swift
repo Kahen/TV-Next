@@ -60,6 +60,7 @@ struct ContentView: View {
                     quickPlaySection
                     localMediaSection
                     importSection
+                    ConfigPreviewSection()
                     librarySection
 
                     Text("本地播放列表、收藏及进度只保存在这台设备；暂不支持跨设备同步。不内置媒体源。")
