@@ -79,6 +79,8 @@ def run_fixture(
         raise ValueError("unsupported runtime")
     if method not in (DIAGNOSTICS if diagnostic else METHODS):
         raise ValueError("method is not allowed for this mode")
+    if args is None:
+        args = {}
     if not isinstance(args, dict):
         raise ValueError("args must be a JSON object")
     if not 0.1 <= timeout <= 20:
@@ -127,8 +129,12 @@ def run_fixture(
     finally:
         # --rm normally removes successful runs. A timed-out docker client may
         # leave its container alive; always explicitly force-remove by unique name.
-        subprocess.run(
-            ["docker", "rm", "-f", name],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            timeout=8, check=False,
-        )
+        try:
+            subprocess.run(
+                ["docker", "rm", "-f", name],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                timeout=8, check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            # Do not replace the original runtime failure with cleanup noise.
+            pass
