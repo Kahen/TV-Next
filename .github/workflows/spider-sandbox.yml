@@ -1,0 +1,41 @@
+name: Spider Fixture Isolation CI
+
+on:
+  push:
+    branches: [main, "feat/**"]
+    paths:
+      - "services/spider-runtime/**"
+      - ".github/workflows/spider-sandbox.yml"
+  pull_request:
+    paths:
+      - "services/spider-runtime/**"
+      - ".github/workflows/spider-sandbox.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fixture-isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build immutable demonstration runtimes
+        run: |
+          docker build -f services/spider-runtime/node/Dockerfile -t tvnext/spider-node-fixture:ci services/spider-runtime
+          docker build -f services/spider-runtime/python/Dockerfile -t tvnext/spider-python-fixture:ci services/spider-runtime
+      - name: Exercise OS isolation, protocol parity, network, filesystem and timeout
+        working-directory: services/spider-runtime
+        run: python3 -m unittest -v test_runtime
+      - name: Detect leaked runtime containers
+        if: always()
+        run: |
+          if [ -n "$(docker ps -aq --filter 'name=tvnext-fixture-')" ]; then
+            docker ps -a --filter 'name=tvnext-fixture-'
+            docker ps -aq --filter 'name=tvnext-fixture-' | xargs -r docker rm -f
+            exit 1
+          fi
