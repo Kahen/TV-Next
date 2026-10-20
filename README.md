@@ -74,3 +74,7 @@ An initial **offline XMLTV programme guide** is also available: import a local X
 FongMi/TV is a separate Android project. Any future reuse of GPL-covered code must retain notices and meet license obligations. This repository is **not** an iOS build of the Android APK.
 
 Status: P1 development in progress. CI compilation and unit tests do not replace on-device/network playback verification. No production release yet.
+
+## P3 isolated runtime groundwork
+
+The repository contains an experimental **Node.js and Python bundled-fixture isolation harness** in [services/spider-runtime](services/spider-runtime/README.md), with separate Docker images and a host-side single-invocation controller. This is **NOT** a Spider execution endpoint, remote plugin installer or production sandbox: only reviewable, pre-bundled demonstration fixtures can execute, and JS/Python containers cannot reach the network. The core Spring Boot API, Web/iOS clients, and Docker Compose deployment are unchanged. Real provider compatibility, JVM/JAR support, security assessment and authorized external fixtures remain P3 blockers.
