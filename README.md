@@ -9,7 +9,7 @@ Independent cross-platform media app for Web, iPhone, and iPad, with a self-host
 | Component | Technology | Current scope |
 | --- | --- | --- |
 | Web / PWA candidate | React 19 + TypeScript + Vite + hls.js | HTTP(S) M3U import/export, saved playlists, favorites, recents, VOD resume, local media, UTF-8 SRT/WebVTT, PWA shell, JSON config inspection |
-| iPhone / iPad | SwiftUI + AVPlayer | Manually enter media, import local M3U **offline** (optional API), saved playlist and M3U export, native playback speed, favorites, recents and VOD progress |
+| iPhone / iPad | SwiftUI + AVPlayer | Manually enter media, import local M3U **offline** (optional API), saved playlist and M3U export, local Files media and timed UTF-8 subtitles, native playback speed, favorites, recents and VOD progress |
 | API | Kotlin + Spring Boot | GET health, POST M3U parse, POST FongMi JSON inspect |
 | Infrastructure | Docker Compose, nginx, GitHub Actions | Local self-hosting, Web/API CI, optional manual iOS simulator build |
 
