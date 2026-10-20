@@ -18,6 +18,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install XcodeGen
         run: brew install xcodegen
+      - name: Run native playlist parser smoke tests
+        working-directory: apps/ios
+        run: |
+          swiftc TVNext/TVNextAPI.swift TVNext/M3UParser.swift tests/ParserSmoke.swift -o /tmp/tvnext-parser-tests
+          /tmp/tvnext-parser-tests
       - name: Generate Xcode project
         working-directory: apps/ios
         run: xcodegen generate
