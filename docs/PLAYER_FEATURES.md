@@ -27,3 +27,11 @@ Native AVPlayer speed controls provide 0.75x, 1x, 1.25x, 1.5x and 2x. Some strea
 ## Out of scope
 
 Spider runtime, full FongMi parity, iOS local file play, iOS subtitle tracks, AirPlay, DLNA, PWA offline media, transcoding, DRM circumvention and signed IPA releases remain future work.
+
+## iOS local Files media and external captions
+
+Files picker accepts an item only if its extension is one of MP4, M4V, MOV, MP3, M4A or AAC. After checking the 2 GiB upper bound, the app copies it into a private temporary cache before playback with AVPlayer, avoiding reliance on long-lived Files security scope permissions. The content is never uploaded or put into the persistent media library. Playback may fail for unsupported codecs or insufficient local storage.
+
+An external UTF-8 SRT/VTT file smaller than 1 MiB is parsed on-device into bounded, text-only cues and displayed with a SwiftUI overlay synchronized to the AVPlayer timeline. It is not an embedded/selected native AVPlayer subtitle track; multiple simultaneous subtitles, positioning, ASS styling and timing adjustment are not included.
+
+Native simulator compilation and caption fixtures do not prove that a specific iPhone/iPad decodes any arbitrary video. Physical-device tests are mandatory before an Apple distribution milestone.

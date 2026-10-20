@@ -21,3 +21,11 @@ This is an early native UI, not an iOS execution environment for Android JAR, AA
 - M3U exports include full stream URLs, including sensitive query tokens. Do not publish exported files.
 - Media is still played by native AVPlayer, not by executing Android or Spider plugins.
 - Real-device playback, Files export, subtitle and background playback verification are still pending.
+
+## Local media and subtitles (P1)
+
+- Choose **打开本地视频 / 音频** and select an authorized MP4, M4V, MOV, MP3, M4A or AAC file from Files. The app copies a file of at most **2 GiB** to its private cache, because a document-picker security-scoped URL may not stay valid during playback. Importing large files uses space and may take time.
+- A local file is never uploaded to the backend, added to favorites or recent streams, or restored automatically after relaunch. The previous staged file is deleted when a new source replaces it or when the player is cleared. An unexpected termination may leave a temporary cache file until iOS reclaims the cache.
+- Select **导入 SRT / WebVTT 字幕** for UTF-8 plain-text captions up to **1 MiB**. Cues are rendered in a SwiftUI overlay aligned with AVPlayer's current time, not as a system-selectable AVMediaSelection track.
+- Captions support common SRT/WebVTT cues, simple text and basic timestamps. No ASS/SSA, advanced WebVTT positioning, styling, offsets, muxed subtitle track selection or translation yet.
+- Playback of a supported filename still depends on codecs provided by iOS/AVPlayer. Media copied from cloud storage can fail when inaccessible, oversized, or low on available device storage. Test on physical iPhone/iPad before distribution.
