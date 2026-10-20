@@ -87,8 +87,11 @@ class XmltvGuideService {
             aliases.forEach { alias -> normalizedAliases.getOrPut(normalize(alias)) { mutableSetOf() }.add(id) }
         }
         val guides = request.channels.map { requested ->
-            val name = requested.name.trim().take(200)
-            val explicitId = requested.id?.trim()?.takeIf { it.isNotEmpty() && it.length <= 200 }
+            if (requested.name.length > 200 || (requested.id?.length ?: 0) > 200 ||
+                requested.name.any { Character.isISOControl(it) } ||
+                requested.id?.any { Character.isISOControl(it) } == true) fail("Invalid channel name or tvg-id")
+            val name = requested.name.trim()
+            val explicitId = requested.id?.trim()?.takeIf { it.isNotEmpty() }
             if (name.isBlank() && explicitId == null) fail("Every channel needs a name or tvg-id")
             val matched = if (explicitId != null &&
                 (feed.aliases.containsKey(explicitId) || byId.containsKey(explicitId))) {
@@ -165,6 +168,7 @@ class XmltvGuideService {
 
         override fun startElement(uri: String?, localName: String?, qName: String?, attributes: Attributes) {
             depth++
+            if (depth == 1 && qName != "tv") throw SAXException("Root must be tv")
             if (depth > 20) throw SAXException("XML nesting limit")
             when (qName) {
                 "channel" -> if (depth == 2) {
