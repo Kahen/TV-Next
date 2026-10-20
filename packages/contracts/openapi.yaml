@@ -68,6 +68,84 @@ paths:
                 $ref: "#/components/schemas/CatalogPreview"
         "400":
           description: Invalid or oversized config
+  /api/v1/media/home:
+    post:
+      summary: Browse user-pasted FongMi Result (static only; no network calls)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MediaQuery" }
+      responses:
+        "200":
+          description: Categories and paginated items
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MediaPage" }
+        "400": { description: Invalid media JSON or pagination }
+  /api/v1/media/category:
+    post:
+      summary: Filter imported items by categoryId
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MediaQuery" }
+      responses:
+        "200":
+          description: Filtered page
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MediaPage" }
+        "400": { description: Invalid category }
+  /api/v1/media/search:
+    post:
+      summary: Local title search within imported Result JSON
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MediaQuery" }
+      responses:
+        "200":
+          description: Matching items
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MediaPage" }
+        "400": { description: Invalid search query }
+  /api/v1/media/detail:
+    post:
+      summary: Read imported video metadata, lines and episodes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MediaQuery" }
+      responses:
+        "200":
+          description: Static video details
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MediaDetail" }
+        "400": { description: Invalid request }
+        "404": { description: Video not present in JSON }
+  /api/v1/media/play:
+    post:
+      summary: Return plain imported HTTP(S) episode URL (no proxying)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MediaQuery" }
+      responses:
+        "200":
+          description: Direct playback URL
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MediaPlayback" }
+        "400": { description: Invalid episode selection }
+        "404": { description: Video not present }
+        "422": { description: Unsupported parser required }
 components:
   schemas:
     TextImportRequest:
@@ -157,3 +235,79 @@ components:
         warnings:
           type: array
           items: { type: string }
+
+    MediaQuery:
+      type: object
+      required: [content]
+      properties:
+        content: { type: string, maxLength: 1048576 }
+        categoryId: { type: string, maxLength: 100 }
+        query: { type: string, maxLength: 120 }
+        vodId: { type: string, maxLength: 200 }
+        page: { type: integer, minimum: 1, maximum: 1000, default: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100, default: 40 }
+        lineIndex: { type: integer, minimum: 0, default: 0 }
+        episodeIndex: { type: integer, minimum: 0, default: 0 }
+    MediaItem:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        categoryId: { type: [string, "null"] }
+        categoryName: { type: [string, "null"] }
+        poster: { type: [string, "null"] }
+        remarks: { type: [string, "null"] }
+        year: { type: [string, "null"] }
+    MediaPage:
+      type: object
+      required: [categories, items, total, page, pageSize, hasMore, provider]
+      properties:
+        categories:
+          type: array
+          items:
+            type: object
+            required: [id, name]
+            properties:
+              id: { type: string }
+              name: { type: string }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/MediaItem" }
+        total: { type: integer }
+        page: { type: integer }
+        pageSize: { type: integer }
+        hasMore: { type: boolean }
+        provider: { type: string }
+    MediaDetail:
+      type: object
+      required: [item, lines, provider]
+      properties:
+        item: { $ref: "#/components/schemas/MediaItem" }
+        description: { type: [string, "null"] }
+        director: { type: [string, "null"] }
+        actors: { type: [string, "null"] }
+        provider: { type: string }
+        lines:
+          type: array
+          items:
+            type: object
+            required: [name, episodes]
+            properties:
+              name: { type: string }
+              episodes:
+                type: array
+                items:
+                  type: object
+                  required: [name, playable]
+                  properties:
+                    name: { type: string }
+                    playable: { type: boolean }
+    MediaPlayback:
+      type: object
+      required: [url, name, lineName, provider]
+      properties:
+        url: { type: string, format: uri }
+        name: { type: string }
+        lineName: { type: string }
+        provider: { type: string }

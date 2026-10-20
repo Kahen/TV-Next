@@ -1,0 +1,14 @@
+.media-browser textarea{width:100%;min-height:140px;resize:vertical;border-radius:9px;background:#080f1d;color:#edf1fa;padding:13px;border:1px solid #30405a;font:12px/1.65 ui-monospace,Menlo,Consolas,monospace}
+.media-controls{display:flex;gap:8px;flex-wrap:wrap;margin:19px 0}
+.media-selected{border-color:#7799ff;background:#284577;color:#fff}
+.media-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;margin:18px 0}
+.media-tile{display:flex;flex-direction:column;gap:7px;align-items:flex-start;text-align:left;padding:13px;border-radius:12px;border:1px solid #30415b;color:#e4eaff;background:#15243a;cursor:pointer}
+.media-tile:hover,.media-tile:focus-visible{background:#254169}
+.media-tile-icon{display:flex;align-items:center;justify-content:center;height:100px;width:100%;border-radius:7px;background:#223858;color:#a4bdfa}
+.media-tile strong{font-size:13px;overflow-wrap:anywhere}
+.media-tile small{font-size:11px;color:#a1b2ce}
+.media-pagination{display:flex;justify-content:space-between;gap:12px}
+.media-detail{margin-top:22px;padding-top:18px;border-top:1px solid #354767}
+.media-detail p{font-size:13px;line-height:1.65;white-space:pre-wrap}
+.media-episodes{display:flex;flex-wrap:wrap;gap:8px}
+.media-episodes button{white-space:normal;overflow-wrap:anywhere}

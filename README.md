@@ -54,6 +54,8 @@ Import content is capped at 1 MiB in the application; large requests should addi
 
 New P2 preview endpoint: `POST /api/v1/catalog/preview` accepts JSON `{"content":"{\\"sites\\":[],\\"lives\\":[]}"}`. Preview only: no external media sources are automatically fetched; only pure direct HTTP(S) IPTV channels can be manually selected for playback. See [catalog limitations](docs/FONGMI_CATALOG.md).
 
+The experimental static MediaProvider supports home, category, local search, detail, and player lookup on manually supplied FongMi Result JSON. It neither fetches network resources nor executes Spider. See [MediaProvider docs](docs/MEDIA_PROVIDER.md).
+
 ## Implementation plan
 
 - [Roadmap from foundation through advanced features](docs/ROADMAP.md)
@@ -62,6 +64,8 @@ New P2 preview endpoint: `POST /api/v1/catalog/preview` accepts JSON `{"content"
 - [Development and smoke test guide](docs/DEVELOPMENT.md)
 - [Player features and limitations](docs/PLAYER_FEATURES.md)
 - [FongMi site/live metadata support](docs/FONGMI_CATALOG.md)
+- [MediaProvider contract](docs/MEDIA_PROVIDER.md)
+- [P0–P6 acceptance evidence](docs/ACCEPTANCE.md)
 - [OpenAPI contract](packages/contracts/openapi.yaml)
 
 FongMi/TV is a separate Android project. Any future reuse of GPL-covered code must retain notices and meet license obligations. This repository is **not** an iOS build of the Android APK.
