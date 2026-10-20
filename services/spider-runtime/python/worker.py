@@ -11,7 +11,7 @@ class WorkerError(Exception):
 
 
 METHODS = {"home", "category", "search", "detail", "player"}
-TEST_METHODS = {"__probe_network", "__probe_write", "__probe_policy", "__sleep"}
+TEST_METHODS = {"__probe_network", "__probe_write", "__probe_policy", "__probe_output", "__crash", "__sleep"}
 with open("/worker/catalog.json", encoding="utf-8") as fixture_file:
     FIXTURE = json.load(fixture_file)
 
@@ -58,6 +58,10 @@ def execute(req):
                 "pidsMax": read("pids.max"),
                 "cpuMax": read("cpu.max")
             }
+        if method == "__probe_output":
+            return {"filler": "x" * 20_000}
+        if method == "__crash":
+            os._exit(17)
         if method == "__sleep":
             time.sleep(30)
             return {"slept": True}

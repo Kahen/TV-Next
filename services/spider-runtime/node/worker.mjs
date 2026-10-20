@@ -3,7 +3,7 @@ import net from "node:net";
 
 const fixture = JSON.parse(fs.readFileSync("/worker/catalog.json", "utf8"));
 const METHODS = new Set(["home", "category", "search", "detail", "player"]);
-const TEST_METHODS = new Set(["__probe_network", "__probe_write", "__probe_policy", "__sleep"]);
+const TEST_METHODS = new Set(["__probe_network", "__probe_write", "__probe_policy", "__probe_output", "__crash", "__sleep"]);
 
 function fail(code) {
   process.stdout.write(JSON.stringify({ version: 1, status: "error", code }) + "\n");
@@ -56,6 +56,8 @@ async function handle(message) {
         cpuMax: read("/sys/fs/cgroup/cpu.max")
       };
     }
+    if (method === "__probe_output") return { filler: "x".repeat(20_000) };
+    if (method === "__crash") process.exit(17);
     if (method === "__sleep") {
       await new Promise((resolve) => setTimeout(resolve, 30_000));
       return { slept: true };

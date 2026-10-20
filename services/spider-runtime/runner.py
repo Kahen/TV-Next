@@ -19,7 +19,7 @@ IMAGES = {
     "python": "tvnext/spider-python-fixture:ci",
 }
 METHODS = frozenset({"home", "category", "search", "detail", "player"})
-DIAGNOSTICS = frozenset({"__probe_network", "__probe_write", "__probe_policy", "__sleep"})
+DIAGNOSTICS = frozenset({"__probe_network", "__probe_write", "__probe_policy", "__probe_output", "__crash", "__sleep"})
 MAX_INPUT = 16_384
 MAX_OUTPUT = 16_384
 MAX_STDIO_FILE = 65_536

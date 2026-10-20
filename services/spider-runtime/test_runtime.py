@@ -90,6 +90,14 @@ class FixtureIsolationTests(unittest.TestCase):
             else:
                 os.environ["TVNEXT_HOST_SECRET_TEST"] = original
 
+    def test_output_flood_and_unexpected_worker_crash_are_contained(self):
+        for runtime in IMAGES:
+            with self.subTest(runtime=runtime):
+                with self.assertRaisesRegex(RuntimeFailure, "output limit exceeded"):
+                    run_fixture(runtime, "__probe_output", diagnostic=True)
+                with self.assertRaisesRegex(RuntimeFailure, "nonzero-exit"):
+                    run_fixture(runtime, "__crash", diagnostic=True)
+
     def test_wall_clock_timeout_kills_container(self):
         for runtime in IMAGES:
             with self.subTest(runtime=runtime):
