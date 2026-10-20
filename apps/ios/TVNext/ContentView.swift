@@ -19,6 +19,9 @@ struct ContentView: View {
     @State private var selection: LibraryView = .channels
     @State private var useRemoteParser = false
     @State private var isShowingFilePicker = false
+    @State private var isShowingExporter = false
+    @State private var exportDocument: M3UExportDocument?
+    @State private var playbackSpeed: Float = 1.0
     @State private var isShowingClearConfirmation = false
     @State private var errorMessage: String?
     @State private var isLoading = false
@@ -69,6 +72,16 @@ struct ContentView: View {
                 allowsMultipleSelection: false
             ) { result in
                 importFile(result)
+            }
+            .fileExporter(
+                isPresented: $isShowingExporter,
+                document: exportDocument,
+                contentType: .m3uPlaylist,
+                defaultFilename: "tv-next-playlist"
+            ) { result in
+                if case .failure(let issue) = result {
+                    errorMessage = issue.localizedDescription
+                }
             }
             .confirmationDialog(
                 "确定删除本机保存的播放列表、收藏和观看进度吗？",
@@ -123,6 +136,18 @@ struct ContentView: View {
                         .buttonStyle(.bordered)
                     }
                 }
+                Picker("播放速度", selection: $playbackSpeed) {
+                    Text("0.75×").tag(Float(0.75))
+                    Text("1×").tag(Float(1))
+                    Text("1.25×").tag(Float(1.25))
+                    Text("1.5×").tag(Float(1.5))
+                    Text("2×").tag(Float(2))
+                }
+                .pickerStyle(.menu)
+                .onChange(of: playbackSpeed) { _, speed in
+                    library.setPlaybackSpeed(speed)
+                }
+
                 if let channel = library.current,
                    let seconds = library.positions[channel.url] {
                     Text("已记住播放进度：" + String(Int(seconds / 60)) + " 分钟")
@@ -186,6 +211,16 @@ struct ContentView: View {
                         .textFieldStyle(.roundedBorder)
                     Text("真机使用可访问的 HTTPS 服务。")
                         .font(.caption).foregroundStyle(.secondary)
+                }
+
+                if !library.channels.isEmpty {
+                    Button {
+                        exportDocument = M3UExportDocument(channels: library.channels)
+                        isShowingExporter = true
+                    } label: {
+                        Label("导出当前播放列表 (.m3u)", systemImage: "square.and.arrow.up")
+                    }
+                    .buttonStyle(.bordered)
                 }
 
                 Button(isLoading ? "解析中…" : "导入频道") {
