@@ -55,3 +55,18 @@ CI checks both, while macOS iOS simulator build can be triggered separately unde
 ## Design and security
 
 The P0 API only processes supplied text; it does not fetch external URLs. No authentication/persistent storage exists yet; do not expose this development service publicly. There is no unrestricted forward proxy, automated Spider loading or bundled source catalog.
+
+
+## Automated real-container smoke test
+
+GitHub Actions workflow `.github/workflows/compose-smoke.yml` builds both Docker images, brings up the actual `compose.yaml` services, and runs `python3 scripts/compose_smoke.py`. The integration test checks the real Web homepage, nginx reverse proxy, API health, M3U parser, static MediaProvider and XXE-safe XMLTV query using only local in-memory fixtures. No third-party media streams are fetched.
+
+Run this yourself with Docker Compose installed:
+
+```bash
+docker compose up --build -d
+python3 scripts/compose_smoke.py
+docker compose down -v --remove-orphans
+```
+
+This checks runtime boot and HTTP contracts; it is not evidence of browser codec playback, Apple-device performance, P3 Spider sandbox security or NAS reliability.
