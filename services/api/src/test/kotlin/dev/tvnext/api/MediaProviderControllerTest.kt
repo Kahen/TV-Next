@@ -15,7 +15,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 @AutoConfigureMockMvc
 class MediaProviderControllerTest(@Autowired private val mvc: MockMvc) {
     private val json = jacksonObjectMapper()
-    private val result = """{"class":[{"type_id":"movie","type_name":"Movies"}],"list":[{"vod_id":"1","vod_name":"Fixture","type_id":"movie","vod_play_from":"Direct","vod_play_url":"1$https://example.org/1.mp4"}]}"""
+    private val result = """{"class":[{"type_id":"movie","type_name":"Movies"}],"list":[{"vod_id":"1","vod_name":"Fixture","type_id":"movie","vod_play_from":"Direct","vod_play_url":"1${'$'}https://example.org/1.mp4"}]}"""
 
     private fun request(extra: Map<String, Any?> = emptyMap()): String =
         json.writeValueAsString(mapOf("content" to result) + extra)

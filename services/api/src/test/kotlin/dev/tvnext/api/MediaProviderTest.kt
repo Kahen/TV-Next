@@ -17,9 +17,9 @@ class MediaProviderTest {
           "list": [
             {"vod_id":"m1","vod_name":"Example Movie","type_id":"movie","vod_year":"2026",
              "vod_remarks":"HD","vod_content":"Sample text",
-             "vod_play_from":"Direct$$$Plugin",
-             "vod_play_url":"Part 1$https://example.org/m1.mp4#Part 2$https://example.org/m2.m3u8$$$Captcha$script://requires-plugin"},
-            {"vod_id":"s1","vod_name":"Example Series","type_id":"series","vod_play_from":"Line","vod_play_url":"E1$https://example.org/s1.mp4"},
+             "vod_play_from":"Direct${'$'}${'$'}${'$'}Plugin",
+             "vod_play_url":"Part 1${'$'}https://example.org/m1.mp4#Part 2${'$'}https://example.org/m2.m3u8${'$'}${'$'}${'$'}Captcha${'$'}script://requires-plugin"},
+            {"vod_id":"s1","vod_name":"Example Series","type_id":"series","vod_play_from":"Line","vod_play_url":"E1${'$'}https://example.org/s1.mp4"},
             {"vod_id":"x3","vod_name":"No Url","type_id":"movie","vod_pic":"javascript:alert(1)"}
           ]
         }
@@ -73,9 +73,9 @@ class MediaProviderTest {
 
     @Test fun duplicatesAndUnsafeUrlsAreIgnored() {
         val data = provider.read("""{"list":[
-          {"vod_id":"1","vod_name":"First","vod_play_from":"Line","vod_play_url":"A$https://user:pass@example.org/movie"},
+          {"vod_id":"1","vod_name":"First","vod_play_from":"Line","vod_play_url":"A${'$'}https://user:pass@example.org/movie"},
           {"vod_id":"1","vod_name":"Duplicate"},
-          {"vod_id":"2","vod_name":"Second","vod_play_from":"Line","vod_play_url":"A$javascript:alert(1)"}
+          {"vod_id":"2","vod_name":"Second","vod_play_from":"Line","vod_play_url":"A${'$'}javascript:alert(1)"}
         ]}""")
         assertEquals(2, data.entries.size)
         assertFalse(data.entries[0].lines.single().episodes.single().playable)
