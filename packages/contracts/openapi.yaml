@@ -50,6 +50,24 @@ paths:
                 $ref: "#/components/schemas/ConfigPreview"
         "400":
           description: Invalid JSON or size limits
+  /api/v1/catalog/preview:
+    post:
+      summary: Normalize FongMi sites and live groups without fetching sources or executing Spider
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TextImportRequest"
+      responses:
+        "200":
+          description: Static site descriptors and live channel groups with optional plain HTTP(S) direct URLs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogPreview"
+        "400":
+          description: Invalid or oversized config
 components:
   schemas:
     TextImportRequest:
@@ -92,3 +110,50 @@ components:
         sites:
           type: array
           items: { $ref: "#/components/schemas/SitePreview" }
+
+    CatalogPreview:
+      type: object
+      required: [sites, liveSources, directPlayableChannelCount, warnings]
+      properties:
+        sites:
+          type: array
+          items:
+            type: object
+            required: [key, name, searchable, hidden, categories, mode]
+            properties:
+              key: { type: string }
+              name: { type: string }
+              type: { type: [integer, "null"] }
+              searchable: { type: boolean }
+              hidden: { type: boolean }
+              categories:
+                type: array
+                items: { type: string }
+              mode: { type: string, const: preview-only }
+        liveSources:
+          type: array
+          items:
+            type: object
+            required: [name, groups]
+            properties:
+              name: { type: string }
+              groups:
+                type: array
+                items:
+                  type: object
+                  required: [name, channels]
+                  properties:
+                    name: { type: string }
+                    channels:
+                      type: array
+                      items:
+                        type: object
+                        required: [name, directUrl, sourceCount]
+                        properties:
+                          name: { type: string }
+                          directUrl: { type: [string, "null"] }
+                          sourceCount: { type: integer }
+        directPlayableChannelCount: { type: integer }
+        warnings:
+          type: array
+          items: { type: string }
