@@ -8,7 +8,7 @@ Independent cross-platform media app for Web, iPhone, and iPad, with a self-host
 
 | Component | Technology | Current scope |
 | --- | --- | --- |
-| Web / PWA candidate | React 19 + TypeScript + Vite + hls.js | HTTP(S) M3U import/export, saved playlists, favorites, recents, VOD resume, local media, UTF-8 SRT/WebVTT, PWA shell, JSON config inspection |
+| Web / PWA candidate | React 19 + TypeScript + Vite + hls.js | HTTP(S) M3U import/export, saved playlists, favorites, recents, VOD resume, local media, UTF-8 SRT/WebVTT, PWA shell, FongMi JSON catalog preview (sites and IPTV live groups, no Spider execution) |
 | iPhone / iPad | SwiftUI + AVPlayer | Manually enter media, import local M3U **offline** (optional API), saved playlist and M3U export, local Files media and timed UTF-8 subtitles, native playback speed, favorites, recents and VOD progress |
 | API | Kotlin + Spring Boot | GET health, POST M3U parse, POST FongMi JSON inspect |
 | Infrastructure | Docker Compose, nginx, GitHub Actions | Local self-hosting, Web/API CI, optional manual iOS simulator build |
@@ -52,6 +52,8 @@ Open http://localhost:5173. For iOS see [apps/ios/README.md](apps/ios/README.md)
 
 Import content is capped at 1 MiB in the application; large requests should additionally be bounded at the deployment proxy. The browser may still fail to play sources due to CORS, codecs or inaccessible media.
 
+New P2 preview endpoint: `POST /api/v1/catalog/preview` accepts JSON `{\"content\":\"{\\\"sites\\\":[],\\\"lives\\\":[]}\"}`. Preview only: no external media sources are automatically fetched; only pure direct HTTP(S) IPTV channels can be manually selected for playback. See [catalog limitations](docs/FONGMI_CATALOG.md).
+
 ## Implementation plan
 
 - [Roadmap from foundation through advanced features](docs/ROADMAP.md)
@@ -59,6 +61,7 @@ Import content is capped at 1 MiB in the application; large requests should addi
 - [Compatibility matrix](docs/COMPATIBILITY.md)
 - [Development and smoke test guide](docs/DEVELOPMENT.md)
 - [Player features and limitations](docs/PLAYER_FEATURES.md)
+- [FongMi site/live metadata support](docs/FONGMI_CATALOG.md)
 - [OpenAPI contract](packages/contracts/openapi.yaml)
 
 FongMi/TV is a separate Android project. Any future reuse of GPL-covered code must retain notices and meet license obligations. This repository is **not** an iOS build of the Android APK.

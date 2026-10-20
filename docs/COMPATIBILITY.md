@@ -16,6 +16,8 @@ Legend: Implemented = coded and checked at compile/test level (NOT necessarily d
 | Playback speed | Implemented | AVPlayer rate selector (device test pending) | N/A |
 | Favorites, recents and VOD resume | Implemented locally (unit tests) | Implemented locally (simulator build test) | Not required |
 | Cross-device library synchronization | Planned P5 | Planned P5 | Planned P5 |
+| FongMi JSON site metadata preview | Implemented (metadata only, no Spider) | Planned | Implemented bounded parser |
+| FongMi IPTV groups/channels | Preview + manual click for plain HTTP(S) URLs | Planned | Implemented bounded metadata parser |
 | FongMi sites/home/search/details | Planned P2 | Planned P2 | Planned P2 |
 | Java/JAR Spider | N/A | N/A | Planned P3 (pure JVM subset) |
 | JS Spider | N/A | N/A | Planned P3 |

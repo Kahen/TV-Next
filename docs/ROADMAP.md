@@ -37,9 +37,9 @@ Acceptance pending: equivalent catalog handling and history semantics across Web
 
 Tracking: https://github.com/Kahen/TV-Next/issues/3
 
-- [ ] JSON source/config dictionary including live, sites, flags, headers and nested references
+- [ ] Initial FongMi site/live/group/channel metadata normalization + Web browsing + optional direct HTTP(S) live playback; headers/flags, nested references and full config compatibility still pending
 - [ ] Home categories, filtered catalog, site search, detail, episodes and line selection
-- [ ] Playlist M3U/TXT/JSON import, XMLTV EPG parsing, replay/time shift metadata
+- [ ] FongMi nested live JSON metadata preview implemented; full M3U/TXT/JSON imports, XMLTV EPG, replay and timeshift remain
 - [ ] Subtitle tracks (WebVTT/SRT) and per-title audio preferences
 - [ ] Cross-provider search with cancellation, timeout, pagination and deduplication
 - [ ] Structured golden fixtures from sources with permission to test
