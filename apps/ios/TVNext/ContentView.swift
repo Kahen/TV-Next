@@ -19,6 +19,10 @@ struct ContentView: View {
     @State private var selection: LibraryView = .channels
     @State private var useRemoteParser = false
     @State private var isShowingFilePicker = false
+    @State private var isShowingMediaPicker = false
+    @State private var isShowingCaptionPicker = false
+    @State private var isLoadingMedia = false
+    @State private var captionFileName: String?
     @State private var isShowingExporter = false
     @State private var exportDocument: M3UExportDocument?
     @State private var playbackSpeed: Float = 1.0
@@ -54,6 +58,7 @@ struct ContentView: View {
                     header
                     playerSection
                     quickPlaySection
+                    localMediaSection
                     importSection
                     librarySection
 
