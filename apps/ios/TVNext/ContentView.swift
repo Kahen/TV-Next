@@ -1,146 +1,311 @@
 import SwiftUI
 import AVKit
+import UniformTypeIdentifiers
+
+private enum LibraryView: String, CaseIterable, Identifiable {
+    case channels = "全部频道"
+    case favorites = "收藏"
+    case recent = "最近播放"
+
+    var id: String { rawValue }
+}
 
 struct ContentView: View {
-    @State private var serverURL = "http://localhost:8080"
+    @StateObject private var library = MediaLibraryStore()
+    @AppStorage("tv-next-api-url") private var serverURL = "http://localhost:8080"
     @State private var manualURL = ""
     @State private var playlistText = ""
-    @State private var channels: [TVChannel] = []
-    @State private var player: AVPlayer?
-    @State private var currentTitle = "未选择媒体"
+    @State private var search = ""
+    @State private var selection: LibraryView = .channels
+    @State private var useRemoteParser = false
+    @State private var isShowingFilePicker = false
+    @State private var isShowingClearConfirmation = false
     @State private var errorMessage: String?
     @State private var isLoading = false
+
+    private var visibleChannels: [TVChannel] {
+        let entries: [TVChannel]
+        switch selection {
+        case .channels:
+            entries = library.channels
+        case .favorites:
+            let available = library.channels + library.recent
+            entries = library.favorites.compactMap { favorite in
+                available.first(where: { $0.url == favorite })
+            }
+        case .recent:
+            entries = library.recent
+        }
+        let term = search.trimmingCharacters(in: .whitespacesAndNewlines)
+        return entries.filter { channel in
+            term.isEmpty ||
+            channel.name.localizedCaseInsensitiveContains(term) ||
+            channel.group.localizedCaseInsensitiveContains(term)
+        }
+    }
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
+                VStack(alignment: .leading, spacing: 20) {
                     header
+                    playerSection
+                    quickPlaySection
+                    importSection
+                    librarySection
 
-                    GroupBox {
-                        VStack(alignment: .leading, spacing: 12) {
-                            VideoPlayer(player: player)
-                                .frame(minHeight: 215)
-                                .aspectRatio(16.0 / 9.0, contentMode: .fit)
-                                .background(Color.black)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                            Text(currentTitle).font(.headline)
-                                .accessibilityLabel("正在播放：" + currentTitle)
-                        }
-                    }
-
-                    GroupBox("快速播放") {
-                        HStack {
-                            TextField("https://example.org/movie.m3u8", text: $manualURL)
-                                .keyboardType(.URL)
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled()
-                                .textFieldStyle(.roundedBorder)
-                            Button("播放") { play(urlString: manualURL, title: "自定义 URL") }
-                                .buttonStyle(.borderedProminent)
-                        }
-                        .padding(.top, 8)
-                    }
-
-                    GroupBox("M3U 播放列表") {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("需要 TV-Next API。模拟器默认使用 localhost；真机请填写你自己服务器的地址。")
-                                .font(.footnote).foregroundStyle(.secondary)
-                            TextField("API 地址", text: $serverURL)
-                                .keyboardType(.URL)
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled()
-                                .textFieldStyle(.roundedBorder)
-                            TextEditor(text: $playlistText)
-                                .font(.system(.footnote, design: .monospaced))
-                                .frame(height: 125)
-                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(.gray.opacity(0.3)))
-                            Button(isLoading ? "解析中…" : "解析播放列表") {
-                                Task { await importPlaylist() }
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .disabled(isLoading)
-                        }
-                        .padding(.top, 8)
-                    }
-
-                    if let errorMessage {
-                        Text(errorMessage).foregroundStyle(.red).font(.footnote)
-                    }
-
-                    if !channels.isEmpty {
-                        GroupBox("频道 · " + String(channels.count)) {
-                            LazyVStack(alignment: .leading, spacing: 6) {
-                                ForEach(channels) { channel in
-                                    Button {
-                                        play(urlString: channel.url, title: channel.name)
-                                    } label: {
-                                        HStack {
-                                            Image(systemName: "play.circle")
-                                            VStack(alignment: .leading) {
-                                                Text(channel.name).font(.subheadline).fontWeight(.semibold)
-                                                Text(channel.group).font(.caption).foregroundStyle(.secondary)
-                                            }
-                                            Spacer()
-                                            Image(systemName: "chevron.right").font(.caption)
-                                        }.padding(.vertical, 7)
-                                    }
-                                    .buttonStyle(.plain)
-                                    Divider()
-                                }
-                            }
-                            .padding(.top, 8)
-                        }
-                    }
-                    Text("不内置任何媒体来源。播放格式及网络权限取决于 iOS 和内容提供方。")
-                        .font(.caption).foregroundStyle(.secondary)
+                    Text("本地播放列表、收藏及进度只保存在这台设备；暂不支持跨设备同步。不内置媒体源。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: 850)
                 .frame(maxWidth: .infinity)
                 .padding()
             }
             .navigationTitle("TV-Next")
-            .onDisappear { player?.pause() }
+            .fileImporter(
+                isPresented: $isShowingFilePicker,
+                allowedContentTypes: [.plainText, UTType(filenameExtension: "m3u") ?? .plainText],
+                allowsMultipleSelection: false
+            ) { result in
+                importFile(result)
+            }
+            .confirmationDialog(
+                "确定删除本机保存的播放列表、收藏和观看进度吗？",
+                isPresented: $isShowingClearConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("删除本地媒体库", role: .destructive) {
+                    library.clear()
+                    playlistText = ""
+                    search = ""
+                }
+            }
+            .onDisappear {
+                library.savePosition()
+                library.player.pause()
+            }
         }
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text("PERSONAL MEDIA")
-                .font(.caption2).tracking(3).foregroundStyle(.secondary)
-            Text("你的媒体，随处播放。")
-                .font(.largeTitle).fontWeight(.bold)
-            Text("iPhone / iPad 原生播放器 · 初期预览")
+            Text("PERSONAL MEDIA").font(.caption2).tracking(3).foregroundStyle(.secondary)
+            Text("你的媒体，随处播放。").font(.largeTitle).fontWeight(.bold)
+            Text("iPhone / iPad · M3U · 收藏 · 点播断点续播")
                 .font(.subheadline).foregroundStyle(.secondary)
         }
     }
 
-    private func play(urlString: String, title: String) {
-        guard let url = URL(string: urlString.trimmingCharacters(in: .whitespacesAndNewlines)),
-              let scheme = url.scheme?.lowercased(),
-              (scheme == "http" || scheme == "https"),
-              url.user == nil, url.password == nil else {
-            errorMessage = "请输入有效的 HTTP(S) 媒体地址。"
-            return
+    private var playerSection: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 12) {
+                VideoPlayer(player: library.player)
+                    .frame(minHeight: 215)
+                    .aspectRatio(16.0 / 9.0, contentMode: .fit)
+                    .background(Color.black)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                HStack {
+                    Text(library.current?.name ?? "尚未选择媒体")
+                        .font(.headline)
+                        .accessibilityLabel("正在播放：" + (library.current?.name ?? "尚未选择媒体"))
+                    Spacer()
+                    if let channel = library.current {
+                        Button {
+                            library.toggleFavorite(channel)
+                        } label: {
+                            Label(
+                                library.isFavorite(channel) ? "取消收藏" : "收藏",
+                                systemImage: library.isFavorite(channel) ? "star.fill" : "star"
+                            )
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
+                if let channel = library.current,
+                   let seconds = library.positions[channel.url] {
+                    Text("已记住播放进度：" + String(Int(seconds / 60)) + " 分钟")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
         }
-        errorMessage = nil
-        player?.pause()
-        player = AVPlayer(url: url)
-        currentTitle = title
-        player?.play()
+    }
+
+    private var quickPlaySection: some View {
+        GroupBox("快速播放") {
+            HStack {
+                TextField("https://example.org/movie.m3u8", text: $manualURL)
+                    .keyboardType(.URL)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .textFieldStyle(.roundedBorder)
+                Button("播放") {
+                    let url = manualURL.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard MediaAddress.valid(url) else {
+                        errorMessage = "请输入有效的 HTTP(S) 媒体地址。"
+                        return
+                    }
+                    errorMessage = nil
+                    library.play(TVChannel(name: "自定义播放地址", url: url,
+                                           group: "Manual", logo: nil, tvgId: nil))
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            .padding(.top, 8)
+        }
+    }
+
+    private var importSection: some View {
+        GroupBox("导入 M3U 播放列表") {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("默认直接在 iPhone/iPad 本机解析，不必部署服务器。导入会替换当前频道，但保留收藏和观看记录。")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                Button {
+                    isShowingFilePicker = true
+                } label: {
+                    Label("选择本地 M3U / TXT 文件", systemImage: "doc.text")
+                }
+                .buttonStyle(.bordered)
+
+                TextEditor(text: $playlistText)
+                    .font(.system(.footnote, design: .monospaced))
+                    .frame(height: 120)
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(.gray.opacity(0.3)))
+
+                Toggle("使用自建 API 解析", isOn: $useRemoteParser)
+                    .font(.subheadline)
+
+                if useRemoteParser {
+                    TextField("API 地址", text: $serverURL)
+                        .keyboardType(.URL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .textFieldStyle(.roundedBorder)
+                    Text("真机使用可访问的 HTTPS 服务。")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+
+                Button(isLoading ? "解析中…" : "导入频道") {
+                    Task { await importPlaylist() }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(isLoading)
+                if let errorMessage {
+                    Text(errorMessage)
+                        .foregroundStyle(.red)
+                        .font(.footnote)
+                        .accessibilityAddTraits(.updatesFrequently)
+                }
+            }
+            .padding(.top, 8)
+        }
+    }
+
+    private var librarySection: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 14) {
+                Picker("媒体库", selection: $selection) {
+                    ForEach(LibraryView.allCases) { tab in
+                        Text(tab.rawValue).tag(tab)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                TextField("按频道名称或分组搜索", text: $search)
+                    .textFieldStyle(.roundedBorder)
+
+                if visibleChannels.isEmpty {
+                    Text(selection == .favorites ? "还没有收藏的频道。" :
+                            selection == .recent ? "还没有播放记录。" : "请先导入播放列表。")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                }
+
+                LazyVStack(alignment: .leading, spacing: 10) {
+                    ForEach(visibleChannels) { channel in
+                        HStack(spacing: 12) {
+                            Button {
+                                errorMessage = nil
+                                library.play(channel)
+                            } label: {
+                                HStack {
+                                    Image(systemName: "play.circle")
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(channel.name)
+                                            .font(.subheadline)
+                                            .fontWeight(.semibold)
+                                        Text(channel.group)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+
+                            Button {
+                                library.toggleFavorite(channel)
+                            } label: {
+                                Image(systemName: library.isFavorite(channel) ? "star.fill" : "star")
+                                    .foregroundStyle(.yellow)
+                            }
+                            .accessibilityLabel(library.isFavorite(channel) ?
+                                "取消收藏 " + channel.name : "收藏 " + channel.name)
+                            .buttonStyle(.plain)
+                        }
+                        Divider()
+                    }
+                }
+
+                if !library.channels.isEmpty || !library.recent.isEmpty {
+                    Button("清空本地媒体库", role: .destructive) {
+                        isShowingClearConfirmation = true
+                    }
+                    .font(.footnote)
+                }
+            }
+            .padding(.top, 8)
+        }
     }
 
     @MainActor
     private func importPlaylist() async {
-        guard let server = URL(string: serverURL) else {
-            errorMessage = "服务器地址无效"
-            return
-        }
         isLoading = true
         defer { isLoading = false }
         do {
-            channels = try await TVNextAPI(server: server).parsePlaylist(playlistText)
-            errorMessage = channels.isEmpty ? "没有可解析的 HTTP(S) 频道。" : nil
+            let channels: [TVChannel]
+            if useRemoteParser {
+                guard let server = URL(string: serverURL) else {
+                    throw APIError.invalidServer
+                }
+                channels = try await TVNextAPI(server: server).parsePlaylist(playlistText)
+            } else {
+                channels = try M3UParser.parse(playlistText)
+            }
+            library.importChannels(channels)
+            selection = .channels
+            search = ""
+            errorMessage = channels.isEmpty ? "没有找到 HTTP(S) 频道。" : nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func importFile(_ result: Result<[URL], Error>) {
+        do {
+            let urls = try result.get()
+            guard let url = urls.first else { return }
+            let canAccess = url.startAccessingSecurityScopedResource()
+            defer { if canAccess { url.stopAccessingSecurityScopedResource() } }
+            let attrs = try FileManager.default.attributesOfItem(atPath: url.path)
+            if let size = attrs[.size] as? NSNumber, size.intValue > 1_048_576 {
+                throw PlaylistError.tooLarge
+            }
+            playlistText = try String(contentsOf: url, encoding: .utf8)
+            errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
         }

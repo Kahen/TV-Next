@@ -1,6 +1,6 @@
 import Foundation
 
-struct TVChannel: Decodable, Identifiable {
+struct TVChannel: Codable, Identifiable {
     let name: String
     let url: String
     let group: String

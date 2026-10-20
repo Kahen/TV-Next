@@ -43,12 +43,12 @@ Use only content you are authorized to access. The example.org URL is an illustr
 
 ## Native iOS
 
-See apps/ios/README.md. On simulator, the backend address may be localhost. On physical devices use a reachable HTTPS endpoint and honor Apple App Transport Security. No third-party JAR or Python plugins execute on device.
+Local M3U/TXT import works without an API. See apps/ios/README.md. On simulator, the backend address may be localhost. On physical devices use a reachable HTTPS endpoint and honor Apple App Transport Security. No third-party JAR or Python plugins execute on device.
 
 ## Testing
 
     cd services/api && gradle test
-    cd apps/web && npm install && npm run build
+    cd apps/web && npm install && npm run test && npm run build
 
 CI checks both, while macOS iOS simulator build can be triggered separately under GitHub Actions. Build success must be verified before tagging a release.
 
