@@ -1,0 +1,143 @@
+import AVFoundation
+import Combine
+import Foundation
+
+private struct SavedLibrary: Codable {
+    let version: Int
+    let channels: [TVChannel]
+    let favorites: [String]
+    let recent: [TVChannel]
+    let positions: [String: Double]
+}
+
+@MainActor
+final class MediaLibraryStore: ObservableObject {
+    @Published private(set) var channels: [TVChannel] = []
+    @Published private(set) var favorites: [String] = []
+    @Published private(set) var recent: [TVChannel] = []
+    @Published private(set) var positions: [String: Double] = [:]
+    @Published private(set) var current: TVChannel?
+
+    let player = AVPlayer()
+    private let storageKey = "tv-next-library-v1"
+    private var timeObserver: Any?
+    private var statusObservation: NSKeyValueObservation?
+
+    init() {
+        restore()
+        timeObserver = player.addPeriodicTimeObserver(
+            forInterval: CMTime(seconds: 8, preferredTimescale: 600),
+            queue: .main
+        ) { [weak self] _ in
+            self?.savePosition()
+        }
+    }
+
+    deinit {
+        if let timeObserver {
+            player.removeTimeObserver(timeObserver)
+        }
+        statusObservation?.invalidate()
+    }
+
+    func importChannels(_ input: [TVChannel]) {
+        let unique = Dictionary(grouping: input.filter { MediaAddress.valid($0.url) }, by: \.url)
+        // Preserve the original order, rather than dictionary iteration order.
+        var seen = Set<String>()
+        channels = Array(input.filter {
+            MediaAddress.valid($0.url) && seen.insert($0.url).inserted
+        }.prefix(1500))
+        _ = unique
+        persist()
+    }
+
+    func toggleFavorite(_ channel: TVChannel) {
+        if favorites.contains(channel.url) {
+            favorites.removeAll { $0 == channel.url }
+        } else {
+            favorites.insert(channel.url, at: 0)
+            favorites = Array(favorites.prefix(300))
+        }
+        persist()
+    }
+
+    func isFavorite(_ channel: TVChannel) -> Bool {
+        favorites.contains(channel.url)
+    }
+
+    func play(_ channel: TVChannel) {
+        guard MediaAddress.valid(channel.url), let url = URL(string: channel.url) else { return }
+        savePosition()
+        player.pause()
+        statusObservation?.invalidate()
+        current = channel
+        recent.removeAll { $0.url == channel.url }
+        recent.insert(channel, at: 0)
+        recent = Array(recent.prefix(100))
+
+        let item = AVPlayerItem(url: url)
+        let resume = positions[channel.url]
+        if let resume, resume >= 5 {
+            statusObservation = item.observe(\.status, options: [.new]) { [weak self] observed, _ in
+                guard observed.status == .readyToPlay else { return }
+                Task { @MainActor [weak self] in
+                    self?.player.seek(to: CMTime(seconds: resume, preferredTimescale: 600))
+                }
+            }
+        }
+        player.replaceCurrentItem(with: item)
+        player.play()
+        persist()
+    }
+
+    func savePosition() {
+        guard let channel = current,
+              let duration = player.currentItem?.duration.seconds, duration.isFinite, duration >= 60 else { return }
+        let seconds = player.currentTime().seconds
+        guard seconds.isFinite, seconds >= 0 else { return }
+        if seconds < 5 || duration - seconds < 15 {
+            positions.removeValue(forKey: channel.url)
+        } else {
+            positions[channel.url] = Double(Int(seconds))
+        }
+        if positions.count > 250 {
+            for key in positions.keys.sorted().prefix(positions.count - 250) {
+                positions.removeValue(forKey: key)
+            }
+        }
+        persist()
+    }
+
+    func clear() {
+        player.pause()
+        player.replaceCurrentItem(with: nil)
+        statusObservation?.invalidate()
+        current = nil
+        channels = []
+        favorites = []
+        recent = []
+        positions = [:]
+        UserDefaults.standard.removeObject(forKey: storageKey)
+    }
+
+    private func restore() {
+        guard let data = UserDefaults.standard.data(forKey: storageKey),
+              data.count <= 2_000_000,
+              let saved = try? JSONDecoder().decode(SavedLibrary.self, from: data),
+              saved.version == 1 else { return }
+        channels = Array(saved.channels.filter { MediaAddress.valid($0.url) }.prefix(1500))
+        favorites = Array(Set(saved.favorites.filter(MediaAddress.valid)).sorted().prefix(300))
+        recent = Array(saved.recent.filter { MediaAddress.valid($0.url) }.prefix(100))
+        positions = saved.positions.filter { MediaAddress.valid($0.key) && $0.value.isFinite &&
+            $0.value >= 0 && $0.value < 604800 }
+    }
+
+    private func persist() {
+        let value = SavedLibrary(
+            version: 1, channels: channels, favorites: favorites,
+            recent: recent, positions: positions
+        )
+        guard let data = try? JSONEncoder().encode(value), data.count <= 2_000_000 else { return }
+        UserDefaults.standard.set(data, forKey: storageKey)
+    }
+}
