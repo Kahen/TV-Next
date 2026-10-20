@@ -96,7 +96,7 @@ class XmltvGuideTest {
             EpgGuideRequest(xml, channel, hours=73),
             EpgGuideRequest(xml, channel, at="2026-10-20"),
             EpgGuideRequest("<root><channel id=\"c\"/></root>", channel),
-            EpgGuideRequest(xml, listOf(EpgChannelRequest(name="bad\\nname"))),
+            EpgGuideRequest(xml, listOf(EpgChannelRequest(name="bad\nname"))),
             EpgGuideRequest(xml, listOf(EpgChannelRequest(name="A".repeat(201)))),
             EpgGuideRequest(xml, emptyList()),
             EpgGuideRequest("x".repeat(2_097_153), channel)
