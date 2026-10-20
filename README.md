@@ -4,13 +4,13 @@ Independent cross-platform media app for Web, iPhone, and iPad, with a self-host
 
 > **Early development.** This project does not include any streaming sources. Supply media and sources only when you are authorized to access them. It currently **inspects** FongMi-style JSON but does **not** execute Spider plugins, proxy media, or recreate all Android TV features.
 
-## Current implementation (P1 under development)
+## Current implementation (P1 preview, P2 catalog prototype)
 
 | Component | Technology | Current scope |
 | --- | --- | --- |
 | Web / PWA candidate | React 19 + TypeScript + Vite + hls.js | HTTP(S) M3U import/export, saved playlists, favorites, recents, VOD resume, local media, UTF-8 SRT/WebVTT, PWA shell, FongMi JSON catalog preview (sites and IPTV live groups, no Spider execution) |
 | iPhone / iPad | SwiftUI + AVPlayer | Manually enter media, import local M3U **offline** (optional API), saved playlist and M3U export, local Files media and timed UTF-8 subtitles, native playback speed, favorites, recents and VOD progress |
-| API | Kotlin + Spring Boot | GET health, POST M3U parse, POST FongMi JSON inspect |
+| API | Kotlin + Spring Boot | GET health, POST M3U parse, POST FongMi JSON inspect/catalog preview |
 | Infrastructure | Docker Compose, nginx, GitHub Actions | Local self-hosting, Web/API CI, optional manual iOS simulator build |
 
 Local library data is saved **independently per browser or iOS device**, not synced across devices or backed up to the API. See [local media library design and limits](docs/LOCAL_LIBRARY.md).
@@ -52,7 +52,7 @@ Open http://localhost:5173. For iOS see [apps/ios/README.md](apps/ios/README.md)
 
 Import content is capped at 1 MiB in the application; large requests should additionally be bounded at the deployment proxy. The browser may still fail to play sources due to CORS, codecs or inaccessible media.
 
-New P2 preview endpoint: `POST /api/v1/catalog/preview` accepts JSON `{\"content\":\"{\\\"sites\\\":[],\\\"lives\\\":[]}\"}`. Preview only: no external media sources are automatically fetched; only pure direct HTTP(S) IPTV channels can be manually selected for playback. See [catalog limitations](docs/FONGMI_CATALOG.md).
+New P2 preview endpoint: `POST /api/v1/catalog/preview` accepts JSON `{"content":"{\\"sites\\":[],\\"lives\\":[]}"}`. Preview only: no external media sources are automatically fetched; only pure direct HTTP(S) IPTV channels can be manually selected for playback. See [catalog limitations](docs/FONGMI_CATALOG.md).
 
 ## Implementation plan
 
