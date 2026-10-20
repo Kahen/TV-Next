@@ -8,6 +8,7 @@ import {
 } from "./library";
 import type { LibraryState } from "./library";
 import { isPlayableLocalMedia, toWebVtt } from "./subtitles";
+import { exportM3u } from "./playlistExport";
 
 type Tab = "playlist" | "config";
 type Collection = "all" | "favorites" | "recent";
@@ -255,6 +256,22 @@ export default function App() {
     }
   }
 
+  function downloadPlaylist() {
+    if (!channels.length) {
+      setError("尚无频道可导出。");
+      return;
+    }
+    const url = URL.createObjectURL(new Blob([exportM3u(channels)], { type: "audio/x-mpegurl;charset=utf-8" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "tv-next-playlist.m3u";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    // Export includes source URLs and query-string tokens. Treat the file as private.
+  }
+
   function resetLibrary() {
     if (!window.confirm("清空当前浏览器内的频道、收藏、最近播放及进度？此操作不可撤销。")) return;
     setSelected(null);
@@ -324,7 +341,7 @@ export default function App() {
           <section className="panel">
             <p className="hint">导入 .m3u 或文本；新列表会替换当前频道，但不会清空收藏和历史。最多保存 1500 个频道。</p>
             <textarea aria-label="M3U 内容" spellCheck={false} rows={5} value={rawText} onChange={(event) => setRawText(event.target.value)} placeholder={'#EXTM3U\n#EXTINF:-1 group-title="Demo",My Channel\nhttps://example.org/stream.m3u8'}/>
-            <div className="panel-actions"><label className="file-picker">选择 M3U 文件<input type="file" accept=".m3u,.txt,text/plain" onChange={(event) => { void importFile(event.target.files?.[0]); event.target.value = ""; }}/></label><button disabled={busy} className="primary" onClick={() => void importPlaylist()}>{busy ? "解析中…" : "导入频道"}</button></div>
+            <div className="panel-actions"><label className="file-picker">选择 M3U 文件<input type="file" accept=".m3u,.txt,text/plain" onChange={(event) => { void importFile(event.target.files?.[0]); event.target.value = ""; }}/></label><div className="inline-controls"><button className="secondary" disabled={!channels.length} onClick={downloadPlaylist}>导出 M3U</button><button disabled={busy} className="primary" onClick={() => void importPlaylist()}>{busy ? "解析中…" : "导入频道"}</button></div></div>
           </section>
           <section className="results">
             <div className="section-heading"><h2>{collection === "favorites" ? "我的收藏" : collection === "recent" ? "最近播放" : "频道列表"}</h2><span>{collection === "all" ? groups.length + " GROUPS" : displayed.length + " ITEMS"}</span></div>
