@@ -7,7 +7,7 @@ Legend: Implemented = coded and checked at compile/test level (NOT necessarily d
 | MP4 progressive HTTP playback | Implemented UI (browser/device test pending) | Implemented AVPlayer UI (device test pending) | Not required |
 | HLS playback | Implemented via native/MSE/HLS.js (source/CORS dependent) | Implemented AVPlayer (device test pending) | Not required |
 | M3U metadata import | Implemented via API | Implemented offline or via API | Implemented bounded subset |
-| FongMi JSON inspection | Implemented (static only) | Planned P2 | Implemented (static only) |
+| FongMi JSON inspection | Implemented (static only) | Offline file/paste metadata preview (iOS simulator CI; real device pending) | Implemented (static only) |
 | Local file play | Implemented via ephemeral blob URL (codec-dependent) | Files -> staged private cache -> AVPlayer (device test pending, 2 GiB max) | N/A |
 | UTF-8 SRT/WebVTT subtitles | Implemented via text track (limited subset) | CaptionParser + SwiftUI time overlay (device test pending) | N/A |
 | Fullscreen / Picture-in-Picture | Browser API best effort | Native verification pending | N/A |
@@ -32,3 +32,5 @@ Legend: Implemented = coded and checked at compile/test level (NOT necessarily d
 | Transcoding | N/A | N/A | Planned P4 (sidecar) |
 
 "Implemented" does not imply 100% source compatibility. Device-specific playback has not yet been validated on a physical iPhone/iPad. See docs/LOCAL_LIBRARY.md.
+
+Native JSON preview covers only site metadata and live declaration counts; it does not reproduce Web's live-channel catalog or provider execution. See docs/IOS_CONFIG_PREVIEW.md.
