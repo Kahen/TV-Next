@@ -50,10 +50,10 @@ class PlaylistParser {
             when {
                 line.startsWith("#EXTINF", ignoreCase = true) -> {
                     val attrs = attribute.findAll(line).associate { it.groupValues[1].lowercase() to it.groupValues[2] }
-                    name = line.substringAfter(",", "").trim().ifBlank { attrs["tvg-name"]?.ifBlank { null } ?: "Unnamed" }
-                    group = attrs["group-title"]?.ifBlank { null } ?: "Uncategorized"
-                    logo = attrs["tvg-logo"]?.ifBlank { null }
-                    tvgId = attrs["tvg-id"]?.ifBlank { null }
+                    name = line.substringAfter(",", "").trim().ifBlank { attrs["tvg-name"]?.takeIf { it.isNotBlank() } ?: "Unnamed" }
+                    group = attrs["group-title"]?.takeIf { it.isNotBlank() } ?: "Uncategorized"
+                    logo = attrs["tvg-logo"]?.takeIf { it.isNotBlank() }
+                    tvgId = attrs["tvg-id"]?.takeIf { it.isNotBlank() }
                 }
                 line.startsWith("#EXTGRP:", ignoreCase = true) -> {
                     group = line.substringAfter(":").trim().ifBlank { "Uncategorized" }
@@ -82,7 +82,7 @@ class ConfigInspector(private val mapper: ObjectMapper) {
     fun inspect(content: String): ConfigPreviewResponse {
         validateSize(content)
         val root = try { mapper.readTree(content) } catch (_: Exception) { fail("Invalid JSON configuration") }
-        if (!root.isObject) fail("Expected JSON object")
+        if (root == null || !root.isObject) fail("Expected JSON object")
         val sites = root.path("sites")
         val lives = root.path("lives")
         if (!sites.isMissingNode && !sites.isArray) fail("sites must be an array")
