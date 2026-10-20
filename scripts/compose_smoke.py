@@ -28,8 +28,10 @@ def wait_for_health():
     for _ in range(90):
         try:
             health = json.loads(request(API + "/api/v1/health"))
-            if health.get("status") == "ok":
-                print("API ready", flush=True)
+            index = request(WEB + "/")
+            reverse_health = json.loads(request(WEB + "/api/v1/health"))
+            if health.get("status") == "ok" and b"TV-Next" in index and reverse_health.get("status") == "ok":
+                print("API, Web and nginx proxy ready", flush=True)
                 return
         except (OSError, ValueError, AssertionError) as error:
             last = error
