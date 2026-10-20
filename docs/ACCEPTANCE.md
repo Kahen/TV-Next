@@ -31,6 +31,6 @@ If Apple devices, authorized external fixtures, signing credentials or independe
 ## Evidence ledger — 2026-10-20
 
 - CI currently passes for initial Web/API and unsigned iOS simulator scaffolds; this does NOT validate actual media playback.
-- P2 static FongMi catalog and local Result adapter are experimental; they do not execute Spider or connect remote content providers.
+- P2 static FongMi catalog and local Result adapter are experimental; they do not execute Spider or connect remote content providers. An offline XMLTV current/upcoming guide slice has unit and controller fixture tests; live XMLTV ingestion, real provider integration and iOS EPG parity are unverified.
 - P3–P6 completion is explicitly **NOT VERIFIED**.
 - Link every accepted milestone to exact PR/commit/Actions run, test fixture version, real test devices and results.

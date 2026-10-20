@@ -56,6 +56,8 @@ New P2 preview endpoint: `POST /api/v1/catalog/preview` accepts JSON `{"content"
 
 The experimental static MediaProvider supports home, category, local search, detail, and player lookup on manually supplied FongMi Result JSON. It neither fetches network resources nor executes Spider. See [MediaProvider docs](docs/MEDIA_PROVIDER.md).
 
+An initial **offline XMLTV programme guide** is also available: import a local XMLTV file or paste its contents into the Web **直播节目表** tab after importing an M3U playlist. The API matches `tvg-id` first, then uniquely matched channel names; it never fetches an XMLTV URL or media stream automatically. See [XMLTV EPG support](docs/XMLTV_EPG.md).
+
 ## Implementation plan
 
 - [Roadmap from foundation through advanced features](docs/ROADMAP.md)
@@ -65,6 +67,7 @@ The experimental static MediaProvider supports home, category, local search, det
 - [Player features and limitations](docs/PLAYER_FEATURES.md)
 - [FongMi site/live metadata support](docs/FONGMI_CATALOG.md)
 - [MediaProvider contract](docs/MEDIA_PROVIDER.md)
+- [XMLTV EPG matching and limits](docs/XMLTV_EPG.md)
 - [P0–P6 acceptance evidence](docs/ACCEPTANCE.md)
 - [OpenAPI contract](packages/contracts/openapi.yaml)
 

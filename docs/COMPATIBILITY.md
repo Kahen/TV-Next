@@ -23,7 +23,7 @@ Legend: Implemented = coded and checked at compile/test level (NOT necessarily d
 | JS Spider | N/A | N/A | Planned P3 |
 | Python Spider | N/A | N/A | Planned P3 |
 | Android-context/JNI Spider | Unsupported until separately assessed | Unsupported until separately assessed | Unverified |
-| EPG/XMLTV | Planned P2 | Planned P2 | Planned P2 |
+| EPG/XMLTV | Manual local XMLTV import + current/upcoming programme matching (not auto refresh) | Planned | XXE-safe SAX parser, timezones, bounded matching |
 | ASS subtitles/danmaku | Planned P4 | Planned P4 | Depends on assets |
 | AirPlay | N/A | Planned P4 | N/A |
 | DLNA | Browser restricted | Planned P4 | Planned P4 |
