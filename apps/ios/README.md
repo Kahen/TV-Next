@@ -5,7 +5,11 @@ Universal SwiftUI native client with AVKit/AVPlayer. Development requires macOS 
 1. Install XcodeGen (for example, brew install xcodegen).
 2. In apps/ios run xcodegen generate.
 3. Open TVNext.xcodeproj in Xcode and run the TVNext scheme on an iOS 17+ simulator.
-4. For M3U import, run the API locally and use the default http://localhost:8080 in the simulator. On a physical device, use an appropriately secured reachable API endpoint, preferably HTTPS.
-5. For playback, provide an authorized MP4 or HLS URL; AVPlayer codec and ATS limitations apply.
+4. Paste M3U text or choose a local M3U/TXT file through Files; **offline parsing is the default and requires no API**.
+5. Optionally enable the API parser and set the API URL (localhost works in the simulator; real devices need a reachable trusted server, preferably HTTPS).
+6. Play authorized MP4 or HLS links, save favorites and recents, resume finite-length videos. AVPlayer codec and ATS limitations apply.
+7. Channel lists (up to 1500), favorites, recents and VOD progress are stored locally in UserDefaults. They are **not synced** to Web or other Apple devices.
+
+Smoke parser tests run in iOS CI on macOS using Swift; iOS simulator builds are unsigned. Test on physical devices before distribution.
 
 This is an early native UI, not an iOS execution environment for Android JAR, AAR or Spider plugins. The full features are scoped in docs/ROADMAP.md.

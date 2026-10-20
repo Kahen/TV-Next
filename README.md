@@ -4,14 +4,16 @@ Independent cross-platform media app for Web, iPhone, and iPad, with a self-host
 
 > **Early development.** This project does not include any streaming sources. Supply media and sources only when you are authorized to access them. It currently **inspects** FongMi-style JSON but does **not** execute Spider plugins, proxy media, or recreate all Android TV features.
 
-## First implementation
+## Current implementation (P1 under development)
 
 | Component | Technology | Current scope |
 | --- | --- | --- |
-| Web / PWA candidate | React 19 + TypeScript + Vite + hls.js | HTTP(S) M3U import, channel filtering, MP4/HLS playback, JSON config inspection |
-| iPhone / iPad | SwiftUI + AVPlayer | Manually enter a media URL, parse M3U using the API and choose a channel |
+| Web / PWA candidate | React 19 + TypeScript + Vite + hls.js | HTTP(S) M3U import, saved playlists, favorites, recent plays, VOD resume, MP4/HLS playback, JSON config inspection |
+| iPhone / iPad | SwiftUI + AVPlayer | Manually enter media, import local M3U **offline** (optional API), saved playlist, favorites, recent plays and VOD progress |
 | API | Kotlin + Spring Boot | GET health, POST M3U parse, POST FongMi JSON inspect |
 | Infrastructure | Docker Compose, nginx, GitHub Actions | Local self-hosting, Web/API CI, optional manual iOS simulator build |
+
+Local library data is saved **independently per browser or iOS device**, not synced across devices or backed up to the API. See [local media library design and limits](docs/LOCAL_LIBRARY.md).
 
 ## Run with Docker
 
@@ -60,4 +62,4 @@ Import content is capped at 1 MiB in the application; large requests should addi
 
 FongMi/TV is a separate Android project. Any future reuse of GPL-covered code must retain notices and meet license obligations. This repository is **not** an iOS build of the Android APK.
 
-Status: initial implementation in progress; CI build results and Apple device behavior must be verified before release.
+Status: P1 development in progress. CI compilation and unit tests do not replace on-device/network playback verification. No production release yet.
