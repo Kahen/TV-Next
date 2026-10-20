@@ -23,6 +23,7 @@ struct ParserSmoke {
         precondition(channels[1].name == "Movie")
         precondition(!MediaAddress.valid("javascript:alert(1)"))
         precondition(!MediaAddress.valid("https://user:secret@example.org/path"))
+        precondition(!MediaAddress.valid("https://example.org/\n#EXTINF:-1"))
 
         do {
             _ = try M3UParser.parse(" ")
