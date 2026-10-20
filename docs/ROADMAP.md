@@ -6,7 +6,7 @@ Updated: 2026-10-20. This is a delivery plan, not a claim that every feature exi
 
 Build independent Web/PWA and native iPhone/iPad clients with a shared, optional self-hosted service. Allow users to import authorized external media and FongMi-style configuration files. Do not bundle unauthorized streaming sources, DRM circumvention, site-specific bypasses, or remotely executable untrusted plugins in iOS.
 
-Definition of done for each phase: implementation + automated checks + usage documentation + regression testing + explicit compatibility matrix. Each milestone may ship independently. Prioritize functioning vertical slices over superficial feature checklists.
+Definition of done for each phase: implementation + automated checks + usage documentation + regression testing + explicit compatibility matrix. See docs/ACCEPTANCE.md for release gates. Each milestone may ship independently. Prioritize functioning vertical slices over superficial feature checklists.
 
 ## P0 — Foundations (initial implementation)
 
@@ -38,7 +38,7 @@ Acceptance pending: equivalent catalog handling and history semantics across Web
 Tracking: https://github.com/Kahen/TV-Next/issues/3
 
 - [ ] Initial FongMi site/live/group/channel metadata normalization + Web browsing + optional direct HTTP(S) live playback; headers/flags, nested references and full config compatibility still pending
-- [ ] Home categories, filtered catalog, site search, detail, episodes and line selection
+- [ ] Static FongMi Result adapter provides local home/category/search/detail/line/episode APIs; genuine network providers, cross-site queries and compatibility tests with permitted real fixtures remain
 - [ ] FongMi nested live JSON metadata preview implemented; full M3U/TXT/JSON imports, XMLTV EPG, replay and timeshift remain
 - [ ] Subtitle tracks (WebVTT/SRT) and per-title audio preferences
 - [ ] Cross-provider search with cancellation, timeout, pagination and deduplication
