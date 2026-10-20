@@ -205,6 +205,7 @@ struct ContentView: View {
                         return
                     }
                     errorMessage = nil
+                    captionFileName = nil
                     library.play(TVChannel(name: "自定义播放地址", url: url,
                                            group: "Manual", logo: nil, tvgId: nil))
                 }
@@ -331,6 +332,7 @@ struct ContentView: View {
                         HStack(spacing: 12) {
                             Button {
                                 errorMessage = nil
+                                captionFileName = nil
                                 library.play(channel)
                             } label: {
                                 HStack {
@@ -392,6 +394,42 @@ struct ContentView: View {
             selection = .channels
             search = ""
             errorMessage = channels.isEmpty ? "没有找到 HTTP(S) 频道。" : nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func importLocalMedia(_ result: Result<[URL], Error>) async {
+        isLoadingMedia = true
+        defer { isLoadingMedia = false }
+        do {
+            guard let source = try result.get().first else { return }
+            let localFile = try await LocalMediaStager.stage(source)
+            library.playLocalFile(localFile, name: source.lastPathComponent)
+            captionFileName = nil
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func importCaption(_ result: Result<[URL], Error>) {
+        do {
+            guard let url = try result.get().first else { return }
+            guard ["srt", "vtt"].contains(url.pathExtension.lowercased()) else {
+                throw CaptionError.invalidTimeline
+            }
+            let permission = url.startAccessingSecurityScopedResource()
+            defer { if permission { url.stopAccessingSecurityScopedResource() } }
+            let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+            if let size = attributes[.size] as? NSNumber, size.int64Value > 1_048_576 {
+                throw CaptionError.tooLarge
+            }
+            let cues = try CaptionParser.parse(Data(contentsOf: url))
+            library.setCaptions(cues)
+            captionFileName = url.lastPathComponent
+            errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
         }
