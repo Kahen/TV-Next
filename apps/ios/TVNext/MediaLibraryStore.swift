@@ -41,13 +41,11 @@ final class MediaLibraryStore: ObservableObject {
     }
 
     func importChannels(_ input: [TVChannel]) {
-        let unique = Dictionary(grouping: input.filter { MediaAddress.valid($0.url) }, by: \.url)
-        // Preserve the original order, rather than dictionary iteration order.
+        // Preserve the original order and remove duplicate stream URLs.
         var seen = Set<String>()
         channels = Array(input.filter {
             MediaAddress.valid($0.url) && seen.insert($0.url).inserted
         }.prefix(1500))
-        _ = unique
         persist()
     }
 
@@ -126,7 +124,10 @@ final class MediaLibraryStore: ObservableObject {
               let saved = try? JSONDecoder().decode(SavedLibrary.self, from: data),
               saved.version == 1 else { return }
         channels = Array(saved.channels.filter { MediaAddress.valid($0.url) }.prefix(1500))
-        favorites = Array(Set(saved.favorites.filter(MediaAddress.valid)).sorted().prefix(300))
+        var seenFavorites = Set<String>()
+        favorites = Array(saved.favorites.filter {
+            MediaAddress.valid($0) && seenFavorites.insert($0).inserted
+        }.prefix(300))
         recent = Array(saved.recent.filter { MediaAddress.valid($0.url) }.prefix(100))
         positions = saved.positions.filter { MediaAddress.valid($0.key) && $0.value.isFinite &&
             $0.value >= 0 && $0.value < 604800 }
