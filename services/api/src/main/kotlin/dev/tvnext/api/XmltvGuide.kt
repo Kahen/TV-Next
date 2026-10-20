@@ -75,10 +75,9 @@ class XmltvGuideService {
             fail("Provide 1..300 channels for EPG matching")
         }
         if (request.hours !in 1..72) fail("hours must be between 1 and 72")
-        val now = request.at?.let {
-            runCatching { OffsetDateTime.parse(it).toInstant() }.getOrElse {
-                runCatching { Instant.parse(it) }.getOrElse { fail("at must be an ISO-8601 timestamp with timezone") }
-            }
+        val now = request.at?.let { timestamp ->
+            runCatching { OffsetDateTime.parse(timestamp).toInstant() }
+                .getOrElse { fail("at must be an ISO-8601 timestamp with timezone") }
         } ?: Instant.now()
         val until = now.plusSeconds(request.hours.toLong() * 3600)
         val feed = parseXml(request.xml)
