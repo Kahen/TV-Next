@@ -39,6 +39,6 @@ GitHub Actions `.github/workflows/spider-sandbox.yml` executes the same tests on
 
 ## Verified and unverified
 
-The suite checks five method responses and JS/Python parity; malformed action and oversized input handling; blocked outbound TCP; rejected attempts to write under `/worker`; live cgroup CPU/memory/PID quotas, non-root UID and host-environment-secret isolation; wall-clock timeout and leaked container cleanup; and checks explicit Docker hardening flags.
+The suite checks five method responses and JS/Python parity; malformed action and oversized input handling; blocked outbound TCP; rejected attempts to write under `/worker`; live cgroup CPU/memory/PID quotas, non-root UID and host-environment-secret isolation; worker crash containment, oversized-output rejection, wall-clock timeout and leaked container cleanup; and checks explicit Docker hardening flags.
 
 **Not implemented / not proven:** Java/JAR Android-free adapter, real Spider callback APIs, arbitrary JS/Python code execution, plugin dependency installation, QuickJS compatibility, network allowlist logic, end-user authorization, full control-plane/API integration, Linux container escape resistance, independent security audit, native iOS Spider parity, or real provider fixture corpus. Any future transition to dynamic plugins requires a new reviewed architecture and complete P3 acceptance tests.
