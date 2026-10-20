@@ -1,0 +1,27 @@
+# macOS and editors
+.DS_Store
+.idea/
+.vscode/
+*.iml
+# Node
+node_modules/
+dist/
+coverage/
+.env
+.env.local
+# Gradle / Kotlin
+.gradle/
+build/
+out/
+# Apple
+DerivedData/
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+# Signing
+*.p12
+*.mobileprovision
+*.jks
+local.properties
+# local secrets
+secrets/

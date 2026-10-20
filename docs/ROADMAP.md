@@ -1,0 +1,102 @@
+# TV-Next roadmap
+
+Updated: 2026-10-20. This is a delivery plan, not a claim that every feature exists.
+
+## Goals and non-goals
+
+Build independent Web/PWA and native iPhone/iPad clients with a shared, optional self-hosted service. Allow users to import authorized external media and FongMi-style configuration files. Do not bundle unauthorized streaming sources, DRM circumvention, site-specific bypasses, or remotely executable untrusted plugins in iOS.
+
+Definition of done for each phase: implementation + automated checks + usage documentation + regression testing + explicit compatibility matrix. Each milestone may ship independently. Prioritize functioning vertical slices over superficial feature checklists.
+
+## P0 — Foundations (initial implementation)
+
+- [x] Initialize repository, development branch, docs and architecture
+- [ ] Web app shell, TypeScript types and basic player
+- [ ] Kotlin API with health and bounded M3U parsing/config inspection
+- [ ] SwiftUI iPhone/iPad app scaffold with native AVPlayer
+- [ ] Web/API checks and Docker development workflow
+- [ ] CI runs green on GitHub; native app builds on macOS
+
+Acceptance: Web dev server works; API tests pass; import an explicitly provided M3U containing an HTTP(S) media URL; MP4/HLS playback works for compatible CORS-enabled sources; iOS can open user-supplied native-compatible media URL. No Spider execution yet.
+
+## P1 — Media browsing and playback MVP
+
+- [ ] Persist playlists, recent items, favorites and playback progress
+- [ ] Support JSON config import (file/paste) and site display; reject oversized data
+- [ ] Playlist groups, search, favorites, keyboard/remote accessibility
+- [ ] Support HLS/MP4 with explicit errors; local file play where platform permits
+- [ ] Resume progress, playback speed, full-screen and PiP where supported
+- [ ] Device-responsive UX and a11y; iPad Split View and orientation tests
+- [ ] API contract snapshots and end-to-end smoke tests
+
+Acceptance: identical catalog data and history across Web/iOS under a known test fixture. Browser restrictions (CORS/codecs) documented.
+
+## P2 — FongMi core semantics
+
+- [ ] JSON source/config dictionary including live, sites, flags, headers and nested references
+- [ ] Home categories, filtered catalog, site search, detail, episodes and line selection
+- [ ] Playlist M3U/TXT/JSON import, XMLTV EPG parsing, replay/time shift metadata
+- [ ] Subtitle tracks (WebVTT/SRT) and per-title audio preferences
+- [ ] Cross-provider search with cancellation, timeout, pagination and deduplication
+- [ ] Structured golden fixtures from sources with permission to test
+
+Acceptance: comparison snapshots for home/category/detail/search/player APIs against a documented compatibility subset.
+
+## P3 — Spider execution compatibility (highest risk)
+
+- [ ] Define versioned Spider provider contract (home/category/detail/search/player)
+- [ ] Java/JAR JVM-side adapter for pure Java providers; Android SDK-dependent providers report unsupported
+- [ ] Node.js / isolated JS runtime adapter; QuickJS behavior gap assessment
+- [ ] Python subprocess/container adapter, locked dependencies and runtime quotas
+- [ ] For every runtime: sandbox, CPU/memory/time budget, max output, egress allowlist, secrets boundary
+- [ ] Error taxonomy: unsupported Android APIs, transport failures, parsing, timeouts
+- [ ] Compatibility test corpus: a dozen permitted representative plugins and failure cases
+
+Acceptance: declared supported plugin fixtures pass on server; never execute remote code in the browser or iOS app. JVM bytecode alone is NOT a promise of Android JAR support.
+
+## P4 — Advanced media features
+
+- [ ] ASS/SSA styling, multiple subtitles, subtitle offset, Danmaku overlay
+- [ ] Audio track/channel selection, decoder capability diagnostics, speed, skip intro/outro
+- [ ] Native iOS: AVPlayer/PiP/background media, AirPlay; evaluate alternate player SDK licensing
+- [ ] Optional transcoding sidecar for media not supported natively; measure CPU/bandwidth
+- [ ] DLNA discovery/control in a LAN-capable service; iOS local-network permissions
+- [ ] Media ingestion from authorized WebDAV/SMB/DLNA/local files
+- [ ] Offline cache/download lifecycle for downloadable content where authorized
+
+Acceptance: device matrix includes iPhone/iPad models, Safari/Chrome/Firefox, and H.264/H.265/AAC compatibility tests.
+
+## P5 — Multi-device + home server
+
+- [ ] Account, device pairing, API keys, per-user ACL and opt-in sync
+- [ ] WebSocket remote control with device authorization and expiring pairing codes
+- [ ] NAS Docker Compose deployment; PostgreSQL migrations; optional Redis caching
+- [ ] Metrics, structured logs, tracing and failure dashboards
+- [ ] Safe SSRF-resistant proxy limited to approved destinations; byte/rate/connection caps
+- [ ] Secure remote access/TLS guidance; backups/import-export, conflict resolution
+- [ ] EPG scheduling, provider health reporting and search caching
+
+Acceptance: least-privilege self-hosted service, audited access to user data and consistent playback history on devices.
+
+## P6 — Hardening, distribution and long-tail compatibility
+
+- [ ] Additional provider formats/legacy quirks; explicit compatibility status per module
+- [ ] Security reviews: sandbox escapes, SSRF, XSS, content injection, auth, supply chain
+- [ ] Automated dependency audits, license attribution and source disclosure
+- [ ] Native signing, TestFlight, App Store policy review; no promise of approval
+- [ ] Versioned REST contract, migration plan and release channels
+- [ ] macOS/tvOS investigation when stable (not required for initial release)
+- [ ] Performance budgets: catalog latency, startup time, memory and playback quality
+
+Acceptance: repeatable signed releases, published limitations, reproducible infrastructure and documented rollback.
+
+## Architectural gates (must be verified before implementation expands)
+
+1. P0/P1: Verify that user-provided JSON and M3U can be parsed with no remote execution.
+2. P2/P3: Test a small lawful Spider corpus for real Java/JS/Python portability. Abort or narrow scope if plugins rely on Android Context, WebView, JNI or device APIs.
+3. P4: Validate codecs and app lifecycle behavior on physical Apple devices, not simulator alone.
+4. P5: Conduct a security assessment before exposing any server or media proxy outside a private LAN.
+
+## Release conventions
+
+Initial work lives in feature branches and PRs. Only tested milestones get version tags. Separate Web, Server, and iOS build pipelines; no empty GitHub Release, unverified APK/IPA or pre-signed app claims. Android upstream continues separately in Kahen/TV.
