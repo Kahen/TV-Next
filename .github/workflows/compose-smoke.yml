@@ -10,12 +10,14 @@ on:
       - compose.yaml
       - apps/web/**
       - services/api/**
+      - scripts/compose_smoke.py
       - .github/workflows/compose-smoke.yml
   pull_request:
     paths:
       - compose.yaml
       - apps/web/**
       - services/api/**
+      - scripts/compose_smoke.py
       - .github/workflows/compose-smoke.yml
   workflow_dispatch:
 
