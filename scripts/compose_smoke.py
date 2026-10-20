@@ -53,6 +53,19 @@ def main():
     playlist = json.loads(request(WEB + "/api/v1/playlists/parse", m3u))
     assert playlist["channels"][0]["tvgId"] == "fixture", playlist
 
+    config = json.dumps({
+        "spider": "https://example.org/never-loaded.jar",
+        "sites": [{"key": "fixture-site", "name": "Fixture", "type": 3}],
+        "lives": [{"name": "Fixture IPTV", "groups": [{"name": "News", "channel": [
+            {"name": "Fixture TV", "urls": ["https://example.org/fixture.m3u8"]}
+        ]}]}]
+    })
+    inspection = json.loads(request(WEB + "/api/v1/configs/inspect", {"content": config}))
+    assert inspection["spiderDeclared"] is True and inspection["sites"][0]["key"] == "fixture-site", inspection
+    catalog = json.loads(request(WEB + "/api/v1/catalog/preview", {"content": config}))
+    assert catalog["sites"][0]["key"] == "fixture-site", catalog
+    assert catalog["directPlayableChannelCount"] == 1, catalog
+
     xmltv = (
         '<tv><channel id="fixture"><display-name>Fixture TV</display-name></channel>'
         '<programme channel="fixture" start="20261020120000 +0000" '
@@ -94,7 +107,7 @@ def main():
     movie = json.loads(request(WEB + "/api/v1/media/home", {"content": media_result}))
     assert movie["items"][0]["id"] == "fixture-movie", movie
 
-    print("SUCCESS: nginx Web + API proxy + M3U + XMLTV + MediaProvider", flush=True)
+    print("SUCCESS: real nginx Web + API proxy + M3U + config + catalog + XMLTV + MediaProvider", flush=True)
 
 
 if __name__ == "__main__":
