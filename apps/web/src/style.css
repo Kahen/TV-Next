@@ -17,3 +17,9 @@
 .favorite-toggle:hover{background:#1d314d}
 .nav small{margin-left:auto;color:#91a9d4}
 @media(max-width:600px){.library-toolbar{flex-wrap:wrap}.library-toolbar .filter-input{flex-basis:100%}.favorite-toggle{padding:0 12px}}
+
+/* Playback utilities, local media picker and subtitles */
+.local-file-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:13px}
+.local-file-actions .hint{margin:0;flex:1;min-width:185px}
+.player-actions .file-picker{display:inline-flex;align-items:center;font-size:12px;background:#17253b}
+@media(max-width:600px){.local-file-actions{align-items:flex-start;flex-direction:column}.player-actions{gap:9px}.player-actions .file-picker{padding:11px}}
