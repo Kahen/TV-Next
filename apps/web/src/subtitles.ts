@@ -4,8 +4,8 @@
 export function toWebVtt(text: string, filename: string): string {
   if (!text.trim() || text.length > 1_048_576) throw new Error("字幕必须为 1 B 至 1 MiB 的 UTF-8 文本。");
   const normalized = text.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
-  if (filename.toLowerCase().endsWith(".vtt") || /^\s*WEBVTT(?:[ \t]|$)/.test(normalized)) {
-    if (!/^\s*WEBVTT(?:[ \t]|$)/.test(normalized)) throw new Error("VTT 文件缺少 WEBVTT 标识。");
+  if (filename.toLowerCase().endsWith(".vtt") || /^\s*WEBVTT(?:[ \t\r\n]|$)/.test(normalized)) {
+    if (!/^\s*WEBVTT(?:[ \t\r\n]|$)/.test(normalized)) throw new Error("VTT 文件缺少 WEBVTT 标识。");
     return normalized;
   }
   if (!filename.toLowerCase().endsWith(".srt")) throw new Error("仅支持 UTF-8 SRT / WebVTT 字幕文件。");
