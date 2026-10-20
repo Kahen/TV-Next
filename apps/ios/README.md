@@ -13,3 +13,11 @@ Universal SwiftUI native client with AVKit/AVPlayer. Development requires macOS 
 Smoke parser tests run in iOS CI on macOS using Swift; iOS simulator builds are unsigned. Test on physical devices before distribution.
 
 This is an early native UI, not an iOS execution environment for Android JAR, AAR or Spider plugins. The full features are scoped in docs/ROADMAP.md.
+
+## P1 playback controls and export
+
+- The player includes a 0.75x to 2x native rate selector, subject to AVPlayer stream capabilities.
+- After importing a playlist, use the "导出当前播放列表 (.m3u)" button to choose a destination in Files.
+- M3U exports include full stream URLs, including sensitive query tokens. Do not publish exported files.
+- Media is still played by native AVPlayer, not by executing Android or Spider plugins.
+- Real-device playback, Files export, subtitle and background playback verification are still pending.
