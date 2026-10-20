@@ -41,6 +41,6 @@ struct M3UExportDocument: FileDocument {
     }
 
     func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
-        FileWrapper(regularFileContents: Data(content.utf8))
+        FileWrapper(regularFileWithContents: Data(content.utf8))
     }
 }
