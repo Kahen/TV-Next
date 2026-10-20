@@ -14,3 +14,6 @@
 .epg-upcoming div{display:flex;gap:15px;font-size:12px;border-top:1px solid #253750;padding-top:9px}
 .epg-upcoming time{color:#91afd0;min-width:110px}
 .epg-upcoming span{color:#d8e4fa}
+
+.epg-current p{margin:8px 0}
+.epg-description{font-size:12px;line-height:1.5;color:#a9bdd6;white-space:pre-wrap;overflow-wrap:anywhere}
