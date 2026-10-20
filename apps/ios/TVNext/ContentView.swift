@@ -214,6 +214,41 @@ struct ContentView: View {
         }
     }
 
+    private var localMediaSection: some View {
+        GroupBox("本机文件与字幕") {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("本机视频仅保存在临时缓存，不上传、不加入历史。支持 MP4/MOV/M4V 及常见音频，最大 2 GiB；编解码能力取决于设备。")
+                    .font(.footnote).foregroundStyle(.secondary)
+                Button {
+                    isShowingMediaPicker = true
+                } label: {
+                    Label(isLoadingMedia ? "正在导入…" : "打开本地视频 / 音频", systemImage: "film")
+                }
+                .buttonStyle(.bordered)
+                .disabled(isLoadingMedia)
+                HStack {
+                    Button {
+                        isShowingCaptionPicker = true
+                    } label: {
+                        Label("导入 SRT / WebVTT 字幕", systemImage: "captions.bubble")
+                    }
+                    .buttonStyle(.bordered)
+                    if captionFileName != nil {
+                        Button("移除字幕") {
+                            library.clearCaptions()
+                            captionFileName = nil
+                        }.buttonStyle(.bordered)
+                    }
+                }
+                if let captionFileName {
+                    Text("字幕：" + captionFileName)
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .padding(.top, 8)
+        }
+    }
+
     private var importSection: some View {
         GroupBox("导入 M3U 播放列表") {
             VStack(alignment: .leading, spacing: 12) {
