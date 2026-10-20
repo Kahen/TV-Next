@@ -124,8 +124,11 @@ export default function EpgGuide({ channels, onPlay }: {
               </button>}
             </div>
             {item.current
-              ? <p className="epg-current"><strong>正在播：</strong>{item.current.title}
-                  <small> {formatProgrammeRange(item.current.start, item.current.stop)}</small></p>
+              ? <div className="epg-current">
+                  <p><strong>正在播：</strong>{item.current.title}
+                    <small> {formatProgrammeRange(item.current.start, item.current.stop)}</small></p>
+                  {item.current.description && <p className="epg-description">{item.current.description}</p>}
+                </div>
               : <p className="hint">当前时间没有节目数据。</p>}
             {item.upcoming.length > 0 && <div className="epg-upcoming">
               {item.upcoming.map((next, i) => <div key={i}>
