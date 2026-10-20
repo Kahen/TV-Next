@@ -46,13 +46,18 @@ function asChannel(input: unknown): Channel | null {
   const value = input as Partial<Channel>;
   if (!validMediaUrl(value.url ?? "") || typeof value.name !== "string" ||
       typeof value.group !== "string") return null;
-  return {
+  const channel: Channel = {
     url: value.url!,
     name: value.name.slice(0, 200),
-    group: value.group.slice(0, 100),
-    logo: typeof value.logo === "string" && validMediaUrl(value.logo) ? value.logo : null,
-    tvgId: typeof value.tvgId === "string" ? value.tvgId.slice(0, 150) : null
+    group: value.group.slice(0, 100)
   };
+  if (value.logo === null || (typeof value.logo === "string" && validMediaUrl(value.logo))) {
+    channel.logo = value.logo;
+  }
+  if (value.tvgId === null || typeof value.tvgId === "string") {
+    channel.tvgId = typeof value.tvgId === "string" ? value.tvgId.slice(0, 150) : null;
+  }
+  return channel;
 }
 
 function normalizedChannels(value: unknown, limit: number): Channel[] {
@@ -185,5 +190,6 @@ export function setPosition(state: LibraryState, url: string, current: number, d
   } else {
     positions[url] = Math.floor(current);
   }
+  if (positions[url] === state.positions[url]) return state;
   return { ...state, positions: Object.fromEntries(Object.entries(positions).slice(-MAX_POSITIONS)) };
 }
