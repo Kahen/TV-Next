@@ -78,6 +78,20 @@ struct ContentView: View {
             ) { result in
                 importFile(result)
             }
+            .fileImporter(
+                isPresented: $isShowingMediaPicker,
+                allowedContentTypes: [.item],
+                allowsMultipleSelection: false
+            ) { result in
+                Task { await importLocalMedia(result) }
+            }
+            .fileImporter(
+                isPresented: $isShowingCaptionPicker,
+                allowedContentTypes: [.item],
+                allowsMultipleSelection: false
+            ) { result in
+                importCaption(result)
+            }
             .fileExporter(
                 isPresented: $isShowingExporter,
                 document: exportDocument,
@@ -122,12 +136,26 @@ struct ContentView: View {
                     .frame(minHeight: 215)
                     .aspectRatio(16.0 / 9.0, contentMode: .fit)
                     .background(Color.black)
+                    .overlay(alignment: .bottom) {
+                        if !library.captionText.isEmpty {
+                            Text(library.captionText)
+                                .font(.headline)
+                                .multilineTextAlignment(.center)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 6))
+                                .padding(.horizontal, 12)
+                                .padding(.bottom, 32)
+                                .allowsHitTesting(false)
+                        }
+                    }
                     .clipShape(RoundedRectangle(cornerRadius: 12))
 
                 HStack {
-                    Text(library.current?.name ?? "尚未选择媒体")
+                    Text(library.localFileName ?? library.current?.name ?? "尚未选择媒体")
                         .font(.headline)
-                        .accessibilityLabel("正在播放：" + (library.current?.name ?? "尚未选择媒体"))
+                        .accessibilityLabel("正在播放：" + (library.localFileName ?? library.current?.name ?? "尚未选择媒体"))
                     Spacer()
                     if let channel = library.current {
                         Button {
