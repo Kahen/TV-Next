@@ -23,3 +23,10 @@
 .local-file-actions .hint{margin:0;flex:1;min-width:185px}
 .player-actions .file-picker{display:inline-flex;align-items:center;font-size:12px;background:#17253b}
 @media(max-width:600px){.local-file-actions{align-items:flex-start;flex-direction:column}.player-actions{gap:9px}.player-actions .file-picker{padding:11px}}
+
+.catalog-source{border-top:1px solid #273a58;padding-top:12px;margin-top:15px}
+.catalog-source h3{font-size:15px;color:#c7d8fb;margin:9px 0}
+.catalog-group-title{font-size:12px;color:#8fa6ca;font-weight:650;margin:13px 0 8px}
+.catalog-channel{cursor:default;pointer-events:none}
+.catalog-unavailable{white-space:nowrap;padding:14px;color:#8392ad;font-size:11px}
+.catalog-source .channel-line .secondary{margin:7px 4px}
