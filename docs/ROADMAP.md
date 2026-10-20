@@ -11,15 +11,17 @@ Definition of done for each phase: implementation + automated checks + usage doc
 ## P0 — Foundations (initial implementation)
 
 - [x] Initialize repository, development branch, docs and architecture
-- [ ] Web app shell, TypeScript types and basic player
-- [ ] Kotlin API with health and bounded M3U parsing/config inspection
-- [ ] SwiftUI iPhone/iPad app scaffold with native AVPlayer
-- [ ] Web/API checks and Docker development workflow
-- [ ] CI runs green on GitHub; native app builds on macOS
+- [x] Web app shell, TypeScript types and basic player
+- [x] Kotlin API with health and bounded M3U parsing/config inspection
+- [x] SwiftUI iPhone/iPad app scaffold with native AVPlayer
+- [x] Web/API CI green; Docker Compose defined (live deployment smoke test pending)
+- [x] CI green on GitHub; unsigned native iOS simulator build passed on macOS (device test pending)
 
 Acceptance: Web dev server works; API tests pass; import an explicitly provided M3U containing an HTTP(S) media URL; MP4/HLS playback works for compatible CORS-enabled sources; iOS can open user-supplied native-compatible media URL. No Spider execution yet.
 
 ## P1 — Media browsing and playback MVP
+
+Tracking: https://github.com/Kahen/TV-Next/issues/2
 
 - [ ] Persist playlists, recent items, favorites and playback progress
 - [ ] Support JSON config import (file/paste) and site display; reject oversized data
@@ -33,6 +35,8 @@ Acceptance: identical catalog data and history across Web/iOS under a known test
 
 ## P2 — FongMi core semantics
 
+Tracking: https://github.com/Kahen/TV-Next/issues/3
+
 - [ ] JSON source/config dictionary including live, sites, flags, headers and nested references
 - [ ] Home categories, filtered catalog, site search, detail, episodes and line selection
 - [ ] Playlist M3U/TXT/JSON import, XMLTV EPG parsing, replay/time shift metadata
@@ -43,6 +47,8 @@ Acceptance: identical catalog data and history across Web/iOS under a known test
 Acceptance: comparison snapshots for home/category/detail/search/player APIs against a documented compatibility subset.
 
 ## P3 — Spider execution compatibility (highest risk)
+
+Tracking: https://github.com/Kahen/TV-Next/issues/4
 
 - [ ] Define versioned Spider provider contract (home/category/detail/search/player)
 - [ ] Java/JAR JVM-side adapter for pure Java providers; Android SDK-dependent providers report unsupported
@@ -56,6 +62,8 @@ Acceptance: declared supported plugin fixtures pass on server; never execute rem
 
 ## P4 — Advanced media features
 
+Tracking: https://github.com/Kahen/TV-Next/issues/5
+
 - [ ] ASS/SSA styling, multiple subtitles, subtitle offset, Danmaku overlay
 - [ ] Audio track/channel selection, decoder capability diagnostics, speed, skip intro/outro
 - [ ] Native iOS: AVPlayer/PiP/background media, AirPlay; evaluate alternate player SDK licensing
@@ -68,6 +76,8 @@ Acceptance: device matrix includes iPhone/iPad models, Safari/Chrome/Firefox, an
 
 ## P5 — Multi-device + home server
 
+Tracking: https://github.com/Kahen/TV-Next/issues/6
+
 - [ ] Account, device pairing, API keys, per-user ACL and opt-in sync
 - [ ] WebSocket remote control with device authorization and expiring pairing codes
 - [ ] NAS Docker Compose deployment; PostgreSQL migrations; optional Redis caching
@@ -79,6 +89,8 @@ Acceptance: device matrix includes iPhone/iPad models, Safari/Chrome/Firefox, an
 Acceptance: least-privilege self-hosted service, audited access to user data and consistent playback history on devices.
 
 ## P6 — Hardening, distribution and long-tail compatibility
+
+Tracking: https://github.com/Kahen/TV-Next/issues/7
 
 - [ ] Additional provider formats/legacy quirks; explicit compatibility status per module
 - [ ] Security reviews: sandbox escapes, SSRF, XSS, content injection, auth, supply chain
