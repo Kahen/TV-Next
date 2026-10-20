@@ -31,7 +31,7 @@ export function emptyLibrary(): LibraryState {
 }
 
 export function validMediaUrl(value: string): boolean {
-  if (typeof value !== "string" || value.length > 2048 || value !== value.trim()) return false;
+  if (typeof value !== "string" || value.length > 2048 || value !== value.trim() || /[\x00-\x1f\x7f]/.test(value)) return false;
   try {
     const parsed = new URL(value);
     return (parsed.protocol === "http:" || parsed.protocol === "https:")

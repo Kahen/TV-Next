@@ -19,6 +19,14 @@ final class MediaLibraryStore: ObservableObject {
     @Published private(set) var current: TVChannel?
 
     let player = AVPlayer()
+    @Published private(set) var playbackSpeed: Float = 1.0
+
+    func setPlaybackSpeed(_ speed: Float) {
+        let accepted = min(2, max(0.75, speed))
+        playbackSpeed = accepted
+        player.defaultRate = accepted
+        if player.timeControlStatus == .playing { player.rate = accepted }
+    }
     private let storageKey = "tv-next-library-v1"
     private var timeObserver: Any?
     private var statusObservation: NSKeyValueObservation?
@@ -84,7 +92,7 @@ final class MediaLibraryStore: ObservableObject {
             }
         }
         player.replaceCurrentItem(with: item)
-        player.play()
+        player.playImmediately(atRate: playbackSpeed)
         persist()
     }
 

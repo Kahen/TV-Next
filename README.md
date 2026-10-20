@@ -8,8 +8,8 @@ Independent cross-platform media app for Web, iPhone, and iPad, with a self-host
 
 | Component | Technology | Current scope |
 | --- | --- | --- |
-| Web / PWA candidate | React 19 + TypeScript + Vite + hls.js | HTTP(S) M3U import, saved playlists, favorites, recent plays, VOD resume, MP4/HLS playback, JSON config inspection |
-| iPhone / iPad | SwiftUI + AVPlayer | Manually enter media, import local M3U **offline** (optional API), saved playlist, favorites, recent plays and VOD progress |
+| Web / PWA candidate | React 19 + TypeScript + Vite + hls.js | HTTP(S) M3U import/export, saved playlists, favorites, recents, VOD resume, local media, UTF-8 SRT/WebVTT, PWA shell, JSON config inspection |
+| iPhone / iPad | SwiftUI + AVPlayer | Manually enter media, import local M3U **offline** (optional API), saved playlist and M3U export, native playback speed, favorites, recents and VOD progress |
 | API | Kotlin + Spring Boot | GET health, POST M3U parse, POST FongMi JSON inspect |
 | Infrastructure | Docker Compose, nginx, GitHub Actions | Local self-hosting, Web/API CI, optional manual iOS simulator build |
 
@@ -58,6 +58,7 @@ Import content is capped at 1 MiB in the application; large requests should addi
 - [System architecture and security boundaries](docs/ARCHITECTURE.md)
 - [Compatibility matrix](docs/COMPATIBILITY.md)
 - [Development and smoke test guide](docs/DEVELOPMENT.md)
+- [Player features and limitations](docs/PLAYER_FEATURES.md)
 - [OpenAPI contract](packages/contracts/openapi.yaml)
 
 FongMi/TV is a separate Android project. Any future reuse of GPL-covered code must retain notices and meet license obligations. This repository is **not** an iOS build of the Android APK.

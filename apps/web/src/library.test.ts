@@ -21,7 +21,7 @@ function memoryStorage(): StorageLike {
 describe("local media library", () => {
   it("checks protocols and blocks credentials", () => {
     expect(validMediaUrl(a.url)).toBe(true);
-    for (const url of ["javascript:alert(1)", "file:///private", "https://name:secret@host/path", "example.org", " https://example.org"]) {
+    for (const url of ["javascript:alert(1)", "file:///private", "https://name:secret@host/path", "example.org", " https://example.org", "https://example.org/\n#EXTINF:-1", "https://example.org/\r\nunsafe"]) {
       expect(validMediaUrl(url)).toBe(false);
     }
   });

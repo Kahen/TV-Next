@@ -26,10 +26,10 @@ Tracking: https://github.com/Kahen/TV-Next/issues/2
 - [x] Implement device-local persistence for playlists, recents, favorites and finite-VOD playback progress (Web unit-tested, iOS simulator build-tested; cross-device sync not yet available)
 - [ ] Support JSON config import (file/paste) and site display; reject oversized data
 - [x] Initial playlist group display, search, and favorites on Web/iOS (full accessibility audit pending)
-- [ ] Support HLS/MP4 with explicit errors; local file play where platform permits
-- [ ] Playback speed (Web initial support); seek/resume implemented for finite VOD; fullscreen/PiP and native speed controls still pending
-- [ ] Device-responsive UX and a11y; iPad Split View and orientation tests
-- [ ] API contract snapshots and end-to-end smoke tests
+- [ ] Web local compatible file playback added; iOS local file support and codec/device testing remain
+- [ ] Web and iOS speed selectors, Web fullscreen/PiP best-effort controls added; native and device verification still pending
+- [ ] PWA manifest + shell-only service worker added; real install tests, iPad Split View, orientation and accessibility remain
+- [ ] Web UTF-8 SRT/WebVTT and M3U export, iOS FileDocument M3U export added; E2E and API contract tests remain
 
 Acceptance pending: equivalent catalog handling and history semantics across Web/iOS using golden fixtures, browser restrictions (CORS/codecs) documented, actual device tests. Device-local storage is NOT synchronization.
 

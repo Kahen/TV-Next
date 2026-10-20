@@ -17,6 +17,7 @@ enum PlaylistError: LocalizedError {
 enum MediaAddress {
     static func valid(_ value: String) -> Bool {
         guard value.count <= 2048, value == value.trimmingCharacters(in: .whitespacesAndNewlines),
+              !value.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }),
               let components = URLComponents(string: value),
               let scheme = components.scheme?.lowercased(),
               scheme == "http" || scheme == "https",
