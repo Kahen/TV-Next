@@ -65,6 +65,26 @@ def main():
     assert guide["matchedChannels"] == 1, guide
     assert guide["channels"][0]["current"]["title"] == "Fixture News", guide
 
+    # Prove nginx accepts a realistic XMLTV body larger than its old default 1 MiB cap.
+    large_xmltv = xmltv.replace("<tv>", "<tv><!--" + ("a" * 1_100_000) + "-->", 1)
+    large_guide = json.loads(request(WEB + "/api/v1/epg/guide", {
+        "xml": large_xmltv,
+        "channels": [{"id": "fixture", "name": "Fixture TV"}],
+        "at": "2026-10-20T12:30:00Z",
+        "hours": 12
+    }))
+    assert large_guide["matchedChannels"] == 1, "Reverse proxy rejected bounded XMLTV document"
+
+    # Prove hostile external entities never get expanded by the API.
+    try:
+        request(WEB + "/api/v1/epg/guide", {
+            "xml": '<!DOCTYPE tv [<!ENTITY xxe SYSTEM "file:///etc/passwd">]><tv/>',
+            "channels": [{"name": "Fixture TV"}]
+        })
+        raise AssertionError("DOCTYPE unexpectedly accepted")
+    except urllib.error.HTTPError as error:
+        assert error.code == 400, error.code
+
     media_result = json.dumps({
         "class": [{"type_id": "movie", "type_name": "Movie"}],
         "list": [{"vod_id": "fixture-movie", "vod_name": "Sample Movie"}]
