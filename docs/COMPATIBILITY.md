@@ -20,8 +20,8 @@ Legend: Implemented = coded and checked at compile/test level (NOT necessarily d
 | FongMi IPTV groups/channels | Preview + manual click for plain HTTP(S) URLs | Planned | Implemented bounded metadata parser |
 | FongMi sites/home/search/details | Planned P2 | Planned P2 | Planned P2 |
 | Java/JAR Spider | N/A | N/A | Planned P3 (pure JVM subset) |
-| JS Spider | N/A | N/A | Planned P3 |
-| Python Spider | N/A | N/A | Planned P3 |
+| JS Spider | N/A | N/A | Bundled JS fixture worker in Docker (no dynamic Spider compatibility) |
+| Python Spider | N/A | N/A | Bundled Python fixture worker in Docker (no dynamic Spider compatibility) |
 | Android-context/JNI Spider | Unsupported until separately assessed | Unsupported until separately assessed | Unverified |
 | EPG/XMLTV | Manual local XMLTV import + current/upcoming programme matching (not auto refresh) | Planned | XXE-safe SAX parser, timezones, bounded matching |
 | ASS subtitles/danmaku | Planned P4 | Planned P4 | Depends on assets |

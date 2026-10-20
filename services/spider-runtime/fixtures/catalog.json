@@ -1,0 +1,36 @@
+{
+  "categories": [
+    {
+      "id": "movie",
+      "name": "Movies"
+    },
+    {
+      "id": "series",
+      "name": "Series"
+    }
+  ],
+  "items": [
+    {
+      "id": "movie-1",
+      "name": "Authorized Fixture Movie",
+      "categoryId": "movie",
+      "episodes": [
+        {
+          "name": "Episode 1",
+          "url": "https://example.org/fixture.mp4"
+        }
+      ]
+    },
+    {
+      "id": "series-1",
+      "name": "Example Series",
+      "categoryId": "series",
+      "episodes": [
+        {
+          "name": "Pilot",
+          "url": "https://example.org/pilot.m3u8"
+        }
+      ]
+    }
+  ]
+}
