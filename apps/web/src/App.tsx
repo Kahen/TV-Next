@@ -224,6 +224,7 @@ export default function App() {
     setBusy(true);
     setError("");
     setCatalog(null);
+    setPreview(null);
     try {
       const [inspection, normalized] = await Promise.all([
         postText<ConfigPreview>("/api/v1/configs/inspect", configText),
