@@ -11,7 +11,7 @@ class WorkerError(Exception):
 
 
 METHODS = {"home", "category", "search", "detail", "player"}
-TEST_METHODS = {"__probe_network", "__probe_write", "__sleep"}
+TEST_METHODS = {"__probe_network", "__probe_write", "__probe_policy", "__sleep"}
 with open("/worker/catalog.json", encoding="utf-8") as fixture_file:
     FIXTURE = json.load(fixture_file)
 
@@ -43,6 +43,21 @@ def execute(req):
                 return {"readonly": False}
             except OSError:
                 return {"readonly": True}
+        if method == "__probe_policy":
+            def read(name):
+                try:
+                    with open("/sys/fs/cgroup/" + name, encoding="ascii") as f:
+                        return f.read().strip()
+                except OSError:
+                    return None
+
+            return {
+                "uid": os.getuid(),
+                "hostSecretVisible": "TVNEXT_HOST_SECRET_TEST" in os.environ,
+                "memoryMax": read("memory.max"),
+                "pidsMax": read("pids.max"),
+                "cpuMax": read("cpu.max")
+            }
         if method == "__sleep":
             time.sleep(30)
             return {"slept": True}

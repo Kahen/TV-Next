@@ -1,6 +1,7 @@
 """Docker-backed isolation, parity, error and timeout tests (unittest only)."""
 from __future__ import annotations
 
+import os
 import subprocess
 import unittest
 from runner import (
@@ -67,6 +68,27 @@ class FixtureIsolationTests(unittest.TestCase):
                 self.assertTrue(output["readonly"])
                 net = run_fixture(runtime, "__probe_network", diagnostic=True).data
                 self.assertEqual(net["network"], "blocked")
+
+    def test_cgroup_quotas_nonroot_uid_and_secret_boundary(self):
+        original = os.environ.get("TVNEXT_HOST_SECRET_TEST")
+        os.environ["TVNEXT_HOST_SECRET_TEST"] = "host-secret-never-forward"
+        try:
+            for runtime in IMAGES:
+                with self.subTest(runtime=runtime):
+                    probe = run_fixture(runtime, "__probe_policy", diagnostic=True).data
+                    self.assertEqual(probe["uid"], 65534)
+                    self.assertFalse(probe["hostSecretVisible"])
+                    # Linux GitHub runners use cgroup v2; don't infer quotas from CLI args alone.
+                    self.assertIsNotNone(probe["memoryMax"], "memory cgroup missing")
+                    self.assertLessEqual(int(probe["memoryMax"]), 128 * 1024 * 1024)
+                    self.assertLessEqual(int(probe["pidsMax"]), 32)
+                    quota, period = map(int, probe["cpuMax"].split())
+                    self.assertLessEqual(quota / period, 0.5)
+        finally:
+            if original is None:
+                del os.environ["TVNEXT_HOST_SECRET_TEST"]
+            else:
+                os.environ["TVNEXT_HOST_SECRET_TEST"] = original
 
     def test_wall_clock_timeout_kills_container(self):
         for runtime in IMAGES:

@@ -3,7 +3,7 @@ import net from "node:net";
 
 const fixture = JSON.parse(fs.readFileSync("/worker/catalog.json", "utf8"));
 const METHODS = new Set(["home", "category", "search", "detail", "player"]);
-const TEST_METHODS = new Set(["__probe_network", "__probe_write", "__sleep"]);
+const TEST_METHODS = new Set(["__probe_network", "__probe_write", "__probe_policy", "__sleep"]);
 
 function fail(code) {
   process.stdout.write(JSON.stringify({ version: 1, status: "error", code }) + "\n");
@@ -43,6 +43,18 @@ async function handle(message) {
     if (method === "__probe_write") {
       try { fs.writeFileSync("/worker/probe", "x"); return { readonly: false }; }
       catch { return { readonly: true }; }
+    }
+    if (method === "__probe_policy") {
+      const read = (path) => {
+        try { return fs.readFileSync(path, "utf8").trim(); } catch { return null; }
+      };
+      return {
+        uid: process.getuid?.() ?? -1,
+        hostSecretVisible: Object.hasOwn(process.env, "TVNEXT_HOST_SECRET_TEST"),
+        memoryMax: read("/sys/fs/cgroup/memory.max"),
+        pidsMax: read("/sys/fs/cgroup/pids.max"),
+        cpuMax: read("/sys/fs/cgroup/cpu.max")
+      };
     }
     if (method === "__sleep") {
       await new Promise((resolve) => setTimeout(resolve, 30_000));
