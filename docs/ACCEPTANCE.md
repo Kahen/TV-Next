@@ -35,3 +35,11 @@ If Apple devices, authorized external fixtures, signing credentials or independe
 - P3 bundled-fixture Docker sandbox harness is experimental and NOT a real Spider implementation. Isolation CI [run 39449853176](https://github.com/Kahen/TV-Next/actions/runs/39449853176) checks live runtime CPU/memory/PID quotas, host-secret noninheritance, non-root UID, denied network/filesystem writes, crash/output-limit behavior, timeout cleanup and JS/Python result parity. Host daemon security and actual plugin loading remain unverified.
 - P3–P6 completion is explicitly **NOT VERIFIED**.
 - Link every accepted milestone to exact PR/commit/Actions run, test fixture version, real test devices and results.
+
+## Evidence ledger — 2026-10-21 (P1 native JSON preview slice)
+
+- Implementation branch: [feat/p1-ios-offline-config-preview](https://github.com/Kahen/TV-Next/tree/feat/p1-ios-offline-config-preview); compare with main: [diff](https://github.com/Kahen/TV-Next/compare/main...feat/p1-ios-offline-config-preview). **Not merged; PR creation pending.**
+- Native offline file/paste JSON site metadata preview and bounded parser: `apps/ios/TVNext/OfflineConfigPreview.swift`, `ConfigPreviewSection.swift`. Test fixture: `apps/ios/tests/ConfigSmoke.swift` (inline, synthetic).
+- First [iOS run 39513343008](https://github.com/Kahen/TV-Next/actions/runs/39513343008) **failed** during SwiftUI type checking of the initial monolithic view; the view was split into smaller subviews.
+- Fixed [iOS run 39513552898](https://github.com/Kahen/TV-Next/actions/runs/39513552898) **passed** parser smoke tests and an **unsigned iOS simulator build**. [Web/API run 39513552915](https://github.com/Kahen/TV-Next/actions/runs/39513552915) **passed** at the same code head `ed26273087c1f0991294828610edbae2c1ea6b7d`.
+- Physical iPhone/iPad Files-provider behavior, VoiceOver, native playback, permitted Spider fixtures, independent security review and signed distribution remain **NOT VERIFIED**. Do not close P1–P6 on this evidence.
