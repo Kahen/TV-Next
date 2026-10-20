@@ -39,7 +39,7 @@ Tracking: https://github.com/Kahen/TV-Next/issues/3
 
 - [ ] Initial FongMi site/live/group/channel metadata normalization + Web browsing + optional direct HTTP(S) live playback; headers/flags, nested references and full config compatibility still pending
 - [ ] Static FongMi Result adapter provides local home/category/search/detail/line/episode APIs; genuine network providers, cross-site queries and compatibility tests with permitted real fixtures remain
-- [ ] FongMi nested live JSON metadata preview implemented; full M3U/TXT/JSON imports, XMLTV EPG, replay and timeshift remain
+- [ ] FongMi nested live JSON metadata preview and offline XMLTV import/EPG channel matching implemented on Web/API. Full M3U/TXT/JSON live imports, auto EPG updates, iOS EPG, replay and timeshift remain
 - [ ] Subtitle tracks (WebVTT/SRT) and per-title audio preferences
 - [ ] Cross-provider search with cancellation, timeout, pagination and deduplication
 - [ ] Structured golden fixtures from sources with permission to test

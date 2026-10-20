@@ -146,6 +146,28 @@ paths:
         "400": { description: Invalid episode selection }
         "404": { description: Video not present }
         "422": { description: Unsupported parser required }
+  /api/v1/epg/guide:
+    post:
+      summary: Match uploaded XMLTV to imported M3U channels (offline, no URL fetching)
+      description: |
+        Parses an explicitly provided XMLTV document with external XML entities and DTDs
+        disabled. Matches tvg-id first, then unique XMLTV display-name. No remote feed
+        fetching, persistence, EPG subscription or streaming is performed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EpgGuideRequest" }
+      responses:
+        "200":
+          description: Current and upcoming programmes for requested channels
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EpgGuideResponse" }
+        "400":
+          description: Invalid XML, forbidden DOCTYPE, timestamps or request limits
+        "503":
+          description: Secure XML parser unavailable
 components:
   schemas:
     TextImportRequest:
@@ -311,3 +333,58 @@ components:
         name: { type: string }
         lineName: { type: string }
         provider: { type: string }
+
+    EpgGuideRequest:
+      type: object
+      required: [xml, channels]
+      properties:
+        xml: { type: string, maxLength: 2097152 }
+        channels:
+          type: array
+          minItems: 1
+          maxItems: 300
+          items:
+            type: object
+            required: [name]
+            properties:
+              id: { type: [string, "null"] }
+              name: { type: string }
+        at: { type: [string, "null"], format: date-time }
+        hours: { type: integer, minimum: 1, maximum: 72, default: 12 }
+    EpgProgram:
+      type: object
+      required: [start, stop, title]
+      properties:
+        start: { type: string, format: date-time }
+        stop: { type: string, format: date-time }
+        title: { type: string }
+        description: { type: [string, "null"] }
+    EpgChannelGuide:
+      type: object
+      required: [name, matchType, upcoming]
+      properties:
+        id: { type: [string, "null"] }
+        name: { type: string }
+        matchedChannelId: { type: [string, "null"] }
+        matchType: { type: string, enum: [id, name, none] }
+        current:
+          anyOf:
+            - { $ref: "#/components/schemas/EpgProgram" }
+            - { type: "null" }
+        upcoming:
+          type: array
+          items: { $ref: "#/components/schemas/EpgProgram" }
+    EpgGuideResponse:
+      type: object
+      required: [generatedAt, until, totalChannels, matchedChannels, channels, warnings]
+      properties:
+        generatedAt: { type: string, format: date-time }
+        until: { type: string, format: date-time }
+        totalChannels: { type: integer }
+        matchedChannels: { type: integer }
+        channels:
+          type: array
+          items: { $ref: "#/components/schemas/EpgChannelGuide" }
+        warnings:
+          type: array
+          items: { type: string }
