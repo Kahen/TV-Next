@@ -1,5 +1,15 @@
 name: iOS (manual)
 on:
+  push:
+    branches:
+      - feat/**
+    paths:
+      - apps/ios/**
+      - .github/workflows/ios.yml
+  pull_request:
+    paths:
+      - apps/ios/**
+      - .github/workflows/ios.yml
   workflow_dispatch:
 jobs:
   simulator-build:
