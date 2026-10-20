@@ -38,6 +38,19 @@ struct ParserSmoke {
             // Expected.
         }
 
-        print("TV-Next native M3U parser smoke test passed")
+        let exported = M3UEncoder.serialize(channels)
+        precondition(exported.hasPrefix("#EXTM3U\n"))
+        let roundTrip = try M3UParser.parse(exported)
+        precondition(roundTrip.count == 2)
+        precondition(roundTrip[0].group == "News")
+        precondition(roundTrip[0].tvgId == "sample")
+        let sanitized = TVChannel(
+            name: "Line\nBreak", url: "https://example.org/stream.mp4",
+            group: "TV\"Group", logo: nil, tvgId: nil
+        )
+        let safe = M3UEncoder.serialize([sanitized])
+        precondition(!safe.contains("TV\"Group"))
+        precondition(safe.contains("TV Group"))
+        print("TV-Next native M3U import/export smoke tests passed")
     }
 }
