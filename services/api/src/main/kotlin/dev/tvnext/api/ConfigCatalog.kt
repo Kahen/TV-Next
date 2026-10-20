@@ -103,3 +103,11 @@ class ConfigCatalog(private val mapper: ObjectMapper) {
     private fun reject(reason: String): Nothing =
         throw ResponseStatusException(HttpStatus.BAD_REQUEST, reason)
 }
+
+@org.springframework.web.bind.annotation.RestController
+@org.springframework.web.bind.annotation.RequestMapping("/api/v1/catalog")
+class CatalogController(private val catalog: ConfigCatalog) {
+    @org.springframework.web.bind.annotation.PostMapping("/preview")
+    fun preview(@org.springframework.web.bind.annotation.RequestBody body: TextImportRequest): CatalogPreviewResponse =
+        catalog.preview(body.content)
+}
