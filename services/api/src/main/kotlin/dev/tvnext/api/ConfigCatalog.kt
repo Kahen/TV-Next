@@ -73,7 +73,7 @@ class ConfigCatalog(private val mapper: ObjectMapper) {
                     if (name.isBlank()) return@forEach
                     val urls = item.path("urls")
                     val direct = urls.takeIf { it.isArray }?.take(10)?.firstNotNullOfOrNull {
-                        text(it, 2048).takeIf { value -> safeStreamUrl(value) }
+                        it.takeIf { node -> node.isTextual }?.asText()?.takeIf { value -> safeStreamUrl(value) }
                     }
                     channels += CatalogChannel(name, direct, if (urls.isArray) urls.size() else 0)
                     totalChannels++
