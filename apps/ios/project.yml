@@ -1,0 +1,26 @@
+name: TVNext
+options:
+  bundleIdPrefix: dev.kahen
+settings:
+  base:
+    SWIFT_VERSION: 5.9
+    IPHONEOS_DEPLOYMENT_TARGET: 17.0
+targets:
+  TVNext:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: TVNext
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.kahen.tvnext
+        TARGETED_DEVICE_FAMILY: "1,2"
+        GENERATE_INFOPLIST_FILE: YES
+    info:
+      path: TVNext/Info.plist
+      properties:
+        CFBundleDisplayName: TV-Next
+        UILaunchScreen: {}
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true

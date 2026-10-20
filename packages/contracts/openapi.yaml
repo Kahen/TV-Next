@@ -1,0 +1,94 @@
+openapi: 3.1.0
+info:
+  title: TV-Next API
+  version: 0.1.0
+  description: |
+    Local metadata-only import preview. No remote fetch, Spider execution, media proxy,
+    or authenticated personal data in v0.1.0. This contract will evolve.
+servers:
+  - url: http://localhost:8080
+paths:
+  /api/v1/health:
+    get:
+      summary: Health probe
+      responses:
+        "200":
+          description: Service is accepting requests
+  /api/v1/playlists/parse:
+    post:
+      summary: Normalize a user-provided M3U playlist (HTTP/S entries only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TextImportRequest"
+      responses:
+        "200":
+          description: Parsed channels; invalid/non-HTTP entries omitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaylistResponse"
+        "400":
+          description: Bad input or size limits
+  /api/v1/configs/inspect:
+    post:
+      summary: Inspect FongMi-style JSON without executing configured scripts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TextImportRequest"
+      responses:
+        "200":
+          description: Site and live group descriptors
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigPreview"
+        "400":
+          description: Invalid JSON or size limits
+components:
+  schemas:
+    TextImportRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+          maxLength: 1048576
+    Channel:
+      type: object
+      required: [name, url, group]
+      properties:
+        name: { type: string }
+        url: { type: string, format: uri }
+        group: { type: string }
+        logo: { type: [string, "null"] }
+        tvgId: { type: [string, "null"] }
+    PlaylistResponse:
+      type: object
+      required: [channels, total]
+      properties:
+        total: { type: integer }
+        channels:
+          type: array
+          items: { $ref: "#/components/schemas/Channel" }
+    SitePreview:
+      type: object
+      required: [key, name]
+      properties:
+        key: { type: string }
+        name: { type: string }
+        type: { type: [integer, "null"] }
+    ConfigPreview:
+      type: object
+      required: [spiderDeclared, sites, liveGroupCount]
+      properties:
+        spiderDeclared: { type: boolean }
+        liveGroupCount: { type: integer }
+        sites:
+          type: array
+          items: { $ref: "#/components/schemas/SitePreview" }
