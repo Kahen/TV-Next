@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Hls from "hls.js";
 import { postText } from "./api";
-import type { Channel, ConfigPreview, PlaylistResult } from "./api";
+import type { Channel, CatalogPreview, ConfigPreview, PlaylistResult } from "./api";
 import {
   addRecent, emptyLibrary, loadLibrary, normalizeLibrary, saveLibrary,
   setPosition, toggleFavorite, validMediaUrl
@@ -20,6 +20,7 @@ export default function App() {
   const [configText, setConfigText] = useState("");
   const [library, setLibrary] = useState<LibraryState>(loadLibrary);
   const [preview, setPreview] = useState<ConfigPreview | null>(null);
+  const [catalog, setCatalog] = useState<CatalogPreview | null>(null);
   const [selected, setSelected] = useState<Channel | null>(null);
   const [manualUrl, setManualUrl] = useState("");
   const [filter, setFilter] = useState("");
@@ -222,8 +223,14 @@ export default function App() {
   async function inspectConfig() {
     setBusy(true);
     setError("");
+    setCatalog(null);
     try {
-      setPreview(await postText<ConfigPreview>("/api/v1/configs/inspect", configText));
+      const [inspection, normalized] = await Promise.all([
+        postText<ConfigPreview>("/api/v1/configs/inspect", configText),
+        postText<CatalogPreview>("/api/v1/catalog/preview", configText)
+      ]);
+      setPreview(inspection);
+      setCatalog(normalized);
     } catch (err) {
       setError(err instanceof Error ? err.message : "配置解析失败");
     } finally {
@@ -336,6 +343,52 @@ export default function App() {
             <div className="panel-actions"><label className="file-picker">选择 JSON 文件<input type="file" accept=".json,application/json,text/plain" onChange={(event) => { void importFile(event.target.files?.[0]); event.target.value = ""; }}/></label><button disabled={busy} className="primary" onClick={() => void inspectConfig()}>{busy ? "检查中…" : "检查配置"}</button></div>
           </section>
           {preview && <section className="results"><div className="section-heading"><h2>配置概况</h2><span>NO CODE EXECUTION</span></div><div className="stats"><div><strong>{preview.sites.length}</strong><small>站点预览（最多 1000）</small></div><div><strong>{preview.liveGroupCount}</strong><small>直播分组</small></div><div><strong>{preview.spiderDeclared ? "Yes" : "No"}</strong><small>声明 Spider</small></div></div><div className="channel-list">{preview.sites.map((site, i) => <div className="channel" key={site.key + i}><span className="channel-avatar">◈</span><span className="channel-name"><strong>{site.name || site.key || "Unnamed"}</strong><small>type {site.type ?? "unknown"} · {site.key}</small></span></div>)}</div></section>}
+          {catalog && <section className="results">
+            <div className="section-heading"><h2>FongMi 站点目录</h2><span>{catalog.sites.length} SITES · PREVIEW ONLY</span></div>
+            <p className="hint">这些站点尚未连接 Spider，不能搜索、展示影视内容或执行脚本。隐藏站点以灰色标记。</p>
+            <div className="channel-list">{catalog.sites.map((site) =>
+              <div className="channel" key={site.key}>
+                <span className="channel-avatar">◈</span>
+                <span className="channel-name">
+                  <strong>{site.name}</strong>
+                  <small>{site.key} · type {site.type ?? "unknown"} · {site.searchable ? "支持搜索（原配置声明）" : "原配置禁止搜索"}
+                    {site.hidden ? " · 已隐藏" : ""}</small>
+                  {site.categories.length > 0 && <small>分类：{site.categories.join(" / ")}</small>}
+                </span>
+              </div>
+            )}</div>
+            <div className="section-heading"><h2>直播目录</h2><span>{catalog.directPlayableChannelCount} DIRECT URLS</span></div>
+            <p className="hint">仅纯 HTTP(S) 播放地址提供播放按钮；含特殊路由语法、额外请求头或 Spider 依赖的线路仍不能播放。</p>
+            {catalog.liveSources.map((source, index) =>
+              <div key={source.name + index} className="catalog-source">
+                <h3>{source.name}</h3>
+                {source.groups.map((group, groupIndex) =>
+                  <div key={group.name + groupIndex}>
+                    <p className="catalog-group-title">{group.name} · {group.channels.length} 个频道</p>
+                    <div className="channel-list">
+                      {group.channels.map((channel, channelIndex) =>
+                        <div className="channel-line" key={channel.name + channelIndex}>
+                          <div className="channel catalog-channel">
+                            <span className="channel-name"><strong>{channel.name}</strong>
+                              <small>{channel.sourceCount} 条配置线路</small>
+                            </span>
+                          </div>
+                          {channel.directUrl
+                            ? <button className="secondary" onClick={() => playChannel({
+                                name: channel.name,
+                                url: channel.directUrl!,
+                                group: group.name
+                              })}>播放</button>
+                            : <span className="catalog-unavailable">需适配</span>}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            {catalog.warnings.map((warning, i) => <p className="hint" key={i}>{warning}</p>)}
+          </section>}
         </> : <>
           <div className="section-heading"><h2>导入 M3U 播放列表</h2><span>{channels.length} CHANNELS</span></div>
           <section className="panel">
