@@ -31,7 +31,7 @@ def wait_for_health():
             if health.get("status") == "ok":
                 print("API ready", flush=True)
                 return
-        except (urllib.error.URLError, TimeoutError, ValueError, AssertionError) as error:
+        except (OSError, ValueError, AssertionError) as error:
             last = error
         time.sleep(2)
     raise RuntimeError(f"API did not become healthy: {last}")
