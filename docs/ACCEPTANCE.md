@@ -16,7 +16,7 @@
 
 | Phase | Completion gate | Current blocker |
 | --- | --- | --- |
-| P0 | Clean checkout, Docker smoke, API/Web/iOS build | Docker deployment smoke pending |
+| P0 | Clean checkout, Docker smoke, API/Web/iOS build | GitHub Linux Docker Compose smoke verified; independent NAS deployment and Apple real-device behavior not yet verified |
 | P1 | Real iPhone/iPad and browsers HLS/MP4/local media, subtitle/PiP, PWA/a11y, persistence | Physical Apple device/browser matrix pending |
 | P2 | Real permitted FongMi corpus: home, category, search, details, episodes, line selection, IPTV XMLTV/EPG; Web and iOS parity | Only static site/live and FongMi Result preview is implemented |
 | P3 | Java/JAR, JS and Python permitted Spider fixtures; isolated runtime; egress deny, crash, quota and timeout tests; Android-specific plugin limits disclosed | Runtimes and test corpus missing |
@@ -30,7 +30,7 @@ If Apple devices, authorized external fixtures, signing credentials or independe
 
 ## Evidence ledger — 2026-10-20
 
-- CI currently passes for initial Web/API and unsigned iOS simulator scaffolds; this does NOT validate actual media playback.
+- Web/API and unsigned iOS simulator checks have passed; this does NOT validate actual media playback. A clean GitHub-hosted Linux Docker Compose build/boot and HTTP integration smoke has passed: https://github.com/Kahen/TV-Next/actions/runs/39444315596. Additional expanded endpoint coverage is under PR #14 and requires its own CI evidence. Real NAS installation remains unverified.
 - P2 static FongMi catalog and local Result adapter are experimental; they do not execute Spider or connect remote content providers. An offline XMLTV current/upcoming guide slice has unit and controller fixture tests; live XMLTV ingestion, real provider integration and iOS EPG parity are unverified.
 - P3–P6 completion is explicitly **NOT VERIFIED**.
 - Link every accepted milestone to exact PR/commit/Actions run, test fixture version, real test devices and results.
