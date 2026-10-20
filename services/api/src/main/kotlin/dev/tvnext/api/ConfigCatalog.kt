@@ -91,7 +91,7 @@ class ConfigCatalog(private val mapper: ObjectMapper) {
     }
 
     private fun safeStreamUrl(value: String): Boolean {
-        if (value.isBlank() || value.length > 2048 || value.any { it.isISOControl() }) return false
+        if (value.isBlank() || value.length > 2048 || value.any { Character.isISOControl(it) }) return false
         val uri = runCatching { URI(value) }.getOrNull() ?: return false
         return uri.scheme?.lowercase() in setOf("http", "https") &&
             !uri.host.isNullOrBlank() && uri.rawUserInfo == null
