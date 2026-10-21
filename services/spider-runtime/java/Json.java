@@ -107,10 +107,9 @@ final class Json {
                     String key = string();
                     need(':');
                     Object child = value(depth + 1);
-                    if (obj.putIfAbsent(key, child) != null)
+                    if (obj.containsKey(key))
                         throw new IllegalArgumentException("duplicate-key");
-                    // A duplicate with a null first value is still a duplicate.
-                    if (child == null && obj.containsKey(key)) { /* null allowed */ }
+                    obj.put(key, child);
                     if (eat('}')) return obj;
                     need(',');
                 } while (true);

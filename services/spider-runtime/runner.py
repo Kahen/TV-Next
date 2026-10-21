@@ -17,6 +17,7 @@ from typing import Any
 IMAGES = {
     "node": "tvnext/spider-node-fixture:ci",
     "python": "tvnext/spider-python-fixture:ci",
+    "java": "tvnext/spider-java-fixture:ci",
 }
 METHODS = frozenset({"home", "category", "search", "detail", "player"})
 DIAGNOSTICS = frozenset({"__probe_network", "__probe_write", "__probe_policy", "__probe_output", "__crash", "__sleep"})

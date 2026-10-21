@@ -27,7 +27,7 @@ class FixtureIsolationTests(unittest.TestCase):
                               "docker.sock", "--pid host"):
                 self.assertNotIn(forbidden, parts)
 
-    def test_same_provider_contract_for_js_and_python(self):
+    def test_same_provider_contract_for_all_three_runtimes(self):
         actions = [
             ("home", {}),
             ("category", {"categoryId": "movie"}),
@@ -37,13 +37,17 @@ class FixtureIsolationTests(unittest.TestCase):
         ]
         for method, args in actions:
             with self.subTest(method=method):
-                node = run_fixture("node", method, args).data
-                python = run_fixture("python", method, args).data
-                self.assertEqual(node, python)
+                responses = {
+                    runtime: run_fixture(runtime, method, args).data
+                    for runtime in IMAGES
+                }
+                self.assertEqual(responses["node"], responses["python"])
+                self.assertEqual(responses["node"], responses["java"])
+                result = responses["java"]
                 if method == "home":
-                    self.assertEqual(len(node["items"]), 2)
+                    self.assertEqual(len(result["items"]), 2)
                 if method == "player":
-                    self.assertEqual(node["url"], "https://example.org/fixture.mp4")
+                    self.assertEqual(result["url"], "https://example.org/fixture.mp4")
 
     def test_allows_no_arbitrary_methods_images_or_user_source(self):
         for runtime in IMAGES:
