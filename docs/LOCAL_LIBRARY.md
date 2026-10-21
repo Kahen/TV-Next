@@ -32,3 +32,9 @@ Status: initial implementation. This is **local persistence**, NOT account-based
 - Persistent playlist names, group filters, import/export and migration strategy beyond schema version 1.
 - Playback speed in iOS, audio/subtitle track selection, PiP, AirPlay and file playback.
 - P5: opt-in authenticated synchronization and media library backups.
+
+## Shared M3U metadata parity fixture (P1 partial)
+
+The synthetic, source-free `fixtures/p1-m3u-golden.m3u` and expected `fixtures/p1-m3u-golden.json` are consumed by Kotlin API tests and iOS Swift parser smoke tests. The tested subset covers commas inside quoted EXTINF attributes and titles, missing title fallback to tvg-name, EXTGRP override, unsafe scheme/credential rejection and invalid logo filtering. Both clients must agree on channel name, URL, group, logo and tvgId.
+
+The Web client imports M3U through the API, while iOS defaults to its offline parser. The API can return up to 5,000 channels, whereas iOS stores up to 1,500; this fixture verifies **metadata semantics only**, not large-playlist parity, actual streaming, CORS, browser E2E, or physical Apple devices. See `docs/ACCEPTANCE.md` before declaring P1 complete.

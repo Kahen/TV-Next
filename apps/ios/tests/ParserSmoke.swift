@@ -52,6 +52,19 @@ struct ParserSmoke {
         let safe = M3UEncoder.serialize([sanitized])
         precondition(!safe.contains("TV\"Group"))
         precondition(safe.contains("TV Group"))
-        print("TV-Next native M3U import/export smoke tests passed")
+        // The same synthetic fixture is asserted in Kotlin API tests.
+        let fixture = try String(contentsOfFile: "../../fixtures/p1-m3u-golden.m3u", encoding: .utf8)
+        let expectedData = try Data(contentsOf: URL(fileURLWithPath: "../../fixtures/p1-m3u-golden.json"))
+        let expected = try JSONDecoder().decode([TVChannel].self, from: expectedData)
+        let actual = try M3UParser.parse(fixture)
+        precondition(actual.count == expected.count, "Golden M3U channel count differs")
+        for (found, wanted) in zip(actual, expected) {
+            precondition(found.name == wanted.name, "Golden M3U name differs")
+            precondition(found.url == wanted.url, "Golden M3U URL differs")
+            precondition(found.group == wanted.group, "Golden M3U group differs")
+            precondition(found.logo == wanted.logo, "Golden M3U logo differs")
+            precondition(found.tvgId == wanted.tvgId, "Golden M3U tvg-id differs")
+        }
+        print("TV-Next native M3U import/export and golden parity tests passed")
     }
 }
