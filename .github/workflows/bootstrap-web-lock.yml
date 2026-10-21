@@ -1,0 +1,32 @@
+name: Temporary Web Lockfile Bootstrap
+
+on:
+  push:
+    branches: ["chore/p6-web-lockfile"]
+    paths:
+      - ".github/workflows/bootstrap-web-lock.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  generate-lock:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Resolve and audit package lock once
+        working-directory: apps/web
+        run: |
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          node -e 'const l=require("./package-lock.json");if(l.lockfileVersion!==3)process.exit(1)'
+      - name: Commit generated lockfile onto this feature branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/web/package-lock.json
+          git commit -m "build(web): generate npm v3 dependency lockfile"
+          git push origin HEAD:chore/p6-web-lockfile
