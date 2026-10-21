@@ -10,7 +10,7 @@ Clients:
 
 Backend:
 - services/api: Kotlin/JVM 21 + Spring Boot REST; stateless config inspection, playlists and future catalog API.
-- services/spider-runtime: opt-in **host-side** Docker isolated JS/Python bundled fixture execution harness, not exposed as an API and not used by production clients. Real remote Spider/JAR/Python plugin execution still future work; see services/spider-runtime/README.md.
+- services/spider-runtime: opt-in **host-side** Docker isolated Node/Python/Java 21 bundled fixture execution harness, not exposed as an API and not used by production clients. Real remote Spider/JAR/JS/Python plugin execution still future work; see services/spider-runtime/README.md.
 - packages/contracts: versioned HTTP shapes and API expectations (OpenAPI to be adopted once endpoints stabilize).
 
 No content sources are bundled, and user-provided content is never presumed legal or safe. Start with local import and a well-defined API contract. Production CORS origin configuration is explicit; do not allow arbitrary origins with credentials.

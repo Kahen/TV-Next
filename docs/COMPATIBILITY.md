@@ -19,7 +19,7 @@ Legend: Implemented = coded and checked at compile/test level (NOT necessarily d
 | FongMi JSON site metadata preview | Implemented (metadata only, no Spider) | Planned | Implemented bounded parser |
 | FongMi IPTV groups/channels | Preview + manual click for plain HTTP(S) URLs | Planned | Implemented bounded metadata parser |
 | FongMi sites/home/search/details | Planned P2 | Planned P2 | Planned P2 |
-| Java/JAR Spider | N/A | N/A | Planned P3 (pure JVM subset) |
+| Java/JAR Spider | N/A | N/A | Bundled Java 21 fixture JAR tested in Docker; third-party Spider JAR loading not supported |
 | JS Spider | N/A | N/A | Bundled JS fixture worker in Docker (no dynamic Spider compatibility) |
 | Python Spider | N/A | N/A | Bundled Python fixture worker in Docker (no dynamic Spider compatibility) |
 | Android-context/JNI Spider | Unsupported until separately assessed | Unsupported until separately assessed | Unverified |

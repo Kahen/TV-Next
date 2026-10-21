@@ -1,9 +1,11 @@
 """Docker-backed isolation, parity, error and timeout tests (unittest only)."""
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import unittest
+import uuid
 from runner import (
     IMAGES, RuntimeFailure, RuntimeTimeout,
     docker_command, run_fixture,
@@ -27,7 +29,7 @@ class FixtureIsolationTests(unittest.TestCase):
                               "docker.sock", "--pid host"):
                 self.assertNotIn(forbidden, parts)
 
-    def test_same_provider_contract_for_js_and_python(self):
+    def test_same_provider_contract_for_all_three_runtimes(self):
         actions = [
             ("home", {}),
             ("category", {"categoryId": "movie"}),
@@ -37,13 +39,42 @@ class FixtureIsolationTests(unittest.TestCase):
         ]
         for method, args in actions:
             with self.subTest(method=method):
-                node = run_fixture("node", method, args).data
-                python = run_fixture("python", method, args).data
-                self.assertEqual(node, python)
+                responses = {
+                    runtime: run_fixture(runtime, method, args).data
+                    for runtime in IMAGES
+                }
+                self.assertEqual(responses["node"], responses["python"])
+                self.assertEqual(responses["node"], responses["java"])
+                result = responses["java"]
                 if method == "home":
-                    self.assertEqual(len(node["items"]), 2)
+                    self.assertEqual(len(result["items"]), 2)
                 if method == "player":
-                    self.assertEqual(node["url"], "https://example.org/fixture.mp4")
+                    self.assertEqual(result["url"], "https://example.org/fixture.mp4")
+
+    def test_java_jar_rejects_malformed_wire_and_duplicate_json_keys(self):
+        malformed_requests = [
+            b"not JSON",
+            b'{"version":1,"method":"home","args":{},"method":"player"}',
+            b'{"version":1,"method":"home","args":{"null_key":null,"null_key":true}}',
+            b'{"version":1,"method":"home","args":[]}',
+            b'{"version":1.0,"method":"home","args":{}}',
+            b'{"version":1,"method":"home","args":{}}' + b" " * 17000,
+        ]
+        for raw in malformed_requests:
+            name = "tvnext-fixture-" + uuid.uuid4().hex[:20]
+            with self.subTest(request=raw[:65]):
+                run = subprocess.run(
+                    docker_command("java", name),
+                    input=raw, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                    timeout=9, check=False
+                )
+                self.assertEqual(run.returncode, 2, run.stderr[:500])
+                self.assertLess(len(run.stdout), 1000)
+                result = json.loads(run.stdout)
+                self.assertEqual(result["version"], 1)
+                self.assertEqual(result["status"], "error")
+                self.assertIn(result["code"], ("invalid-input", "invalid-request", "request-too-large"))
+                self.assertNotIn("Exception", run.stdout.decode("utf8"))
 
     def test_allows_no_arbitrary_methods_images_or_user_source(self):
         for runtime in IMAGES:
