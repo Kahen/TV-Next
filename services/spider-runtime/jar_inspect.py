@@ -164,6 +164,7 @@ def inspect_jar(path: str | os.PathLike[str]) -> JarReport:
                     if len(blob) != entry.file_size:
                         raise JarInspectionError("truncated-entry")
                     has_android, native = _constant_pool_and_methods(blob)
+                    native_methods += native
                     if has_android:
                         blockers.add("android-api-reference")
                     if native:
