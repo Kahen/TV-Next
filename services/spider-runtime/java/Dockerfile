@@ -1,7 +1,7 @@
 FROM eclipse-temurin:21-jdk-alpine AS builder
 WORKDIR /build
-COPY java/Json.java java/Worker.java ./
-RUN javac --release 21 -encoding UTF-8 -d /build/classes Json.java Worker.java \
+COPY java/Json.java java/Worker.java java/ProviderSpi.java java/ProviderFailure.java java/BundledFixtureProvider.java ./
+RUN javac --release 21 -encoding UTF-8 -d /build/classes Json.java Worker.java ProviderSpi.java ProviderFailure.java BundledFixtureProvider.java \
     && jar --create --file /build/tvnext-fixture.jar --main-class Worker -C /build/classes .
 
 FROM eclipse-temurin:21-jre-alpine

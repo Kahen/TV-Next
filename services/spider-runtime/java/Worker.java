@@ -4,10 +4,8 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 /** No dynamic classloading, arbitrary JARs, reflection, script evaluation or network fetch. */
@@ -26,24 +24,6 @@ public final class Worker {
         if (!(value instanceof Map<?, ?> raw)) throw new WorkerError("invalid-request");
         for (Object key : raw.keySet()) if (!(key instanceof String)) throw new WorkerError("invalid-request");
         return (Map<String, Object>) raw;
-    }
-
-    @SuppressWarnings("unchecked")
-    private static List<Map<String, Object>> objects(Object value) {
-        if (!(value instanceof List<?> raw)) throw new WorkerError("invalid-input");
-        List<Map<String, Object>> output = new ArrayList<>();
-        for (Object element : raw) output.add(asObject(element));
-        return output;
-    }
-
-    private static String limited(Object value, int length) {
-        return value instanceof String str && str.length() <= length ? str.trim() : "";
-    }
-
-    private static Map<String, Object> summary(Map<String, Object> item) {
-        Map<String, Object> copy = new LinkedHashMap<>(item);
-        copy.remove("episodes");
-        return copy;
     }
 
     private static Map<String, Object> execute(
@@ -90,33 +70,10 @@ public final class Worker {
             };
         }
         if (!METHODS.contains(method)) throw new WorkerError("unsupported-method");
-        List<Map<String, Object>> categories = objects(catalog.get("categories"));
-        List<Map<String, Object>> items = objects(catalog.get("items"));
-        List<Map<String, Object>> summaries = items.stream().map(Worker::summary).toList();
-
-        if ("home".equals(method)) return Map.of("categories", categories, "items", summaries);
-        if ("category".equals(method)) {
-            String id = limited(args.get("categoryId"), 200);
-            if (id.isEmpty()) throw new WorkerError("missing-category");
-            return Map.of("categories", categories, "items", items.stream()
-                .filter(x -> id.equals(x.get("categoryId"))).map(Worker::summary).toList());
-        }
-        if ("search".equals(method)) {
-            String query = limited(args.get("query"), 120).toLowerCase(Locale.ROOT);
-            if (query.isEmpty()) throw new WorkerError("missing-query");
-            return Map.of("items", items.stream()
-                .filter(x -> ((String) x.get("name")).toLowerCase(Locale.ROOT).contains(query))
-                .map(Worker::summary).toList());
-        }
-        String id = limited(args.get("vodId"), 200);
-        Map<String, Object> item = items.stream().filter(x -> id.equals(x.get("id")))
-            .findFirst().orElseThrow(() -> new WorkerError("unknown-item"));
-        if ("detail".equals(method)) return item;
-        Object index = args.get("episodeIndex");
-        List<Map<String, Object>> episodes = objects(item.get("episodes"));
-        if (!(index instanceof Long n) || n < 0 || n >= episodes.size())
-            throw new WorkerError("unknown-episode");
-        return episodes.get(n.intValue());
+        // Fixed compile-time binding only. No ServiceLoader, reflection, external
+        // JAR loading, or caller-selected implementation.
+        ProviderSpi provider = new BundledFixtureProvider();
+        return provider.handle(method, args, catalog);
     }
 
     private static String cgroup(String file) {
@@ -139,7 +96,8 @@ public final class Worker {
             System.out.println(Json.stringify(Map.of("version", 1, "status", "ok",
                 "runtime", "java", "data", data)));
         } catch (Exception e) {
-            String code = e instanceof WorkerError err ? err.getMessage() : "invalid-input";
+            String code = e instanceof WorkerError err ? err.getMessage() :
+                e instanceof ProviderFailure failure ? failure.getMessage() : "invalid-input";
             System.out.println(Json.stringify(Map.of("version", 1, "status", "error", "code", code)));
             System.exit(2);
         }
