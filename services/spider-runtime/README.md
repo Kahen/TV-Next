@@ -50,3 +50,17 @@ The suite checks five method responses and Node/Python/Java parity; malformed ac
 The `java/Dockerfile` image uses **Java 21**, compiles `Json.java` and `Worker.java` into `tvnext-fixture.jar` using the JDK `jar` tool, and runs it via `java -jar` in a separate unprivileged JRE Alpine container. The worker parses bounded JSON messages using a small local strict codec and reads only the same committed `fixtures/catalog.json` as the other runtimes. A multi-stage build keeps the Java compiler out of the runtime image.
 
 **Security caveats:** This is an audited **static fixture JAR**. It does *not* accept arbitrary JAR bytecode, external dependencies, Android classes, JNI, dynamic `ClassLoader`, arbitrary reflection or third-party Spider callbacks. Calling this a full FongMi Java Spider adapter would be incorrect. A future separate milestone needs explicit Java SPI contracts, an allowlisted dependency policy, permitted test JARs, provenance checks, sandbox escape tests and rejection of Android-only implementations. No JAR loading endpoint exists in Spring Boot, Web or iOS.
+
+## Pure JVM SPI and static JAR compatibility inspection
+
+`ProviderSpi` is now the common Java implementation boundary, with `providerId()` and `handle(method,args,fixture)`. `BundledFixtureProvider` is the only implementation, selected through **fixed compile-time instantiation**. `Worker` handles the JSON wire, diagnostic probes and error redaction. No `ServiceLoader`, external JAR classpath, reflection, arbitrary class instantiation or runtime-selected provider is permitted.
+
+To check an explicitly obtained JAR **without executing it**, use:
+
+```bash
+python3 services/spider-runtime/jar_inspect.py /path/to/authorized.jar
+```
+
+The local, read-only scanner checks archive size/ZIP path traversal/compression limits, class file structure, JVM constant pool/descriptors referencing `android/`, `dalvik/` and `androidx/`, JNI `native` method flags and bundled native libraries (`.so`, `.dll`, etc.). It produces machine-readable `pure-jvm-candidate`, `unsupported` or `rejected` statuses. Candidate means **not obviously Android-dependent by these heuristics**, NOT verified safe, functional or compatible. Reflection, JNI wrappers, classfile tricks, late-loaded dependencies and obfuscation may evade static identification. Both external provider activation and network access remain prohibited.
+
+CI runs unit tests built from synthetic classfile bytes and scans the actual bundled JAR extracted without execution from the freshly built Docker image. P3 still requires an approved source corpus, dynamic plugin policy, full bytecode/security review, Android API test fixtures and an independent sandbox assessment before executing other JARs.
