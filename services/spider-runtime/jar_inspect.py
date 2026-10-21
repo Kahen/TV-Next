@@ -136,12 +136,18 @@ def inspect_jar(path: str | os.PathLike[str]) -> JarReport:
                 raise JarInspectionError("too-many-entries")
             if not records:
                 raise JarInspectionError("empty-jar")
+            seen_names: set[str] = set()
             for entry in records:
                 name = entry.filename.replace("\\", "/")
                 parts = name.split("/")
                 if (name.startswith("/") or any(part in (".", "..") for part in parts)
                         or "\x00" in name):
                     raise JarInspectionError("unsafe-entry-path")
+                if name in seen_names:
+                    raise JarInspectionError("duplicate-entry-path")
+                seen_names.add(name)
+                if (entry.external_attr >> 16) & 0o170000 == 0o120000:
+                    raise JarInspectionError("symlink-entry")
                 if entry.is_dir():
                     continue
                 if entry.flag_bits & 1:
@@ -156,6 +162,13 @@ def inspect_jar(path: str | os.PathLike[str]) -> JarReport:
                     raise JarInspectionError("archive-uncompressed-limit")
                 if name.lower().endswith(NATIVE_EXTENSIONS):
                     blockers.add("native-library")
+                if name.lower().endswith((".jar", ".zip")):
+                    blockers.add("nested-archive-not-inspected")
+                if name.upper() == "META-INF/MANIFEST.MF":
+                    with archive.open(entry) as manifest_stream:
+                        manifest = manifest_stream.read(16_384).decode("utf-8", "replace")
+                    if any(line.lower().startswith("class-path:") for line in manifest.splitlines()):
+                        blockers.add("external-classpath")
                 if name.lower().endswith(".class"):
                     if entry.file_size > MAX_CLASS_BYTES:
                         raise JarInspectionError("class-too-large")
