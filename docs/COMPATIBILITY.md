@@ -16,10 +16,10 @@ Legend: Implemented = coded and checked at compile/test level (NOT necessarily d
 | Playback speed | Implemented | AVPlayer rate selector (device test pending) | N/A |
 | Favorites, recents and VOD resume | Implemented locally (unit tests) | Implemented locally (simulator build test) | Not required |
 | Cross-device library synchronization | Planned P5 | Planned P5 | Planned P5 |
-| FongMi JSON site metadata preview | Implemented (metadata only, no Spider) | Planned | Implemented bounded parser |
+| FongMi JSON site metadata preview | Implemented (metadata only, no Spider) | Offline metadata only (device test pending) | Implemented bounded parser |
 | FongMi IPTV groups/channels | Preview + manual click for plain HTTP(S) URLs | Planned | Implemented bounded metadata parser |
 | FongMi sites/home/search/details | Planned P2 | Planned P2 | Planned P2 |
-| Java/JAR Spider | N/A | N/A | Planned P3 (pure JVM subset) |
+| Java/JAR Spider | N/A | N/A | Bundled Java 21 `ProviderSpi` fixture in Docker; static JAR compatibility inspection; third-party JAR execution not supported |
 | JS Spider | N/A | N/A | Bundled JS fixture worker in Docker (no dynamic Spider compatibility) |
 | Python Spider | N/A | N/A | Bundled Python fixture worker in Docker (no dynamic Spider compatibility) |
 | Android-context/JNI Spider | Unsupported until separately assessed | Unsupported until separately assessed | Unverified |
@@ -31,6 +31,6 @@ Legend: Implemented = coded and checked at compile/test level (NOT necessarily d
 | Native background playback | Browser limited | Planned P4 | N/A |
 | Transcoding | N/A | N/A | Planned P4 (sidecar) |
 
-"Implemented" does not imply 100% source compatibility. Device-specific playback has not yet been validated on a physical iPhone/iPad. See docs/LOCAL_LIBRARY.md.
-
 Native JSON preview covers only site metadata and live declaration counts; it does not reproduce Web's live-channel catalog or provider execution. See docs/IOS_CONFIG_PREVIEW.md.
+
+"Implemented" does not imply 100% source compatibility. Device-specific playback has not yet been validated on a physical iPhone/iPad. See docs/LOCAL_LIBRARY.md.
