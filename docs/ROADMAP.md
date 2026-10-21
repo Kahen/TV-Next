@@ -51,10 +51,10 @@ Acceptance: comparison snapshots for home/category/detail/search/player APIs aga
 Tracking: https://github.com/Kahen/TV-Next/issues/4
 
 - [ ] Define versioned Spider provider contract (home/category/detail/search/player)
-- [ ] Java/JAR JVM-side adapter for pure Java providers; Android SDK-dependent providers report unsupported
+- [ ] Java 21 self-contained, static reference JAR now executes under the same default-deny Docker sandbox with parity tests. Real pure-JVM Spider JAR adapter, Android API detection and permitted external JAR compatibility tests still pending
 - [ ] Initial **bundled-fixture-only** Node.js Docker worker with fixed JSON v1 RPC; runtime compatibility with QuickJS and real FongMi JS providers still unimplemented
 - [ ] Initial **bundled-fixture-only** Python Docker worker with fixed JSON v1 RPC and OS quotas; real Python Spider library/third-party dependency compatibility unimplemented
-- [ ] Docker host harness for JS/Python fixtures uses read-only filesystem, non-root UID, no network, cap-drop, no-new-privileges, pids/memory/CPU/wall-time/output limits; host threat assessment, escape regression and **real plugin execution** not yet complete
+- [ ] Docker host harness for Node/Python/Java fixtures uses read-only filesystem, non-root UID, no network, cap-drop, no-new-privileges, pids/memory/CPU/wall-time/output limits; host threat assessment, escape regression and **real plugin execution** not yet complete
 - [ ] Error taxonomy: unsupported Android APIs, transport failures, parsing, timeouts
 - [ ] Compatibility test corpus: a dozen permitted representative plugins and failure cases
 
