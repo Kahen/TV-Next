@@ -84,6 +84,35 @@ class JavaCompatibilityTests(unittest.TestCase):
         with self.assertRaises(JarInspectionError):
             inspect_jar(str(file) + ".not-a-jar")
 
+    def test_flags_nested_code_or_manifest_classpath_for_review(self):
+        filename = self.with_jar([
+            ("Fixture.class", fake_class()),
+            ("lib/nested.jar", b"opaque nested code"),
+            ("META-INF/MANIFEST.MF", b"Manifest-Version: 1.0\nClass-Path: lib/remote.jar\n")
+        ])
+        report = inspect_jar(filename)
+        self.assertEqual(report.status, "unsupported")
+        self.assertIn("nested-archive-not-inspected", report.reasons)
+        self.assertIn("external-classpath", report.reasons)
+
+    def test_rejects_duplicate_zip_member_paths(self):
+        filename = self.with_jar([
+            ("Fixture.class", fake_class()),
+            ("Fixture.class", fake_class())
+        ])
+        with self.assertRaisesRegex(JarInspectionError, "duplicate-entry-path"):
+            inspect_jar(filename)
+
+    def test_rejects_compression_bomb_even_when_uncompressed_size_is_bounded(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        filename = Path(temp.name) / "bomb.jar"
+        with zipfile.ZipFile(filename, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr("highly-compressible.txt", b"\x00" * 1_000_000)
+            archive.writestr("Fixture.class", fake_class())
+        with self.assertRaisesRegex(JarInspectionError, "compression-ratio"):
+            inspect_jar(filename)
+
     def test_class_parser_rejects_unknown_constant_pool_tag(self):
         damaged = bytearray(fake_class())
         damaged[10] = 0xFF
