@@ -26,6 +26,12 @@ const MAX_RECENT = 100;
 const MAX_POSITIONS = 250;
 const MAX_STORED_BYTES = 2_000_000;
 
+/** Browser storage quotas are measured in UTF-8 bytes, not UTF-16 code units. */
+function withinStorageBudget(text: string): boolean {
+  return text.length <= MAX_STORED_BYTES &&
+    new TextEncoder().encode(text).byteLength <= MAX_STORED_BYTES;
+}
+
 export function emptyLibrary(): LibraryState {
   return { version: 1, channels: [], favorites: [], recent: [], positions: {} };
 }
@@ -130,7 +136,7 @@ export function loadLibrary(storage: StorageLike | null = browserStorage()): Lib
   if (!storage) return emptyLibrary();
   try {
     const text = storage.getItem(STORAGE_KEY);
-    if (!text || text.length > MAX_STORED_BYTES) return emptyLibrary();
+    if (!text || !withinStorageBudget(text)) return emptyLibrary();
     return normalizeLibrary(JSON.parse(text) as unknown);
   } catch {
     return emptyLibrary();
@@ -141,7 +147,7 @@ export function saveLibrary(value: LibraryState, storage: StorageLike | null = b
   if (!storage) return false;
   try {
     const text = JSON.stringify(normalizeLibrary(value));
-    if (text.length > MAX_STORED_BYTES) return false;
+    if (!withinStorageBudget(text)) return false;
     storage.setItem(STORAGE_KEY, text);
     return true;
   } catch {

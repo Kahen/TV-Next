@@ -55,6 +55,29 @@ describe("local media library", () => {
     expect(state.positions[b.url]).toBeUndefined();
   });
 
+  it("rejects oversized UTF-8 snapshots on load", () => {
+    const storage = memoryStorage();
+    const snapshot = JSON.stringify({ version: 1, channels: [a], padding: "😀".repeat(510_000) });
+    expect(snapshot.length).toBeLessThan(2_000_000);
+    expect(new TextEncoder().encode(snapshot).byteLength).toBeGreaterThan(2_000_000);
+    storage.setItem(STORAGE_KEY, snapshot);
+    expect(loadLibrary(storage)).toEqual(emptyLibrary());
+  });
+
+  it("preserves the previous snapshot when a Unicode-heavy save exceeds the byte budget", () => {
+    const storage = memoryStorage();
+    expect(saveLibrary({ ...emptyLibrary(), channels: [a] }, storage)).toBe(true);
+    const channels: Channel[] = Array.from({ length: 1500 }, (_, index) => ({
+      name: "😀".repeat(100), group: "😀".repeat(50),
+      url: "https://example.org/" + index + "/" + "x".repeat(730)
+    }));
+    const serialized = JSON.stringify(normalizeLibrary({ ...emptyLibrary(), channels }));
+    expect(serialized.length).toBeLessThan(2_000_000);
+    expect(new TextEncoder().encode(serialized).byteLength).toBeGreaterThan(2_000_000);
+    expect(saveLibrary({ ...emptyLibrary(), channels }, storage)).toBe(false);
+    expect(loadLibrary(storage).channels).toEqual([a]);
+  });
+
   it("handles storage permission/quota failure", () => {
     const failing: StorageLike = {
       getItem: () => { throw new Error("blocked"); },
