@@ -170,6 +170,30 @@ export function clearLibrary(storage: StorageLike | null = browserStorage()): bo
   }
 }
 
+
+/** An empty/invalid import must not replace an existing local library. */
+export function replacePlaylistChannels(
+  state: LibraryState,
+  parsed: { channels: Channel[]; total: number }
+): { state: LibraryState; applied: boolean; warning: string | null } {
+  const channels = Array.isArray(parsed.channels)
+    ? parsed.channels.filter((channel) =>
+        channel && typeof channel.name === "string" &&
+        typeof channel.group === "string" && validMediaUrl(channel.url)
+      ).slice(0, MAX_CHANNELS)
+    : [];
+  if (!channels.length) {
+    return { state, applied: false, warning: "未找到可播放的 HTTP(S) 频道，已保留原有媒体库。" };
+  }
+  return {
+    state: { ...state, channels },
+    applied: true,
+    warning: parsed.total > MAX_CHANNELS
+      ? "本地媒体库最多保留前 1500 个频道，可通过搜索或分组管理。"
+      : null
+  };
+}
+
 export function addRecent(state: LibraryState, channel: Channel, now = Date.now()): LibraryState {
   const normalized = asChannel(channel);
   if (!normalized) return state;

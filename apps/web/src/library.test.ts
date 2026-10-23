@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Channel } from "./api";
 import {
   addRecent, clearLibrary, emptyLibrary, loadLibrary, normalizeLibrary, saveLibrary,
-  setPosition, STORAGE_KEY, toggleFavorite, validMediaUrl
+  replacePlaylistChannels, setPosition, STORAGE_KEY, toggleFavorite, validMediaUrl
 } from "./library";
 import type { StorageLike } from "./library";
 
@@ -113,4 +113,56 @@ it("does not persist Cookie or Authorization headers and marks required reload",
   expect(normalized.channels[0].headers).toEqual({"User-Agent":"TV-Next"});
   expect(normalized.channels[0].headersRequired).toBe(true);
   expect(JSON.stringify(normalized)).not.toContain("own-secret");
+});
+
+
+describe("playlist import integrity", () => {
+  it("keeps existing channels, favorites, recents and positions when the parsed playlist is empty", () => {
+    const before = { ...emptyLibrary(), channels: [a], favorites: [a.url],
+      recent: [{ channel: a, openedAt: 123 }], positions: { [a.url]: 85 } };
+    const result = replacePlaylistChannels(before, { channels: [], total: 0 });
+    expect(result.applied).toBe(false);
+    expect(result.state).toBe(before);
+    expect(result.warning).toContain("保留");
+    const storage = memoryStorage();
+    expect(saveLibrary(result.state, storage)).toBe(true);
+    expect(loadLibrary(storage)).toEqual(before);
+  });
+
+  it("does not erase a valid library when all parsed URLs are invalid", () => {
+    const before = { ...emptyLibrary(), channels: [a] };
+    const result = replacePlaylistChannels(before, {
+      channels: [{ name: "Unsafe", group: "Test", url: "javascript:alert(1)" }],
+      total: 1
+    });
+    expect(result.applied).toBe(false);
+    expect(result.state).toBe(before);
+  });
+
+  it("replaces channels while retaining user metadata and caps oversized lists", () => {
+    const before = { ...emptyLibrary(), channels: [a], favorites: [a.url],
+      recent: [{ channel: a, openedAt: 123 }], positions: { [a.url]: 85 } };
+    const incoming: Channel[] = Array.from({ length: 1501 }, (_, index) => ({
+      name: "New " + index, group: "Imported", url: "https://example.org/new/" + index
+    }));
+    const result = replacePlaylistChannels(before, { channels: incoming, total: 1501 });
+    expect(result.applied).toBe(true);
+    expect(result.state.channels).toHaveLength(1500);
+    expect(result.state.favorites).toEqual([a.url]);
+    expect(result.state.recent).toEqual(before.recent);
+    expect(result.state.positions).toEqual(before.positions);
+    expect(result.warning).toContain("1500");
+  });
+
+  it("retains in-memory stream headers for playback while storage sanitizes secrets", () => {
+    const before = emptyLibrary();
+    const channel: Channel = { name: "Own", group: "Test", url: "https://example.org/own",
+      headers: { Cookie: "private-token", "User-Agent": "TV-Next" } };
+    const result = replacePlaylistChannels(before, { channels: [channel], total: 1 });
+    expect(result.state.channels[0].headers?.Cookie).toBe("private-token");
+    const storage = memoryStorage();
+    expect(saveLibrary(result.state, storage)).toBe(true);
+    expect(loadLibrary(storage).channels[0].headers).toEqual({ "User-Agent": "TV-Next" });
+    expect(loadLibrary(storage).channels[0].headersRequired).toBe(true);
+  });
 });
