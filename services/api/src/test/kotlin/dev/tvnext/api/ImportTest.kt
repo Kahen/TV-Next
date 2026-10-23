@@ -36,6 +36,24 @@ class ImportTest {
     }
 
     @Test
+    fun rejectsUnicodePayloadsOverUtf8ByteBudget() {
+        val emojiPayload = "😀".repeat(300_000)
+        assertTrue(emojiPayload.length <= PlaylistParser.MAX_CHARS)
+        assertTrue(emojiPayload.toByteArray(Charsets.UTF_8).size > PlaylistParser.MAX_CHARS)
+        assertFailsWith<ResponseStatusException> { PlaylistParser().parse(emojiPayload) }
+        assertFailsWith<ResponseStatusException> {
+            ConfigInspector(jacksonObjectMapper()).inspect("""{"sites":[],"note":"$emojiPayload"}""")
+        }
+    }
+
+    @Test
+    fun acceptsUtf8PayloadAtExactByteBoundary() {
+        val prefix = "#EXTM3U\n"
+        val content = prefix + "#".repeat(PlaylistParser.MAX_CHARS - prefix.toByteArray(Charsets.UTF_8).size)
+        assertEquals(0, PlaylistParser().parse(content).total)
+    }
+
+    @Test
     fun sharedGoldenM3uMatchesNativeMetadataContract() {
         val fixtureRoot = Path.of("..", "..", "fixtures")
         val input = Files.readString(fixtureRoot.resolve("p1-m3u-golden.m3u"))

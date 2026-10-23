@@ -13,7 +13,7 @@ Status: initial implementation. This is **local persistence**, NOT account-based
 
 ## Local quotas and recovery
 
-- Input M3U text is capped at 1 MiB; iOS parser accepts up to 20,000 lines and stores a maximum of 1,500 channels. Web API may parse up to 5,000, but Web persists the first 1,500.
+- API M3U and JSON config imports reject inputs above **1,048,576 UTF-8 bytes**, matching the iOS parser's byte budget (the HTTP JSON envelope itself may be larger). This is a parsing limit, not an HTTP request-size or network-security guarantee. Input M3U text is capped at 1 MiB; iOS parser accepts up to 20,000 lines and stores a maximum of 1,500 channels. Web API may parse up to 5,000, but Web persists the first 1,500.
 - Favorites are capped at 300 and recent items at 100. Web saves up to 250 playback positions.
 - Web snapshots are limited to **2,000,000 UTF-8 bytes**, not JavaScript UTF-16 code units. Oversized persisted data is rejected on load; an oversized save leaves the previous valid snapshot untouched. Browser quotas can be stricter; this is a storage-integrity limit, not a media-file size limit.
 - Web rejects invalid protocols and embedded basic-auth URLs when loading stored items, ignores corrupted/wrong-version records, and handles localStorage quota failures without crashing.
