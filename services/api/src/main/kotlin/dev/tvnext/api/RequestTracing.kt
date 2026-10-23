@@ -19,11 +19,12 @@ class RequestTracing:OncePerRequestFilter() {
         if(!request.requestURI.startsWith("/api/")){chain.doFilter(request,response);return}
         val id=UUID.randomUUID().toString();val start=System.nanoTime()
         response.setHeader("X-Request-Id",id);MDC.put("requestId",id)
-        try { chain.doFilter(request,response) }
+        var failed=false
+        try { chain.doFilter(request,response) } catch(error:Exception){failed=true;throw error}
         finally {
             val route=request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE)?.toString() ?: "unmatched"
             log.atInfo().addKeyValue("requestId",id).addKeyValue("method",request.method).addKeyValue("route",route)
-                .addKeyValue("status",response.status).addKeyValue("durationMs",(System.nanoTime()-start)/1_000_000).log("http_request")
+                .addKeyValue("status",if(failed && response.status<400)500 else response.status).addKeyValue("durationMs",(System.nanoTime()-start)/1_000_000).log("http_request")
             MDC.remove("requestId")
         }
     }

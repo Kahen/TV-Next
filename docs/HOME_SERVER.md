@@ -12,7 +12,7 @@ Open http://localhost:3000, select **家庭服务器**, create an account (12–
 
 Web keeps the home-session bearer token in sessionStorage for the current tab. iOS stores it under the exact server URL in the device Keychain (`WhenUnlockedThisDeviceOnly`). Tokens last 90 days, contain 256 random bits and are stored only as SHA-256 hashes on the server. Passwords use per-user random salts and PBKDF2-HMAC-SHA256 with 600,000 iterations; the iteration count is stored for future migrations. OpenList credentials remain separate and are not part of library synchronization.
 
-Creating a pairing code requires a valid device. The 64-bit random code is valid for five minutes and can be claimed only once. A newly created code replaces that device's previous code. Account creation/login/pair claims are limited to 10 requests/minute per actual peer address; other POST operations are limited to 300/minute. Reverse proxies share the peer quota because arbitrary forwarded headers are not trusted.
+Creating a pairing code requires a valid device. The 64-bit random code is valid for five minutes and can be claimed only once. A newly created code replaces that device's previous code. Account creation/login/pair claims are limited to 10 requests/minute per actual peer address; other API requests are limited to 300/minute. Reverse proxies share the peer quota because arbitrary forwarded headers are not trusted.
 
 Device listing and revocation apply only to the authenticated user's devices. Revoking a token prevents new REST access and closes its remote channel when revoked through the API. Per-user library storage accepts only version-1 channel/favorite/recent/progress data and excludes private request-header credentials.
 
@@ -47,7 +47,7 @@ Restore to the intended test/restore instance with `pg_restore`. Do not run `doc
 
 ## Authorized real-time remote control
 
-Web and iOS connect as their own authenticated device. The REST API issues a random single-use handshake ticket lasting 30 seconds. A WebSocket URL contains only that ticket, never the reusable device bearer token. Origin restrictions and per-user ownership checks apply. Reconnect obtains a fresh ticket.
+Web and iOS connect as their own authenticated device. The REST API issues a random single-use handshake ticket lasting 30 seconds. A WebSocket URL contains only that ticket, never the reusable device bearer token. Origin restrictions and per-user ownership checks apply. Reconnect obtains a fresh ticket. Each connection accepts at most 120 incoming text messages per minute.
 
 Commands are limited to `PLAY`, `PAUSE`, `SEEK` and `LOAD` with bounded HTTP(S) URLs/positions. Sender and receiver must belong to the same account. An offline target returns HTTP 409. The receiver sends an explicit positive/negative acknowledgement; the sender can query the result for five minutes. Remote-control state is ephemeral and is not a durable task queue. Browser autoplay restrictions or unsupported seeking produce rejection rather than a fabricated playback success.
 

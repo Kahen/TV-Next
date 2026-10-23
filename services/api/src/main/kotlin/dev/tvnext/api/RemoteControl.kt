@@ -76,6 +76,13 @@ class RemoteControl(private val accounts: HomeAccounts,private val mapper: Objec
         if(old?.socket?.id!=session.id) old?.socket?.let { runCatching { it.close(CloseStatus.NORMAL) } }
     }
     override fun handleTextMessage(session: WebSocketSession,message: TextMessage) {
+        synchronized(session) {
+            val minute=System.currentTimeMillis()/60_000
+            val start=session.attributes["tvnext-minute"] as? Long
+            val count=if(start==minute)(session.attributes["tvnext-count"] as? Int ?: 0)+1 else 1
+            session.attributes["tvnext-minute"]=minute;session.attributes["tvnext-count"]=count
+            if(count>120){session.close(CloseStatus.POLICY_VIOLATION);return}
+        }
         val p=session.attributes["tvnext-principal"] as HomePrincipal
         if(!active(p)){session.close(CloseStatus.POLICY_VIOLATION);return}
         val node=runCatching { mapper.readTree(message.payload) }.getOrNull() ?: return

@@ -22,5 +22,6 @@ targets:
       properties:
         CFBundleDisplayName: TV-Next
         UILaunchScreen: {}
+        NSLocalNetworkUsageDescription: 用于连接你配置的局域网媒体服务器、网盘及遥控设备。
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true

@@ -20,7 +20,7 @@ class ApiRequestLimits : OncePerRequestFilter() {
     private data class Window(val minute: Long, var count: Int)
     private val windows = ConcurrentHashMap<String,Window>()
     override fun doFilterInternal(request: HttpServletRequest, response: HttpServletResponse, chain: FilterChain) {
-        if (!request.requestURI.startsWith("/api/v1/") || request.method != "POST") { chain.doFilter(request,response); return }
+        if (!request.requestURI.startsWith("/api/v1/") || request.method !in setOf("POST","GET")) { chain.doFilter(request,response); return }
         val now = System.currentTimeMillis() / 60_000
         val accepted = synchronized(windows) {
             if (windows.size >= 4096) windows.entries.removeIf { it.value.minute != now }
@@ -37,6 +37,7 @@ class ApiRequestLimits : OncePerRequestFilter() {
             response.writer.write("{\"error\":\"$message\"}")
         }
         if (!accepted) { reject(429,"API request rate limit"); return }
+        if (request.method=="GET") { chain.doFilter(request,response);return }
         val max = 3_145_728
         if (request.contentLengthLong > max) { reject(413,"Request envelope exceeds 3 MiB"); return }
         val bytes = request.inputStream.readNBytes(max + 1)
