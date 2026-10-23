@@ -20,10 +20,11 @@ export default function EpgGuide({ channels, onPlay, session = null }: {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
+  const [feedReset,setFeedReset] = useState(0);
   const [guideChannels,setGuideChannels] = useState<Channel[]>([]);
   const pending=useRef<AbortController|null>(null);
   const generation=useRef(0);
-  function invalidate() { generation.current++;pending.current?.abort();setGuide(null);setGuideChannels([]);setBusy(false); }
+  function invalidate(feeds=true) { if(feeds)setFeedReset(value=>value+1);generation.current++;pending.current?.abort();setGuide(null);setGuideChannels([]);setBusy(false); }
   useEffect(()=>{invalidate();return ()=>{generation.current++;pending.current?.abort();};},[channels,session?.token]);
   const shown = guide?.channels.map((item, index) => ({ item, channel: guideChannels[index] }))
     .filter(({ item }) => item.name.toLowerCase().includes(filter.toLowerCase()));
@@ -53,7 +54,7 @@ export default function EpgGuide({ channels, onPlay, session = null }: {
       setError("请先在“播放列表”导入含频道的 M3U，再导入相应 XMLTV。");
       return;
     }
-    pending.current?.abort();const controller=new AbortController();pending.current=controller;
+    setFeedReset(value=>value+1);pending.current?.abort();const controller=new AbortController();pending.current=controller;
     const id=++generation.current;const snapshot=channels.slice(0,300);
     setBusy(true);
     setError("");
@@ -89,7 +90,7 @@ export default function EpgGuide({ channels, onPlay, session = null }: {
       <span>XMLTV / XMLTV.GZ</span>
     </div>
     <p className="hint">导入你有权使用的 XMLTV 文件或粘贴内容。按 M3U 的 tvg-id 优先匹配，再尝试唯一频道名称；也可登录家庭服务器保存节目表订阅，开启服务器定时刷新。</p>
-    <EpgFeeds session={session} channels={channels} hours={hours} onGuide={(value,snapshot)=>{invalidate();setGuide(value);setGuideChannels(snapshot);}}/>
+    <EpgFeeds resetKey={feedReset} onRequest={()=>invalidate(false)} session={session} channels={channels} hours={hours} onGuide={(value,snapshot)=>{invalidate(false);setGuide(value);setGuideChannels(snapshot);}}/>
     <div className="epg-toolbar">
       <label className="file-picker">选择 XMLTV 文件
         <input type="file" accept=".xml,.xmltv,application/xml,text/xml" onChange={(e) => {

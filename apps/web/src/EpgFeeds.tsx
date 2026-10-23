@@ -6,7 +6,7 @@ import type { EpgGuideResponse } from "./epg";
 import { epgChannelsFromPlaylist } from "./epg";
 export interface EpgFeed { id:string;name:string;url:string;intervalMinutes:number;enabled:boolean;updatedAt:number;nextRefresh:number;lastError:string|null;available:boolean }
 
-export default function EpgFeeds({session,channels,hours,onGuide}:{session:HomeSession|null;channels:Channel[];hours:number;onGuide:(guide:EpgGuideResponse,channels:Channel[])=>void}) {
+export default function EpgFeeds({session,channels,hours,onGuide,resetKey=0,onRequest}:{resetKey?:number;onRequest?:()=>void;session:HomeSession|null;channels:Channel[];hours:number;onGuide:(guide:EpgGuideResponse,channels:Channel[])=>void}) {
   const [feeds,setFeeds]=useState<EpgFeed[]>([]);
   const [name,setName]=useState("");const [url,setUrl]=useState("");const [interval,setInterval]=useState(360);
   const [error,setError]=useState("");const [busy,setBusy]=useState(false);
@@ -14,7 +14,7 @@ export default function EpgFeeds({session,channels,hours,onGuide}:{session:HomeS
   const sessionKey=session?.token;
   useEffect(()=>{generation.current++;setFeeds([]);setError("");setBusy(false);setName("");setUrl("");return ()=>{generation.current++;};},[sessionKey]);
   // Channel changes invalidate in-flight guide results, including same-length reorder/replacement.
-  useEffect(()=>{generation.current++;setBusy(false);},[channels,hours]);
+  useEffect(()=>{generation.current++;setBusy(false);},[channels,hours,resetKey]);
   async function run(action:(token:string)=>Promise<void>){
     if(!sessionKey)return;const id=++generation.current;setBusy(true);setError("");
     try{await action(sessionKey);}catch(e){if(id===generation.current)setError(e instanceof Error?e.message:"节目表请求失败");}
@@ -24,7 +24,7 @@ export default function EpgFeeds({session,channels,hours,onGuide}:{session:HomeS
   const list=()=>run(async token=>reload(token,generation.current));
   const create=()=>run(async token=>{const id=generation.current;await homeRequest<EpgFeed>("epg/feeds",{name,url,intervalMinutes:interval,enabled:true},token);if(id===generation.current){setName("");setUrl("");await reload(token,id);}});
   const mutate=(feed:EpgFeed,action:"remove"|"refresh")=>run(async token=>{const id=generation.current;await homeRequest("epg/feeds/"+feed.id+"/"+action,{},token);await reload(token,id);});
-  const guide=(feed:EpgFeed)=>run(async token=>{const id=generation.current;const snapshot=channels.slice(0,300);const value=await homeRequest<EpgGuideResponse>("epg/feeds/"+feed.id+"/guide",{channels:epgChannelsFromPlaylist(snapshot),hours},token);if(id===generation.current)onGuide(value,snapshot);});
+  const guide=(feed:EpgFeed)=>{onRequest?.();return run(async token=>{const id=generation.current;const snapshot=channels.slice(0,300);const value=await homeRequest<EpgGuideResponse>("epg/feeds/"+feed.id+"/guide",{channels:epgChannelsFromPlaylist(snapshot),hours},token);if(id===generation.current)onGuide(value,snapshot);});};
   if(!session)return <p className="hint">登录家庭服务器账号后可保存 XMLTV / XMLTV.gz 订阅，并由服务器定时更新。</p>;
   return <fieldset><legend>节目表订阅 · {session.user.username}</legend>
     <p className="hint">最多 10 个订阅，每份下载及解压后最多 1 MiB。服务器按周期刷新；失败时保留上次数据。</p>

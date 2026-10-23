@@ -32,7 +32,7 @@ class EpgFeeds(private val db: JdbcTemplate, private val transport: ProviderTran
 
     @Transactional
     fun create(user: String, r: EpgFeedWrite): EpgFeedStatus {
-        if (r.name.isBlank() || r.name.length>80 || r.name.any { it.code<32 } || r.intervalMinutes !in 15..1440)
+        if (r.name.isBlank() || r.name.length>80 || r.name.any { it.code<32 } || r.url.length>2048 || r.intervalMinutes !in 15..1440)
             fail(HttpStatus.BAD_REQUEST,"Invalid EPG feed name or refresh interval (15..1440 minutes)")
         Subscriptions.httpUri(r.url)
         // Serialize creates globally to keep the scheduled-fetch and storage budgets finite.

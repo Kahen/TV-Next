@@ -52,6 +52,23 @@ class EpgFeedIntegrationTest @Autowired constructor(private val db: JdbcTemplate
         assertNotNull(failed.lastError);assertEquals(refreshed.updatedAt,failed.updatedAt)
         assertEquals("今日新闻",service.guide(session.user.id,saved.id,guideRequest()).channels.single().current?.title)
     }
+    @Test fun concurrentApiInstancesShareOneRefreshLeaseAndDeletingInFlightNeverResurrectsFeed() {
+        val owner=user().user.id;val saved=feeds.create(owner,EpgFeedWrite("News","https://example.org/guide"))
+        val entered=java.util.concurrent.CountDownLatch(1);val release=java.util.concurrent.CountDownLatch(1)
+        val transport=object:ProviderTransport() { override fun get(uri: URI,headers: Map<String,String>,form: String?): String {
+            entered.countDown();check(release.await(5,java.util.concurrent.TimeUnit.SECONDS));return xml
+        } }
+        val first=EpgFeeds(db,transport,XmltvGuideService());val second=EpgFeeds(db,transport,XmltvGuideService())
+        java.util.concurrent.Executors.newSingleThreadExecutor().use { pool ->
+            val pending=pool.submit<Int> { try { first.refresh(owner,saved.id);200 } catch(e:ResponseStatusException) { e.statusCode.value() } }
+            try {
+                assertTrue(entered.await(5,java.util.concurrent.TimeUnit.SECONDS))
+                assertEquals(429,assertFailsWith<ResponseStatusException> { second.refresh(owner,saved.id) }.statusCode.value())
+                feeds.remove(owner,saved.id)
+            } finally { release.countDown() }
+            assertEquals(404,pending.get(5,java.util.concurrent.TimeUnit.SECONDS));assertTrue(feeds.list(owner).isEmpty())
+        }
+    }
     @Test fun schedulerHonorsOptInIntervalsAndDeviceRevocation() {
         val active=user();val revoked=user()
         var calls=0
@@ -69,6 +86,7 @@ class EpgFeedIntegrationTest @Autowired constructor(private val db: JdbcTemplate
         val owner=user().user.id
         assertFailsWith<ResponseStatusException> { feeds.create(owner,EpgFeedWrite("Bad","file:///etc/passwd")) }
         assertFailsWith<ResponseStatusException> { feeds.create(owner,EpgFeedWrite("Bad","https://example.org/guide",intervalMinutes=1)) }
+        assertFailsWith<ResponseStatusException> { feeds.create(owner,EpgFeedWrite("Bad","https://example.org/"+"a".repeat(2048))) }
         val privateFeed=feeds.create(owner,EpgFeedWrite("Denied","http://127.0.0.1/secret"))
         val result=feeds.refresh(owner,privateFeed.id)
         assertFalse(result.available);assertNotNull(result.lastError)
@@ -77,6 +95,17 @@ class EpgFeedIntegrationTest @Autowired constructor(private val db: JdbcTemplate
         assertEquals(10,feeds.list(owner).size)
         feeds.remove(owner,privateFeed.id)
         assertEquals(9,feeds.list(owner).size)
+    }
+    @Test fun simultaneousCreatesCannotExceedPerAccountQuota() {
+        val owner=user().user.id
+        repeat(9) { feeds.create(owner,EpgFeedWrite("Feed $it","https://example.org/$it")) }
+        java.util.concurrent.Executors.newFixedThreadPool(2).use { pool ->
+            val results=pool.invokeAll((1..2).map { java.util.concurrent.Callable {
+                try { feeds.create(owner,EpgFeedWrite("Concurrent $it","https://example.org/new-$it"));200 }
+                catch(e:ResponseStatusException) { e.statusCode.value() }
+            } }).map { it.get() }.sorted()
+            assertEquals(listOf(200,409),results);assertEquals(10,feeds.list(owner).size)
+        }
     }
     @Test fun sharedNativeAndJvmGoldenGuideMatchesSameChannelsAndTimes() {
         val actual=XmltvGuideService().guide(EpgGuideRequest(xml,listOf(EpgChannelRequest("news","News"),EpgChannelRequest("unknown","Unknown")),"2026-10-23T04:30:00Z",12))
