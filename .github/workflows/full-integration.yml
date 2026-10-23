@@ -1,0 +1,75 @@
+name: Full Cross-Platform Integration Gate
+
+# A code-level integration gate. Real-browser and Apple-device E2E remain P6 gates.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/**"
+      - "services/**"
+      - "fixtures/**"
+      - "compose.yaml"
+      - "scripts/compose_smoke.py"
+      - "packages/contracts/**"
+      - ".github/workflows/**"
+  pull_request:
+    paths:
+      - ".github/workflows/full-integration.yml"
+      - ".github/workflows/ci.yml"
+      - ".github/workflows/ios.yml"
+      - ".github/workflows/compose-smoke.yml"
+      - ".github/workflows/spider-sandbox.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: full-integration-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web-api:
+    uses: ./.github/workflows/ci.yml
+
+  ios:
+    uses: ./.github/workflows/ios.yml
+
+  compose:
+    uses: ./.github/workflows/compose-smoke.yml
+
+  spider:
+    uses: ./.github/workflows/spider-sandbox.yml
+
+  verify:
+    name: Gate verification
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [web-api, ios, compose, spider]
+    steps:
+      - name: Publish coverage and reject any incomplete check
+        env:
+          WEB_API: ${{ needs.web-api.result }}
+          IOS: ${{ needs.ios.result }}
+          COMPOSE: ${{ needs.compose.result }}
+          SPIDER: ${{ needs.spider.result }}
+        run: |
+          {
+            echo "## Full cross-platform integration"
+            echo ""
+            echo "| Subsystem | Result |"
+            echo "| --- | --- |"
+            echo "| Web + Kotlin API tests/build | $WEB_API |"
+            echo "| Swift parser smoke + unsigned iOS simulator | $IOS |"
+            echo "| Real Docker Compose/nginx/API golden HTTP checks | $COMPOSE |"
+            echo "| Node/Python/Java isolation and JAR inspection | $SPIDER |"
+            echo ""
+            echo "This gate does not validate actual browser codecs, physical Apple playback,"
+            echo "authorized third-party Spider compatibility, security audit or signed distribution."
+          } >> "$GITHUB_STEP_SUMMARY"
+          for outcome in "$WEB_API" "$IOS" "$COMPOSE" "$SPIDER"; do
+            if [ "$outcome" != success ]; then
+              echo "Full integration gate rejected: $outcome" >&2
+              exit 1
+            fi
+          done

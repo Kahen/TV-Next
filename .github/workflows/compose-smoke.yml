@@ -21,6 +21,7 @@ on:
       - fixtures/**
       - scripts/compose_smoke.py
       - .github/workflows/compose-smoke.yml
+  workflow_call:
   workflow_dispatch:
 
 permissions:
