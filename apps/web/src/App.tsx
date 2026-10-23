@@ -4,7 +4,7 @@ import { postText, requestJson } from "./api";
 import type { Channel, CatalogPreview, ConfigPreview, PlaylistResult } from "./api";
 import {
   addRecent, emptyLibrary, loadLibrary, saveLibrary,
-  setPosition, toggleFavorite, validMediaUrl
+  replacePlaylistChannels, setPosition, toggleFavorite, validMediaUrl
 } from "./library";
 import type { LibraryState } from "./library";
 import { isPlayableLocalMedia, shiftWebVtt, toWebVtt } from "./subtitles";
@@ -262,12 +262,10 @@ export default function App() {
     setError("");
     try {
       const parsed = await postText<PlaylistResult>("/api/v1/playlists/parse", rawText);
-      if (parsed.total > 1500) {
-        setError("本地媒体库最多保留前 1500 个频道，可通过搜索或分组管理。");
-      } else if (!parsed.total) {
-        setError("未找到可播放的 HTTP(S) 频道。");
-      }
-      setLibrary((state) => ({...state,channels:parsed.channels.slice(0,1500)}));
+      const decision = replacePlaylistChannels(libraryRef.current, parsed);
+      if (decision.warning) setError(decision.warning);
+      if (!decision.applied) return;
+      setLibrary((state) => replacePlaylistChannels(state, parsed).state);
       setSelected(null);
       setCollection("all");
       setFilter("");

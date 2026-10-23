@@ -7,7 +7,7 @@ Status: initial implementation. This is **local persistence**, NOT account-based
 - Web stores normalized M3U channels, favorites, recent streams and finite-duration VOD progress in the current origin's localStorage (schema key: tv-next-library-v1, version 1).
 - iPhone/iPad independently store a bounded Codable snapshot in app UserDefaults and use AVPlayer for finite-VOD resume. Offline M3U file/text parsing does not require a server.
 - Choosing a channel adds it to recent; repeated plays move it to the top.
-- Favorites are keyed by the media URL; replacing a playlist preserves favorites and history where the stored URL is still available.
+- Favorites are keyed by the media URL; replacing a playlist preserves favorites and history where the stored URL is still available. An empty or all-invalid M3U import now **keeps the previous channel list and metadata** and displays an error; a valid nonempty import intentionally replaces channels (up to 1,500).
 - Resume time is saved periodically and on pause, for finite-duration items longer than 60 seconds. Live/infinite streams and nearly finished items do not retain progress.
 - Web exposes a confirmation before clearing data; iOS uses a destructive confirmation dialog.
 
