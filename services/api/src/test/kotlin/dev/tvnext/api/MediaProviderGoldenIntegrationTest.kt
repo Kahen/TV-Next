@@ -25,7 +25,7 @@ class MediaProviderGoldenIntegrationTest(@Autowired private val mvc: MockMvc) {
 
     private fun callMedia(path: String, fields: Map<String, Any> = emptyMap()) =
         mvc.perform(
-            callMedia("/api/v1/media/$path")
+            post("/api/v1/media/$path")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request(fields))
         )
