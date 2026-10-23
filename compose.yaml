@@ -3,7 +3,11 @@ services:
     build:
       context: ./services/api
     environment:
+      TV_NEXT_DB_URL: jdbc:h2:file:/data/tvnext;DB_CLOSE_ON_EXIT=FALSE
+      TV_NEXT_REGISTRATION_OPEN: ${TV_NEXT_REGISTRATION_OPEN:-false}
       TV_NEXT_CORS_ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+    volumes:
+      - api-data:/data
     ports:
       - "127.0.0.1:8080:8080"
     restart: unless-stopped
@@ -15,3 +19,6 @@ services:
     ports:
       - "127.0.0.1:3000:80"
     restart: unless-stopped
+
+volumes:
+  api-data:

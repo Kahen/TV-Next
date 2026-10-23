@@ -1,5 +1,24 @@
 server:
   port: 8080
+  tomcat:
+    threads:
+      max: 32
+      min-spare: 4
+    accept-count: 64
 spring:
   application:
     name: tv-next-api
+  datasource:
+    url: ${TV_NEXT_DB_URL:jdbc:h2:file:./data/tvnext;DB_CLOSE_ON_EXIT=FALSE}
+    username: ${TV_NEXT_DB_USER:sa}
+    password: ${TV_NEXT_DB_PASSWORD:}
+    hikari:
+      maximum-pool-size: 8
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      show-details: never

@@ -72,6 +72,26 @@ class TransportIntegrationTest {
             one.join(3000);two.join(3000)
         } }
     }
+    @Test fun globalAdmissionBoundsConcurrentRequestsAndReleasesSlots() {
+        val filter=ApiRequestLimits()
+        val entered=java.util.concurrent.CountDownLatch(8)
+        val release=java.util.concurrent.CountDownLatch(1)
+        val pool=java.util.concurrent.Executors.newFixedThreadPool(8)
+        try {
+            val work=(0 until 8).map { index -> pool.submit {
+                val request=MockHttpServletRequest("GET","/api/v1/home/library").apply { remoteAddr="192.0.2."+index }
+                filter.doFilter(request,MockHttpServletResponse(),FilterChain { _,_ -> entered.countDown();assertTrue(release.await(5,TimeUnit.SECONDS)) })
+            } }
+            assertTrue(entered.await(5,TimeUnit.SECONDS))
+            val rejected=MockHttpServletResponse()
+            filter.doFilter(MockHttpServletRequest("GET","/api/v1/home/library"),rejected,FilterChain { _,_ -> fail("Ninth request must wait for capacity") })
+            assertEquals(429,rejected.status)
+            release.countDown();work.forEach { it.get(5,TimeUnit.SECONDS) }
+            var reached=false
+            filter.doFilter(MockHttpServletRequest("GET","/api/v1/home/library"),MockHttpServletResponse(),FilterChain { _,_ -> reached=true })
+            assertTrue(reached)
+        } finally { release.countDown();pool.shutdownNow() }
+    }
     @Test fun envelopeLimitAlsoAppliesWhenLengthIsUnknownAndRateIsPerActualPeer() {
         val filter = ApiRequestLimits()
         val request = MockHttpServletRequest("POST","/api/v1/resources/text").apply { setContent(ByteArray(3_145_729));remoteAddr="127.0.0.1" }

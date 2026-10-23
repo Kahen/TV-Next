@@ -23,6 +23,7 @@ private struct TextImportRequest: Encodable {
 
 struct TVNextAPI {
     let server: URL
+    var token: String? = nil
 
     func parsePlaylist(_ content: String) async throws -> [TVChannel] {
         guard let scheme = server.scheme?.lowercased(),

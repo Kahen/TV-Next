@@ -10,6 +10,9 @@ import type { LibraryState } from "./library";
 import { isPlayableLocalMedia, shiftWebVtt, toWebVtt } from "./subtitles";
 import { exportM3u } from "./playlistExport";
 import MediaBrowser from "./MediaBrowser";
+import HomeServerPanel from "./HomeServerPanel";
+import { useRemoteControl } from "./useRemoteControl";
+import { loadHomeSession, saveHomeSession } from "./homeApi";
 import CloudBrowser from "./CloudBrowser";
 import SubscriptionBrowser from "./SubscriptionBrowser";
 import DanmakuOverlay, { defaultDanmakuSettings } from "./DanmakuOverlay";
@@ -19,12 +22,14 @@ import "./media-style.css";
 import EpgGuide from "./EpgGuide";
 import "./epg-style.css";
 
-type Tab = "playlist" | "config" | "media" | "epg";
+type Tab = "playlist" | "config" | "media" | "epg" | "home";
 type Collection = "all" | "favorites" | "recent";
 
 export default function App() {
   const [danmaku, setDanmaku] = useState<DanmakuComment[]>([]);
   const [danmakuSettings, setDanmakuSettings] = useState(defaultDanmakuSettings);
+  const [homeSession, setHomeSession] = useState(loadHomeSession);
+  useEffect(() => saveHomeSession(homeSession), [homeSession]);
   const [tab, setTab] = useState<Tab>("playlist");
   const [collection, setCollection] = useState<Collection>("all");
   const [rawText, setRawText] = useState("");
@@ -50,6 +55,14 @@ export default function App() {
   const libraryRef = useRef(library);
   libraryRef.current = library;
   const channels = library.channels;
+  const remoteState = useRemoteControl(homeSession,async packet=>{
+    const video=videoRef.current;
+    if(packet.type==="LOAD"){if(!packet.url||!validMediaUrl(packet.url))throw Error("无效的播放地址");playChannel({name:"远程媒体",url:packet.url,group:"Remote"});return;}
+    if(!video)throw Error("播放器尚未就绪");
+    if(packet.type==="PLAY"){await video.play();return;}
+    if(packet.type==="PAUSE"){video.pause();return;}
+    if(packet.type==="SEEK"){if(typeof packet.position!=="number"||!Number.isFinite(video.duration)||packet.position<0||packet.position>video.duration)throw Error("当前媒体无法跳转到该位置");video.currentTime=packet.position;}
+  });
 
   // Object URLs are deliberately ephemeral and never written to the media library.
   useEffect(() => () => { if (localVideo) URL.revokeObjectURL(localVideo.url); }, [localVideo]);
@@ -345,6 +358,7 @@ export default function App() {
         <button className={tab === "config" ? "nav active" : "nav"} onClick={() => { setTab("config"); setError(""); }}>⚙ <span>配置检查</span></button>
         <button className={tab === "media" ? "nav active" : "nav"} onClick={() => { setTab("media"); setError(""); }}>▣ <span>影视目录</span></button>
         <button className={tab === "epg" ? "nav active" : "nav"} onClick={() => { setTab("epg"); setError(""); }}>▤ <span>直播节目表</span></button>
+        <button className={tab === "home" ? "nav active" : "nav"} onClick={() => setTab("home")}>⌂ <span>家庭服务器</span></button>
         <div className="side-bottom"><p>Phase 1 · Local library</p><small>资料仅保存在此浏览器。不会自动同步到服务器。</small></div>
       </aside>
       <main>
@@ -400,7 +414,7 @@ export default function App() {
             <span className="hint">本地文件不会上传，也不会保存到播放历史；能否播放取决于浏览器编解码能力。</span>
           </div>
         </div>
-        {tab === "media" ? <><SubscriptionBrowser onPlay={playChannel} onImport={channels=>setLibrary(state=>({...state,channels:channels.slice(0,1500)}))}/><CloudBrowser onPlay={playChannel}/><MediaBrowser onPlay={playChannel} /></> : tab === "epg" ? <EpgGuide channels={channels} onPlay={playChannel} /> : tab === "config" ? <>
+        {tab === "home" ? <HomeServerPanel library={library} onRestore={setLibrary} session={homeSession} onSessionChange={setHomeSession} remoteState={remoteState}/> : tab === "media" ? <><SubscriptionBrowser onPlay={playChannel} onImport={channels=>setLibrary(state=>({...state,channels:channels.slice(0,1500)}))}/><CloudBrowser onPlay={playChannel}/><MediaBrowser onPlay={playChannel} /></> : tab === "epg" ? <EpgGuide channels={channels} onPlay={playChannel} /> : tab === "config" ? <>
           <div className="section-heading"><h2>检查 FongMi JSON 配置</h2><span>STATIC INSPECTION ONLY</span></div>
           <section className="panel">
             <p className="hint">只展示站点、直播分组及 Spider 声明，不会运行 Java/JS/Python 插件或获取远程内容。</p>

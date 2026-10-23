@@ -116,3 +116,7 @@ Initial work lives in feature branches and PRs. Only tested milestones get versi
 ## 2026-10-23 source-parity implementation increment
 
 See [UPSTREAM_COMPATIBILITY.md](UPSTREAM_COMPATIBILITY.md) for exact original source paths and remaining gaps. Subscription decoding and type 0/1/2/4 HTTP operations now have Web/iOS client paths; AList/OpenList directory and raw-link browsing is implemented; Web/native danmaku parsers and timeline overlays are implemented. P3 type 3 execution, direct cloud account/login flows, remaining P4/P5 modules and P6 release gates remain open. This increment must not be reported as P1–P6 completion.
+
+### P5 account/sync implementation increment
+
+Accounts, per-device tokens, expiring one-use pairing, user-scoped library CAS, Web/iOS controls, WebSocket ticket/ACK remote control, Flyway migrations, H2/PostgreSQL deployment paths and private metrics/request tracing are implemented in the P5 feature branch. Full CI and deployment acceptance are still required before closing any milestone. See HOME_SERVER.md. Provider/EPG scheduling, shared caches and native media byte relay remain open.

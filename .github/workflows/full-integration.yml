@@ -9,6 +9,7 @@ on:
       - "services/**"
       - "fixtures/**"
       - "compose.yaml"
+      - "compose.nas.yaml"
       - "scripts/**"
       - "packages/contracts/**"
       - ".github/workflows/**"
@@ -18,6 +19,7 @@ on:
       - "services/**"
       - "fixtures/**"
       - "compose.yaml"
+      - "compose.nas.yaml"
       - "scripts/**"
       - "packages/contracts/**"
       - ".github/workflows/full-integration.yml"
@@ -25,6 +27,7 @@ on:
       - ".github/workflows/ios.yml"
       - ".github/workflows/compose-smoke.yml"
       - ".github/workflows/spider-sandbox.yml"
+      - ".github/workflows/nas-integration.yml"
   workflow_dispatch:
 
 permissions:
@@ -47,11 +50,14 @@ jobs:
   spider:
     uses: ./.github/workflows/spider-sandbox.yml
 
+  nas:
+    uses: ./.github/workflows/nas-integration.yml
+
   verify:
     name: Gate verification
     runs-on: ubuntu-latest
     if: always()
-    needs: [web-api, ios, compose, spider]
+    needs: [web-api, ios, compose, spider, nas]
     steps:
       - name: Publish coverage and reject any incomplete check
         env:
@@ -59,6 +65,7 @@ jobs:
           IOS: ${{ needs.ios.result }}
           COMPOSE: ${{ needs.compose.result }}
           SPIDER: ${{ needs.spider.result }}
+          NAS: ${{ needs.nas.result }}
         run: |
           {
             echo "## Full cross-platform integration"
@@ -69,11 +76,12 @@ jobs:
             echo "| Swift parser smoke + unsigned iOS simulator | $IOS |"
             echo "| Real Docker Compose/nginx/API golden HTTP checks | $COMPOSE |"
             echo "| Node/Python/Java isolation and JAR inspection | $SPIDER |"
+            echo "| PostgreSQL NAS HTTP/WS/restart/backup restore | $NAS |"
             echo ""
             echo "This gate does not validate actual browser codecs, physical Apple playback,"
             echo "authorized third-party Spider compatibility, security audit or signed distribution."
           } >> "$GITHUB_STEP_SUMMARY"
-          for outcome in "$WEB_API" "$IOS" "$COMPOSE" "$SPIDER"; do
+          for outcome in "$WEB_API" "$IOS" "$COMPOSE" "$SPIDER" "$NAS"; do
             if [ "$outcome" != success ]; then
               echo "Full integration gate rejected: $outcome" >&2
               exit 1

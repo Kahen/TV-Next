@@ -8,6 +8,7 @@ private struct SavedLibrary: Codable {
     let favorites: [String]
     let recent: [TVChannel]
     let positions: [String: Double]
+    let recentTimes: [String:Double]?
 }
 
 @MainActor
@@ -22,6 +23,7 @@ final class MediaLibraryStore: ObservableObject {
     @Published private(set) var captionText = ""
     @Published private(set) var captionOffset: TimeInterval = 0
 
+    private var recentTimes: [String:Double] = [:]
     private var currentLocalFile: URL?
     private var captionCues: [CaptionCue] = []
     private var captionObserver: Any?
@@ -104,6 +106,8 @@ final class MediaLibraryStore: ObservableObject {
         recent.removeAll { $0.url == channel.url }
         recent.insert(channel, at: 0)
         recent = Array(recent.prefix(100))
+        recentTimes[channel.url] = Date().timeIntervalSince1970 * 1000
+        recentTimes = recentTimes.filter { key,_ in recent.contains(where: { $0.url == key }) }
 
         let item = AVPlayerItem(url: url)
         let resume = positions[channel.url]
@@ -193,6 +197,7 @@ final class MediaLibraryStore: ObservableObject {
         channels = []
         favorites = []
         recent = []
+        recentTimes = [:]
         positions = [:]
         UserDefaults.standard.removeObject(forKey: storageKey)
     }
@@ -208,10 +213,24 @@ final class MediaLibraryStore: ObservableObject {
             MediaAddress.valid($0) && seenFavorites.insert($0).inserted
         }.prefix(300))
         recent = Array(saved.recent.filter { MediaAddress.valid($0.url) }.prefix(100))
+        recentTimes = saved.recentTimes ?? [:]
         positions = saved.positions.filter { MediaAddress.valid($0.key) && $0.value.isFinite &&
             $0.value >= 0 && $0.value < 604800 }
     }
 
+    func syncedSnapshot() -> NativeLibrarySnapshot {
+        NativeLibrarySnapshot(version:1,channels:channels.map(safeSnapshot),favorites:favorites,
+            recent:recent.map { NativeRecent(channel:safeSnapshot($0),openedAt:recentTimes[$0.url] ?? 0) },positions:positions)
+    }
+    func restoreSnapshot(_ value: NativeLibrarySnapshot) throws {
+        guard value.version == 1,value.channels.count<=1500,value.favorites.count<=300,value.recent.count<=100,value.positions.count<=250 else { throw NativeRequestError.message("备份版本或数量无效") }
+        channels=Array(value.channels.filter { MediaAddress.valid($0.url) }.prefix(1500))
+        favorites=Array(value.favorites.filter { MediaAddress.valid($0) }.prefix(300))
+        recent=Array(value.recent.filter { MediaAddress.valid($0.channel.url) && $0.openedAt.isFinite && $0.openedAt>=0 }.map(\.channel).prefix(100))
+        recentTimes=Dictionary(value.recent.map { ($0.channel.url,$0.openedAt) },uniquingKeysWith:max)
+        positions=value.positions.filter { MediaAddress.valid($0.key) && $0.value.isFinite && $0.value>=0 && $0.value<604800 }
+        persist()
+    }
     private func safeSnapshot(_ channel: TVChannel) -> TVChannel {
         var result = channel
         result.headersRequired = channel.headersRequired == true || !(channel.headers ?? [:]).isEmpty
@@ -221,7 +240,7 @@ final class MediaLibraryStore: ObservableObject {
     private func persist() {
         let value = SavedLibrary(
             version: 1, channels: channels.map(safeSnapshot), favorites: favorites,
-            recent: recent.map(safeSnapshot), positions: positions
+            recent: recent.map(safeSnapshot), positions: positions, recentTimes: recentTimes
         )
         guard let data = try? JSONEncoder().encode(value), data.count <= 2_000_000 else { return }
         UserDefaults.standard.set(data, forKey: storageKey)

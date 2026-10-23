@@ -6,7 +6,9 @@ info:
     and AList/OpenList metadata operations. Type 3 remote code activation and media
     streaming proxy are not implemented. Network destinations are public by default;
     explicit LAN origins are configured by the administrator. POST envelopes are limited
-    to 3 MiB and peers to 300 requests/minute.
+    to 3 MiB and peers to 300 requests/minute. Home accounts, device pairing, revision-based
+    library synchronization and one-use WebSocket ticket endpoints are opt-in; registration
+    is disabled by default.
 servers:
 - url: http://localhost:8080
 paths:
@@ -527,6 +529,357 @@ paths:
         '502':
           description: Provider transport, denied destination or invalid upstream
             response
+  /api/v1/home/auth/register:
+    post:
+      summary: Create an account only while administrator registration is enabled
+      security: []
+      responses:
+        '200':
+          description: Successful result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HomeSession'
+        '400':
+          description: Invalid input
+        '401':
+          description: Missing, revoked or expired credentials/code
+        '403':
+          description: Registration disabled
+        '404':
+          description: Unknown owned resource
+        '409':
+          description: Revision conflict, device quota or offline target
+        '429':
+          description: Request/connection limit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Credentials'
+  /api/v1/home/auth/login:
+    post:
+      summary: Authenticate and issue a 90-day device token
+      security: []
+      responses:
+        '200':
+          description: Successful result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HomeSession'
+        '400':
+          description: Invalid input
+        '401':
+          description: Missing, revoked or expired credentials/code
+        '403':
+          description: Registration disabled
+        '404':
+          description: Unknown owned resource
+        '409':
+          description: Revision conflict, device quota or offline target
+        '429':
+          description: Request/connection limit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Credentials'
+  /api/v1/home/diagnostics:
+    get:
+      summary: Read aggregate process counters and only this user's device/library totals
+      security:
+      - deviceBearer: []
+      responses:
+        '200':
+          description: Aggregate diagnostics without tokens, media URLs or other users' data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HomeDiagnostics'
+        '401':
+          description: Missing, revoked or expired credentials
+        '429':
+          description: Request or concurrency limit
+  /api/v1/home/devices:
+    get:
+      summary: List this user's active devices
+      security:
+      - deviceBearer: []
+      responses:
+        '200':
+          description: Successful result
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HomeDevice'
+        '400':
+          description: Invalid input
+        '401':
+          description: Missing, revoked or expired credentials/code
+        '403':
+          description: Registration disabled
+        '404':
+          description: Unknown owned resource
+        '409':
+          description: Revision conflict, device quota or offline target
+        '429':
+          description: Request/connection limit
+  /api/v1/home/devices/{id}/revoke:
+    post:
+      summary: Revoke an owned device and close its remote channel
+      security:
+      - deviceBearer: []
+      responses:
+        '200':
+          description: Successful result
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          description: Invalid input
+        '401':
+          description: Missing, revoked or expired credentials/code
+        '403':
+          description: Registration disabled
+        '404':
+          description: Unknown owned resource
+        '409':
+          description: Revision conflict, device quota or offline target
+        '429':
+          description: Request/connection limit
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          maxLength: 36
+  /api/v1/home/pairings:
+    post:
+      summary: Create a five-minute one-use pairing code
+      security:
+      - deviceBearer: []
+      responses:
+        '200':
+          description: Successful result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PairingCode'
+        '400':
+          description: Invalid input
+        '401':
+          description: Missing, revoked or expired credentials/code
+        '403':
+          description: Registration disabled
+        '404':
+          description: Unknown owned resource
+        '409':
+          description: Revision conflict, device quota or offline target
+        '429':
+          description: Request/connection limit
+  /api/v1/home/pairings/claim:
+    post:
+      summary: Claim a new device using a one-use pairing code
+      security: []
+      responses:
+        '200':
+          description: Successful result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HomeSession'
+        '400':
+          description: Invalid input
+        '401':
+          description: Missing, revoked or expired credentials/code
+        '403':
+          description: Registration disabled
+        '404':
+          description: Unknown owned resource
+        '409':
+          description: Revision conflict, device quota or offline target
+        '429':
+          description: Request/connection limit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PairingRequest'
+  /api/v1/home/library:
+    get:
+      summary: Read the user-scoped library and revision
+      security:
+      - deviceBearer: []
+      responses:
+        '200':
+          description: Successful result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncedLibrary'
+        '400':
+          description: Invalid input
+        '401':
+          description: Missing, revoked or expired credentials/code
+        '403':
+          description: Registration disabled
+        '404':
+          description: Unknown owned resource
+        '409':
+          description: Revision conflict, device quota or offline target
+        '429':
+          description: Request/connection limit
+    post:
+      summary: Atomically update only the expected library revision
+      security:
+      - deviceBearer: []
+      responses:
+        '200':
+          description: Successful result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncedLibrary'
+        '400':
+          description: Invalid input
+        '401':
+          description: Missing, revoked or expired credentials/code
+        '403':
+          description: Registration disabled
+        '404':
+          description: Unknown owned resource
+        '409':
+          description: Revision conflict, device quota or offline target
+        '429':
+          description: Request/connection limit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveLibraryRequest'
+  /api/v1/home/remote/ticket:
+    post:
+      summary: Issue a 30-second one-use WebSocket ticket
+      security:
+      - deviceBearer: []
+      responses:
+        '200':
+          description: Successful result
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - ticket
+                - expiresAt
+        '400':
+          description: Invalid input
+        '401':
+          description: Missing, revoked or expired credentials/code
+        '403':
+          description: Registration disabled
+        '404':
+          description: Unknown owned resource
+        '409':
+          description: Revision conflict, device quota or offline target
+        '429':
+          description: Request/connection limit
+  /api/v1/home/remote/devices:
+    get:
+      summary: List owned devices and remote connection status
+      security:
+      - deviceBearer: []
+      responses:
+        '200':
+          description: Successful result
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        '400':
+          description: Invalid input
+        '401':
+          description: Missing, revoked or expired credentials/code
+        '403':
+          description: Registration disabled
+        '404':
+          description: Unknown owned resource
+        '409':
+          description: Revision conflict, device quota or offline target
+        '429':
+          description: Request/connection limit
+  /api/v1/home/remote/commands:
+    post:
+      summary: Send a bounded command to an online device of this account
+      security:
+      - deviceBearer: []
+      responses:
+        '200':
+          description: Successful result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemoteStatus'
+        '400':
+          description: Invalid input
+        '401':
+          description: Missing, revoked or expired credentials/code
+        '403':
+          description: Registration disabled
+        '404':
+          description: Unknown owned resource
+        '409':
+          description: Revision conflict, device quota or offline target
+        '429':
+          description: Request/connection limit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RemoteRequest'
+  /api/v1/home/remote/commands/{id}:
+    get:
+      summary: Read sender-owned command delivery/ACK state for five minutes
+      security:
+      - deviceBearer: []
+      responses:
+        '200':
+          description: Successful result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemoteStatus'
+        '400':
+          description: Invalid input
+        '401':
+          description: Missing, revoked or expired credentials/code
+        '403':
+          description: Registration disabled
+        '404':
+          description: Unknown owned resource
+        '409':
+          description: Revision conflict, device quota or offline target
+        '429':
+          description: Request/connection limit
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          maxLength: 36
 components:
   schemas:
     TextImportRequest:
@@ -1099,3 +1452,259 @@ components:
           type: integer
           minimum: 0
           maximum: 49
+    Credentials:
+      type: object
+      required:
+      - username
+      - password
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 100
+        password:
+          type: string
+          maxLength: 128
+        deviceName:
+          type: string
+          maxLength: 80
+    HomeDiagnostics:
+      type: object
+      required:
+      - uptimeSeconds
+      - memoryUsedBytes
+      - memoryMaxBytes
+      - httpRequests
+      - httpClientErrors
+      - httpServerErrors
+      - devices
+      - onlineDevices
+      - libraryRevision
+      properties:
+        uptimeSeconds:
+          type: integer
+          format: int64
+          minimum: 0
+        memoryUsedBytes:
+          type: integer
+          format: int64
+          minimum: 0
+        memoryMaxBytes:
+          type: integer
+          format: int64
+          minimum: 0
+        httpRequests:
+          type: integer
+          format: int64
+          minimum: 0
+        httpClientErrors:
+          type: integer
+          format: int64
+          minimum: 0
+        httpServerErrors:
+          type: integer
+          format: int64
+          minimum: 0
+        devices:
+          type: integer
+          format: int64
+          minimum: 0
+        onlineDevices:
+          type: integer
+          format: int64
+          minimum: 0
+        libraryRevision:
+          type: integer
+          format: int64
+          minimum: 0
+    HomeDevice:
+      type: object
+      required:
+      - id
+      - name
+      - createdAt
+      - expiresAt
+      - current
+      properties:
+        id:
+          type: string
+          maxLength: 36
+        name:
+          type: string
+          maxLength: 80
+        createdAt:
+          type: integer
+          format: int64
+        expiresAt:
+          type: integer
+          format: int64
+        current:
+          type: boolean
+    HomeSession:
+      type: object
+      required:
+      - token
+      - user
+      - device
+      properties:
+        token:
+          type: string
+          minLength: 43
+          maxLength: 43
+        user:
+          type: object
+          required:
+          - id
+          - username
+          properties:
+            id:
+              type: string
+              maxLength: 36
+            username:
+              type: string
+              maxLength: 100
+        device:
+          $ref: '#/components/schemas/HomeDevice'
+    LibrarySnapshot:
+      type: object
+      required:
+      - version
+      - channels
+      - favorites
+      - recent
+      - positions
+      properties:
+        version:
+          const: 1
+        channels:
+          type: array
+          maxItems: 1500
+          items:
+            $ref: '#/components/schemas/Channel'
+        favorites:
+          type: array
+          maxItems: 300
+          items:
+            type: string
+            maxLength: 2048
+        recent:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            required:
+            - channel
+            - openedAt
+            properties:
+              channel:
+                $ref: '#/components/schemas/Channel'
+              openedAt:
+                type: number
+                minimum: 0
+        positions:
+          type: object
+          maxProperties: 250
+          additionalProperties:
+            type: number
+            minimum: 0
+            exclusiveMaximum: 604800
+    SyncedLibrary:
+      type: object
+      required:
+      - revision
+      - updatedAt
+      - library
+      properties:
+        revision:
+          type: integer
+          format: int64
+          minimum: 0
+        updatedAt:
+          type: integer
+          format: int64
+        library:
+          $ref: '#/components/schemas/LibrarySnapshot'
+    SaveLibraryRequest:
+      type: object
+      required:
+      - expectedRevision
+      - library
+      properties:
+        expectedRevision:
+          type: integer
+          format: int64
+          minimum: 0
+        library:
+          $ref: '#/components/schemas/LibrarySnapshot'
+    PairingRequest:
+      type: object
+      required:
+      - code
+      properties:
+        code:
+          type: string
+          maxLength: 64
+        deviceName:
+          type: string
+          maxLength: 80
+    PairingCode:
+      type: object
+      required:
+      - code
+      - expiresAt
+      properties:
+        code:
+          type: string
+          maxLength: 19
+        expiresAt:
+          type: integer
+          format: int64
+    RemoteRequest:
+      type: object
+      required:
+      - targetDeviceId
+      - type
+      properties:
+        targetDeviceId:
+          type: string
+          maxLength: 36
+        type:
+          type: string
+          enum:
+          - PLAY
+          - PAUSE
+          - SEEK
+          - LOAD
+        position:
+          type: number
+          minimum: 0
+          exclusiveMaximum: 604800
+        url:
+          type: string
+          maxLength: 4096
+    RemoteStatus:
+      type: object
+      required:
+      - id
+      - state
+      properties:
+        id:
+          type: string
+          maxLength: 36
+        state:
+          type: string
+          enum:
+          - dispatched
+          - acknowledged
+          - rejected
+          - failed
+        message:
+          type:
+          - string
+          - 'null'
+          maxLength: 200
+  securitySchemes:
+    deviceBearer:
+      type: http
+      scheme: bearer
+      description: Opaque per-device token; never place it in URLs.

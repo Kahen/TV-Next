@@ -5,7 +5,7 @@ RUN gradle bootJar --no-daemon
 
 FROM eclipse-temurin:21-jre
 WORKDIR /app
-RUN useradd --system --uid 10001 tvnext
+RUN useradd --system --uid 10001 tvnext && mkdir /data && chown tvnext /data
 COPY --from=build /src/build/libs/*.jar /app/api.jar
 USER 10001
 EXPOSE 8080
