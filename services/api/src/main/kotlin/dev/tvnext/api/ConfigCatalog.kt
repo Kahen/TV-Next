@@ -30,7 +30,7 @@ data class CatalogPreviewResponse(
 @Service
 class ConfigCatalog(private val mapper: ObjectMapper) {
     fun preview(content: String): CatalogPreviewResponse {
-        if (content.isBlank() || content.length > 1_048_576) reject("Config must be 1..1048576 characters")
+        if (content.isBlank() || content.length > 1_048_576 || content.toByteArray(Charsets.UTF_8).size > 1_048_576) reject("Config must be 1..1048576 characters")
         val root = try { mapper.readTree(content) } catch (_: Exception) { reject("Invalid JSON config") }
         if (root == null || !root.isObject) reject("Expected JSON object")
         val siteNodes = root.path("sites")

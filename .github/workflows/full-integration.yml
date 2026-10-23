@@ -14,6 +14,12 @@ on:
       - ".github/workflows/**"
   pull_request:
     paths:
+      - "apps/**"
+      - "services/**"
+      - "fixtures/**"
+      - "compose.yaml"
+      - "scripts/**"
+      - "packages/contracts/**"
       - ".github/workflows/full-integration.yml"
       - ".github/workflows/ci.yml"
       - ".github/workflows/ios.yml"

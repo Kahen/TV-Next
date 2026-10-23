@@ -58,8 +58,12 @@ data class MediaPlayback(
     val url: String,
     val name: String,
     val lineName: String,
-    val provider: String = "static-fongmi-result"
+    val provider: String = "static-fongmi-result",
+    val headers: Map<String, String> = emptyMap(),
+    val subtitles: List<PlaybackResource> = emptyList(),
+    val danmaku: List<PlaybackResource> = emptyList()
 )
+data class PlaybackResource(val name: String, val url: String, val lang: String? = null)
 data class MediaContent(val categories: List<MediaCategory>, val entries: List<MediaEntry>)
 data class MediaEntry(
     val item: MediaItem,
@@ -93,8 +97,8 @@ class StaticFongMiProvider(private val mapper: ObjectMapper) : MediaProvider {
         private const val MAX_TEXT = 2_000
     }
 
-    fun read(content: String): MediaContent {
-        if (content.isBlank() || content.length > MAX_CONTENT) bad("Media JSON must be 1..1048576 chars")
+    fun read(content: String, resolveOpaque: Boolean = false): MediaContent {
+        if (content.isBlank() || content.length > MAX_CONTENT || content.toByteArray(Charsets.UTF_8).size > MAX_CONTENT) bad("Media JSON must be 1..1048576 chars")
         val root = try { mapper.readTree(content) } catch (_: Exception) { bad("Invalid media JSON") }
         if (root == null || !root.isObject) bad("Expected JSON object")
         val types = root.path("class")
@@ -126,7 +130,7 @@ class StaticFongMiProvider(private val mapper: ObjectMapper) : MediaProvider {
             val lineNames = string(node.path("vod_play_from"), MAX_TEXT)
                 .split("$$$")
                 .take(MAX_LINES)
-                .filter { it.isNotBlank() }
+
             val episodeGroups = string(node.path("vod_play_url"), MAX_CONTENT)
                 .split("$$$")
                 .take(MAX_LINES)
@@ -137,13 +141,13 @@ class StaticFongMiProvider(private val mapper: ObjectMapper) : MediaProvider {
                 val parsed = rawEpisodes.split("#").take(MAX_EPISODES).mapNotNull { raw ->
                     if (raw.isBlank()) return@mapNotNull null
                     val split = raw.indexOf('$')
-                    val label = if (split > 0) raw.substring(0, split).take(150) else "Episode"
+                    val label = if (split >= 0) raw.substring(0, split).trim().take(150).ifBlank { "Episode" } else "Episode"
                     val target = if (split >= 0) raw.substring(split + 1) else raw
-                    val playable = target.takeIf { validUrl(it) }
+                    val playable = target.takeIf { validUrl(it) || resolveOpaque && it.isNotBlank() && it.length <= 16384 && !it.any { c -> Character.isISOControl(c) } }
                     Pair(MediaEpisode(label, playable != null), playable)
                 }
                 if (parsed.isNotEmpty()) {
-                    lines += MediaLine(lineNames[index].take(120), parsed.map { it.first })
+                    lines += MediaLine(lineNames[index].take(120).ifBlank { "Line ${index + 1}" }, parsed.map { it.first })
                     urls += parsed.map { it.second }
                 }
             }

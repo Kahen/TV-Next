@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Hls from "hls.js";
-import { postText } from "./api";
+import { postText, requestJson } from "./api";
 import type { Channel, CatalogPreview, ConfigPreview, PlaylistResult } from "./api";
 import {
   addRecent, emptyLibrary, loadLibrary, normalizeLibrary, saveLibrary,
@@ -10,6 +10,11 @@ import type { LibraryState } from "./library";
 import { isPlayableLocalMedia, shiftWebVtt, toWebVtt } from "./subtitles";
 import { exportM3u } from "./playlistExport";
 import MediaBrowser from "./MediaBrowser";
+import CloudBrowser from "./CloudBrowser";
+import SubscriptionBrowser from "./SubscriptionBrowser";
+import DanmakuOverlay, { defaultDanmakuSettings } from "./DanmakuOverlay";
+import { parseDanmaku } from "./danmaku";
+import type { DanmakuComment } from "./danmaku";
 import "./media-style.css";
 import EpgGuide from "./EpgGuide";
 import "./epg-style.css";
@@ -18,6 +23,8 @@ type Tab = "playlist" | "config" | "media" | "epg";
 type Collection = "all" | "favorites" | "recent";
 
 export default function App() {
+  const [danmaku, setDanmaku] = useState<DanmakuComment[]>([]);
+  const [danmakuSettings, setDanmakuSettings] = useState(defaultDanmakuSettings);
   const [tab, setTab] = useState<Tab>("playlist");
   const [collection, setCollection] = useState<Collection>("all");
   const [rawText, setRawText] = useState("");
@@ -87,6 +94,7 @@ export default function App() {
     setError("");
     setLocalVideo(null);
     setSelected(channel);
+    setDanmaku([]); setSubtitleOriginal(""); setSubtitleName("");
     setLibrary((state) => addRecent(state, channel));
   }
 
@@ -134,10 +142,12 @@ export default function App() {
     video.addEventListener("pause", onPause);
     video.addEventListener("ended", onEnded);
 
-    if (isHls && video.canPlayType("application/vnd.apple.mpegurl")) {
+    if (Object.keys(selected?.headers || {}).length && !(isHls && Hls.isSupported())) {
+      setPlayerError("此来源要求额外请求头；当前浏览器原生视频无法附加这些请求头。请使用受支持的服务端播放适配。");
+    } else if (isHls && !Object.keys(selected?.headers || {}).length && video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = url;
     } else if (isHls && Hls.isSupported()) {
-      hls = new Hls({ enableWorker: true });
+      hls = new Hls({ enableWorker: true, xhrSetup: (xhr) => { for (const [key, value] of Object.entries(selected?.headers || {})) xhr.setRequestHeader(key, value); } });
       hls.loadSource(url);
       hls.attachMedia(video);
       hls.on(Hls.Events.ERROR, (_, detail) => {
@@ -171,6 +181,7 @@ export default function App() {
     }
     setError("");
     setSelected(null);
+    setDanmaku([]); setSubtitleOriginal(""); setSubtitleName("");
     setLocalVideo({ url: URL.createObjectURL(file), name: file.name });
     // Browser object URLs do not survive refresh, and must never appear in recent/favorites.
   }
@@ -192,14 +203,23 @@ export default function App() {
     }
   }
 
+  async function loadDanmakuFile(file: File) {
+    try { if(file.size>2097152)throw new Error("弹幕最多 2 MiB");setDanmaku(parseDanmaku(await file.text()));setError(""); }
+    catch(e) {setError(e instanceof Error?e.message:"弹幕导入失败");}
+  }
+  async function loadDanmakuSource(url: string) {
+    try { const result = await requestJson<{content:string}>("/api/v1/resources/text",{url});setDanmaku(parseDanmaku(result.content)); }
+    catch(e) {setError(e instanceof Error?e.message:"弹幕加载失败");}
+  }
+
   async function enterFullscreen() {
     const video = videoRef.current;
     if (!video) return;
-    if (!video.requestFullscreen) {
+    if (!video.parentElement?.requestFullscreen) {
       setPlayerError("此浏览器请使用视频原生的全屏按钮。");
       return;
     }
-    try { await video.requestFullscreen(); } catch {
+    try { await video.parentElement!.requestFullscreen(); } catch {
       setPlayerError("浏览器拒绝进入全屏，请检查权限和用户交互限制。");
     }
   }
@@ -324,9 +344,12 @@ export default function App() {
         {storageWarning && <div className="alert" role="status">{storageWarning}</div>}
         <section className="player-card">
           <div className="player-header"><span className="small-dot" /> {localVideo?.name || selected?.name || "尚未选择媒体"} <span className="player-type">{localVideo ? "LOCAL / NOT SAVED" : "HTTP(S) · HLS / MP4"}</span></div>
+          <div className="video-stage">
           <video ref={videoRef} controls playsInline preload="metadata" aria-label="视频播放器">
             {subtitleUrl && <track key={subtitleUrl} kind="subtitles" label="外置字幕" srcLang="zh" src={subtitleUrl} default />}
           </video>
+          <DanmakuOverlay video={videoRef} comments={danmaku} settings={danmakuSettings}/>
+          </div>
           {playerError && <p className="player-error" role="alert">{playerError}</p>}
           {(selected || localVideo) && <div className="player-actions">
             <button className="secondary" onClick={() => void enterFullscreen()}>⛶ 全屏</button>
@@ -337,6 +360,18 @@ export default function App() {
             {subtitleUrl && <label>字幕偏移（正值延后） <input aria-label="字幕偏移" type="range" min="-10" max="10" step="0.5" value={subtitleOffset} onChange={(e) => setSubtitleOffset(Number(e.target.value))} /> {subtitleOffset.toFixed(1)} 秒</label>}
             {subtitleUrl && <button className="secondary" onClick={() => { setSubtitleOriginal(""); setSubtitleUrl(null); setSubtitleName(""); setSubtitleOffset(0); }} title={subtitleName}>移除字幕</button>}
           </div>}
+          {(selected || localVideo) && <details className="danmaku-controls"><summary>弹幕 · {danmaku.length} 条</summary>
+            <label className="file-picker">导入弹幕 XML / JSON<input type="file" accept=".xml,.json" onChange={e=>{const f=e.target.files?.[0]; if(f)void loadDanmakuFile(f);e.target.value="";}}/></label>
+            {selected?.danmaku?.map((source,i)=><button key={i} onClick={()=>void loadDanmakuSource(source.url)}>{source.name}</button>)}
+            <label><input type="checkbox" checked={danmakuSettings.enabled} onChange={e=>setDanmakuSettings(s=>({...s,enabled:e.target.checked}))}/>显示弹幕</label>
+            <label>透明度<input type="range" min="0.1" max="1" step="0.1" value={danmakuSettings.opacity} onChange={e=>setDanmakuSettings(s=>({...s,opacity:Number(e.target.value)}))}/></label>
+            <label>字号<input type="range" min="12" max="40" value={danmakuSettings.fontSize} onChange={e=>setDanmakuSettings(s=>({...s,fontSize:Number(e.target.value)}))}/></label>
+            <label>显示区域<select value={danmakuSettings.area} onChange={e=>setDanmakuSettings(s=>({...s,area:Number(e.target.value)}))}><option value="0.25">1/4 屏</option><option value="0.5">半屏</option><option value="1">全屏</option></select></label>
+            <label>弹幕时长<input type="range" min="4" max="15" value={danmakuSettings.duration} onChange={e=>setDanmakuSettings(s=>({...s,duration:Number(e.target.value)}))}/></label>
+            <label>偏移（秒）<input type="number" min="-120" max="120" value={danmakuSettings.offset} onChange={e=>setDanmakuSettings(s=>({...s,offset:Math.max(-120,Math.min(120,Number(e.target.value)||0))}))}/></label>
+            <label>屏蔽词（逗号分隔）<input maxLength={1000} value={danmakuSettings.blocked} onChange={e=>setDanmakuSettings(s=>({...s,blocked:e.target.value}))}/></label>
+            <button onClick={()=>setDanmaku([])}>清空弹幕</button>
+          </details>}
           {selected && <div className="player-actions">
             <button className="secondary" onClick={() => setLibrary((state) => toggleFavorite(state, selected.url))}>
               {library.favorites.includes(selected.url) ? "★ 取消收藏" : "☆ 收藏此频道"}
@@ -355,7 +390,7 @@ export default function App() {
             <span className="hint">本地文件不会上传，也不会保存到播放历史；能否播放取决于浏览器编解码能力。</span>
           </div>
         </div>
-        {tab === "media" ? <MediaBrowser onPlay={playChannel} /> : tab === "epg" ? <EpgGuide channels={channels} onPlay={playChannel} /> : tab === "config" ? <>
+        {tab === "media" ? <><SubscriptionBrowser onPlay={playChannel}/><CloudBrowser onPlay={playChannel}/><MediaBrowser onPlay={playChannel} /></> : tab === "epg" ? <EpgGuide channels={channels} onPlay={playChannel} /> : tab === "config" ? <>
           <div className="section-heading"><h2>检查 FongMi JSON 配置</h2><span>STATIC INSPECTION ONLY</span></div>
           <section className="panel">
             <p className="hint">只展示站点、直播分组及 Spider 声明，不会运行 Java/JS/Python 插件或获取远程内容。</p>

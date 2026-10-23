@@ -4,6 +4,9 @@ export interface Channel {
   group: string;
   logo?: string | null;
   tvgId?: string | null;
+  headers?: Record<string, string>;
+  subtitles?: PlaybackResource[];
+  danmaku?: PlaybackResource[];
 }
 export interface PlaylistResult {
   channels: Channel[];
@@ -66,7 +69,7 @@ export interface MediaDetail {
   item: MediaItem; description: string | null; director: string | null;
   actors: string | null; lines: MediaLine[]; provider: string;
 }
-export interface MediaPlayback { url: string; name: string; lineName: string; provider: string }
+export interface MediaPlayback { url: string; name: string; lineName: string; provider: string; headers?: Record<string, string>; subtitles?: PlaybackResource[]; danmaku?: PlaybackResource[] }
 export interface MediaQuery {
   content: string; categoryId?: string; query?: string; vodId?: string;
   page?: number; pageSize?: number; lineIndex?: number; episodeIndex?: number;
@@ -84,6 +87,19 @@ export async function postMedia<T>(path: string, body: MediaQuery): Promise<T> {
     const reason = error && typeof error === "object" && "error" in error
       ? String(error.error) : "HTTP " + response.status;
     throw new Error(reason);
+  }
+  return response.json() as Promise<T>;
+}
+
+export interface PlaybackResource { name: string; url: string; lang?: string | null }
+export interface SubscriptionSite { key: string; name: string; type: number; searchable: boolean; hidden: boolean; support: string }
+export interface SubscriptionDocument { content: string; url: string; sites: SubscriptionSite[]; depots: {name: string; url: string}[]; liveCount: number; warnings: string[] }
+export async function requestJson<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
+  const response = await fetch(base + path, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body), signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(20000)]) : AbortSignal.timeout(20000) });
+  if (!response.ok) {
+    const data: unknown = await response.json().catch(() => null);
+    throw new Error(data && typeof data === "object" && "error" in data ? String(data.error) : "HTTP " + response.status);
   }
   return response.json() as Promise<T>;
 }

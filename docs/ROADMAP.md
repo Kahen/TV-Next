@@ -112,3 +112,7 @@ Acceptance: repeatable signed releases, published limitations, reproducible infr
 ## Release conventions
 
 Initial work lives in feature branches and PRs. Only tested milestones get version tags. Separate Web, Server, and iOS build pipelines; no empty GitHub Release, unverified APK/IPA or pre-signed app claims. Android upstream continues separately in Kahen/TV.
+
+## 2026-10-23 source-parity implementation increment
+
+See [UPSTREAM_COMPATIBILITY.md](UPSTREAM_COMPATIBILITY.md) for exact original source paths and remaining gaps. Subscription decoding and type 0/1/2/4 HTTP operations now have Web/iOS client paths; AList/OpenList directory and raw-link browsing is implemented; Web/native danmaku parsers and timeline overlays are implemented. P3 type 3 execution, direct cloud account/login flows, remaining P4/P5 modules and P6 release gates remain open. This increment must not be reported as P1–P6 completion.
