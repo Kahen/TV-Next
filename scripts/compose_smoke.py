@@ -4,6 +4,7 @@
 Never fetches third-party media, external plugins or XMLTV URLs.
 """
 import json
+from pathlib import Path
 import sys
 import time
 import urllib.error
@@ -100,12 +101,38 @@ def main():
     except urllib.error.HTTPError as error:
         assert error.code == 400, error.code
 
-    media_result = json.dumps({
-        "class": [{"type_id": "movie", "type_name": "Movie"}],
-        "list": [{"vod_id": "fixture-movie", "vod_name": "Sample Movie"}]
-    })
-    movie = json.loads(request(WEB + "/api/v1/media/home", {"content": media_result}))
-    assert movie["items"][0]["id"] == "fixture-movie", movie
+    # Shared golden Result: the same authorized synthetic data is parsed by
+    # Swift offline and Kotlin MockMvc, and now exercised through nginx + real API.
+    media_result = (Path(__file__).resolve().parent.parent
+                    / "fixtures/p2-fongmi-result.json").read_text(encoding="utf-8")
+
+    def media(endpoint, **fields):
+        return json.loads(request(
+            WEB + "/api/v1/media/" + endpoint,
+            {"content": media_result, **fields}
+        ))
+
+    movie = media("home")
+    assert movie["total"] == 3 and len(movie["categories"]) == 2, movie
+    assert movie["items"][0]["id"] == "film-1", movie
+    category = media("category", categoryId="movie")
+    assert category["total"] == 2, category
+    matches = media("search", query="FIXTURE")
+    assert matches["total"] == 2, matches
+    detail = media("detail", vodId="film-1")
+    assert len(detail["lines"]) == 2, detail
+    assert detail["lines"][1]["episodes"][0]["playable"] is False, detail
+    playable = media("play", vodId="film-1", lineIndex=0, episodeIndex=1)
+    assert playable["url"] == "https://example.org/movie2.m3u8", playable
+    for video_id, line_index, episode_index in [
+        ("film-1", 1, 0), ("unsafe", 0, 0)
+    ]:
+        try:
+            media("play", vodId=video_id,
+                  lineIndex=line_index, episodeIndex=episode_index)
+            raise AssertionError("Unsupported episode unexpectedly allowed")
+        except urllib.error.HTTPError as error:
+            assert error.code == 422, (video_id, error.code)
 
     print("SUCCESS: real nginx Web + API proxy + M3U + config + catalog + XMLTV + MediaProvider", flush=True)
 

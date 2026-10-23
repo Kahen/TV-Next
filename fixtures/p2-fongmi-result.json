@@ -1,0 +1,39 @@
+{
+  "class": [
+    {
+      "type_id": "movie",
+      "type_name": "Films"
+    },
+    {
+      "type_id": "series",
+      "type_name": "Shows"
+    }
+  ],
+  "list": [
+    {
+      "vod_id": "film-1",
+      "vod_name": "Fixture Movie",
+      "type_id": "movie",
+      "vod_year": "2026",
+      "vod_remarks": "HD",
+      "vod_content": "A harmless offline sample.",
+      "vod_play_from": "Direct$$$Parser",
+      "vod_play_url": "Episode 1$https://example.org/movie.mp4#Episode 2$https://example.org/movie2.m3u8$$$Requires Spider$script://external"
+    },
+    {
+      "vod_id": "show-1",
+      "vod_name": "Fixture Series",
+      "type_id": "series",
+      "vod_play_from": "CDN",
+      "vod_play_url": "Pilot$https://example.org/pilot.mp4"
+    },
+    {
+      "vod_id": "unsafe",
+      "vod_name": "Blocked URL",
+      "type_id": "movie",
+      "vod_play_from": "Direct",
+      "vod_play_url": "Episode$javascript:alert(1)",
+      "vod_pic": "javascript:alert(1)"
+    }
+  ]
+}
