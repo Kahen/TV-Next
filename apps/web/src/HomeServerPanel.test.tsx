@@ -40,3 +40,21 @@ it("persists device session in this tab only and rejects expired sessions",()=>{
   saveHomeSession(session);expect(loadHomeSession()?.token).toBe(session.token);expect(window.localStorage.length).toBe(0);
   saveHomeSession({...session,device:{...session.device,expiresAt:1}});expect(loadHomeSession()).toBeNull();saveHomeSession(null);expect(loadHomeSession()).toBeNull();
 });
+
+it("signs out immediately, clears prior account controls and revokes only the old token",async()=>{
+  request.mockResolvedValueOnce([{id:"old-target",name:"Old receiver",online:true}]).mockReturnValueOnce(new Promise(()=>{}));
+  render(<Wrapper onRestore={vi.fn()}/>);
+  fireEvent.click(screen.getByText("刷新遥控设备"));await screen.findByText("Old receiver · 在线");
+  fireEvent.change(screen.getByLabelText("遥控目标设备"),{target:{value:"old-target"}});
+  fireEvent.change(screen.getByLabelText("远程媒体地址"),{target:{value:"https://example.org/private.mp4"}});
+  fireEvent.click(screen.getByText("退出本页"));
+  expect(screen.getByLabelText("密码")).toBeTruthy();
+  expect(screen.queryByText("Old receiver · 在线")).toBeNull();
+  expect(request.mock.calls[1]).toEqual(["devices/d1/revoke",{},session.token]);
+  request.mockResolvedValueOnce({...session,token:"b".repeat(43),user:{id:"u2",username:"next"}});
+  fireEvent.change(screen.getByLabelText("账号"),{target:{value:"next"}});
+  fireEvent.change(screen.getByLabelText("密码"),{target:{value:"another-password"}});
+  fireEvent.click(screen.getByText("登录"));await screen.findByText("next · Browser");
+  expect((screen.getByLabelText("遥控目标设备") as HTMLSelectElement).value).toBe("");
+  expect((screen.getByLabelText("远程媒体地址") as HTMLInputElement).value).toBe("");
+});
