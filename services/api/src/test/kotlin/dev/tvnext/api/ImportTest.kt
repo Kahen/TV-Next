@@ -1,6 +1,8 @@
 package dev.tvnext.api
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import java.nio.file.Files
+import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -31,6 +33,17 @@ class ImportTest {
     @Test
     fun rejectsOversizeContent() {
         assertFailsWith<ResponseStatusException> { PlaylistParser().parse("x".repeat(1_048_577)) }
+    }
+
+    @Test
+    fun sharedGoldenM3uMatchesNativeMetadataContract() {
+        val fixtureRoot = Path.of("..", "..", "fixtures")
+        val input = Files.readString(fixtureRoot.resolve("p1-m3u-golden.m3u"))
+        val expected = jacksonObjectMapper().readValue(
+            Files.readString(fixtureRoot.resolve("p1-m3u-golden.json")),
+            Array<Channel>::class.java
+        ).toList()
+        assertEquals(expected, PlaylistParser().parse(input).channels)
     }
 
     @Test

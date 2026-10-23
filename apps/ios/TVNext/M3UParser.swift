@@ -54,13 +54,12 @@ enum M3UParser {
             let line = raw.trimmingCharacters(in: .whitespacesAndNewlines)
             if line.lowercased().hasPrefix("#extinf") {
                 let attrs = attributes(in: line)
-                nextName = line.split(separator: ",", omittingEmptySubsequences: false)
-                    .last.map(String.init)?
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                if nextName?.isEmpty != false { nextName = attrs["tvg-name"] ?? "Unnamed" }
+                nextName = title(in: line).flatMap { $0.isEmpty ? nil : $0 }
+                    ?? attrs["tvg-name"].flatMap { $0.isEmpty ? nil : $0 }
+                    ?? "Unnamed"
                 group = attrs["group-title"].flatMap { $0.isEmpty ? nil : $0 } ?? "Uncategorized"
                 logo = attrs["tvg-logo"]
-                tvgId = attrs["tvg-id"]
+                tvgId = attrs["tvg-id"].flatMap { $0.isEmpty ? nil : $0 }
             } else if line.lowercased().hasPrefix("#extgrp:") {
                 let extracted = String(line.dropFirst(8)).trimmingCharacters(in: .whitespacesAndNewlines)
                 group = extracted.isEmpty ? "Uncategorized" : extracted
@@ -82,6 +81,21 @@ enum M3UParser {
             }
         }
         return result
+    }
+
+    /// EXTINF metadata ends at the first comma outside quoted attributes.
+    private static func title(in line: String) -> String? {
+        var quoted = false
+        for index in line.indices {
+            let character = line[index]
+            if character == "\"" {
+                quoted.toggle()
+            } else if character == "," && !quoted {
+                return String(line[line.index(after: index)...])
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
+        return nil
     }
 
     private static func attributes(in line: String) -> [String: String] {
