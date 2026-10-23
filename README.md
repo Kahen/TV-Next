@@ -84,3 +84,7 @@ Java fixture logic now implements a reviewable pure-JVM Provider SPI. For a loca
 Web dependency installs are locked with `apps/web/package-lock.json`. Use `cd apps/web && npm ci` rather than `npm install` for clean development and CI builds; changes to dependencies require committing an updated lockfile.
 
 The [full cross-platform integration gate](.github/workflows/full-integration.yml) runs Web/API, iOS simulator, real Docker Compose and Spider sandbox verification together on relevant `main` changes (and can be dispatched manually). A green result is a code-integration milestone, **not** signed release, real-media/provider compatibility or Apple device certification.
+
+### Original subscription compatibility
+
+TVBox/FongMi subscription handling is tracked against the original Android source, including type 0 XML, type 1/2 JSON and type 4 HTTP Spider operations. Web/iOS subscription browsing, bounded XML/JSON danmaku overlays and AList/OpenList cloud browsing are under active implementation. See [source mappings, usage and explicit gaps](docs/UPSTREAM_COMPATIBILITY.md). Type 3 Android Spider and direct cloud account authentication are not yet complete. Source-derived compatibility changes retain GPL-3.0 attribution in [NOTICE.md](NOTICE.md).

@@ -30,3 +30,10 @@
 .catalog-channel{cursor:default;pointer-events:none}
 .catalog-unavailable{white-space:nowrap;padding:14px;color:#8392ad;font-size:11px}
 .catalog-source .channel-line .secondary{margin:7px 4px}
+.video-stage { position: relative; width: 100%; background: #000; }
+.video-stage video { display: block; width: 100%; }
+.video-stage:fullscreen { display: flex; align-items: center; justify-content: center; height: 100%; }
+.video-stage:fullscreen video { max-height: 100vh; height: 100%; object-fit: contain; }
+.danmaku-overlay { position: absolute; inset: 0; width: 100%; height: calc(100% - 44px); pointer-events: none; }
+.danmaku-controls { padding: 16px; }
+.danmaku-controls label { display: inline-flex; align-items: center; gap: 8px; margin: 8px; }

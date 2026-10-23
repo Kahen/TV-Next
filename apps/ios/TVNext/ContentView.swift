@@ -13,6 +13,11 @@ private enum LibraryView: String, CaseIterable, Identifiable {
 struct ContentView: View {
     @StateObject private var library = MediaLibraryStore()
     @AppStorage("tv-next-api-url") private var serverURL = "http://localhost:8080"
+    @State private var danmaku: [DanmakuComment] = []
+    @State private var danmakuOptions = DanmakuOptions()
+    @State private var remoteResourceKey: String?
+    @State private var remoteDanmaku: [NativePlaybackResource] = []
+    @State private var choosingDanmaku = false
     @State private var manualURL = ""
     @State private var playlistText = ""
     @State private var search = ""
@@ -62,11 +67,22 @@ struct ContentView: View {
                     localMediaSection
                     importSection
                     ConfigPreviewSection()
+                    CloudSection(serverURL: serverURL) { library.play($0) }
+                    SubscriptionSection(serverURL: serverURL, onPlay: { playback, title in
+                        guard playback.headers.isEmpty else {
+                            errorMessage = "此来源需要额外播放请求头，尚需服务端媒体适配。"
+                            return
+                        }
+                        library.play(TVChannel(name: title + " · " + playback.name, url: playback.url, group: playback.lineName, logo: nil, tvgId: nil))
+                        remoteResourceKey = playback.url
+                        remoteDanmaku = playback.danmaku
+                    }, onImport: { library.importChannels($0) })
                     MediaCatalogSection { channel in
                         errorMessage = nil
                         captionFileName = nil
                         library.play(channel)
                     }
+                    danmakuSection
                     librarySection
 
                     Text("本地播放列表、收藏及进度只保存在这台设备；暂不支持跨设备同步。不内置媒体源。")
@@ -120,9 +136,51 @@ struct ContentView: View {
                     search = ""
                 }
             }
+            .fileImporter(isPresented: $choosingDanmaku, allowedContentTypes: [.xml, .json], allowsMultipleSelection: false) { result in
+                do {
+                    guard let file = try result.get().first else { return }
+                    let access = file.startAccessingSecurityScopedResource()
+                    defer { if access { file.stopAccessingSecurityScopedResource() } }
+                    let handle = try FileHandle(forReadingFrom: file)
+                    defer { try? handle.close() }
+                    let data = try handle.read(upToCount: 2_097_153) ?? Data()
+                    guard data.count <= 2_097_152, let text = String(data: data, encoding: .utf8) else { throw DanmakuError.invalid }
+                    danmaku = try DanmakuParser.parse(text)
+                } catch { errorMessage = error.localizedDescription }
+            }
+            .onChange(of: library.current?.url) { _, url in danmaku = []; if url != remoteResourceKey { remoteDanmaku = [] } }
             .onDisappear {
                 library.savePosition()
                 library.player.pause()
+            }
+        }
+    }
+
+    private var danmakuSection: some View {
+        GroupBox("弹幕 · \(danmaku.count) 条") {
+            VStack(alignment: .leading) {
+                Button("导入 XML / JSON 弹幕") { choosingDanmaku = true }.buttonStyle(.bordered)
+                ForEach(remoteDanmaku) { resource in
+                    Button("加载 " + resource.name) {
+                        let key = library.current?.url
+                        Task { @MainActor in
+                            do {
+                                guard let url = URL(string: serverURL) else { throw APIError.invalidServer }
+                                let result: NativeTextResponse = try await TVNextAPI(server: url).request("resources/text", body: NativeResourceRequest(url: resource.url))
+                                guard library.current?.url == key else { return }
+                                danmaku = try DanmakuParser.parse(result.content)
+                            } catch { errorMessage = error.localizedDescription }
+                        }
+                    }
+                }
+                Toggle("显示弹幕", isOn: $danmakuOptions.enabled)
+                HStack { Text("透明度"); Slider(value: $danmakuOptions.opacity, in: 0.1...1) }
+                HStack { Text("字号"); Slider(value: $danmakuOptions.fontSize, in: 12...40, step: 1) }
+                HStack { Text("显示区域"); Slider(value: $danmakuOptions.area, in: 0.25...1, step: 0.25) }
+                HStack { Text("时长"); Slider(value: $danmakuOptions.duration, in: 4...15, step: 1) }
+                HStack { Text("偏移 \(Int(danmakuOptions.offset)) 秒"); Slider(value: $danmakuOptions.offset, in: -120...120, step: 1) }
+                TextField("屏蔽词，逗号分隔", text: $danmakuOptions.blocked).textFieldStyle(.roundedBorder)
+                Button("清空弹幕") { danmaku = [] }
             }
         }
     }
@@ -157,6 +215,7 @@ struct ContentView: View {
                                 .allowsHitTesting(false)
                         }
                     }
+                    .overlay { DanmakuOverlay(player: library.player, comments: danmaku, options: danmakuOptions).padding(.bottom, 44) }
                     .clipShape(RoundedRectangle(cornerRadius: 12))
 
                 HStack {
@@ -176,6 +235,7 @@ struct ContentView: View {
                         .buttonStyle(.bordered)
                     }
                 }
+                if let issue = library.playbackError { Text(issue).font(.caption).foregroundStyle(.red) }
                 Picker("播放速度", selection: $playbackSpeed) {
                     Text("0.75×").tag(Float(0.75))
                     Text("1×").tag(Float(1))

@@ -134,7 +134,25 @@ def main():
         except urllib.error.HTTPError as error:
             assert error.code == 422, (video_id, error.code)
 
-    print("SUCCESS: real nginx Web + API proxy + M3U + config + catalog + XMLTV + MediaProvider", flush=True)
+    subscription = json.loads(request(WEB + "/api/v1/subscriptions/load", {
+        "url": "https://example.org/a/config.json", "content": json.dumps({
+            "spider":"./spider.jar", "sites":[{"key":"pan","type":4,"api":"https://example.org/api","ext":{"token":"own-fixture"}}],
+            "urls":[{"name":"Next","url":"../next.json"}]})
+    }))
+    assert subscription["sites"][0]["type"] == 4
+    assert subscription["sites"][0]["jar"] == "https://example.org/a/spider.jar"
+    assert subscription["depots"][0]["url"] == "https://example.org/next.json"
+    for endpoint, payload, status in [
+        ("/resources/text", {"url":"http://169.254.169.254/latest/meta-data/"}, 502),
+        ("/cloud/list", {"server":"https://example.org", "path":"/../secret"}, 400),
+        ("/subscriptions/detail", {"content":config,"siteKey":"fixture-site","vodId":"1"}, 422)
+    ]:
+        try:
+            request(WEB + "/api/v1" + endpoint, payload)
+            raise AssertionError("Forbidden request unexpectedly accepted: " + endpoint)
+        except urllib.error.HTTPError as error:
+            assert error.code == status, (endpoint,error.code)
+    print("SUCCESS: nginx + API + M3U + config + catalog + XMLTV + MediaProvider + subscriptions + network guards", flush=True)
 
 
 if __name__ == "__main__":

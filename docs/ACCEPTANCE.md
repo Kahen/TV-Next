@@ -55,3 +55,12 @@ This is a **code and API integration gate**, not a claim that SwiftUI navigation
 ### P6 integration orchestration
 
 GitHub Actions [Full Cross-Platform Integration Gate](../.github/workflows/full-integration.yml) brings Web/API, native unsigned simulator, real Compose HTTP and the three Docker isolation runtimes into a single all-or-nothing code verification workflow. This must pass before considering P6 release-candidate validation, but cannot replace permitted real Spider fixtures, comprehensive UI E2E, physical device testing, security reviews or distribution signing.
+
+
+### 2026-10-23 original-source parity increment (PR #26)
+
+Reference Android source is pinned to `Kahen/TV` commit `0af3b31a1783b8fa4f0ce12e52ac9fad78ddfb1e`. Original Decoder/SiteApi/LiveParser/Result/Danmaku semantics are mapped in [UPSTREAM_COMPATIBILITY.md](UPSTREAM_COMPATIBILITY.md). PR #26 adds Web/iOS subscription and AList/OpenList paths, timeline-based danmaku, live references and source-derived protocol cases, including opaque cloud IDs, folder navigation, AES/Base64 envelopes, request headers, and bounded network transport.
+
+Local Web: 27 tests and production build passed. Local API: initial suite successful with 43 cases, 42 passed and 1 LAN-interface-dependent redirect integration check skipped; later source-page and repeatable-header regressions add 2 cases; skipped is not acceptance evidence. CI now publishes exact pass/fail/skip counts and preserves JUnit/HTML artifacts. The final PR head must pass the complete workflow before merge; previous green runs are not proof for later commits.
+
+This does not complete P1–P6: actual type 3 Spider, direct cloud login/QR/OAuth, native header-dependent media adaptation, remaining advanced modules, account/sync services, physical playback, independent security review and signed releases remain outstanding. No issues or milestones are closed on the basis of these fixtures.

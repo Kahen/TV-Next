@@ -21,7 +21,7 @@ fun main(args: Array<String>) {
 }
 
 data class TextImportRequest(val content: String = "")
-data class Channel(val name: String, val url: String, val group: String, val logo: String? = null, val tvgId: String? = null)
+data class Channel(val name: String, val url: String, val group: String, val logo: String? = null, val tvgId: String? = null, val headers: Map<String,String> = emptyMap())
 data class PlaylistResponse(val channels: List<Channel>, val total: Int = channels.size)
 data class SitePreview(val key: String, val name: String, val type: Int?)
 data class ConfigPreviewResponse(val spiderDeclared: Boolean, val sites: List<SitePreview>, val liveGroupCount: Int)
@@ -63,6 +63,7 @@ class PlaylistParser {
         var group = "Uncategorized"
         var logo: String? = null
         var tvgId: String? = null
+        var mediaHeaders = emptyMap<String,String>()
         var lines = 0
         content.lineSequence().forEach { raw ->
             lines++
@@ -76,22 +77,35 @@ class PlaylistParser {
                     group = attrs["group-title"]?.takeIf { it.isNotBlank() } ?: "Uncategorized"
                     logo = attrs["tvg-logo"]?.takeIf { safeHttpUri(it) != null }
                     tvgId = attrs["tvg-id"]?.takeIf { it.isNotBlank() }
+                    attrs["http-user-agent"]?.let { mediaHeaders = mediaHeaders + ("User-Agent" to it) }
                 }
                 line.startsWith("#EXTGRP:", ignoreCase = true) -> {
                     group = line.substringAfter(":").trim().ifBlank { "Uncategorized" }
                 }
+                line.startsWith("#EXTVLCOPT:",true) -> {
+                    val option = line.substringAfter(":"); val field = option.substringBefore('=').lowercase()
+                    val key = mapOf("http-user-agent" to "User-Agent","http-referrer" to "Referer","http-origin" to "Origin","http-cookie" to "Cookie")[field]
+                    if (key != null) mediaHeaders = mediaHeaders + (key to option.substringAfter('=',"").trim())
+                }
+                line.startsWith("#EXTHTTP:",true) -> {
+                    val node = runCatching { com.fasterxml.jackson.module.kotlin.jacksonObjectMapper().readTree(line.substringAfter(':')) }.getOrNull()
+                    if (node?.isObject == true) mediaHeaders = mediaHeaders + node.fields().asSequence().associate { it.key to it.value.asText() }
+                }
                 line.isEmpty() || line.startsWith("#") -> Unit
                 else -> {
-                    val uri = safeHttpUri(line)
+                    val stream = line.substringBefore('|')
+                    val extra = LiveHeaders.inline(line.substringAfter('|',""))
+                    val uri = safeHttpUri(stream)
                     if (uri != null) {
                         if (channels.size >= MAX_CHANNELS) fail("Too many channels")
                         channels += Channel(name?.take(200) ?: (uri.host ?: "Stream"),
-                            line, group.take(100), logo, tvgId?.take(150))
+                            stream, group.take(100), logo, tvgId?.take(150), (mediaHeaders + extra).also { ProviderTransport.validateHeaders(it) })
                     }
                     name = null
                     group = "Uncategorized"
                     logo = null
                     tvgId = null
+                    mediaHeaders = emptyMap()
                 }
             }
         }

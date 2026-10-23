@@ -6,6 +6,8 @@ struct TVChannel: Codable, Identifiable {
     let group: String
     let logo: String?
     let tvgId: String?
+    var headers: [String:String]? = nil
+    var headersRequired: Bool? = nil
 
     var id: String { group + "|" + name + "|" + url }
 }
