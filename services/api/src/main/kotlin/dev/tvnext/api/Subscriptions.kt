@@ -3,6 +3,7 @@ package dev.tvnext.api
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
+import com.fasterxml.jackson.databind.node.ArrayNode
 import java.net.URI
 import java.util.Base64
 import javax.crypto.Cipher
@@ -37,11 +38,13 @@ class Subscriptions(private val mapper: ObjectMapper, private val transport: Pro
         resolveNode(root, base)
         val warnings = mutableListOf<String>()
         val spider = root.path("spider").asText("")
+        if (spider.length > 8192) bad("Spider reference exceeds limit")
         val keys = mutableSetOf<String>()
         if (root.path("sites").size() > 1000 || root.path("urls").size() > 100) bad("Subscription exceeds limits")
         val sites = root.path("sites").takeIf { it.isArray }?.mapNotNull { node ->
             val key = node.path("key").asText("")
             if (key.isBlank() || !keys.add(key)) return@mapNotNull null
+            if (key.length > 200 || node.path("api").asText("").length > 4096 || node.path("jar").asText("").length > 8192) bad("Site field exceeds limit")
             val type = node.path("type").asInt(0)
             val ext = node.path("ext").let { if (it.isObject || it.isArray) it.toString() else it.asText("").trim() }
             SubscriptionSite(key.take(200), node.path("name").asText(key).take(200), type, node.path("api").asText(""), ext,
@@ -56,8 +59,10 @@ class Subscriptions(private val mapper: ObjectMapper, private val transport: Pro
             val url = it.path("url").asText("")
             if (runCatching { httpUri(url) }.isFailure) null else SubscriptionDepot(it.path("name").asText(url).take(200), url)
         }.orEmpty()
-        return SubscriptionDocument(root.toString(), base?.toString().orEmpty(), sites, depots,
+        val document = SubscriptionDocument(root.toString(), base?.toString().orEmpty(), sites, depots,
             root.path("lives").takeIf { it.isArray }?.size() ?: 0, warnings)
+        if (mapper.writeValueAsBytes(document).size > 3_145_728) bad("Normalized subscription response exceeds 3 MiB")
+        return document
     }
     fun site(content: String, base: String, key: String): JsonNode {
         val doc = load(SubscriptionRequest(content, base))
@@ -93,7 +98,11 @@ class Subscriptions(private val mapper: ObjectMapper, private val transport: Pro
                     node.put(key, base.resolve(value.asText()).toString())
                 else resolveNode(value, base, depth + 1)
             }
-            node.isArray -> node.forEach { resolveNode(it, base, depth + 1) }
+            node.isArray -> (node as ArrayNode).forEachIndexed { index, value ->
+                if (value.isTextual && base != null && value.asText().let { it.startsWith("./") || it.startsWith("../") || it.startsWith("//") })
+                    node.set(index,mapper.nodeFactory.textNode(base.resolve(value.asText()).toString()))
+                else resolveNode(value,base,depth+1)
+            }
         }
     }
     companion object {

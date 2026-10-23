@@ -33,7 +33,9 @@ data class MediaItem(
     val categoryName: String?,
     val poster: String?,
     val remarks: String?,
-    val year: String?
+    val year: String?,
+    val folder: Boolean = false,
+    val action: String? = null
 )
 data class MediaEpisode(val name: String, val playable: Boolean)
 data class MediaLine(val name: String, val episodes: List<MediaEpisode>)
@@ -116,7 +118,7 @@ class StaticFongMiProvider(private val mapper: ObjectMapper) : MediaProvider {
         }
         val ids = mutableSetOf<String>()
         val entries = videos.filter { it.isObject }.mapNotNull { node ->
-            val id = string(node.path("vod_id"), 200)
+            val id = string(node.path("vod_id"), if (resolveOpaque) 16384 else 200)
             val name = string(node.path("vod_name"), 200)
             if (id.isBlank() || name.isBlank() || !ids.add(id)) return@mapNotNull null
             val item = MediaItem(
@@ -125,7 +127,9 @@ class StaticFongMiProvider(private val mapper: ObjectMapper) : MediaProvider {
                 string(node.path("type_name"), 150).ifBlank { null },
                 string(node.path("vod_pic"), 2048).takeIf { validUrl(it) },
                 string(node.path("vod_remarks"), 150).ifBlank { null },
-                string(node.path("vod_year"), 30).ifBlank { null }
+                string(node.path("vod_year"), 30).ifBlank { null },
+                node.path("vod_tag").asText() == "folder" || node.path("cate").isObject,
+                string(node.path("action"), 8192).ifBlank { null }
             )
             val lineNames = string(node.path("vod_play_from"), MAX_TEXT)
                 .split("$$$")
@@ -196,7 +200,7 @@ class StaticFongMiProvider(private val mapper: ObjectMapper) : MediaProvider {
     }
 
     private fun entry(data: MediaContent, id: String?): MediaEntry {
-        if (id.isNullOrBlank() || id.length > 200) bad("vodId required")
+        if (id.isNullOrBlank() || id.length > 16384) bad("vodId required")
         return data.entries.firstOrNull { it.item.id == id }
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown video ID")
     }

@@ -13,7 +13,7 @@ import org.springframework.web.server.ResponseStatusException
 
 data class SiteRequest(val content: String = "", val url: String = "", val siteKey: String = "", val categoryId: String? = null,
     val query: String? = null, val vodId: String? = null, val page: Int = 1, val lineIndex: Int = 0,
-    val episodeIndex: Int = 0, val filters: Map<String, String> = emptyMap(), val quick: Boolean = false)
+    val episodeIndex: Int = 0, val action: String? = null, val filters: Map<String, String> = emptyMap(), val quick: Boolean = false)
 data class ProviderPage(val categories: List<MediaCategory>, val items: List<MediaItem>, val total: Int, val page: Int,
     val pageSize: Int, val hasMore: Boolean, val provider: String, val filters: JsonNode)
 
@@ -24,7 +24,7 @@ class SubscribedProvider(private val subscriptions: Subscriptions, private val m
     fun page(op: String, r: SiteRequest): ProviderPage {
         val site = site(r)
         val root = fetch(site, op, r)
-        val data = parser.read(root.toString())
+        val data = parser.read(root.toString(), true)
         val total = root.path("total").asText().toIntOrNull()?.coerceIn(0, 10_000_000) ?: data.entries.size
         val pages = root.path("pagecount").asText().toIntOrNull()?.coerceAtLeast(1) ?: 1
         val allowed = site.path("categories").map { it.asText() }
@@ -35,13 +35,13 @@ class SubscribedProvider(private val subscriptions: Subscriptions, private val m
     }
     fun detail(r: SiteRequest): MediaDetail {
         val site = site(r)
-        val data = parser.read(fetch(site, "detail", r).toString(), site.path("type").asInt() == 4)
+        val data = parser.read(fetch(site, "detail", r).toString(), true)
         return parser.detail(data, MediaQuery(vodId = r.vodId)).copy(provider = r.siteKey)
     }
     fun play(r: SiteRequest): MediaPlayback {
         val site = site(r)
         val type = site.path("type").asInt()
-        val data = parser.read(fetch(site, "detail", r).toString(), type == 4)
+        val data = parser.read(fetch(site, "detail", r).toString(), true)
         val entry = data.entries.firstOrNull { it.item.id == r.vodId } ?: reject("Unknown video", HttpStatus.NOT_FOUND)
         val line = entry.lines.getOrNull(r.lineIndex) ?: reject("Invalid lineIndex")
         val episode = line.episodes.getOrNull(r.episodeIndex) ?: reject("Invalid episodeIndex")
@@ -67,6 +67,13 @@ class SubscribedProvider(private val subscriptions: Subscriptions, private val m
         val resultHeaders = header(root.path("header")).ifEmpty { headers }
         return MediaPlayback(resultUrl, episode.name, line.name, r.siteKey, resultHeaders,
             resources(root.path("subs")), resources(root.path("danmaku")))
+    }
+    fun action(r: SiteRequest): JsonNode {
+        val site = site(r)
+        if (site.path("type").asInt() != 4) reject("Only HTTP Spider actions are supported",HttpStatus.UNPROCESSABLE_ENTITY)
+        val address = r.action?.takeIf { it.isNotBlank() } ?: reject("action required")
+        return try { mapper.readTree(transport.get(Subscriptions.httpUri(address))) }
+            catch (e: ResponseStatusException) { throw e } catch (_: Exception) { reject("Invalid action response",HttpStatus.BAD_GATEWAY) }
     }
     internal fun params(type: Int, op: String, r: SiteRequest, ext: String): Map<String, String> {
         val p = linkedMapOf<String, String>()
@@ -103,7 +110,7 @@ class SubscribedProvider(private val subscriptions: Subscriptions, private val m
         val p = params(type, op, r, ext) + extra
         val endpoint = Subscriptions.httpUri(site.path("api").asText())
         val body = p.entries.joinToString("&") { URLEncoder.encode(it.key, Charsets.UTF_8) + "=" + URLEncoder.encode(it.value, Charsets.UTF_8) }
-        val post = ext.length > 1000 && op != "home"
+        val post = ext.length > 1000 && (op != "home" || type == 4)
         val url = if (post || body.isEmpty()) endpoint else URI(endpoint.toString() + (if (endpoint.rawQuery == null) "?" else "&") + body)
         val text = transport.get(url, header(site.path("header")), if (post) body else null)
         val root = try { if (type == 0) xml.parse(text) else mapper.readTree(text) }
@@ -130,6 +137,7 @@ class SubscribedProvider(private val subscriptions: Subscriptions, private val m
 @RestController
 @RequestMapping("/api/v1/subscriptions")
 class SubscribedProviderController(private val service: SubscribedProvider) {
+    @PostMapping("/action") fun action(@RequestBody r: SiteRequest) = service.action(r)
     @PostMapping("/home") fun home(@RequestBody r: SiteRequest) = service.page("home", r)
     @PostMapping("/category") fun category(@RequestBody r: SiteRequest) = service.page("category", r)
     @PostMapping("/search") fun search(@RequestBody r: SiteRequest) = service.page("search", r)

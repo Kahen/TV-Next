@@ -63,6 +63,11 @@ function asChannel(input: unknown): Channel | null {
   if (value.tvgId === null || typeof value.tvgId === "string") {
     channel.tvgId = typeof value.tvgId === "string" ? value.tvgId.slice(0, 150) : null;
   }
+  const allowed = ["user-agent", "referer", "origin"];
+  if (value.headers && typeof value.headers === "object") {
+    channel.headers = Object.fromEntries(Object.entries(value.headers).filter(([key, val]) => allowed.includes(key.toLowerCase()) && typeof val === "string" && val.length <= 8192 && !/[\x00-\x1f\x7f]/.test(val)));
+    channel.headersRequired = value.headersRequired === true || Object.keys(value.headers).some(key => !allowed.includes(key.toLowerCase()));
+  } else if (value.headersRequired === true) channel.headersRequired = true;
   return channel;
 }
 

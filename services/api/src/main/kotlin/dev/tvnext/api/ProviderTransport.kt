@@ -13,7 +13,7 @@ import org.springframework.web.server.ResponseStatusException
 
 /** GET only, pinned IP, verified TLS hostname; no redirects, inherited proxy, cookies or caller headers. */
 @Component
-open class ProviderTransport(@Value("\${tvnext.lan-origins:}") allowedPrivate: String = "") {
+open class ProviderTransport(@Value("\${TV_NEXT_LAN_ORIGINS:}") allowedPrivate: String = "") {
     private val lanOrigins = allowedPrivate.split(',').map { it.trim() }.filter { it.isNotEmpty() }.map { origin(Subscriptions.httpUri(it)) }.toSet()
     private fun origin(uri: URI) = "${uri.scheme.lowercase()}://${uri.host.lowercase()}:${if (uri.port != -1) uri.port else if (uri.scheme == "https") 443 else 80}"
     private fun allowed(uri: URI, address: InetAddress) = publicAddress(address) ||
@@ -21,7 +21,7 @@ open class ProviderTransport(@Value("\${tvnext.lan-origins:}") allowedPrivate: S
 
     private val permits = Semaphore(8)
     open fun get(uri: URI, headers: Map<String, String> = emptyMap(), form: String? = null): String = perform(uri, headers, form, "application/x-www-form-urlencoded")
-    fun postJson(uri: URI, headers: Map<String,String>, json: String): String = perform(uri, headers, json, "application/json")
+    open fun postJson(uri: URI, headers: Map<String,String>, json: String): String = perform(uri, headers, json, "application/json")
     private fun perform(uri: URI, headers: Map<String,String>, form: String?, contentType: String): String {
         Subscriptions.httpUri(uri.toString())
         validateHeaders(headers)
@@ -52,7 +52,8 @@ open class ProviderTransport(@Value("\${tvnext.lan-origins:}") allowedPrivate: S
                 ssl
             } else plain
             socket.use {
-                val path = (uri.rawPath.takeIf { p -> !p.isNullOrEmpty() } ?: "/") + (uri.rawQuery?.let { q -> "?$q" } ?: "")
+                val wire = URI(uri.toASCIIString())
+                val path = (wire.rawPath.takeIf { p -> !p.isNullOrEmpty() } ?: "/") + (wire.rawQuery?.let { q -> "?$q" } ?: "")
                 val host = if (uri.host.contains(':')) "[${uri.host}]" else uri.host
                 val authority = host + if (uri.port == -1) "" else ":${uri.port}"
                 val body = form?.toByteArray(StandardCharsets.UTF_8)

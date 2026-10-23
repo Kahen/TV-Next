@@ -1,18 +1,20 @@
 openapi: 3.1.0
 info:
   title: TV-Next API
-  version: 0.1.0
-  description: |
-    Local metadata-only import preview. No remote fetch, Spider execution, media proxy,
-    or authenticated personal data in v0.1.0. This contract will evolve.
+  version: 0.3.0-preview
+  description: Bounded offline imports plus DNS-pinned TVBox/FongMi type 0/1/2/4 subscription
+    and AList/OpenList metadata operations. Type 3 remote code activation and media
+    streaming proxy are not implemented. Network destinations are public by default;
+    explicit LAN origins are configured by the administrator. POST envelopes are limited
+    to 3 MiB and peers to 300 requests/minute.
 servers:
-  - url: http://localhost:8080
+- url: http://localhost:8080
 paths:
   /api/v1/health:
     get:
       summary: Health probe
       responses:
-        "200":
+        '200':
           description: Service is accepting requests
   /api/v1/playlists/parse:
     post:
@@ -22,15 +24,15 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/TextImportRequest"
+              $ref: '#/components/schemas/TextImportRequest'
       responses:
-        "200":
+        '200':
           description: Parsed channels; invalid/non-HTTP entries omitted
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PlaylistResponse"
-        "400":
+                $ref: '#/components/schemas/PlaylistResponse'
+        '400':
           description: Bad input or size limits
   /api/v1/configs/inspect:
     post:
@@ -40,33 +42,35 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/TextImportRequest"
+              $ref: '#/components/schemas/TextImportRequest'
       responses:
-        "200":
+        '200':
           description: Site and live group descriptors
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ConfigPreview"
-        "400":
+                $ref: '#/components/schemas/ConfigPreview'
+        '400':
           description: Invalid JSON or size limits
   /api/v1/catalog/preview:
     post:
-      summary: Normalize FongMi sites and live groups without fetching sources or executing Spider
+      summary: Normalize FongMi sites and live groups without fetching sources or
+        executing Spider
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/TextImportRequest"
+              $ref: '#/components/schemas/TextImportRequest'
       responses:
-        "200":
-          description: Static site descriptors and live channel groups with optional plain HTTP(S) direct URLs
+        '200':
+          description: Static site descriptors and live channel groups with optional
+            plain HTTP(S) direct URLs
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CatalogPreview"
-        "400":
+                $ref: '#/components/schemas/CatalogPreview'
+        '400':
           description: Invalid or oversized config
   /api/v1/media/home:
     post:
@@ -75,14 +79,17 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/MediaQuery" }
+            schema:
+              $ref: '#/components/schemas/MediaQuery'
       responses:
-        "200":
+        '200':
           description: Categories and paginated items
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/MediaPage" }
-        "400": { description: Invalid media JSON or pagination }
+              schema:
+                $ref: '#/components/schemas/MediaPage'
+        '400':
+          description: Invalid media JSON or pagination
   /api/v1/media/category:
     post:
       summary: Filter imported items by categoryId
@@ -90,14 +97,17 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/MediaQuery" }
+            schema:
+              $ref: '#/components/schemas/MediaQuery'
       responses:
-        "200":
+        '200':
           description: Filtered page
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/MediaPage" }
-        "400": { description: Invalid category }
+              schema:
+                $ref: '#/components/schemas/MediaPage'
+        '400':
+          description: Invalid category
   /api/v1/media/search:
     post:
       summary: Local title search within imported Result JSON
@@ -105,14 +115,17 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/MediaQuery" }
+            schema:
+              $ref: '#/components/schemas/MediaQuery'
       responses:
-        "200":
+        '200':
           description: Matching items
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/MediaPage" }
-        "400": { description: Invalid search query }
+              schema:
+                $ref: '#/components/schemas/MediaPage'
+        '400':
+          description: Invalid search query
   /api/v1/media/detail:
     post:
       summary: Read imported video metadata, lines and episodes
@@ -120,15 +133,19 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/MediaQuery" }
+            schema:
+              $ref: '#/components/schemas/MediaQuery'
       responses:
-        "200":
+        '200':
           description: Static video details
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/MediaDetail" }
-        "400": { description: Invalid request }
-        "404": { description: Video not present in JSON }
+              schema:
+                $ref: '#/components/schemas/MediaDetail'
+        '400':
+          description: Invalid request
+        '404':
+          description: Video not present in JSON
   /api/v1/media/play:
     post:
       summary: Return plain imported HTTP(S) episode URL (no proxying)
@@ -136,255 +153,948 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/MediaQuery" }
+            schema:
+              $ref: '#/components/schemas/MediaQuery'
       responses:
-        "200":
+        '200':
           description: Direct playback URL
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/MediaPlayback" }
-        "400": { description: Invalid episode selection }
-        "404": { description: Video not present }
-        "422": { description: Unsupported parser required }
+              schema:
+                $ref: '#/components/schemas/MediaPlayback'
+        '400':
+          description: Invalid episode selection
+        '404':
+          description: Video not present
+        '422':
+          description: Unsupported parser required
   /api/v1/epg/guide:
     post:
       summary: Match uploaded XMLTV to imported M3U channels (offline, no URL fetching)
-      description: |
-        Parses an explicitly provided XMLTV document with external XML entities and DTDs
-        disabled. Matches tvg-id first, then unique XMLTV display-name. No remote feed
+      description: 'Parses an explicitly provided XMLTV document with external XML
+        entities and DTDs
+
+        disabled. Matches tvg-id first, then unique XMLTV display-name. No remote
+        feed
+
         fetching, persistence, EPG subscription or streaming is performed.
+
+        '
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/EpgGuideRequest" }
+            schema:
+              $ref: '#/components/schemas/EpgGuideRequest'
       responses:
-        "200":
+        '200':
           description: Current and upcoming programmes for requested channels
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/EpgGuideResponse" }
-        "400":
+              schema:
+                $ref: '#/components/schemas/EpgGuideResponse'
+        '400':
           description: Invalid XML, forbidden DOCTYPE, timestamps or request limits
-        "503":
+        '503':
           description: Secure XML parser unavailable
+  /api/v1/subscriptions/load:
+    post:
+      summary: Decode and normalize an original TVBox subscription or depot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubscriptionRequest'
+      responses:
+        '200':
+          description: Successful result
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - content
+                - url
+                - sites
+                - depots
+                - liveCount
+                - warnings
+        '400':
+          description: Invalid input or semantic limit
+        '413':
+          description: Envelope exceeds 3 MiB
+        '422':
+          description: Unsupported provider/parser capability
+        '429':
+          description: Request/concurrency limit
+        '502':
+          description: Provider transport, denied destination or invalid upstream
+            response
+  /api/v1/subscriptions/home:
+    post:
+      summary: Original SiteApi home operation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SiteRequest'
+      responses:
+        '200':
+          description: Successful result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaPage'
+        '400':
+          description: Invalid input or semantic limit
+        '413':
+          description: Envelope exceeds 3 MiB
+        '422':
+          description: Unsupported provider/parser capability
+        '429':
+          description: Request/concurrency limit
+        '502':
+          description: Provider transport, denied destination or invalid upstream
+            response
+  /api/v1/subscriptions/category:
+    post:
+      summary: Original type 0/1/2/4 category and filters
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SiteRequest'
+      responses:
+        '200':
+          description: Successful result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaPage'
+        '400':
+          description: Invalid input or semantic limit
+        '413':
+          description: Envelope exceeds 3 MiB
+        '422':
+          description: Unsupported provider/parser capability
+        '429':
+          description: Request/concurrency limit
+        '502':
+          description: Provider transport, denied destination or invalid upstream
+            response
+  /api/v1/subscriptions/search:
+    post:
+      summary: Original wd/quick/pg search semantics
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SiteRequest'
+      responses:
+        '200':
+          description: Successful result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaPage'
+        '400':
+          description: Invalid input or semantic limit
+        '413':
+          description: Envelope exceeds 3 MiB
+        '422':
+          description: Unsupported provider/parser capability
+        '429':
+          description: Request/concurrency limit
+        '502':
+          description: Provider transport, denied destination or invalid upstream
+            response
+  /api/v1/subscriptions/detail:
+    post:
+      summary: Video or cloud directory item details
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SiteRequest'
+      responses:
+        '200':
+          description: Successful result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaDetail'
+        '400':
+          description: Invalid input or semantic limit
+        '413':
+          description: Envelope exceeds 3 MiB
+        '422':
+          description: Unsupported provider/parser capability
+        '429':
+          description: Request/concurrency limit
+        '502':
+          description: Provider transport, denied destination or invalid upstream
+            response
+  /api/v1/subscriptions/play:
+    post:
+      summary: Resolve opaque type 4 cloud IDs and preserve playback resources
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SiteRequest'
+      responses:
+        '200':
+          description: Successful result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaPlayback'
+        '400':
+          description: Invalid input or semantic limit
+        '413':
+          description: Envelope exceeds 3 MiB
+        '422':
+          description: Unsupported provider/parser capability
+        '429':
+          description: Request/concurrency limit
+        '502':
+          description: Provider transport, denied destination or invalid upstream
+            response
+  /api/v1/subscriptions/action:
+    post:
+      summary: Fetch a type 4 action result as JSON; no UI script execution
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SiteRequest'
+      responses:
+        '200':
+          description: Successful result
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          description: Invalid input or semantic limit
+        '413':
+          description: Envelope exceeds 3 MiB
+        '422':
+          description: Unsupported provider/parser capability
+        '429':
+          description: Request/concurrency limit
+        '502':
+          description: Provider transport, denied destination or invalid upstream
+            response
+  /api/v1/subscriptions/live:
+    post:
+      summary: Import inline or referenced M3U/TXT/group-JSON live channels
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LiveImportRequest'
+      responses:
+        '200':
+          description: Successful result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  channels:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Channel'
+                  total:
+                    type: integer
+                  warnings:
+                    type: array
+                    items:
+                      type: string
+        '400':
+          description: Invalid input or semantic limit
+        '413':
+          description: Envelope exceeds 3 MiB
+        '422':
+          description: Unsupported provider/parser capability
+        '429':
+          description: Request/concurrency limit
+        '502':
+          description: Provider transport, denied destination or invalid upstream
+            response
+  /api/v1/cloud/list:
+    post:
+      summary: AList/OpenList paginated directory listing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CloudRequest'
+      responses:
+        '200':
+          description: Successful result
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - path
+                - entries
+                - page
+                - hasMore
+        '400':
+          description: Invalid input or semantic limit
+        '413':
+          description: Envelope exceeds 3 MiB
+        '422':
+          description: Unsupported provider/parser capability
+        '429':
+          description: Request/concurrency limit
+        '502':
+          description: Provider transport, denied destination or invalid upstream
+            response
+  /api/v1/cloud/play:
+    post:
+      summary: Get the user-authorized cloud raw or signed media URL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CloudRequest'
+      responses:
+        '200':
+          description: Successful result
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - name
+                - url
+                - headers
+        '400':
+          description: Invalid input or semantic limit
+        '413':
+          description: Envelope exceeds 3 MiB
+        '422':
+          description: Unsupported provider/parser capability
+        '429':
+          description: Request/concurrency limit
+        '502':
+          description: Provider transport, denied destination or invalid upstream
+            response
+  /api/v1/resources/text:
+    post:
+      summary: Fetch bounded UTF-8 subtitles or danmaku text
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResourceRequest'
+      responses:
+        '200':
+          description: Successful result
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - content
+                properties:
+                  content:
+                    type: string
+                    maxLength: 1048576
+        '400':
+          description: Invalid input or semantic limit
+        '413':
+          description: Envelope exceeds 3 MiB
+        '422':
+          description: Unsupported provider/parser capability
+        '429':
+          description: Request/concurrency limit
+        '502':
+          description: Provider transport, denied destination or invalid upstream
+            response
 components:
   schemas:
     TextImportRequest:
       type: object
-      required: [content]
+      required:
+      - content
       properties:
         content:
           type: string
           maxLength: 1048576
     Channel:
       type: object
-      required: [name, url, group]
+      required:
+      - name
+      - url
+      - group
       properties:
-        name: { type: string }
-        url: { type: string, format: uri }
-        group: { type: string }
-        logo: { type: [string, "null"] }
-        tvgId: { type: [string, "null"] }
+        name:
+          type: string
+        url:
+          type: string
+          format: uri
+        group:
+          type: string
+        logo:
+          type:
+          - string
+          - 'null'
+        tvgId:
+          type:
+          - string
+          - 'null'
+        headers: &id001
+          type: object
+          maxProperties: 32
+          additionalProperties:
+            type: string
+            maxLength: 8192
     PlaylistResponse:
       type: object
-      required: [channels, total]
+      required:
+      - channels
+      - total
       properties:
-        total: { type: integer }
+        total:
+          type: integer
         channels:
           type: array
-          items: { $ref: "#/components/schemas/Channel" }
+          items:
+            $ref: '#/components/schemas/Channel'
     SitePreview:
       type: object
-      required: [key, name]
+      required:
+      - key
+      - name
       properties:
-        key: { type: string }
-        name: { type: string }
-        type: { type: [integer, "null"] }
+        key:
+          type: string
+        name:
+          type: string
+        type:
+          type:
+          - integer
+          - 'null'
     ConfigPreview:
       type: object
-      required: [spiderDeclared, sites, liveGroupCount]
+      required:
+      - spiderDeclared
+      - sites
+      - liveGroupCount
       properties:
-        spiderDeclared: { type: boolean }
-        liveGroupCount: { type: integer }
+        spiderDeclared:
+          type: boolean
+        liveGroupCount:
+          type: integer
         sites:
           type: array
-          items: { $ref: "#/components/schemas/SitePreview" }
-
+          items:
+            $ref: '#/components/schemas/SitePreview'
     CatalogPreview:
       type: object
-      required: [sites, liveSources, directPlayableChannelCount, warnings]
+      required:
+      - sites
+      - liveSources
+      - directPlayableChannelCount
+      - warnings
       properties:
         sites:
           type: array
           items:
             type: object
-            required: [key, name, searchable, hidden, categories, mode]
+            required:
+            - key
+            - name
+            - searchable
+            - hidden
+            - categories
+            - mode
             properties:
-              key: { type: string }
-              name: { type: string }
-              type: { type: [integer, "null"] }
-              searchable: { type: boolean }
-              hidden: { type: boolean }
+              key:
+                type: string
+              name:
+                type: string
+              type:
+                type:
+                - integer
+                - 'null'
+              searchable:
+                type: boolean
+              hidden:
+                type: boolean
               categories:
                 type: array
-                items: { type: string }
-              mode: { type: string, const: preview-only }
+                items:
+                  type: string
+              mode:
+                type: string
+                const: preview-only
         liveSources:
           type: array
           items:
             type: object
-            required: [name, groups]
+            required:
+            - name
+            - groups
             properties:
-              name: { type: string }
+              name:
+                type: string
               groups:
                 type: array
                 items:
                   type: object
-                  required: [name, channels]
+                  required:
+                  - name
+                  - channels
                   properties:
-                    name: { type: string }
+                    name:
+                      type: string
                     channels:
                       type: array
                       items:
                         type: object
-                        required: [name, directUrl, sourceCount]
+                        required:
+                        - name
+                        - directUrl
+                        - sourceCount
                         properties:
-                          name: { type: string }
-                          directUrl: { type: [string, "null"] }
-                          sourceCount: { type: integer }
-        directPlayableChannelCount: { type: integer }
+                          name:
+                            type: string
+                          directUrl:
+                            type:
+                            - string
+                            - 'null'
+                          sourceCount:
+                            type: integer
+        directPlayableChannelCount:
+          type: integer
         warnings:
           type: array
-          items: { type: string }
-
+          items:
+            type: string
     MediaQuery:
       type: object
-      required: [content]
+      required:
+      - content
       properties:
-        content: { type: string, maxLength: 1048576 }
-        categoryId: { type: string, maxLength: 100 }
-        query: { type: string, maxLength: 120 }
-        vodId: { type: string, maxLength: 200 }
-        page: { type: integer, minimum: 1, maximum: 1000, default: 1 }
-        pageSize: { type: integer, minimum: 1, maximum: 100, default: 40 }
-        lineIndex: { type: integer, minimum: 0, default: 0 }
-        episodeIndex: { type: integer, minimum: 0, default: 0 }
+        content:
+          type: string
+          maxLength: 1048576
+        categoryId:
+          type: string
+          maxLength: 100
+        query:
+          type: string
+          maxLength: 120
+        vodId:
+          type: string
+          maxLength: 200
+        page:
+          type: integer
+          minimum: 1
+          maximum: 1000
+          default: 1
+        pageSize:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 40
+        lineIndex:
+          type: integer
+          minimum: 0
+          default: 0
+        episodeIndex:
+          type: integer
+          minimum: 0
+          default: 0
     MediaItem:
       type: object
-      required: [id, name]
+      required:
+      - id
+      - name
       properties:
-        id: { type: string }
-        name: { type: string }
-        categoryId: { type: [string, "null"] }
-        categoryName: { type: [string, "null"] }
-        poster: { type: [string, "null"] }
-        remarks: { type: [string, "null"] }
-        year: { type: [string, "null"] }
+        id:
+          type: string
+        name:
+          type: string
+        categoryId:
+          type:
+          - string
+          - 'null'
+        categoryName:
+          type:
+          - string
+          - 'null'
+        poster:
+          type:
+          - string
+          - 'null'
+        remarks:
+          type:
+          - string
+          - 'null'
+        year:
+          type:
+          - string
+          - 'null'
+        folder:
+          type: boolean
+        action:
+          type:
+          - string
+          - 'null'
+          maxLength: 8192
     MediaPage:
       type: object
-      required: [categories, items, total, page, pageSize, hasMore, provider]
+      required:
+      - categories
+      - items
+      - total
+      - page
+      - pageSize
+      - hasMore
+      - provider
       properties:
         categories:
           type: array
           items:
             type: object
-            required: [id, name]
+            required:
+            - id
+            - name
             properties:
-              id: { type: string }
-              name: { type: string }
+              id:
+                type: string
+              name:
+                type: string
         items:
           type: array
-          items: { $ref: "#/components/schemas/MediaItem" }
-        total: { type: integer }
-        page: { type: integer }
-        pageSize: { type: integer }
-        hasMore: { type: boolean }
-        provider: { type: string }
+          items:
+            $ref: '#/components/schemas/MediaItem'
+        total:
+          type: integer
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        hasMore:
+          type: boolean
+        provider:
+          type: string
     MediaDetail:
       type: object
-      required: [item, lines, provider]
+      required:
+      - item
+      - lines
+      - provider
       properties:
-        item: { $ref: "#/components/schemas/MediaItem" }
-        description: { type: [string, "null"] }
-        director: { type: [string, "null"] }
-        actors: { type: [string, "null"] }
-        provider: { type: string }
+        item:
+          $ref: '#/components/schemas/MediaItem'
+        description:
+          type:
+          - string
+          - 'null'
+        director:
+          type:
+          - string
+          - 'null'
+        actors:
+          type:
+          - string
+          - 'null'
+        provider:
+          type: string
         lines:
           type: array
           items:
             type: object
-            required: [name, episodes]
+            required:
+            - name
+            - episodes
             properties:
-              name: { type: string }
+              name:
+                type: string
               episodes:
                 type: array
                 items:
                   type: object
-                  required: [name, playable]
+                  required:
+                  - name
+                  - playable
                   properties:
-                    name: { type: string }
-                    playable: { type: boolean }
+                    name:
+                      type: string
+                    playable:
+                      type: boolean
     MediaPlayback:
       type: object
-      required: [url, name, lineName, provider]
+      required:
+      - url
+      - name
+      - lineName
+      - provider
       properties:
-        url: { type: string, format: uri }
-        name: { type: string }
-        lineName: { type: string }
-        provider: { type: string }
-
+        url:
+          type: string
+          format: uri
+        name:
+          type: string
+        lineName:
+          type: string
+        provider:
+          type: string
+        headers: *id001
+        subtitles:
+          type: array
+          maxItems: 30
+          items:
+            $ref: '#/components/schemas/PlaybackResource'
+        danmaku:
+          type: array
+          maxItems: 30
+          items:
+            $ref: '#/components/schemas/PlaybackResource'
     EpgGuideRequest:
       type: object
-      required: [xml, channels]
+      required:
+      - xml
+      - channels
       properties:
-        xml: { type: string, maxLength: 2097152 }
+        xml:
+          type: string
+          maxLength: 2097152
         channels:
           type: array
           minItems: 1
           maxItems: 300
           items:
             type: object
-            required: [name]
+            required:
+            - name
             properties:
-              id: { type: [string, "null"] }
-              name: { type: string }
-        at: { type: [string, "null"], format: date-time }
-        hours: { type: integer, minimum: 1, maximum: 72, default: 12 }
+              id:
+                type:
+                - string
+                - 'null'
+              name:
+                type: string
+        at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        hours:
+          type: integer
+          minimum: 1
+          maximum: 72
+          default: 12
     EpgProgram:
       type: object
-      required: [start, stop, title]
+      required:
+      - start
+      - stop
+      - title
       properties:
-        start: { type: string, format: date-time }
-        stop: { type: string, format: date-time }
-        title: { type: string }
-        description: { type: [string, "null"] }
+        start:
+          type: string
+          format: date-time
+        stop:
+          type: string
+          format: date-time
+        title:
+          type: string
+        description:
+          type:
+          - string
+          - 'null'
     EpgChannelGuide:
       type: object
-      required: [name, matchType, upcoming]
+      required:
+      - name
+      - matchType
+      - upcoming
       properties:
-        id: { type: [string, "null"] }
-        name: { type: string }
-        matchedChannelId: { type: [string, "null"] }
-        matchType: { type: string, enum: [id, name, none] }
+        id:
+          type:
+          - string
+          - 'null'
+        name:
+          type: string
+        matchedChannelId:
+          type:
+          - string
+          - 'null'
+        matchType:
+          type: string
+          enum:
+          - id
+          - name
+          - none
         current:
           anyOf:
-            - { $ref: "#/components/schemas/EpgProgram" }
-            - { type: "null" }
+          - $ref: '#/components/schemas/EpgProgram'
+          - type: 'null'
         upcoming:
           type: array
-          items: { $ref: "#/components/schemas/EpgProgram" }
+          items:
+            $ref: '#/components/schemas/EpgProgram'
     EpgGuideResponse:
       type: object
-      required: [generatedAt, until, totalChannels, matchedChannels, channels, warnings]
+      required:
+      - generatedAt
+      - until
+      - totalChannels
+      - matchedChannels
+      - channels
+      - warnings
       properties:
-        generatedAt: { type: string, format: date-time }
-        until: { type: string, format: date-time }
-        totalChannels: { type: integer }
-        matchedChannels: { type: integer }
+        generatedAt:
+          type: string
+          format: date-time
+        until:
+          type: string
+          format: date-time
+        totalChannels:
+          type: integer
+        matchedChannels:
+          type: integer
         channels:
           type: array
-          items: { $ref: "#/components/schemas/EpgChannelGuide" }
+          items:
+            $ref: '#/components/schemas/EpgChannelGuide'
         warnings:
           type: array
-          items: { type: string }
+          items:
+            type: string
+    PlaybackResource:
+      type: object
+      required:
+      - name
+      - url
+      properties:
+        name:
+          type: string
+          maxLength: 200
+        url:
+          type: string
+          format: uri
+        lang:
+          type:
+          - string
+          - 'null'
+    SubscriptionRequest:
+      type: object
+      properties:
+        content:
+          type: string
+          maxLength: 1048576
+        url:
+          type: string
+          maxLength: 4096
+      description: Provide content or URL. Optional URL supplies relative-path base.
+        Plain, original Base64-wrapper and AES-CBC subscriptions supported; max 1
+        MiB UTF-8 input.
+    SiteRequest:
+      type: object
+      required:
+      - content
+      - siteKey
+      properties:
+        content:
+          type: string
+          maxLength: 1048576
+        url:
+          type: string
+          maxLength: 4096
+        siteKey:
+          type: string
+          maxLength: 200
+        categoryId:
+          type: string
+          maxLength: 4096
+        query:
+          type: string
+          maxLength: 120
+        vodId:
+          type: string
+          maxLength: 16384
+        page:
+          type: integer
+          minimum: 1
+          maximum: 1000
+        lineIndex:
+          type: integer
+          minimum: 0
+        episodeIndex:
+          type: integer
+          minimum: 0
+        action:
+          type: string
+          maxLength: 8192
+        filters:
+          type: object
+          maxProperties: 30
+          additionalProperties:
+            type: string
+            maxLength: 1000
+        quick:
+          type: boolean
+    CloudRequest:
+      type: object
+      required:
+      - server
+      properties:
+        server:
+          type: string
+          maxLength: 4096
+        token:
+          type: string
+          maxLength: 4096
+        path:
+          type: string
+          maxLength: 4096
+        password:
+          type: string
+          maxLength: 500
+        page:
+          type: integer
+          minimum: 1
+          maximum: 1000
+      description: Credentials are per-request only and are not persisted by the server.
+    ResourceRequest:
+      type: object
+      required:
+      - url
+      properties:
+        url:
+          type: string
+          maxLength: 4096
+    LiveImportRequest:
+      type: object
+      properties:
+        content:
+          type: string
+          maxLength: 1048576
+        url:
+          type: string
+          maxLength: 4096
+        liveIndex:
+          type: integer
+          minimum: 0
+          maximum: 49

@@ -25,3 +25,6 @@ DerivedData/
 local.properties
 # local secrets
 secrets/
+*.tsbuildinfo
+__pycache__/
+*.py[cod]

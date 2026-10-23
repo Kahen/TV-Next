@@ -74,7 +74,7 @@ export default function App() {
   const groups = useMemo(() => [...new Set(channels.map((c) => c.group))], [channels]);
   const displayed = useMemo(() => {
     const byUrl = new Map<string, Channel>();
-    for (const channel of [...channels, ...library.recent.map((entry) => entry.channel)]) {
+    for (const channel of [...library.recent.map((entry) => entry.channel), ...channels]) {
       byUrl.set(channel.url, channel);
     }
     const items = collection === "all" ? channels :
@@ -91,6 +91,7 @@ export default function App() {
       setError("媒体 URL 无效或包含不允许的凭据。");
       return;
     }
+    if (channel.headersRequired) { setError("此频道的私密请求头未保存在媒体库，请重新加载订阅后播放。"); return; }
     setError("");
     setLocalVideo(null);
     setSelected(channel);
@@ -203,6 +204,10 @@ export default function App() {
     }
   }
 
+  async function loadSubtitleSource(url: string, name: string) {
+    try { const result=await requestJson<{content:string}>("/api/v1/resources/text",{url});setSubtitleOriginal(toWebVtt(result.content,"remote.srt"));setSubtitleOffset(0);setSubtitleName(name); }
+    catch(e){setError(e instanceof Error?e.message:"字幕加载失败");}
+  }
   async function loadDanmakuFile(file: File) {
     try { if(file.size>2097152)throw new Error("弹幕最多 2 MiB");setDanmaku(parseDanmaku(await file.text()));setError(""); }
     catch(e) {setError(e instanceof Error?e.message:"弹幕导入失败");}
@@ -245,7 +250,7 @@ export default function App() {
       } else if (!parsed.total) {
         setError("未找到可播放的 HTTP(S) 频道。");
       }
-      setLibrary((state) => normalizeLibrary({ ...state, channels: parsed.channels }));
+      setLibrary((state) => ({...state,channels:parsed.channels.slice(0,1500)}));
       setSelected(null);
       setCollection("all");
       setFilter("");
@@ -357,6 +362,7 @@ export default function App() {
             <label className="file-picker">加载 SRT / VTT
               <input type="file" accept=".srt,.vtt,text/vtt,application/x-subrip" onChange={(e) => { void importSubtitle(e.target.files?.[0]); e.target.value = ""; }} />
             </label>
+            {selected?.subtitles?.map((source,i)=><button key={i} onClick={()=>void loadSubtitleSource(source.url,source.name)}>{source.name}</button>)}
             {subtitleUrl && <label>字幕偏移（正值延后） <input aria-label="字幕偏移" type="range" min="-10" max="10" step="0.5" value={subtitleOffset} onChange={(e) => setSubtitleOffset(Number(e.target.value))} /> {subtitleOffset.toFixed(1)} 秒</label>}
             {subtitleUrl && <button className="secondary" onClick={() => { setSubtitleOriginal(""); setSubtitleUrl(null); setSubtitleName(""); setSubtitleOffset(0); }} title={subtitleName}>移除字幕</button>}
           </div>}
@@ -390,7 +396,7 @@ export default function App() {
             <span className="hint">本地文件不会上传，也不会保存到播放历史；能否播放取决于浏览器编解码能力。</span>
           </div>
         </div>
-        {tab === "media" ? <><SubscriptionBrowser onPlay={playChannel}/><CloudBrowser onPlay={playChannel}/><MediaBrowser onPlay={playChannel} /></> : tab === "epg" ? <EpgGuide channels={channels} onPlay={playChannel} /> : tab === "config" ? <>
+        {tab === "media" ? <><SubscriptionBrowser onPlay={playChannel} onImport={channels=>setLibrary(state=>({...state,channels:channels.slice(0,1500)}))}/><CloudBrowser onPlay={playChannel}/><MediaBrowser onPlay={playChannel} /></> : tab === "epg" ? <EpgGuide channels={channels} onPlay={playChannel} /> : tab === "config" ? <>
           <div className="section-heading"><h2>检查 FongMi JSON 配置</h2><span>STATIC INSPECTION ONLY</span></div>
           <section className="panel">
             <p className="hint">只展示站点、直播分组及 Spider 声明，不会运行 Java/JS/Python 插件或获取远程内容。</p>

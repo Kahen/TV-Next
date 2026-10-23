@@ -3,6 +3,7 @@ import SwiftUI
 struct SubscriptionSection: View {
     let serverURL: String
     let onPlay: (NativeMediaPlayback, String) -> Void
+    var onImport: (([TVChannel]) -> Void)? = nil
     @State private var address = ""
     @State private var content = ""
     @State private var document: NativeSubscription?
@@ -66,7 +67,17 @@ struct SubscriptionSection: View {
             page = result; detail = nil; siteKey = key; mode = operation; category = r.categoryId
         }
     }
+    private func loadLive(_ index: Int) {
+        guard let document else { return }
+        run { api, id in
+            let result: NativeLiveResponse = try await api.request("subscriptions/live",body:NativeLiveRequest(content:document.content,url:document.url,liveIndex:index))
+            guard generation == id, !Task.isCancelled else { return }
+            onImport?(result.channels)
+            if !result.warnings.isEmpty { error = result.warnings.joined(separator: " · ") }
+        }
+    }
     private func inspect(_ item: NativeMediaItem) {
+        if item.folder == true { browse(siteKey,operation:"category",type:item.id); return }
         var r = request(); r.vodId = item.id
         run { api, id in
             let result: NativeMediaDetail = try await api.request("subscriptions/detail",body:r)
@@ -84,6 +95,9 @@ struct SubscriptionSection: View {
         }
     }
     @ViewBuilder private func documentView(_ doc: NativeSubscription) -> some View {
+        ForEach(0..<min(doc.liveCount,50),id: \.self) { index in
+            Button("导入直播源 \(index + 1)") { loadLive(index) }.disabled(busy)
+        }
         ForEach(doc.warnings, id: \.self) { Text($0).font(.caption).foregroundStyle(.secondary) }
         ForEach(doc.depots) { depot in Button(depot.name) { load(depot.url) }.disabled(busy) }
         ScrollView(.horizontal) {

@@ -66,14 +66,15 @@ struct ContentView: View {
                     localMediaSection
                     importSection
                     ConfigPreviewSection()
-                    SubscriptionSection(serverURL: serverURL) { playback, title in
+                    CloudSection(serverURL: serverURL) { library.play($0) }
+                    SubscriptionSection(serverURL: serverURL, onPlay: { playback, title in
                         guard playback.headers.isEmpty else {
                             errorMessage = "此来源需要额外播放请求头，尚需服务端媒体适配。"
                             return
                         }
                         library.play(TVChannel(name: title + " · " + playback.name, url: playback.url, group: playback.lineName, logo: nil, tvgId: nil))
                         remoteDanmaku = playback.danmaku
-                    }
+                    }, onImport: { library.importChannels($0) })
                     MediaCatalogSection { channel in
                         errorMessage = nil
                         captionFileName = nil
@@ -230,6 +231,7 @@ struct ContentView: View {
                         .buttonStyle(.bordered)
                     }
                 }
+                if let issue = library.playbackError { Text(issue).font(.caption).foregroundStyle(.red) }
                 Picker("播放速度", selection: $playbackSpeed) {
                     Text("0.75×").tag(Float(0.75))
                     Text("1×").tag(Float(1))

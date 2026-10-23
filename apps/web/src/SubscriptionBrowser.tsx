@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { requestJson } from "./api";
 import type { Channel, MediaDetail, MediaItem, MediaPage, MediaPlayback, SubscriptionDocument } from "./api";
 interface Found { siteKey: string; item: MediaItem }
-export default function SubscriptionBrowser({onPlay}: {onPlay: (channel: Channel) => void}) {
+export default function SubscriptionBrowser({onPlay, onImport}: {onPlay: (channel: Channel) => void; onImport?: (channels: Channel[]) => void}) {
   const [url, setUrl] = useState("");
   const [text, setText] = useState("");
   const [doc, setDoc] = useState<SubscriptionDocument | null>(null);
@@ -13,6 +13,7 @@ export default function SubscriptionBrowser({onPlay}: {onPlay: (channel: Channel
   const [mode, setMode] = useState("home");
   const [detail, setDetail] = useState<MediaDetail | null>(null);
   const [line, setLine] = useState(0);
+  const [actionResult, setActionResult] = useState("");
   const [found, setFound] = useState<Found[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -41,8 +42,14 @@ export default function SubscriptionBrowser({onPlay}: {onPlay: (channel: Channel
     finally { if (id === requestId.current) setBusy(false); }
   }
   async function inspect(item: MediaItem, key = siteKey) {
+    if (item.folder) { await browse(key,"category",1,item.id); return; }
     const {controller, id} = start();
     try {
+      if (item.action) {
+        const result = await requestJson<unknown>("/api/v1/subscriptions/action",{...body(key),action:item.action},controller.signal);
+        if (id === requestId.current) setActionResult(JSON.stringify(result,null,2));
+        return;
+      }
       const result = await requestJson<MediaDetail>("/api/v1/subscriptions/detail", {...body(key), vodId: item.id}, controller.signal);
       if (id === requestId.current) { setDetail(result); setLine(0); setSite(key); }
     } catch (e) { if (id === requestId.current && !controller.signal.aborted) setError(e instanceof Error ? e.message : "详情加载失败"); }
@@ -56,6 +63,13 @@ export default function SubscriptionBrowser({onPlay}: {onPlay: (channel: Channel
       if (id === requestId.current) onPlay({name: detail.item.name + " · " + p.name, url: p.url, group: p.lineName, headers: p.headers, subtitles: p.subtitles, danmaku: p.danmaku});
     } catch (e) { if (id === requestId.current && !controller.signal.aborted) setError(e instanceof Error ? e.message : "播放解析失败"); }
     finally { if (id === requestId.current) setBusy(false); }
+  }
+  async function loadLive(index: number) {
+    const {controller,id}=start();
+    try { const result=await requestJson<{channels:Channel[];warnings:string[]}>("/api/v1/subscriptions/live",{content:doc?.content,url:doc?.url,liveIndex:index},controller.signal);
+      if(id===requestId.current){onImport?.(result.channels);if(result.warnings.length)setError(result.warnings.join(" · "));}
+    }catch(e){if(id===requestId.current&&!controller.signal.aborted)setError(e instanceof Error?e.message:"直播加载失败");}
+    finally{if(id===requestId.current)setBusy(false);}
   }
   async function searchAll() {
     if (!doc || !query.trim()) return;
@@ -82,8 +96,10 @@ export default function SubscriptionBrowser({onPlay}: {onPlay: (channel: Channel
     <div className="panel-actions"><button className="primary" disabled={busy} onClick={()=>void load()}>加载订阅</button>
       <label className="file-picker">导入配置文件<input type="file" accept=".json,.txt" onChange={e=>{const file=e.target.files?.[0]; if(file) {if(file.size>1048576)setError("配置最多 1 MiB");else void file.text().then(value=>{setText(value);void load(value);});} e.target.value="";}}/></label>
       {busy && <button className="secondary" onClick={()=>{active.current?.abort();requestId.current++;setBusy(false);}}>取消请求</button>}</div>
+    {actionResult && <pre className="action-result">{actionResult}</pre>}
     {error && <p role="alert" className="alert">{error}</p>}
     {doc && <>
+      {Array.from({length:Math.min(doc.liveCount,50)},(_,i)=><button key={i} disabled={busy} onClick={()=>void loadLive(i)}>导入直播源 {i+1}</button>)}
       {doc.warnings.map((w,i)=><p className="hint" key={i}>{w}</p>)}
       {doc.depots.length>0 && <div className="media-controls">{doc.depots.map(d=><button key={d.url} disabled={busy} onClick={()=>{setUrl(d.url);setText("");void load("",d.url);}}>{d.name}</button>)}</div>}
       <div className="media-controls">{doc.sites.filter(s=>!s.hidden).map(s=><button className={siteKey===s.key?"secondary media-selected":"secondary"} key={s.key} disabled={busy||![0,1,2,4].includes(s.type)} title={s.support} onClick={()=>void browse(s.key)}>{s.name}{s.type===3?" · 需 Spider 适配":""}</button>)}</div>
@@ -91,7 +107,7 @@ export default function SubscriptionBrowser({onPlay}: {onPlay: (channel: Channel
     </>}
     {page && <>
       <div className="media-controls">{page.categories.map(c=><button key={c.id} disabled={busy} onClick={()=>void browse(siteKey,"category",1,c.id)}>{c.name}</button>)}</div>
-      <div className="media-grid">{page.items.map(item=><button key={item.id} disabled={busy} className="media-tile" onClick={()=>void inspect(item)}><strong>{item.name}</strong><small>{item.remarks}</small></button>)}</div>
+      <div className="media-grid">{page.items.map(item=><button key={item.id} disabled={busy} className="media-tile" onClick={()=>void inspect(item)}><strong>{item.folder?"📁 ":""}{item.name}</strong><small>{item.remarks}</small></button>)}</div>
       <div className="media-pagination"><button disabled={busy||page.page<=1} onClick={()=>void browse(siteKey,mode,page.page-1)}>上一页</button><span>第 {page.page} 页</span><button disabled={busy||!page.hasMore} onClick={()=>void browse(siteKey,mode,page.page+1)}>下一页</button></div>
     </>}
     {found.length>0 && <div className="media-grid">{found.map(x=><button key={x.siteKey+":"+x.item.id} disabled={busy} onClick={()=>void inspect(x.item,x.siteKey)}><strong>{x.item.name}</strong><small>{doc?.sites.find(s=>s.key===x.siteKey)?.name}</small></button>)}</div>}

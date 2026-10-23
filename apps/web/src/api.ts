@@ -5,6 +5,7 @@ export interface Channel {
   logo?: string | null;
   tvgId?: string | null;
   headers?: Record<string, string>;
+  headersRequired?: boolean;
   subtitles?: PlaybackResource[];
   danmaku?: PlaybackResource[];
 }
@@ -57,7 +58,7 @@ export async function postText<T>(path: string, content: string): Promise<T> {
 export interface MediaCategory { id: string; name: string }
 export interface MediaItem {
   id: string; name: string; categoryId: string | null; categoryName: string | null;
-  poster: string | null; remarks: string | null; year: string | null;
+  poster: string | null; remarks: string | null; year: string | null; folder?: boolean; action?: string | null;
 }
 export interface MediaEpisode { name: string; playable: boolean }
 export interface MediaLine { name: string; episodes: MediaEpisode[] }

@@ -105,3 +105,12 @@ describe("local media library", () => {
     expect(setPosition(start, b.url, 30, Infinity)).toEqual(start);
   });
 });
+
+// Sensitive media request headers stay in active playback memory, never local snapshots.
+it("does not persist Cookie or Authorization headers and marks required reload", () => {
+  const state=emptyLibrary();state.channels=[{name:"Own",url:"https://example.org/a",group:"Cloud",headers:{Cookie:"own-secret","User-Agent":"TV-Next"}}];
+  const normalized=normalizeLibrary(state);
+  expect(normalized.channels[0].headers).toEqual({"User-Agent":"TV-Next"});
+  expect(normalized.channels[0].headersRequired).toBe(true);
+  expect(JSON.stringify(normalized)).not.toContain("own-secret");
+});

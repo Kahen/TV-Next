@@ -40,6 +40,19 @@ class SubscriptionCompatibilityTest {
         assertFailsWith<ResponseStatusException> { subscriptions.load(SubscriptionRequest("2423nothex")) }
         assertFailsWith<ResponseStatusException> { subscriptions.load(SubscriptionRequest("😀".repeat(300_000))) }
     }
+    @Test fun originalAesEnvelopeAndLongCloudFolderIdRoundTrip() {
+        val key = "testkey".padEnd(16,'0').toByteArray()
+        val ivText = "1234567890123"
+        val cipher = javax.crypto.Cipher.getInstance("AES/CBC/PKCS5Padding")
+        cipher.init(javax.crypto.Cipher.ENCRYPT_MODE,javax.crypto.spec.SecretKeySpec(key,"AES"),javax.crypto.spec.IvParameterSpec(ivText.padEnd(16,'0').toByteArray()))
+        fun hex(bytes: ByteArray) = bytes.joinToString("") { "%02x".format(it.toInt() and 255) }
+        val envelope = hex("${'$'}#testkey#${'$'}".toByteArray()) + hex(cipher.doFinal(config.toByteArray())) + hex(ivText.toByteArray())
+        assertEquals(subscriptions.load(SubscriptionRequest(config)).sites, subscriptions.load(SubscriptionRequest(envelope)).sites)
+        val id = "cloud-folder:" + "a".repeat(1000)
+        val data = StaticFongMiProvider(mapper).read("""{"list":[{"vod_id":"$id","vod_name":"Folder","vod_tag":"folder"}]}""",true)
+        assertEquals(id,data.entries.single().item.id)
+        assertTrue(data.entries.single().item.folder)
+    }
     @Test fun originalSiteApiParameterConventions() {
         assertEquals(mapOf("filter" to "true"), provider.params(4, "home", SiteRequest(), ""))
         assertEquals(emptyMap(), provider.params(1, "home", SiteRequest(), ""))

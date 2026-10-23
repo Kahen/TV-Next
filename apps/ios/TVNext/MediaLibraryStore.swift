@@ -18,6 +18,7 @@ final class MediaLibraryStore: ObservableObject {
     @Published private(set) var positions: [String: Double] = [:]
     @Published private(set) var current: TVChannel?
     @Published private(set) var localFileName: String?
+    @Published private(set) var playbackError: String?
     @Published private(set) var captionText = ""
     @Published private(set) var captionOffset: TimeInterval = 0
 
@@ -85,6 +86,11 @@ final class MediaLibraryStore: ObservableObject {
     }
 
     func play(_ channel: TVChannel) {
+        playbackError = nil
+        if channel.headersRequired == true || !(channel.headers ?? [:]).isEmpty {
+            playbackError = "此来源需要额外请求头，原生播放尚需服务端媒体适配。"
+            return
+        }
         guard MediaAddress.valid(channel.url), let url = URL(string: channel.url) else { return }
         savePosition()
         player.pause()
@@ -206,10 +212,16 @@ final class MediaLibraryStore: ObservableObject {
             $0.value >= 0 && $0.value < 604800 }
     }
 
+    private func safeSnapshot(_ channel: TVChannel) -> TVChannel {
+        var result = channel
+        result.headersRequired = channel.headersRequired == true || !(channel.headers ?? [:]).isEmpty
+        result.headers = nil
+        return result
+    }
     private func persist() {
         let value = SavedLibrary(
-            version: 1, channels: channels, favorites: favorites,
-            recent: recent, positions: positions
+            version: 1, channels: channels.map(safeSnapshot), favorites: favorites,
+            recent: recent.map(safeSnapshot), positions: positions
         )
         guard let data = try? JSONEncoder().encode(value), data.count <= 2_000_000 else { return }
         UserDefaults.standard.set(data, forKey: storageKey)

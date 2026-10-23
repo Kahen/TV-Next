@@ -10,7 +10,7 @@ struct NativeSubscription: Decodable {
     let content: String; let url: String; let sites: [Site]; let depots: [Depot]; let liveCount: Int; let warnings: [String]
 }
 struct NativeMediaItem: Decodable, Identifiable {
-    let id: String; let name: String; let remarks: String?
+    let id: String; let name: String; let remarks: String?; let folder: Bool?; let action: String?
 }
 struct NativeMediaPage: Decodable {
     struct Category: Decodable, Identifiable { let id: String; let name: String }
@@ -45,7 +45,7 @@ extension TVNextAPI {
         let (bytes, response) = try await URLSession.shared.bytes(for: request)
         var data = Data()
         for try await byte in bytes {
-            if data.count >= 2_097_152 { throw APIError.serverRejected }
+            if data.count >= 4_194_304 { throw APIError.serverRejected }
             data.append(byte)
         }
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
@@ -59,3 +59,13 @@ enum NativeRequestError: LocalizedError {
     case message(String)
     var errorDescription: String? { switch self { case .message(let value): return value } }
 }
+
+struct NativeCloudRequest: Encodable { let server: String; let token: String; let path: String; let password: String; let page: Int }
+struct NativeCloudPage: Decodable {
+    struct Entry: Decodable, Identifiable { let name: String; let directory: Bool; let size: Int64; var id: String { name } }
+    let path: String; let entries: [Entry]; let page: Int; let hasMore: Bool
+}
+struct NativeCloudPlayback: Decodable { let url: String; let name: String; let headers: [String:String] }
+
+struct NativeLiveRequest: Encodable { let content: String; let url: String; let liveIndex: Int }
+struct NativeLiveResponse: Decodable { let channels: [TVChannel]; let warnings: [String] }

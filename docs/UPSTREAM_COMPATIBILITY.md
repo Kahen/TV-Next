@@ -18,11 +18,11 @@ Both clients have subscription URL/paste inputs and original site selection. Web
 
 The server pins a validated DNS answer to each socket, verifies TLS hostname/SNI, denies redirects, limits concurrent calls to 8, connect/read timeouts to 3 seconds and response wall time to 8 seconds (DNS lookup is OS-managed). Bodies are limited to 1 MiB compressed and decoded UTF-8; gzip is bounded. Hop-by-hop headers, Host overrides and CR/LF injection are rejected. Streaming media bytes do not go through this text transport.
 
-Private-address destinations are denied by default. For your own LAN OpenList/provider service, explicitly set `TVNEXT_LAN_ORIGINS` (Spring relaxed binding for `tvnext.lan-origins`) to exact origins such as `http://192.168.2.10:5244`. Each socket remains DNS-pinned. Only site-local LAN addresses are permitted by this opt-in; loopback, link-local/metadata and multicast stay denied. Do not expose these development services publicly without authentication/TLS deployment controls.
+Private-address destinations are denied by default. For your own LAN OpenList/provider service, explicitly set `TV_NEXT_LAN_ORIGINS` to exact origins such as `http://192.168.2.10:5244`. Each socket remains DNS-pinned. Only site-local LAN addresses are permitted by this opt-in; loopback, link-local/metadata and multicast stay denied. Do not expose these development services publicly without authentication/TLS deployment controls.
 
 ## Cloud drives
 
-AList/OpenList browsing uses the project's native `POST api/fs/list` and `POST api/fs/get` operations with user-provided session/API token, folder password and page. Tokens are kept only in UI/request memory and can be cleared with Disconnect. The returned signed/raw URL is used for playback. `fs/get.header` is presentation HTML and is deliberately never interpreted as a media HTTP header. AList/OpenList upstream API reference: [OpenListTeam/OpenList server/handles/fsread.go](https://github.com/OpenListTeam/OpenList/blob/main/server/handles/fsread.go).
+Web and native iOS AList/OpenList browsing uses the project's native `POST api/fs/list` and `POST api/fs/get` operations with user-provided session/API token, folder password and page. Tokens are kept only in UI/request memory and can be cleared with Disconnect. The returned signed/raw URL is used for playback. `fs/get.header` is presentation HTML and is deliberately never interpreted as a media HTTP header. AList/OpenList upstream API reference: [OpenListTeam/OpenList server/handles/fsread.go](https://github.com/OpenListTeam/OpenList/blob/main/server/handles/fsread.go).
 
 Aliyun/Alipan, Quark, UC, 115 and other original TVBox cloud providers commonly live in external type 3 Spider code, rather than this TV Android host. Their metadata and opaque IDs must be retained. This change supports their HTTP type 4 counterparts; it does **not** claim direct cloud login, QR/OAuth, share-password flows or Android type 3 execution. No fabricated successful provider compatibility results are recorded.
 
@@ -31,7 +31,7 @@ Aliyun/Alipan, Quark, UC, 115 and other original TVBox cloud providers commonly 
 - Android type 3 JAR/QuickJS/Python activation and actual provider corpus; current isolation harness is bundled-fixture only.
 - WebView/sniffing parser chains (`parse`/`jx`/`playUrl`) and non-HTTP protocols; these fail explicitly rather than playing a webpage as video.
 - Request headers on native browser MP4/HLS and iOS playback need a media relay/resource adapter. hls.js can attach supported headers, subject to browser/CORS restrictions; header-dependent native playback currently reports the limit.
-- Subscription HTTP redirects; live M3U/TXT/JSON references, request headers/catchup; full client filter UI and action/folder/login workflows.
+- Subscription HTTP redirects; full live catchup, client category-filter controls, and interactive login/QR action workflows. Live TXT/M3U/nested JSON and external references, per-channel headers and type 4 folder navigation are implemented; HTTP actions return data without executing arbitrary UI instructions.
 - ASS styling, automatic danmaku search endpoints and native PiP subtitle/danmaku composition.
 
 Synthetic protocol tests are derived from these source paths. Real cloud accounts, original external Spider artifacts and physical iPhone/iPad playback still require separate evidence. P1–P6 are not all complete.
