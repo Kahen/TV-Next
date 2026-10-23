@@ -82,3 +82,5 @@ The repository contains an experimental **Node.js, Python and Java 21 bundled-fi
 Java fixture logic now implements a reviewable pure-JVM Provider SPI. For a local JAR you own or are permitted to inspect, the static `services/spider-runtime/jar_inspect.py` reports known Android/JNI/native dependencies without executing any code. **A positive candidate report does not authorize executing arbitrary JARs**. See the [Spider runtime guide](services/spider-runtime/README.md).
 
 Web dependency installs are locked with `apps/web/package-lock.json`. Use `cd apps/web && npm ci` rather than `npm install` for clean development and CI builds; changes to dependencies require committing an updated lockfile.
+
+The [full cross-platform integration gate](.github/workflows/full-integration.yml) runs Web/API, iOS simulator, real Docker Compose and Spider sandbox verification together on relevant `main` changes (and can be dispatched manually). A green result is a code-integration milestone, **not** signed release, real-media/provider compatibility or Apple device certification.

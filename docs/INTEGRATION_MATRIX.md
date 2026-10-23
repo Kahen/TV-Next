@@ -25,3 +25,25 @@ This is a **continuously enforced code-level integration plan**, not a substitut
 ## Deferred release-scale E2E
 
 Before P6 acceptance, run browser automation for playlist import, playback UI, subtitles, favorites, resume, and PWA install in supported browsers. Run real iPhone/iPad media/codecs, Files import/export, navigation, playback interruptions, AVPlayer lifecycle, PiP/AirPlay and accessibility checks; document hardware model and OS versions. Validate authenticated NAS sync, permitted provider corpus, security/audit and signed release provenance. Block release if prerequisites are unavailable.
+
+## Unified full-integration gate (P6 groundwork)
+
+The `.github/workflows/full-integration.yml` **Full Cross-Platform Integration Gate**
+invokes four existing workflows at **the same Git revision**, then fails the aggregate
+gate if any job is failed, cancelled or skipped:
+
+1. Web Vitest, TypeScript/Vite build, Kotlin Gradle test/bootJar (MockMvc golden Result).
+2. Native Swift parser smoke, golden Result parity, unsigned simulator build.
+3. Clean Docker Compose boot and nginx-forwarded HTTP tests including XMLTV, FongMi
+   config/catalog, and the shared Result home/category/search/detail/episode flow.
+4. Node/Python/Java Docker sandbox: no network, read-only FS, resource constraints,
+   errors, crash/timeout cleanup, JAR inspection and parity tests.
+
+It triggers on `main` changes to relevant modules, can be run manually, and validates
+changes to its workflow orchestration in PRs. The aggregate verification job publishes
+a per-subsystem GitHub Actions summary. Only `contents:read` permissions are requested.
+
+**Still outside this gate:** real source-backed Spider integration, full Playwright
+browser media/PWA interactions, XCUI physical-device testing, NAS authentication/TLS,
+security audit/SBOM, signed/TestFlight distribution. Those P1–P6 launch checks
+remain blockers, not implicitly passing because the gate turns green.

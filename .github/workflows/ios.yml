@@ -12,6 +12,7 @@ on:
     paths:
       - apps/ios/**
       - .github/workflows/ios.yml
+  workflow_call:
   workflow_dispatch:
 jobs:
   simulator-build:

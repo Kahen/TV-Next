@@ -10,6 +10,7 @@ on:
     paths:
       - "services/spider-runtime/**"
       - ".github/workflows/spider-sandbox.yml"
+  workflow_call:
   workflow_dispatch:
 
 permissions:
