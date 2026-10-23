@@ -24,6 +24,19 @@ jobs:
         with:
           node-version: "22"
       - run: npm ci --no-audit --no-fund
+      - name: Audit all locked Web dependencies
+        run: npm audit --audit-level=moderate --json > npm-audit.json
+      - name: Generate Web dependency SBOM
+        run: npm sbom --sbom-format cyclonedx > sbom-web.cdx.json
+      - name: Preserve dependency audit and SBOM
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dependency-evidence
+          path: |
+            apps/web/npm-audit.json
+            apps/web/sbom-web.cdx.json
+          retention-days: 14
       - run: npm run test
       - run: npm run build
   api:

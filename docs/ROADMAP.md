@@ -126,4 +126,8 @@ Accounts, per-device tokens, expiring one-use pairing, user-scoped library CAS, 
 - [x] Account-scoped XMLTV / XMLTV.gz feeds, persistent cache, scheduled updates, last-good-cache recovery and cross-process refresh lease.
 - [x] Web and native iOS guide import/display and explicit channel playback; same guide contract fixture across Kotlin/Swift.
 - [x] Feed quota, request invalidation, UTF-8 bytes, gzip expansion and XML entity limits implemented with regression coverage.
-- [ ] Final CI evidence and remaining P2/P5 acceptance; no phase closure implied.
+- [x] Final-head full gate passed in [PR #28](https://github.com/Kahen/TV-Next/pull/28): Web 42, API 62, PostgreSQL 16, native simulator, Compose, NAS and isolation. Remaining P2/P5 acceptance stays open.
+
+### Web dependency security increment
+
+Known-advisory build/test packages are upgraded with a regenerated npm lockfile. Web CI now rejects moderate-or-higher advisories and retains a CycloneDX SBOM and JSON audit report. See [DEPENDENCY_SECURITY.md](DEPENDENCY_SECURITY.md); JVM/container/license/signing/provenance and remaining P6 gates stay open.

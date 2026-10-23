@@ -32,3 +32,7 @@ __pycache__/
 
 # Device-local development database
 /services/api/data/
+
+# Generated dependency evidence (CI artifacts)
+npm-audit.json
+sbom-web.cdx.json

@@ -9,10 +9,12 @@ This is the current code backlog. Physical Apple/device acceptance is deferred t
 | P3 | Java/Node/Python fixed fixture isolation, Java SPI and nonexecuting JAR preflight | Real type 3 JVM/Android/QuickJS/Python adapters, API runtime activation and controlled egress, permitted plugin corpus, security review |
 | P4 | SRT/VTT offset, danmaku parser/overlays, AList/OpenList browsing | ASS/SSA, embedded track selection, native PiP/background/AirPlay controls, DLNA, SMB/WebDAV, optional transcoding/offline lifecycle, direct cloud login/QR/OAuth |
 | P5 | Accounts, hashed device tokens, one-use pairing, per-user CAS sync, authenticated WS remote control, H2/PostgreSQL migrations, NAS restart/backup restore, diagnostics, EPG feed scheduling | Native header-dependent media relay with quotas, provider health/search cache and remaining deployment hardening |
-| P6 | npm lockfile/ci install, all-or-nothing Web/API/iOS/Compose/Spider/PostgreSQL gate | Dependency/license/SBOM/provenance audit, pinned container digests/actions, browser E2E, benchmarks, versioned artifacts/rollback and native signing pipeline |
+| P6 | npm lockfile/ci install, Web dependency audit and CycloneDX SBOM gate, all-or-nothing Web/API/iOS/Compose/Spider/PostgreSQL gate | JVM/container dependency and license/provenance audit, pinned container digests/actions, browser E2E, benchmarks, versioned artifacts/rollback and native signing pipeline |
 
 P5 account core merged in PR #27 after final-head full integration succeeded. Its review finding about a non-writable `/data` default was fixed to a working-directory-relative H2 path; Docker/NAS explicit URLs remain deployment-specific.
 
 EPG increment: Flyway V2 feed/cache schema, account ACLs, atomic refresh leases, stale-cache recovery, enabled-device scheduling, gzip/UTF-8/XXE limits, Web request invalidation and native guide UI. H2/PostgreSQL, Web and native shared contract checks are required for acceptance. See XMLTV_EPG.md. This increment does not complete any entire phase.
 
 Human/resource gates after code completion: real iPhone/iPad playback/lifecycle/codec/energy/network matrix, licensed provider corpus validation, independent security assessment where required, Apple signing/TestFlight credentials and release decision. No signed release has been published.
+
+EPG final-head evidence: [PR #28](https://github.com/Kahen/TV-Next/pull/28), [full gate](https://github.com/Kahen/TV-Next/actions/runs/39977400774). Web 42, API 62 and PostgreSQL 16 passed, with no skipped API/PostgreSQL tests; native shared contract and unsigned simulator, Compose, NAS restart/backup and three-runtime isolation passed.
