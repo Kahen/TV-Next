@@ -9,7 +9,7 @@ Legend: Implemented = coded and checked at compile/test level (NOT necessarily d
 | M3U metadata import | Implemented via API | Implemented offline or via API | Implemented bounded subset |
 | FongMi JSON inspection | Implemented (static only) | Offline file/paste metadata preview (iOS simulator CI; real device pending) | Implemented (static only) |
 | Local file play | Implemented via ephemeral blob URL (codec-dependent) | Files -> staged private cache -> AVPlayer (device test pending, 2 GiB max) | N/A |
-| UTF-8 SRT/WebVTT subtitles | Implemented via text track (limited subset) | CaptionParser + SwiftUI time overlay (device test pending) | N/A |
+| UTF-8 SRT/WebVTT subtitles and offset | Text track with -10..+10s generated WebVTT cue adjustment | SwiftUI caption overlay with AVPlayer-aligned -10..+10s shift (device test pending) | N/A |
 | Fullscreen / Picture-in-Picture | Browser API best effort | Native verification pending | N/A |
 | PWA groundwork | Manifest, SVG icon, static shell SW | N/A (native app) | N/A |
 | M3U export | Implemented | FileDocument implemented (Files verification pending) | N/A |

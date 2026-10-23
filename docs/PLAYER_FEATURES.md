@@ -6,7 +6,7 @@ Use the "从本机播放视频 / 音频" picker for authorized files. A temporar
 
 ## SRT and WebVTT subtitles
 
-Choose a UTF-8 SRT/VTT file under 1 MiB while a video is selected. Common SRT time cues are converted into a browser WebVTT text track. Rich styling, ASS/SSA, legacy encodings, delay/offset and automatic language selection are NOT yet supported.
+Choose a UTF-8 SRT/VTT file under 1 MiB while a video is selected. Common SRT time cues are converted into a browser WebVTT text track. Rich styling, ASS/SSA, legacy encodings and automatic language selection remain unsupported. A local -10 to +10 second subtitle timing offset is available on Web and iOS (positive values delay the captions); it does not change actual media time.
 
 ## Fullscreen and picture-in-picture
 
@@ -26,7 +26,7 @@ Native AVPlayer speed controls provide 0.75x, 1x, 1.25x, 1.5x and 2x. Some strea
 
 ## Out of scope
 
-Spider runtime, full FongMi parity, iOS local file play, iOS subtitle tracks, AirPlay, DLNA, PWA offline media, transcoding, DRM circumvention and signed IPA releases remain future work.
+Real Spider execution, full FongMi parity, embedded/multiple native subtitle tracks, ASS styling, AirPlay, DLNA, PWA offline media, transcoding, DRM circumvention and signed IPA releases remain future work.
 
 ## iOS local Files media and external captions
 
@@ -35,3 +35,7 @@ Files picker accepts an item only if its extension is one of MP4, M4V, MOV, MP3,
 An external UTF-8 SRT/VTT file smaller than 1 MiB is parsed on-device into bounded, text-only cues and displayed with a SwiftUI overlay synchronized to the AVPlayer timeline. It is not an embedded/selected native AVPlayer subtitle track; multiple simultaneous subtitles, positioning, ASS styling and timing adjustment are not included.
 
 Native simulator compilation and caption fixtures do not prove that a specific iPhone/iPad decodes any arbitrary video. Physical-device tests are mandatory before an Apple distribution milestone.
+
+## P4 external-caption synchronization
+
+Both Web and iOS offer an external-caption offset slider from **-10 to +10 seconds** in 0.5-second steps. Positive means captions appear later, negative means earlier. The Web client regenerates an ephemeral WebVTT text-track URL from the original source text, without accumulating offsets; iOS evaluates cue timing against the AVPlayer clock using the offset. Changing videos or importing new subtitles resets the offset. Automated TypeScript and Swift boundary tests cover positive/negative offset, zero and out-of-range inputs. This is **text cue synchronization**, not ASS/SSA, embedded track switching or proven real-device playback.
