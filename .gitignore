@@ -29,3 +29,6 @@ secrets/
 __pycache__/
 *.py[cod]
 .kotlin/
+
+# Device-local development database
+/services/api/data/

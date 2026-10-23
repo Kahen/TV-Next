@@ -170,7 +170,8 @@ open class ProviderTransport(@Value("\${TV_NEXT_LAN_ORIGINS:}") allowedPrivate: 
                     body.write(c)
                 }
             }
-            val bytes = if (headers["content-encoding"]?.lowercase() == "gzip") {
+            val bytes = if (headers["content-encoding"]?.lowercase() == "gzip" ||
+                body.size() >= 2 && body.toByteArray()[0] == 0x1f.toByte() && body.toByteArray()[1] == 0x8b.toByte()) {
                 java.util.zip.GZIPInputStream(body.toByteArray().inputStream()).use {
                     val decoded = it.readNBytes(MAX_BYTES + 1)
                     if (decoded.size > MAX_BYTES) throw java.io.IOException("Decompressed body limit")

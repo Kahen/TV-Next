@@ -589,12 +589,14 @@ paths:
               $ref: '#/components/schemas/Credentials'
   /api/v1/home/diagnostics:
     get:
-      summary: Read aggregate process counters and only this user's device/library totals
+      summary: Read aggregate process counters and only this user's device/library
+        totals
       security:
       - deviceBearer: []
       responses:
         '200':
-          description: Aggregate diagnostics without tokens, media URLs or other users' data
+          description: Aggregate diagnostics without tokens, media URLs or other users'
+            data
           content:
             application/json:
               schema:
@@ -880,6 +882,129 @@ paths:
         schema:
           type: string
           maxLength: 36
+  /api/v1/home/epg/feeds:
+    get:
+      summary: List current account EPG feeds
+      security: &id001
+      - deviceBearer: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EpgFeedStatus'
+        '401':
+          description: Expired or revoked device token
+        '404':
+          description: Unknown or unavailable account feed
+        '429':
+          description: Concurrent refresh or retry within one minute
+    post:
+      summary: Create a saved XMLTV or XMLTV.gz subscription
+      security: *id001
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EpgFeedStatus'
+        '401':
+          description: Expired or revoked device token
+        '404':
+          description: Unknown or unavailable account feed
+        '429':
+          description: Concurrent refresh or retry within one minute
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EpgFeedWrite'
+  /api/v1/home/epg/feeds/{id}/refresh:
+    post:
+      summary: Attempt refresh; lastError reports retained-cache failures
+      security: *id001
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EpgFeedStatus'
+        '401':
+          description: Expired or revoked device token
+        '404':
+          description: Unknown or unavailable account feed
+        '429':
+          description: Concurrent refresh or retry within one minute
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+  /api/v1/home/epg/feeds/{id}/remove:
+    post:
+      summary: Remove saved feed and cache
+      security: *id001
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: boolean
+        '401':
+          description: Expired or revoked device token
+        '404':
+          description: Unknown or unavailable account feed
+        '429':
+          description: Concurrent refresh or retry within one minute
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+  /api/v1/home/epg/feeds/{id}/guide:
+    post:
+      summary: Match cached XMLTV to supplied playlist channels
+      security: *id001
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EpgGuideResponse'
+        '401':
+          description: Expired or revoked device token
+        '404':
+          description: Unknown or unavailable account feed
+        '429':
+          description: Concurrent refresh or retry within one minute
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EpgFeedGuideRequest'
 components:
   schemas:
     TextImportRequest:
@@ -912,7 +1037,7 @@ components:
           type:
           - string
           - 'null'
-        headers: &id001
+        headers: &id002
           type: object
           maxProperties: 32
           additionalProperties:
@@ -1213,7 +1338,7 @@ components:
           type: string
         provider:
           type: string
-        headers: *id001
+        headers: *id002
         subtitles:
           type: array
           maxItems: 30
@@ -1703,6 +1828,74 @@ components:
           - string
           - 'null'
           maxLength: 200
+    EpgFeedWrite:
+      type: object
+      required:
+      - name
+      - url
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        url:
+          type: string
+          format: uri
+          maxLength: 2048
+        intervalMinutes:
+          type: integer
+          minimum: 15
+          maximum: 1440
+          default: 360
+        enabled:
+          type: boolean
+          default: true
+    EpgFeedStatus:
+      allOf:
+      - $ref: '#/components/schemas/EpgFeedWrite'
+      - type: object
+        properties:
+          id:
+            type: string
+            format: uuid
+          updatedAt:
+            type: integer
+            format: int64
+          nextRefresh:
+            type: integer
+            format: int64
+          lastError:
+            type:
+            - string
+            - 'null'
+          available:
+            type: boolean
+    EpgFeedGuideRequest:
+      type: object
+      required:
+      - channels
+      properties:
+        channels:
+          type: array
+          minItems: 1
+          maxItems: 300
+          items:
+            type: object
+            properties:
+              id:
+                type:
+                - string
+                - 'null'
+              name:
+                type: string
+        at:
+          type: string
+          format: date-time
+        hours:
+          type: integer
+          minimum: 1
+          maximum: 72
+          default: 12
   securitySchemes:
     deviceBearer:
       type: http

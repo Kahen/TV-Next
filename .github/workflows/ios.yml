@@ -46,6 +46,11 @@ jobs:
         run: |
           swiftc TVNext/DanmakuParser.swift tests/DanmakuSmoke.swift -o /tmp/tvnext-danmaku-tests
           /tmp/tvnext-danmaku-tests
+      - name: Run native XMLTV shared contract tests
+        working-directory: apps/ios
+        run: |
+          swiftc TVNext/EpgModels.swift tests/EpgSmoke.swift -o /tmp/tvnext-epg-tests
+          /tmp/tvnext-epg-tests
       - name: Generate Xcode project
         working-directory: apps/ios
         run: xcodegen generate

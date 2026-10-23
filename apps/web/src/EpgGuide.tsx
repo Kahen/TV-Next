@@ -1,12 +1,15 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { epgChannelsFromPlaylist, formatProgrammeRange } from "./epg";
 import type { EpgGuideResponse } from "./epg";
 import type { Channel } from "./api";
+import EpgFeeds from "./EpgFeeds";
+import type { HomeSession } from "./homeApi";
 import { validMediaUrl } from "./library";
 
 const MAX_XML_BYTES = 2_097_152;
 
-export default function EpgGuide({ channels, onPlay }: {
+export default function EpgGuide({ channels, onPlay, session = null }: {
+  session?: HomeSession | null;
   channels: Channel[];
   onPlay: (channel: Channel) => void;
 }) {
@@ -17,7 +20,13 @@ export default function EpgGuide({ channels, onPlay }: {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const shown = guide?.channels.map((item, index) => ({ item, channel: channels[index] }))
+  const [feedReset,setFeedReset] = useState(0);
+  const [guideChannels,setGuideChannels] = useState<Channel[]>([]);
+  const pending=useRef<AbortController|null>(null);
+  const generation=useRef(0);
+  function invalidate(feeds=true) { if(feeds)setFeedReset(value=>value+1);generation.current++;pending.current?.abort();setGuide(null);setGuideChannels([]);setBusy(false); }
+  useEffect(()=>{invalidate();return ()=>{generation.current++;pending.current?.abort();};},[channels,session?.token]);
+  const shown = guide?.channels.map((item, index) => ({ item, channel: guideChannels[index] }))
     .filter(({ item }) => item.name.toLowerCase().includes(filter.toLowerCase()));
 
   async function loadFile(file: File | undefined) {
@@ -28,9 +37,8 @@ export default function EpgGuide({ channels, onPlay }: {
     }
     try {
       const text = await file.text();
-      if (text.length > MAX_XML_BYTES) throw new Error("XMLTV 内容超过 2 MiB。");
-      setXml(text);
-      setGuide(null);
+      if (new TextEncoder().encode(text).length > MAX_XML_BYTES) throw new Error("XMLTV 内容超过 2 MiB。");
+      invalidate();setXml(text);
       setError("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "读取 XMLTV 失败");
@@ -38,7 +46,7 @@ export default function EpgGuide({ channels, onPlay }: {
   }
 
   async function loadGuide() {
-    if (!xml.trim() || xml.length > MAX_XML_BYTES) {
+    if (!xml.trim() || new TextEncoder().encode(xml).length > MAX_XML_BYTES) {
       setError("粘贴或导入有效的 XMLTV 文本（不超过 2 MiB）。");
       return;
     }
@@ -46,16 +54,19 @@ export default function EpgGuide({ channels, onPlay }: {
       setError("请先在“播放列表”导入含频道的 M3U，再导入相应 XMLTV。");
       return;
     }
+    setFeedReset(value=>value+1);pending.current?.abort();const controller=new AbortController();pending.current=controller;
+    const id=++generation.current;const snapshot=channels.slice(0,300);
     setBusy(true);
     setError("");
     setGuide(null);
     try {
       const res = await fetch((import.meta.env.VITE_API_BASE_URL || "") + "/api/v1/epg/guide", {
+        signal: controller.signal,
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           xml,
-          channels: epgChannelsFromPlaylist(channels),
+          channels: epgChannelsFromPlaylist(snapshot),
           hours
         })
       });
@@ -65,20 +76,21 @@ export default function EpgGuide({ channels, onPlay }: {
           ? String(payload.error) : "HTTP " + res.status;
         throw new Error(message);
       }
-      setGuide(payload as EpgGuideResponse);
+      if(id===generation.current){setGuide(payload as EpgGuideResponse);setGuideChannels(snapshot);}
     } catch (e) {
-      setError(e instanceof Error ? e.message : "节目表解析失败");
+      if(id===generation.current)setError(e instanceof Error ? e.message : "节目表解析失败");
     } finally {
-      setBusy(false);
+      if(id===generation.current)setBusy(false);
     }
   }
 
   return <section className="results epg-panel">
     <div className="section-heading">
       <h2>直播节目表 · XMLTV</h2>
-      <span>P2 · STATIC GUIDE</span>
+      <span>XMLTV / XMLTV.GZ</span>
     </div>
-    <p className="hint">导入你有权使用的 XMLTV 文件或粘贴内容。按 M3U 的 tvg-id 优先匹配，再尝试唯一频道名称；服务端只解析 XML，不会自动获取节目表网址。</p>
+    <p className="hint">导入你有权使用的 XMLTV 文件或粘贴内容。按 M3U 的 tvg-id 优先匹配，再尝试唯一频道名称；也可登录家庭服务器保存节目表订阅，开启服务器定时刷新。</p>
+    <EpgFeeds resetKey={feedReset} onRequest={()=>invalidate(false)} session={session} channels={channels} hours={hours} onGuide={(value,snapshot)=>{invalidate(false);setGuide(value);setGuideChannels(snapshot);}}/>
     <div className="epg-toolbar">
       <label className="file-picker">选择 XMLTV 文件
         <input type="file" accept=".xml,.xmltv,application/xml,text/xml" onChange={(e) => {
@@ -86,7 +98,7 @@ export default function EpgGuide({ channels, onPlay }: {
         }} />
       </label>
       <label>查看未来
-        <select value={hours} onChange={(e) => setHours(Number(e.target.value))}>
+        <select value={hours} onChange={(e) => { invalidate();setHours(Number(e.target.value)); }}>
           <option value={6}>6 小时</option>
           <option value={12}>12 小时</option>
           <option value={24}>24 小时</option>
@@ -99,9 +111,9 @@ export default function EpgGuide({ channels, onPlay }: {
     </div>
     <textarea aria-label="XMLTV 内容" spellCheck={false} rows={5}
       placeholder={'<?xml version="1.0" encoding="UTF-8"?>\n<tv><channel id="example"><display-name>示例频道</display-name></channel></tv>'}
-      value={xml} onChange={(e) => { setXml(e.target.value); setGuide(null); }}
+      value={xml} onChange={(e) => { setXml(e.target.value); invalidate(); }}
     />
-    <p className="hint">目前媒体库 {channels.length} 个频道，每次最多匹配前 300 个。预览不会下载 XML 中的台标，也不会缓存节目表。</p>
+    <p className="hint">目前媒体库 {channels.length} 个频道，每次最多匹配前 300 个。本地导入只解析文本；订阅缓存独立保存在当前账号。</p>
     {error && <p className="alert" role="alert">{error}</p>}
     {guide && <>
       <div className="section-heading">

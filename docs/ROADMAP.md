@@ -1,6 +1,6 @@
 # TV-Next roadmap
 
-Updated: 2026-10-20. This is a delivery plan, not a claim that every feature exists.
+Updated: 2026-10-23. Current code backlog: [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md). This is a delivery plan, not a claim that every feature exists.
 
 ## Goals and non-goals
 
@@ -120,3 +120,10 @@ See [UPSTREAM_COMPATIBILITY.md](UPSTREAM_COMPATIBILITY.md) for exact original so
 ### P5 account/sync implementation increment
 
 Accounts, per-device tokens, expiring one-use pairing, user-scoped library CAS, Web/iOS controls, WebSocket ticket/ACK remote control, Flyway migrations, H2/PostgreSQL deployment paths and private metrics/request tracing are implemented in the P5 feature branch. Full CI and deployment acceptance are still required before closing any milestone. See HOME_SERVER.md. Provider/EPG scheduling, shared caches and native media byte relay remain open.
+
+### EPG subscription and native parity increment
+
+- [x] Account-scoped XMLTV / XMLTV.gz feeds, persistent cache, scheduled updates, last-good-cache recovery and cross-process refresh lease.
+- [x] Web and native iOS guide import/display and explicit channel playback; same guide contract fixture across Kotlin/Swift.
+- [x] Feed quota, request invalidation, UTF-8 bytes, gzip expansion and XML entity limits implemented with regression coverage.
+- [ ] Final CI evidence and remaining P2/P5 acceptance; no phase closure implied.
