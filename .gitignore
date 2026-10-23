@@ -28,3 +28,4 @@ secrets/
 *.tsbuildinfo
 __pycache__/
 *.py[cod]
+.kotlin/
