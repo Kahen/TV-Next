@@ -1,4 +1,5 @@
 import Foundation
+import CoreFoundation
 
 /// Offline-only FongMi Result JSON subset, independent of network/Spider runtime.
 struct OfflineMediaCategory: Equatable, Identifiable {

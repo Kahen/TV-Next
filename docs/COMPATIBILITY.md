@@ -18,7 +18,8 @@ Legend: Implemented = coded and checked at compile/test level (NOT necessarily d
 | Cross-device library synchronization | Planned P5 | Planned P5 | Planned P5 |
 | FongMi JSON site metadata preview | Implemented (metadata only, no Spider) | Offline metadata only (device test pending) | Implemented bounded parser |
 | FongMi IPTV groups/channels | Preview + manual click for plain HTTP(S) URLs | Planned | Implemented bounded metadata parser |
-| FongMi sites/home/search/details | Planned P2 | Planned P2 | Planned P2 |
+| Static FongMi Result home/category/search/details/episodes | Web offline JSON browsing + direct HTTP(S) play | Native offline JSON browsing + direct AVPlayer URLs (simulator tests pending) | Static result normalization and MockMvc golden tests |
+| Real FongMi sites/home/search/details | Planned P2 | Planned P2 | Planned P2 |
 | Java/JAR Spider | N/A | N/A | Bundled Java 21 `ProviderSpi` fixture in Docker; static JAR compatibility inspection; third-party JAR execution not supported |
 | JS Spider | N/A | N/A | Bundled JS fixture worker in Docker (no dynamic Spider compatibility) |
 | Python Spider | N/A | N/A | Bundled Python fixture worker in Docker (no dynamic Spider compatibility) |

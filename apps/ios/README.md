@@ -29,3 +29,11 @@ This is an early native UI, not an iOS execution environment for Android JAR, AA
 - Select **导入 SRT / WebVTT 字幕** for UTF-8 plain-text captions up to **1 MiB**. Cues are rendered in a SwiftUI overlay aligned with AVPlayer's current time, not as a system-selectable AVMediaSelection track.
 - Captions support common SRT/WebVTT cues, simple text and basic timestamps. No ASS/SSA, advanced WebVTT positioning, styling, offsets, muxed subtitle track selection or translation yet.
 - Playback of a supported filename still depends on codecs provided by iOS/AVPlayer. Media copied from cloud storage can fail when inaccessible, oversized, or low on available device storage. Test on physical iPhone/iPad before distribution.
+
+## Native offline FongMi Result catalogue (P2 subset)
+
+Paste a **FongMi Result** JSON (`class` + `list`) or select a local UTF-8 JSON file in the new **影视目录** section. The native iOS implementation parses and filters locally; browse up to 200 categories/2,000 items, search by title, see detail/playback lines and episodes, then tap a supported direct HTTP(S) URL to play with AVPlayer.
+
+This feature never requests Spider URLs, downloads external configs or artwork, executes plugins, or sends JSON to the server. Playback URL validation reuses the existing M3U URL policy, so script schemes and credentials in URLs are rejected. Metadata is not persisted. It cannot resolve `csp_*` Spider sites or complex episode parsing yet.
+
+A shared synthetic [golden Result](../../fixtures/p2-fongmi-result.json) is exercised by native Swift parser smoke tests and Spring MockMvc API integration tests. This ensures consistency for the tested subset but is not proof of real provider compatibility or physical Apple device playback.

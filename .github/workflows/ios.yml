@@ -1,10 +1,12 @@
-name: iOS (manual)
+name: iOS Simulator and Parser CI
 on:
   push:
     branches:
+      - main
       - feat/**
     paths:
       - apps/ios/**
+      - fixtures/**
       - .github/workflows/ios.yml
   pull_request:
     paths:
@@ -28,6 +30,11 @@ jobs:
         run: |
           swiftc TVNext/OfflineConfigPreview.swift tests/ConfigSmoke.swift -o /tmp/tvnext-config-tests
           /tmp/tvnext-config-tests
+      - name: Validate native FongMi Result against shared JVM golden fixture
+        working-directory: apps/ios
+        run: |
+          swiftc TVNext/TVNextAPI.swift TVNext/M3UParser.swift TVNext/OfflineMediaCatalog.swift tests/MediaCatalogSmoke.swift -o /tmp/tvnext-media-tests
+          /tmp/tvnext-media-tests
       - name: Run caption parser smoke tests
         working-directory: apps/ios
         run: |
