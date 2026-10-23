@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach,beforeEach,expect,it,vi } from "vitest";
-import { useState } from "react";
+import { useState, type ComponentProps } from "react";
 import { cleanup,fireEvent,render,screen,waitFor } from "@testing-library/react";
 import HomeServerPanel from "./HomeServerPanel";
 import { homeRequest,loadHomeSession,saveHomeSession } from "./homeApi";
@@ -10,7 +10,7 @@ vi.mock("./homeApi",async()=>{const original=await vi.importActual<typeof import
 const request=vi.mocked(homeRequest);
 const session:HomeSession={token:"a".repeat(43),user:{id:"u1",username:"own"},device:{id:"d1",name:"Browser",createdAt:1,expiresAt:Date.now()+600000,current:true}};
 afterEach(()=>{cleanup();window.sessionStorage.clear();window.localStorage.clear();});beforeEach(()=>request.mockReset());
-function Wrapper({onRestore,initial=session}:{onRestore:ReturnType<typeof vi.fn>;initial?:HomeSession|null}){const [state,setState]=useState(initial);return <HomeServerPanel library={emptyLibrary()} onRestore={onRestore} session={state} onSessionChange={setState}/>;}
+function Wrapper({onRestore,initial=session}:{onRestore:ComponentProps<typeof HomeServerPanel>["onRestore"];initial?:HomeSession|null}){const [state,setState]=useState(initial);return <HomeServerPanel library={emptyLibrary()} onRestore={onRestore} session={state} onSessionChange={setState}/>;}
 it("reads without replacing local data, uses revision CAS, and does not overwrite after conflict",async()=>{
   const restore=vi.fn();const snapshot={...emptyLibrary(),channels:[{name:"Cloud",url:"https://example.org/a",group:"Own"}]};
   request.mockResolvedValueOnce({revision:3,updatedAt:1,library:snapshot}).mockRejectedValueOnce(new Error("Library changed on another device"));

@@ -29,7 +29,7 @@ Ports bind to **127.0.0.1** intentionally. Do not expose this development build 
 
 ## Develop without Docker
 
-Requires Java 21, Gradle 8.14.3, Node 22 and npm.
+Requires Java 21, Gradle 8.14.3, Node 22.12+ (22.x) or Node 24, and npm.
 
 ```bash
 # Terminal 1
@@ -88,3 +88,5 @@ The [full cross-platform integration gate](.github/workflows/full-integration.ym
 ### Original subscription compatibility
 
 TVBox/FongMi subscription handling is tracked against the original Android source, including type 0 XML, type 1/2 JSON and type 4 HTTP Spider operations. Web/iOS subscription browsing, bounded XML/JSON danmaku overlays and AList/OpenList cloud browsing are under active implementation. See [source mappings, usage and explicit gaps](docs/UPSTREAM_COMPATIBILITY.md). Type 3 Android Spider and direct cloud account authentication are not yet complete. Source-derived compatibility changes retain GPL-3.0 attribution in [NOTICE.md](NOTICE.md).
+
+Web CI audits the locked dependency tree and retains a CycloneDX SBOM. See [dependency security and remaining audit scope](docs/DEPENDENCY_SECURITY.md).
