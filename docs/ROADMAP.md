@@ -64,7 +64,7 @@ Acceptance: declared supported plugin fixtures pass on server; never execute rem
 
 Tracking: https://github.com/Kahen/TV-Next/issues/5
 
-- [ ] ASS/SSA styling, multiple subtitles, subtitle offset, Danmaku overlay
+- [ ] External SRT/WebVTT subtitle offset implemented on Web/iOS with bounds and tests; ASS/SSA styling, multiple embedded subtitles, Danmaku overlay and device verification remain
 - [ ] Audio track/channel selection, decoder capability diagnostics, speed, skip intro/outro
 - [ ] Native iOS: AVPlayer/PiP/background media, AirPlay; evaluate alternate player SDK licensing
 - [ ] Optional transcoding sidecar for media not supported natively; measure CPU/bandwidth

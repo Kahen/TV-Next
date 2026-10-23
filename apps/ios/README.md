@@ -37,3 +37,5 @@ Paste a **FongMi Result** JSON (`class` + `list`) or select a local UTF-8 JSON f
 This feature never requests Spider URLs, downloads external configs or artwork, executes plugins, or sends JSON to the server. Playback URL validation reuses the existing M3U URL policy, so script schemes and credentials in URLs are rejected. Metadata is not persisted. It cannot resolve `csp_*` Spider sites or complex episode parsing yet.
 
 A shared synthetic [golden Result](../../fixtures/p2-fongmi-result.json) is exercised by native Swift parser smoke tests and Spring MockMvc API integration tests. This ensures consistency for the tested subset but is not proof of real provider compatibility or physical Apple device playback.
+
+Native external-caption synchronization supports -10..+10 seconds with a 0.5-second step (positive = delayed captions). This adjusts text overlay timing only, not AVPlayer seek position or embedded media subtitle tracks. The new boundary checks run with the Swift parser smoke suite; actual-device results are still pending.
