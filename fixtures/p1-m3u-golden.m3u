@@ -1,0 +1,16 @@
+#EXTM3U
+#EXTINF:-1 tvg-id="news.one" tvg-logo="https://example.org/logo.png" group-title="News, World" tvg-name="Fallback, News",World, Morning
+https://example.org/live.m3u8
+#EXTINF:-1 tvg-name="Fallback, Title" group-title="Documentary"
+https://example.org/doc.mp4
+#EXTINF:-1 tvg-logo="javascript:alert(1)" group-title="Drama",Drama
+https://example.org/drama.mp4
+#EXTINF:-1 group-title="Ignored",Untrusted
+javascript:alert(1)
+#EXTINF:-1,Credentials
+https://user:pass@example.org/secret.mp4
+#EXTINF:-1,Group Override
+#EXTGRP:Sports
+https://example.org/sport.m3u8
+#EXTINF:-1 tvg-id="abc" group-title="",Empty
+https://example.org/empty.mp4

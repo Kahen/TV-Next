@@ -24,7 +24,7 @@ Acceptance: Web dev server works; API tests pass; import an explicitly provided 
 Tracking: https://github.com/Kahen/TV-Next/issues/2
 
 - [x] Implement device-local persistence for playlists, recents, favorites and finite-VOD playback progress (Web unit-tested, iOS simulator build-tested; cross-device sync not yet available)
-- [ ] Support JSON config import (file/paste) and site display; reject oversized data
+- [x] Support JSON config import (file/paste) and site metadata display on Web/iOS, with bounded input (iOS parser smoke tests; unsigned simulator build, real-device validation pending)
 - [x] Initial playlist group display, search, and favorites on Web/iOS (full accessibility audit pending)
 - [ ] Web compatible local file picker and iOS security-scoped local-file staging implemented; codec/format playback and device storage testing remain
 - [ ] Web and iOS speed selectors, Web fullscreen/PiP best-effort controls added; native and device verification still pending
@@ -38,7 +38,7 @@ Acceptance pending: equivalent catalog handling and history semantics across Web
 Tracking: https://github.com/Kahen/TV-Next/issues/3
 
 - [ ] Initial FongMi site/live/group/channel metadata normalization + Web browsing + optional direct HTTP(S) live playback; headers/flags, nested references and full config compatibility still pending
-- [ ] Static FongMi Result adapter provides local home/category/search/detail/line/episode APIs; genuine network providers, cross-site queries and compatibility tests with permitted real fixtures remain
+- [ ] Static FongMi Result adapter provides home/category/search/detail/lines/episodes on Web/API and now native iOS offline data browsing, with shared synthetic fixture tests; genuine network providers, cross-site queries and permitted real fixture validation remain
 - [ ] FongMi nested live JSON metadata preview and offline XMLTV import/EPG channel matching implemented on Web/API. Full M3U/TXT/JSON live imports, auto EPG updates, iOS EPG, replay and timeshift remain
 - [ ] Subtitle tracks (WebVTT/SRT) and per-title audio preferences
 - [ ] Cross-provider search with cancellation, timeout, pagination and deduplication
@@ -64,7 +64,7 @@ Acceptance: declared supported plugin fixtures pass on server; never execute rem
 
 Tracking: https://github.com/Kahen/TV-Next/issues/5
 
-- [ ] ASS/SSA styling, multiple subtitles, subtitle offset, Danmaku overlay
+- [ ] External SRT/WebVTT subtitle offset implemented on Web/iOS with bounds and tests; ASS/SSA styling, multiple embedded subtitles, Danmaku overlay and device verification remain
 - [ ] Audio track/channel selection, decoder capability diagnostics, speed, skip intro/outro
 - [ ] Native iOS: AVPlayer/PiP/background media, AirPlay; evaluate alternate player SDK licensing
 - [ ] Optional transcoding sidecar for media not supported natively; measure CPU/bandwidth

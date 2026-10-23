@@ -23,6 +23,7 @@ struct ContentView: View {
     @State private var isShowingCaptionPicker = false
     @State private var isLoadingMedia = false
     @State private var captionFileName: String?
+    @State private var captionOffsetSeconds: Double = 0
     @State private var isShowingExporter = false
     @State private var exportDocument: M3UExportDocument?
     @State private var playbackSpeed: Float = 1.0
@@ -60,6 +61,12 @@ struct ContentView: View {
                     quickPlaySection
                     localMediaSection
                     importSection
+                    ConfigPreviewSection()
+                    MediaCatalogSection { channel in
+                        errorMessage = nil
+                        captionFileName = nil
+                        library.play(channel)
+                    }
                     librarySection
 
                     Text("本地播放列表、收藏及进度只保存在这台设备；暂不支持跨设备同步。不内置媒体源。")
@@ -238,11 +245,20 @@ struct ContentView: View {
                         Button("移除字幕") {
                             library.clearCaptions()
                             captionFileName = nil
+                            captionOffsetSeconds = 0
                         }.buttonStyle(.bordered)
                     }
                 }
                 if let captionFileName {
                     Text("字幕：" + captionFileName)
+                        .font(.caption).foregroundStyle(.secondary)
+                    Slider(value: $captionOffsetSeconds, in: -10...10, step: 0.5) {
+                        Text("字幕偏移")
+                    }
+                    .onChange(of: captionOffsetSeconds) { _, offset in
+                        library.setCaptionOffset(offset)
+                    }
+                    Text("字幕偏移：" + String(format: "%.1f", captionOffsetSeconds) + " 秒（正值延后）")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
@@ -428,6 +444,7 @@ struct ContentView: View {
             }
             let cues = try CaptionParser.parse(Data(contentsOf: url))
             library.setCaptions(cues)
+            captionOffsetSeconds = 0
             captionFileName = url.lastPathComponent
             errorMessage = nil
         } catch {

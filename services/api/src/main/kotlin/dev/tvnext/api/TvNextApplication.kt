@@ -35,6 +35,27 @@ class PlaylistParser {
         private val attribute = Regex("([A-Za-z0-9_-]+)\\s*=\\s*\"([^\"]*)\"")
     }
 
+    private fun metadataTitle(line: String): String? {
+        var quoted = false
+        for (index in line.indices) {
+            when (line[index]) {
+                '"' -> quoted = !quoted
+                ',' -> if (!quoted) return line.substring(index + 1).trim()
+            }
+        }
+        return null
+    }
+
+    private fun safeHttpUri(value: String): URI? {
+        if (value.length > 2048 || value != value.trim() ||
+            value.any { it.code < 0x20 || it.code == 0x7f }) return null
+        val uri = runCatching { URI(value) }.getOrNull() ?: return null
+        return uri.takeIf {
+            it.scheme?.lowercase() in setOf("http", "https") &&
+                !it.host.isNullOrBlank() && it.rawUserInfo == null
+        }
+    }
+
     fun parse(content: String): PlaylistResponse {
         validateSize(content)
         val channels = mutableListOf<Channel>()
@@ -50,9 +71,10 @@ class PlaylistParser {
             when {
                 line.startsWith("#EXTINF", ignoreCase = true) -> {
                     val attrs = attribute.findAll(line).associate { it.groupValues[1].lowercase() to it.groupValues[2] }
-                    name = line.substringAfter(",", "").trim().ifBlank { attrs["tvg-name"]?.takeIf { it.isNotBlank() } ?: "Unnamed" }
+                    name = metadataTitle(line)?.takeIf { it.isNotEmpty() }
+                        ?: attrs["tvg-name"]?.takeIf { it.isNotBlank() } ?: "Unnamed"
                     group = attrs["group-title"]?.takeIf { it.isNotBlank() } ?: "Uncategorized"
-                    logo = attrs["tvg-logo"]?.takeIf { it.isNotBlank() }
+                    logo = attrs["tvg-logo"]?.takeIf { safeHttpUri(it) != null }
                     tvgId = attrs["tvg-id"]?.takeIf { it.isNotBlank() }
                 }
                 line.startsWith("#EXTGRP:", ignoreCase = true) -> {
@@ -60,11 +82,11 @@ class PlaylistParser {
                 }
                 line.isEmpty() || line.startsWith("#") -> Unit
                 else -> {
-                    val uri = runCatching { URI(line) }.getOrNull()
-                    if (uri != null && uri.scheme?.lowercase() in setOf("http", "https")
-                        && !uri.host.isNullOrBlank() && uri.rawUserInfo == null) {
+                    val uri = safeHttpUri(line)
+                    if (uri != null) {
                         if (channels.size >= MAX_CHANNELS) fail("Too many channels")
-                        channels += Channel(name ?: (uri.host ?: "Stream"), line, group, logo, tvgId)
+                        channels += Channel(name?.take(200) ?: (uri.host ?: "Stream"),
+                            line, group.take(100), logo, tvgId?.take(150))
                     }
                     name = null
                     group = "Uncategorized"

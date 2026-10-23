@@ -7,7 +7,7 @@ import {
   setPosition, toggleFavorite, validMediaUrl
 } from "./library";
 import type { LibraryState } from "./library";
-import { isPlayableLocalMedia, toWebVtt } from "./subtitles";
+import { isPlayableLocalMedia, shiftWebVtt, toWebVtt } from "./subtitles";
 import { exportM3u } from "./playlistExport";
 import MediaBrowser from "./MediaBrowser";
 import "./media-style.css";
@@ -33,6 +33,8 @@ export default function App() {
   const [playerError, setPlayerError] = useState("");
   const [localVideo, setLocalVideo] = useState<{ url: string; name: string } | null>(null);
   const [subtitleUrl, setSubtitleUrl] = useState<string | null>(null);
+  const [subtitleOriginal, setSubtitleOriginal] = useState("");
+  const [subtitleOffset, setSubtitleOffset] = useState(0);
   const [subtitleName, setSubtitleName] = useState("");
   const [storageWarning, setStorageWarning] = useState("");
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -43,6 +45,15 @@ export default function App() {
   // Object URLs are deliberately ephemeral and never written to the media library.
   useEffect(() => () => { if (localVideo) URL.revokeObjectURL(localVideo.url); }, [localVideo]);
   useEffect(() => () => { if (subtitleUrl) URL.revokeObjectURL(subtitleUrl); }, [subtitleUrl]);
+  useEffect(() => {
+    if (!subtitleOriginal) {
+      setSubtitleUrl(null);
+      return;
+    }
+    const shifted = shiftWebVtt(subtitleOriginal, subtitleOffset);
+    setSubtitleUrl(URL.createObjectURL(new Blob([shifted], { type: "text/vtt" })));
+  }, [subtitleOriginal, subtitleOffset]);
+
   useEffect(() => {
     const video = videoRef.current;
     if (video && subtitleUrl && video.textTracks.length) video.textTracks[0].mode = "showing";
@@ -172,7 +183,8 @@ export default function App() {
     }
     try {
       const vtt = toWebVtt(await file.text(), file.name);
-      setSubtitleUrl(URL.createObjectURL(new Blob([vtt], { type: "text/vtt" })));
+      setSubtitleOffset(0);
+      setSubtitleOriginal(vtt);
       setSubtitleName(file.name);
       setError("");
     } catch (err) {
@@ -322,7 +334,8 @@ export default function App() {
             <label className="file-picker">加载 SRT / VTT
               <input type="file" accept=".srt,.vtt,text/vtt,application/x-subrip" onChange={(e) => { void importSubtitle(e.target.files?.[0]); e.target.value = ""; }} />
             </label>
-            {subtitleUrl && <button className="secondary" onClick={() => { setSubtitleUrl(null); setSubtitleName(""); }} title={subtitleName}>移除字幕</button>}
+            {subtitleUrl && <label>字幕偏移（正值延后） <input aria-label="字幕偏移" type="range" min="-10" max="10" step="0.5" value={subtitleOffset} onChange={(e) => setSubtitleOffset(Number(e.target.value))} /> {subtitleOffset.toFixed(1)} 秒</label>}
+            {subtitleUrl && <button className="secondary" onClick={() => { setSubtitleOriginal(""); setSubtitleUrl(null); setSubtitleName(""); setSubtitleOffset(0); }} title={subtitleName}>移除字幕</button>}
           </div>}
           {selected && <div className="player-actions">
             <button className="secondary" onClick={() => setLibrary((state) => toggleFavorite(state, selected.url))}>

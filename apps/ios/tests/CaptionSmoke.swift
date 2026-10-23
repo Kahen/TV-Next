@@ -37,6 +37,15 @@ struct CaptionSmoke {
             fatalError("Oversized caption accepted")
         } catch CaptionError.tooLarge {}
 
+        // Positive offset delays text; negative offset advances it.
+        precondition(CaptionParser.activeText(srtCues, at: 1.5) == "Hello world")
+        precondition(CaptionParser.activeText(srtCues, at: 1.5, offset: 1) == "")
+        precondition(CaptionParser.activeText(srtCues, at: 2.5, offset: 1) == "Hello world")
+        precondition(CaptionParser.activeText(srtCues, at: 0.5, offset: -1) == "Hello world")
+        precondition(CaptionParser.activeText(srtCues, at: 2.25) == "")
+        precondition(CaptionParser.activeText(srtCues, at: .infinity) == "")
+        precondition(CaptionParser.activeText(srtCues, at: 1.5, offset: 11) == "")
+
         print("TV-Next caption parser smoke tests passed")
     }
 }

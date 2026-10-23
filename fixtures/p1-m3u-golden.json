@@ -1,0 +1,37 @@
+[
+  {
+    "name": "World, Morning",
+    "url": "https://example.org/live.m3u8",
+    "group": "News, World",
+    "logo": "https://example.org/logo.png",
+    "tvgId": "news.one"
+  },
+  {
+    "name": "Fallback, Title",
+    "url": "https://example.org/doc.mp4",
+    "group": "Documentary",
+    "logo": null,
+    "tvgId": null
+  },
+  {
+    "name": "Drama",
+    "url": "https://example.org/drama.mp4",
+    "group": "Drama",
+    "logo": null,
+    "tvgId": null
+  },
+  {
+    "name": "Group Override",
+    "url": "https://example.org/sport.m3u8",
+    "group": "Sports",
+    "logo": null,
+    "tvgId": null
+  },
+  {
+    "name": "Empty",
+    "url": "https://example.org/empty.mp4",
+    "group": "Uncategorized",
+    "logo": null,
+    "tvgId": "abc"
+  }
+]

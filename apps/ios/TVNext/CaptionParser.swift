@@ -74,6 +74,14 @@ enum CaptionParser {
         return result.sorted { $0.start < $1.start }
     }
 
+    /// Positive offset delays text relative to media time; negative advances it.
+    static func activeText(_ cues: [CaptionCue], at time: TimeInterval,
+                           offset: TimeInterval = 0) -> String {
+        guard time.isFinite, offset.isFinite, offset >= -10, offset <= 10 else { return "" }
+        let subtitleTime = time - offset
+        return cues.first(where: { subtitleTime >= $0.start && subtitleTime < $0.end })?.text ?? ""
+    }
+
     private static func seconds(_ value: String) -> TimeInterval? {
         let parts = value.replacingOccurrences(of: ",", with: ".").split(separator: ":")
         guard parts.count == 2 || parts.count == 3 else { return nil }
