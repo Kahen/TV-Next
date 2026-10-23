@@ -24,10 +24,11 @@ class ApiRequestLimits : OncePerRequestFilter() {
         val now = System.currentTimeMillis() / 60_000
         val accepted = synchronized(windows) {
             if (windows.size >= 4096) windows.entries.removeIf { it.value.minute != now }
-            val peer = request.remoteAddr
+            val auth = request.requestURI.startsWith("/api/v1/home/auth/") || request.requestURI == "/api/v1/home/pairings/claim"
+            val peer = request.remoteAddr + if (auth) ":auth" else ":api"
             if (!windows.containsKey(peer) && windows.size >= 4096) false else {
                 val window = windows[peer]?.takeIf { it.minute == now } ?: Window(now,0).also { windows[peer] = it }
-                window.count++; window.count <= 300
+                window.count++; window.count <= if (auth) 10 else 300
             }
         }
         fun reject(code: Int, message: String) {

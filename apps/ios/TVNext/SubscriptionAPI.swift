@@ -35,11 +35,26 @@ struct NativeResourceRequest: Encodable { let url: String }
 struct NativeTextResponse: Decodable { let content: String }
 
 extension TVNextAPI {
+    func get<T: Decodable>(_ operation: String) async throws -> T {
+        guard let scheme=server.scheme?.lowercased(),["http","https"].contains(scheme),server.host != nil,server.user == nil,server.password == nil else { throw APIError.invalidServer }
+        var request=URLRequest(url:server.appending(path:"api/v1/"+operation));request.timeoutInterval=20
+        if let token { request.setValue("Bearer " + token,forHTTPHeaderField:"Authorization") }
+        let (bytes,response)=try await URLSession.shared.bytes(for:request)
+        var data=Data()
+        for try await byte in bytes { if data.count>=4_194_304 { throw APIError.serverRejected };data.append(byte) }
+        guard let http=response as? HTTPURLResponse,http.statusCode==200 else {
+            let error=try? JSONDecoder().decode([String:String].self,from:data)
+            throw NativeRequestError.message(error?["error"] ?? "服务器请求失败")
+        }
+        return try JSONDecoder().decode(T.self,from:data)
+    }
+
     func request<T: Decodable, Body: Encodable>(_ operation: String, body: Body) async throws -> T {
         guard let scheme = server.scheme?.lowercased(), ["http","https"].contains(scheme),
               server.host != nil, server.user == nil, server.password == nil else { throw APIError.invalidServer }
         var request = URLRequest(url: server.appending(path: "api/v1/" + operation))
         request.httpMethod = "POST"; request.timeoutInterval = 20
+        if let token { request.setValue("Bearer " + token,forHTTPHeaderField:"Authorization") }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(body)
         let (bytes, response) = try await URLSession.shared.bytes(for: request)

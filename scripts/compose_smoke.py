@@ -14,9 +14,11 @@ API = "http://127.0.0.1:8080"
 WEB = "http://127.0.0.1:3000"
 
 
-def request(url, value=None):
+def request(url, value=None, origin=None):
     body = json.dumps(value).encode("utf-8") if value is not None else None
     headers = {"Content-Type": "application/json"} if body is not None else {}
+    if origin:
+        headers["Origin"] = origin
     method = "POST" if body is not None else "GET"
     req = urllib.request.Request(url, data=body, headers=headers, method=method)
     with urllib.request.urlopen(req, timeout=5) as response:
@@ -51,7 +53,7 @@ def main():
         "content": '#EXTM3U\n#EXTINF:-1 tvg-id="fixture" group-title="News",Fixture TV\n'
                    'https://example.org/fixture.m3u8\n'
     }
-    playlist = json.loads(request(WEB + "/api/v1/playlists/parse", m3u))
+    playlist = json.loads(request(WEB + "/api/v1/playlists/parse", m3u, WEB))
     assert playlist["channels"][0]["tvgId"] == "fixture", playlist
 
     config = json.dumps({

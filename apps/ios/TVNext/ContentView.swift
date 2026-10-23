@@ -12,6 +12,7 @@ private enum LibraryView: String, CaseIterable, Identifiable {
 
 struct ContentView: View {
     @StateObject private var library = MediaLibraryStore()
+    @StateObject private var remote = NativeRemoteControl()
     @AppStorage("tv-next-api-url") private var serverURL = "http://localhost:8080"
     @State private var danmaku: [DanmakuComment] = []
     @State private var danmakuOptions = DanmakuOptions()
@@ -66,6 +67,7 @@ struct ContentView: View {
                     quickPlaySection
                     localMediaSection
                     importSection
+                    HomeServerSection(serverURL:$serverURL,library:library,onSessionChange:{ remote.configure($0,server:$1) },remoteState:remote.state)
                     ConfigPreviewSection()
                     CloudSection(serverURL: serverURL) { library.play($0) }
                     SubscriptionSection(serverURL: serverURL, onPlay: { playback, title in
@@ -94,6 +96,23 @@ struct ContentView: View {
                 .padding()
             }
             .navigationTitle("TV-Next")
+            .onAppear {
+                remote.receive = { packet in
+                    switch packet.type {
+                    case "LOAD":
+                        guard let url=packet.url,MediaAddress.valid(url) else { throw NativeRequestError.message("媒体地址无效") }
+                        library.play(TVChannel(name:"远程媒体",url:url,group:"Remote",logo:nil,tvgId:nil))
+                    case "PLAY":
+                        guard library.player.currentItem != nil else { throw NativeRequestError.message("尚未选择媒体") }
+                        library.player.playImmediately(atRate:library.playbackSpeed)
+                    case "PAUSE": library.player.pause()
+                    case "SEEK":
+                        guard let position=packet.position,position.isFinite,position>=0,let duration=library.player.currentItem?.duration.seconds,duration.isFinite,position<=duration else { throw NativeRequestError.message("媒体无法跳转到该位置") }
+                        library.player.seek(to:CMTime(seconds:position,preferredTimescale:600))
+                    default: throw NativeRequestError.message("未知遥控操作")
+                    }
+                }
+            }
             .fileImporter(
                 isPresented: $isShowingFilePicker,
                 allowedContentTypes: [.plainText, UTType(filenameExtension: "m3u") ?? .plainText],
@@ -150,6 +169,7 @@ struct ContentView: View {
             }
             .onChange(of: library.current?.url) { _, url in danmaku = []; if url != remoteResourceKey { remoteDanmaku = [] } }
             .onDisappear {
+                remote.configure(nil,server:serverURL)
                 library.savePosition()
                 library.player.pause()
             }
