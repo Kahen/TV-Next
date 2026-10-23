@@ -122,7 +122,10 @@ class ConfigInspector(private val mapper: ObjectMapper) {
 }
 
 private fun validateSize(content: String) {
-    if (content.isBlank() || content.length > PlaylistParser.MAX_CHARS) fail("Text must be 1..1048576 characters")
+    if (content.isBlank() || content.length > PlaylistParser.MAX_CHARS ||
+        content.toByteArray(Charsets.UTF_8).size > PlaylistParser.MAX_CHARS) {
+        fail("Text must be 1..1048576 UTF-8 bytes")
+    }
 }
 
 private fun fail(message: String): Nothing = throw ResponseStatusException(HttpStatus.BAD_REQUEST, message)
