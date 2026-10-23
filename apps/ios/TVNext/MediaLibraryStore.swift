@@ -19,6 +19,7 @@ final class MediaLibraryStore: ObservableObject {
     @Published private(set) var current: TVChannel?
     @Published private(set) var localFileName: String?
     @Published private(set) var captionText = ""
+    @Published private(set) var captionOffset: TimeInterval = 0
 
     private var currentLocalFile: URL?
     private var captionCues: [CaptionCue] = []
@@ -130,11 +131,19 @@ final class MediaLibraryStore: ObservableObject {
 
     func setCaptions(_ cues: [CaptionCue]) {
         captionCues = Array(cues.prefix(5_000))
+        captionOffset = 0
+        refreshCaptions()
+    }
+
+    func setCaptionOffset(_ value: TimeInterval) {
+        guard value.isFinite else { return }
+        captionOffset = max(-10, min(10, value))
         refreshCaptions()
     }
 
     func clearCaptions() {
         captionCues = []
+        captionOffset = 0
         captionText = ""
     }
 
@@ -144,7 +153,7 @@ final class MediaLibraryStore: ObservableObject {
             captionText = ""
             return
         }
-        let text = captionCues.first(where: { now >= $0.start && now < $0.end })?.text ?? ""
+        let text = CaptionParser.activeText(captionCues, at: now, offset: captionOffset)
         if text != captionText { captionText = text }
     }
 
