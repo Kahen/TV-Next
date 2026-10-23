@@ -36,7 +36,8 @@ struct MediaCatalogSmoke {
         rejects(#"{"list":{}}"#, .invalidCollections)
         rejects(String(repeating: "é", count: 524_289), .tooLarge)
         let duplicate = #"{"list":[{"vod_id":"x","vod_name":"first"},{"vod_id":"x","vod_name":"second"}]}"#
-        precondition(try OfflineMediaParser.parse(duplicate).videos.count == 1)
+        let deduplicated = try OfflineMediaParser.parse(duplicate)
+        precondition(deduplicated.videos.count == 1)
         print("TV-Next offline MediaProvider golden smoke passed")
     }
 }
