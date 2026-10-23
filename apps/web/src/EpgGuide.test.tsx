@@ -86,3 +86,35 @@ describe("XMLTV programme guide UI", () => {
     expect(screen.queryByText("Current News")).toBeNull();
   });
 });
+
+it("drops a pending guide when playlist channels change before the response", async () => {
+  let finish!: (value:unknown)=>void;
+  vi.stubGlobal("fetch",vi.fn(()=>new Promise(resolve=>{finish=resolve;})));
+  const play=vi.fn();
+  const view=render(<EpgGuide channels={[channel]} onPlay={play}/>);
+  fireEvent.change(screen.getByLabelText("XMLTV 内容"),{target:{value:"<tv/>"}});
+  fireEvent.click(screen.getByRole("button",{name:"解析节目表"}));
+  view.rerender(<EpgGuide channels={[{...channel,name:"Other",url:"https://example.org/other.m3u8"}]} onPlay={play}/>);
+  finish({ok:true,json:async()=>fakeResponse});
+  await new Promise(resolve=>setTimeout(resolve,0));
+  expect(screen.queryByText("Current News")).toBeNull();
+  expect(screen.queryByRole("button",{name:"播放频道"})).toBeNull();
+});
+
+it("invalidates a displayed guide after same-length playlist replacement", async()=>{
+  vi.stubGlobal("fetch",vi.fn(async()=>({ok:true,json:async()=>fakeResponse})));
+  const play=vi.fn();const view=render(<EpgGuide channels={[channel]} onPlay={play}/>);
+  fireEvent.change(screen.getByLabelText("XMLTV 内容"),{target:{value:"<tv/>"}});
+  fireEvent.click(screen.getByRole("button",{name:"解析节目表"}));
+  await screen.findByText("Current News");
+  view.rerender(<EpgGuide channels={[{...channel,name:"Replacement"}]} onPlay={play}/>);
+  expect(screen.queryByText("Current News")).toBeNull();expect(play).not.toHaveBeenCalled();
+});
+
+it("enforces the pasted XML UTF-8 byte limit",async()=>{
+  const fetchMock=vi.fn();vi.stubGlobal("fetch",fetchMock);
+  render(<EpgGuide channels={[channel]} onPlay={vi.fn()}/>);
+  fireEvent.change(screen.getByLabelText("XMLTV 内容"),{target:{value:"<tv><!--"+"中".repeat(700000)+"--></tv>"}});
+  fireEvent.click(screen.getByRole("button",{name:"解析节目表"}));
+  expect(await screen.findByRole("alert")).toBeTruthy();expect(fetchMock).not.toHaveBeenCalled();
+});

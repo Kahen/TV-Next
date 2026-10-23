@@ -2,9 +2,9 @@
 
 Independent cross-platform media app for Web, iPhone, and iPad, with a self-hosted Kotlin service and a staged compatibility layer for FongMi-style configurations.
 
-> **Early development.** This project does not include any streaming sources. Supply media and sources only when you are authorized to access them. It currently **inspects** FongMi-style JSON but does **not** execute Spider plugins, proxy media, or recreate all Android TV features.
+> **Early development.** This project does not include any streaming sources. Supply media and sources only when you are authorized to access them. It supports subscription browsing for type 0/1/2/4, AList/OpenList, danmaku and optional authenticated home-server sync. Type 3 Spider execution, media proxying and remaining advanced Android TV features are still in development.
 
-## Current implementation (P1 preview, P2 catalog prototype)
+## Current implementation
 
 | Component | Technology | Current scope |
 | --- | --- | --- |
@@ -13,7 +13,7 @@ Independent cross-platform media app for Web, iPhone, and iPad, with a self-host
 | API | Kotlin + Spring Boot | GET health, POST M3U parse, POST FongMi JSON inspect/catalog preview |
 | Infrastructure | Docker Compose, nginx, GitHub Actions | Local self-hosting, Web/API CI, optional manual iOS simulator build |
 
-Local library data is saved **independently per browser or iOS device**, not synced across devices or backed up to the API. See [local media library design and limits](docs/LOCAL_LIBRARY.md).
+Local library data is saved **independently per browser or iOS device**. Optional home-server accounts allow explicit revision-based upload/restore; sync conflicts require reading the latest server revision. See [home server deployment and pairing](docs/HOME_SERVER.md). See [local media library design and limits](docs/LOCAL_LIBRARY.md).
 
 ## Run with Docker
 
@@ -56,7 +56,7 @@ New P2 preview endpoint: `POST /api/v1/catalog/preview` accepts JSON `{"content"
 
 The experimental static MediaProvider supports home, category, local search, detail, and player lookup on manually supplied FongMi Result JSON. It neither fetches network resources nor executes Spider. See [MediaProvider docs](docs/MEDIA_PROVIDER.md).
 
-An initial **offline XMLTV programme guide** is also available: import a local XMLTV file or paste its contents into the Web **直播节目表** tab after importing an M3U playlist. The API matches `tvg-id` first, then uniquely matched channel names; it never fetches an XMLTV URL or media stream automatically. See [XMLTV EPG support](docs/XMLTV_EPG.md).
+XMLTV programme guides support local text/Files imports on Web and iOS, plus authenticated saved XMLTV/XMLTV.gz subscriptions with server-side scheduling, persistent per-account cache, bounded downloads and refresh failure recovery. See [XMLTV EPG support](docs/XMLTV_EPG.md).
 
 ## Implementation plan
 
@@ -73,7 +73,7 @@ An initial **offline XMLTV programme guide** is also available: import a local X
 
 FongMi/TV is a separate Android project. Any future reuse of GPL-covered code must retain notices and meet license obligations. This repository is **not** an iOS build of the Android APK.
 
-Status: P1 development in progress. CI compilation and unit tests do not replace on-device/network playback verification. No production release yet.
+Status: P1–P6 development in progress. See [current implementation and remaining work](docs/IMPLEMENTATION_STATUS.md). CI compilation and unit tests do not replace on-device/network playback verification. No production release yet.
 
 ## P3 isolated runtime groundwork
 

@@ -14,6 +14,7 @@ struct ContentView: View {
     @StateObject private var library = MediaLibraryStore()
     @StateObject private var remote = NativeRemoteControl()
     @AppStorage("tv-next-api-url") private var serverURL = "http://localhost:8080"
+    @State private var homeSession: NativeHomeSession?
     @State private var danmaku: [DanmakuComment] = []
     @State private var danmakuOptions = DanmakuOptions()
     @State private var remoteResourceKey: String?
@@ -67,7 +68,9 @@ struct ContentView: View {
                     quickPlaySection
                     localMediaSection
                     importSection
-                    HomeServerSection(serverURL:$serverURL,library:library,onSessionChange:{ remote.configure($0,server:$1) },remoteState:remote.state)
+                    HomeServerSection(serverURL:$serverURL,library:library,onSessionChange:{ homeSession=$0;remote.configure($0,server:$1) },remoteState:remote.state)
+                    EpgSection(serverURL:serverURL,session:homeSession,channels:library.channels) { library.play($0) }
+                        .id(serverURL+"|"+(homeSession?.token ?? ""))
                     ConfigPreviewSection()
                     CloudSection(serverURL: serverURL) { library.play($0) }
                     SubscriptionSection(serverURL: serverURL, onPlay: { playback, title in
@@ -87,7 +90,7 @@ struct ContentView: View {
                     danmakuSection
                     librarySection
 
-                    Text("本地播放列表、收藏及进度只保存在这台设备；暂不支持跨设备同步。不内置媒体源。")
+                    Text("本地媒体库保存在这台设备；登录家庭服务器后可主动同步。不内置媒体源。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

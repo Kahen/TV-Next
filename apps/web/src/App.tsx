@@ -414,7 +414,7 @@ export default function App() {
             <span className="hint">本地文件不会上传，也不会保存到播放历史；能否播放取决于浏览器编解码能力。</span>
           </div>
         </div>
-        {tab === "home" ? <HomeServerPanel library={library} onRestore={setLibrary} session={homeSession} onSessionChange={setHomeSession} remoteState={remoteState}/> : tab === "media" ? <><SubscriptionBrowser onPlay={playChannel} onImport={channels=>setLibrary(state=>({...state,channels:channels.slice(0,1500)}))}/><CloudBrowser onPlay={playChannel}/><MediaBrowser onPlay={playChannel} /></> : tab === "epg" ? <EpgGuide channels={channels} onPlay={playChannel} /> : tab === "config" ? <>
+        {tab === "home" ? <HomeServerPanel library={library} onRestore={setLibrary} session={homeSession} onSessionChange={setHomeSession} remoteState={remoteState}/> : tab === "media" ? <><SubscriptionBrowser onPlay={playChannel} onImport={channels=>setLibrary(state=>({...state,channels:channels.slice(0,1500)}))}/><CloudBrowser onPlay={playChannel}/><MediaBrowser onPlay={playChannel} /></> : tab === "epg" ? <EpgGuide channels={channels} onPlay={playChannel} session={homeSession} /> : tab === "config" ? <>
           <div className="section-heading"><h2>检查 FongMi JSON 配置</h2><span>STATIC INSPECTION ONLY</span></div>
           <section className="panel">
             <p className="hint">只展示站点、直播分组及 Spider 声明，不会运行 Java/JS/Python 插件或获取远程内容。</p>

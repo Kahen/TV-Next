@@ -84,7 +84,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.14.3"
-      - run: gradle test --tests '*HomeServerIntegrationTest' --tests '*RemoteControlIntegrationTest' --no-daemon
+      - run: gradle test --tests '*HomeServerIntegrationTest' --tests '*RemoteControlIntegrationTest' --tests '*EpgFeedIntegrationTest' --no-daemon
       - name: Publish PostgreSQL test evidence
         if: always()
         run: python ../../scripts/summarize_junit.py build/test-results/test

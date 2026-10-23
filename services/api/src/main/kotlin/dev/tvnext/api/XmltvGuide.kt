@@ -70,7 +70,7 @@ class XmltvGuideService {
     }
 
     fun guide(request: EpgGuideRequest): EpgGuideResponse {
-        if (request.xml.isBlank() || request.xml.length > MAX_XML_CHARS) fail("XMLTV must be 1..2097152 characters")
+        validateSize(request.xml)
         if (request.channels.isEmpty() || request.channels.size > MAX_REQUEST_CHANNELS) {
             fail("Provide 1..300 channels for EPG matching")
         }
@@ -113,6 +113,12 @@ class XmltvGuideService {
         return EpgGuideResponse(now.toString(), until.toString(), guides.size,
             guides.count { it.matchedChannelId != null }, guides, feed.warnings)
     }
+
+    private fun validateSize(xml: String) {
+        if (xml.isBlank() || xml.length > MAX_XML_CHARS || xml.toByteArray(Charsets.UTF_8).size > MAX_XML_CHARS)
+            fail("XMLTV must be 1..2097152 UTF-8 bytes")
+    }
+    fun validate(xml: String) { validateSize(xml); parseXml(xml) }
 
     private fun toProgram(item: XmlProgram) =
         EpgProgram(item.start.toString(), item.stop.toString(), item.title, item.description)

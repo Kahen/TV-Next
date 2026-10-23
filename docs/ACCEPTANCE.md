@@ -18,10 +18,10 @@
 | --- | --- | --- |
 | P0 | Clean checkout, Docker smoke, API/Web/iOS build | GitHub Linux Docker Compose smoke verified; independent NAS deployment and Apple real-device behavior not yet verified |
 | P1 | Real iPhone/iPad and browsers HLS/MP4/local media, subtitle/PiP, PWA/a11y, persistence | Physical Apple device/browser matrix pending |
-| P2 | Real permitted FongMi corpus: home, category, search, details, episodes, line selection, IPTV XMLTV/EPG; Web and iOS parity | Only static site/live and FongMi Result preview is implemented |
+| P2 | Real permitted FongMi corpus: home, category, search, details, episodes, line selection, IPTV XMLTV/EPG; Web and iOS parity | Type 0/1/2/4 source browsing, native guide and feed cache/scheduler implemented; real corpus and remaining search/filter/catch-up required |
 | P3 | Java/JAR, JS and Python permitted Spider fixtures; isolated runtime; egress deny, crash, quota and timeout tests; Android-specific plugin limits disclosed | Bundled fixed-data Node/Python/Java Docker process harness prototyped; dynamic Java/JAR adapter, real Spider compatibility corpus, runtime integration and security review missing; non-executing JVM bytecode preflight is available but is not security approval |
 | P4 | Real-device codecs, ASS/danmaku, PiP/background, AirPlay/DLNA, SMB/WebDAV, transcoding when claimed | Major advanced modules unimplemented |
-| P5 | Auth, pairing, ACL, backup/restore, TLS, SSRF/DNS rebinding and redirect regression, NAS deployment load test | Secure server services unimplemented |
+| P5 | Auth, pairing, ACL, backup/restore, TLS, SSRF/DNS rebinding and redirect regression, NAS deployment load test | Auth/sync/remote/NAS core merged in #27; media relay and remaining deployment/security gates required |
 | P6 | Security threat model/review, dependency/SBOM/license audit, reproducible builds, rollback, compatibility matrix, signed iOS/TestFlight path if required | P1–P5 incomplete, Apple signing/equipment and audit evidence unavailable |
 
 ## Release hold
