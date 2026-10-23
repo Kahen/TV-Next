@@ -8,7 +8,8 @@ vi.mock("./homeApi",()=>({homeRequest:vi.fn()}));
 class Peer {
   static OPEN=1;static peers:Peer[]=[];
   readyState=1;sent:string[]=[];onopen:(()=>void)|null=null;onclose:(()=>void)|null=null;onerror:(()=>void)|null=null;onmessage:((event:MessageEvent)=>void)|null=null;
-  constructor(public url:string){Peer.peers.push(this);}
+  url:string;
+  constructor(url:string|URL){this.url=String(url);Peer.peers.push(this);}
   send(value:string){this.sent.push(value);}
   close(){this.readyState=3;this.onclose?.();}
 }

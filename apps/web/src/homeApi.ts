@@ -18,3 +18,5 @@ export function loadHomeSession():HomeSession|null {
   }catch{return null;}
 }
 export function saveHomeSession(session:HomeSession|null):void {try{if(session)window.sessionStorage.setItem(SESSION_KEY,JSON.stringify(session));else window.sessionStorage.removeItem(SESSION_KEY);}catch{/* tab remains usable in memory */}}
+
+export interface HomeDiagnostics {uptimeSeconds:number;memoryUsedBytes:number;memoryMaxBytes:number;httpRequests:number;httpClientErrors:number;httpServerErrors:number;devices:number;onlineDevices:number;libraryRevision:number}

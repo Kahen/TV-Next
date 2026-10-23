@@ -8,6 +8,7 @@ import java.util.UUID
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.dao.DuplicateKeyException
 import org.springframework.http.HttpStatus
 import org.springframework.jdbc.core.JdbcTemplate
@@ -23,9 +24,11 @@ data class HomeSession(val token: String, val user: HomeUser, val device: HomeDe
 data class HomePrincipal(val userId: String, val deviceId: String)
 data class PairingRequest(val deviceName: String = "Device", val code: String = "")
 data class PairingCode(val code: String, val expiresAt: Long)
+data class DeviceRevoked(val deviceId: String)
 
 @Service
-class HomeAccounts(private val db: JdbcTemplate, @Value("\${TV_NEXT_REGISTRATION_OPEN:false}") private val registrationOpen: Boolean) {
+class HomeAccounts(private val db: JdbcTemplate, @Value("\${TV_NEXT_REGISTRATION_OPEN:false}") private val registrationOpen: Boolean,
+    private val events: ApplicationEventPublisher) {
     private val random = SecureRandom()
     private val dummySalt = ByteArray(32).also { random.nextBytes(it) }
     private fun now() = System.currentTimeMillis()
@@ -55,7 +58,7 @@ class HomeAccounts(private val db: JdbcTemplate, @Value("\${TV_NEXT_REGISTRATION
             Account(rs.getString(1),rs.getString(2),rs.getString(3),rs.getInt(4)) }, name).firstOrNull()
         val actual = passwordHash(r.password,user?.salt?.let { unhex(it) } ?: dummySalt,user?.iterations ?: 600_000)
         if (user == null || !MessageDigest.isEqual(actual,unhex(user.hash))) fail(HttpStatus.UNAUTHORIZED,"Invalid credentials")
-        return issue(user.id,name,r.deviceName)
+        return issue(user.id,name,r.deviceName,recover=true)
     }
     fun principal(authorization: String?): HomePrincipal {
         val token = authorization?.let { Regex("(?i)^Bearer ([A-Za-z0-9_-]{43})$").matchEntire(it)?.groupValues?.get(1) }
@@ -69,12 +72,17 @@ class HomeAccounts(private val db: JdbcTemplate, @Value("\${TV_NEXT_REGISTRATION
         { rs,_ -> HomeDevice(rs.getString(1),rs.getString(2),rs.getLong(3),rs.getLong(4),rs.getString(1)==p.deviceId) },p.userId,now())
     @Transactional
     fun revoke(p: HomePrincipal, deviceId: String) {
+        lockUser(p.userId)
+        requireActive(p)
         if (db.update("UPDATE devices SET revoked=TRUE WHERE id=? AND user_id=?",deviceId,p.userId) != 1)
             fail(HttpStatus.NOT_FOUND,"Unknown device")
         db.update("DELETE FROM device_pairings WHERE creator_device=?",deviceId)
+        events.publishEvent(DeviceRevoked(deviceId))
     }
     @Transactional
     fun pairing(p: HomePrincipal): PairingCode {
+        lockUser(p.userId)
+        requireActive(p)
         val current=now()
         db.update("DELETE FROM device_pairings WHERE expires_at<? OR used=TRUE",current)
         db.update("DELETE FROM device_pairings WHERE creator_device=?",p.deviceId)
@@ -90,6 +98,9 @@ class HomeAccounts(private val db: JdbcTemplate, @Value("\${TV_NEXT_REGISTRATION
         val code=r.code.replace("-","").replace(" ","").uppercase(Locale.ROOT)
         if (!code.matches(Regex("[0-9A-F]{16}"))) fail(HttpStatus.UNAUTHORIZED,"Invalid or expired pairing code")
         val hash=sha(code)
+        val user=db.query("SELECT user_id FROM device_pairings WHERE code_hash=?", { rs,_ -> rs.getString(1) },hash).firstOrNull()
+            ?: fail(HttpStatus.UNAUTHORIZED,"Invalid or expired pairing code")
+        lockUser(user)
         val owner=db.query("SELECT p.user_id,u.username FROM device_pairings p JOIN app_users u ON p.user_id=u.id JOIN devices d ON p.creator_device=d.id WHERE p.code_hash=? AND p.used=FALSE AND p.expires_at>? AND d.revoked=FALSE AND d.expires_at>?",
             { rs,_ -> HomeUser(rs.getString(1),rs.getString(2)) },hash,now(),now()).firstOrNull()
             ?: fail(HttpStatus.UNAUTHORIZED,"Invalid or expired pairing code")
@@ -97,10 +108,26 @@ class HomeAccounts(private val db: JdbcTemplate, @Value("\${TV_NEXT_REGISTRATION
             fail(HttpStatus.UNAUTHORIZED,"Invalid or expired pairing code")
         return issue(owner.id,owner.username,r.deviceName)
     }
-    private fun issue(user: String, username: String, name: String): HomeSession {
+    private fun lockUser(user: String) {
         db.queryForObject("SELECT id FROM app_users WHERE id=? FOR UPDATE",String::class.java,user)
+    }
+    private fun requireActive(p: HomePrincipal) {
+        val count=db.queryForObject("SELECT COUNT(*) FROM devices WHERE id=? AND user_id=? AND revoked=FALSE AND expires_at>?",Int::class.java,p.deviceId,p.userId,now()) ?: 0
+        if(count!=1) fail(HttpStatus.UNAUTHORIZED,"Device token is expired or revoked")
+    }
+    private fun issue(user: String, username: String, name: String, recover: Boolean=false): HomeSession {
+        lockUser(user)
         val count=db.queryForObject("SELECT COUNT(*) FROM devices WHERE user_id=? AND revoked=FALSE AND expires_at>?",Int::class.java,user,now()) ?: 0
-        if (count>=50) fail(HttpStatus.CONFLICT,"Device limit reached; revoke an old device")
+        if (count>=50) {
+            if(!recover) fail(HttpStatus.CONFLICT,"Device limit reached; sign in with your password to recover access")
+            // Password authentication can recover an account even when all device slots are occupied.
+            val oldest=db.query("SELECT id FROM devices WHERE user_id=? AND revoked=FALSE AND expires_at>? ORDER BY created_at,id", { rs,_ -> rs.getString(1) },user,now()).take(count-49)
+            oldest.forEach { id ->
+                db.update("UPDATE devices SET revoked=TRUE WHERE id=? AND user_id=?",id,user)
+                db.update("DELETE FROM device_pairings WHERE creator_device=?",id)
+                events.publishEvent(DeviceRevoked(id))
+            }
+        }
         val id=UUID.randomUUID().toString();val created=now();val expires=created+90L*24*60*60*1000
         val token=Base64.getUrlEncoder().withoutPadding().encodeToString(ByteArray(32).also { random.nextBytes(it) })
         db.update("INSERT INTO devices(id,user_id,name,token_hash,created_at,expires_at,revoked) VALUES(?,?,?,?,?,?,FALSE)",id,user,deviceName(name),sha(token),created,expires)
@@ -126,11 +153,11 @@ class HomeAccounts(private val db: JdbcTemplate, @Value("\${TV_NEXT_REGISTRATION
 }
 @RestController
 @RequestMapping("/api/v1/home")
-class HomeAccountController(private val accounts: HomeAccounts, private val remote: RemoteControl) {
+class HomeAccountController(private val accounts: HomeAccounts) {
     @PostMapping("/auth/register") fun register(@RequestBody r: Credentials)=accounts.register(r)
     @PostMapping("/auth/login") fun login(@RequestBody r: Credentials)=accounts.login(r)
     @GetMapping("/devices") fun devices(@RequestHeader("Authorization",required=false) auth: String?)=accounts.devices(accounts.principal(auth))
-    @PostMapping("/devices/{id}/revoke") fun revoke(@RequestHeader("Authorization",required=false) auth: String?,@PathVariable id: String): Map<String,Boolean> { accounts.revoke(accounts.principal(auth),id);remote.disconnect(id);return mapOf("revoked" to true) }
+    @PostMapping("/devices/{id}/revoke") fun revoke(@RequestHeader("Authorization",required=false) auth: String?,@PathVariable id: String): Map<String,Boolean> { accounts.revoke(accounts.principal(auth),id);return mapOf("revoked" to true) }
     @PostMapping("/pairings") fun pairing(@RequestHeader("Authorization",required=false) auth: String?)=accounts.pairing(accounts.principal(auth))
     @PostMapping("/pairings/claim") fun claim(@RequestBody r: PairingRequest)=accounts.claim(r)
 }

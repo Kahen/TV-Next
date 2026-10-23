@@ -12,9 +12,9 @@ Open http://localhost:3000, select **家庭服务器**, create an account (12–
 
 Web keeps the home-session bearer token in sessionStorage for the current tab. iOS stores it under the exact server URL in the device Keychain (`WhenUnlockedThisDeviceOnly`). Tokens last 90 days, contain 256 random bits and are stored only as SHA-256 hashes on the server. Passwords use per-user random salts and PBKDF2-HMAC-SHA256 with 600,000 iterations; the iteration count is stored for future migrations. OpenList credentials remain separate and are not part of library synchronization.
 
-Creating a pairing code requires a valid device. The 64-bit random code is valid for five minutes and can be claimed only once. A newly created code replaces that device's previous code. Account creation/login/pair claims are limited to 10 requests/minute per actual peer address; other API requests are limited to 300/minute. Reverse proxies share the peer quota because arbitrary forwarded headers are not trusted.
+Creating a pairing code requires a valid device. The 64-bit random code is valid for five minutes and can be claimed only once. A newly created code replaces that device's previous code. Account creation/login/pair claims are limited to 10 requests/minute per actual peer address; other API requests are limited to 300/minute. Reverse proxies share the peer quota because arbitrary forwarded headers are not trusted. A global eight-request admission limit bounds concurrent buffered API work; excess requests receive HTTP 429. Tomcat also has bounded worker and backlog counts.
 
-Device listing and revocation apply only to the authenticated user's devices. Revoking a token prevents new REST access and closes its remote channel when revoked through the API. Per-user library storage accepts only version-1 channel/favorite/recent/progress data and excludes private request-header credentials.
+Device listing and revocation apply only to the authenticated user's devices. Revoking a token prevents new REST access and closes its remote channel after the revocation transaction commits, including device replacement during password-login recovery. A user can have 50 active devices; password login replaces the oldest active device at that limit, while pairing never evicts another device. Signing out clears local credentials immediately and attempts to revoke that device online. Per-user library storage accepts only version-1 channel/favorite/recent/progress data and excludes private request-header credentials.
 
 ## NAS / PostgreSQL
 
@@ -53,6 +53,6 @@ Commands are limited to `PLAY`, `PAUSE`, `SEEK` and `LOAD` with bounded HTTP(S) 
 
 ## Diagnostics and remaining scope
 
-The private API exposes Actuator health and Prometheus metrics; nginx publishes only `/api/`, so management URLs are not proxied by the default Web stack. Requests receive a generated `X-Request-Id`; logs record route templates, status and duration without bodies, queries or authentication material. No tokens or pairing codes should be added as metric labels.
+The authenticated Web/iOS status panel shows process uptime/memory and aggregate HTTP counters, plus only the current user's device counts and library revision. It does not expose media URLs or authentication material. The private API exposes Actuator health and Prometheus metrics; nginx publishes only `/api/`, so management URLs are not proxied by the default Web stack. Requests receive a generated `X-Request-Id`; logs record route templates, status and duration without bodies, queries or authentication material. No tokens or pairing codes should be added as metric labels.
 
 No public deployment security audit, real-device/background media acceptance or NAS load benchmark is claimed here. Provider/EPG scheduling, shared caches, a media byte relay, and the remaining Spider/advanced playback/release work stay separately tracked in P3–P6.

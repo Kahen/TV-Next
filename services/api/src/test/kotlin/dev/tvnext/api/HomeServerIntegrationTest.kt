@@ -67,14 +67,35 @@ class HomeServerIntegrationTest @Autowired constructor(private val accounts: Hom
         (bad.path("channels")[0] as com.fasterxml.jackson.databind.node.ObjectNode).put("url","javascript:alert(1)")
         assertFailsWith<ResponseStatusException> { library.save(p,SaveLibraryRequest(0,bad)) }
         assertEquals(0,library.read(p).revision)
-        assertFailsWith<ResponseStatusException> { HomeAccounts(db,false).register(Credentials("new-user","long-test-password")) }
+        assertFailsWith<ResponseStatusException> { HomeAccounts(db,false,org.springframework.context.ApplicationEventPublisher { }).register(Credentials("new-user","long-test-password")) }
         assertFailsWith<ResponseStatusException> { accounts.login(Credentials(session.user.username,"wrong-password")) }
+    }
+    @Test fun passwordLoginRecoversAtDeviceQuotaWithoutLettingPairingEvictDevices() {
+        val first=user();val p=principal(first)
+        val pairing=accounts.pairing(p)
+        repeat(49) { index ->
+            db.update("INSERT INTO devices(id,user_id,name,token_hash,created_at,expires_at,revoked) VALUES(?,?,?,?,?,?,FALSE)",
+                UUID.randomUUID().toString(),first.user.id,"Fixture",
+                ("fixture-"+first.user.id+"-"+index.toString().padStart(4,'0')).padEnd(64,'x'),System.currentTimeMillis()+1000+index,first.device.expiresAt)
+        }
+        assertEquals(50,accounts.devices(p).size)
+        assertEquals(409,assertFailsWith<ResponseStatusException> { accounts.claim(PairingRequest("At quota",pairing.code)) }.statusCode.value())
+        assertEquals(50,accounts.devices(p).size)
+        val recovered=accounts.login(Credentials(first.user.username,"long-test-password","Recovered"))
+        assertEquals(50,accounts.devices(principal(recovered)).size)
+        assertFailsWith<ResponseStatusException> { principal(first) }
+        assertFailsWith<ResponseStatusException> { accounts.claim(PairingRequest("Revoked creator",pairing.code)) }
     }
     @Test fun httpContractRequiresBearerAndNeverAcceptsCallerChosenUserId() {
         mvc.perform(get("/api/v1/home/library")).andExpect(status().isUnauthorized)
+        mvc.perform(get("/api/v1/home/diagnostics")).andExpect(status().isUnauthorized)
         val one=user();val two=user()
         val payload=mapper.createObjectNode().put("expectedRevision",0).put("userId",one.user.id).set<com.fasterxml.jackson.databind.JsonNode>("library",snapshot())
         mvc.perform(post("/api/v1/home/library").header("Authorization","Bearer "+two.token).contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsBytes(payload))).andExpect(status().isOk)
+        val diagnostic=mvc.perform(get("/api/v1/home/diagnostics").header("Authorization","Bearer "+two.token)).andExpect(status().isOk).andReturn().response.contentAsString
+        assertEquals(1,mapper.readTree(diagnostic).path("devices").asInt())
+        assertEquals(1,mapper.readTree(diagnostic).path("libraryRevision").asInt())
+        assertFalse(diagnostic.contains(one.token));assertFalse(diagnostic.contains(two.token))
         assertTrue(library.read(principal(one)).library.path("channels").isEmpty)
         assertEquals(1,library.read(principal(two)).library.path("channels").size())
         mvc.perform(post("/api/v1/home/library").header("Authorization","Bearer "+two.token).contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsBytes(payload))).andExpect(status().isConflict)

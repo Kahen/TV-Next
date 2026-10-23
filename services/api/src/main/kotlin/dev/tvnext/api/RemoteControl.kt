@@ -17,6 +17,7 @@ import org.springframework.web.socket.config.annotation.*
 import org.springframework.web.socket.handler.TextWebSocketHandler
 import org.springframework.web.socket.server.HandshakeInterceptor
 import org.springframework.context.annotation.Configuration
+import org.springframework.transaction.event.TransactionalEventListener
 import org.springframework.web.util.UriComponentsBuilder
 
 data class RemoteTicket(val ticket: String, val expiresAt: Long)
@@ -59,6 +60,8 @@ class RemoteControl(private val accounts: HomeAccounts,private val mapper: Objec
     }
     fun status(p: HomePrincipal,id: String): RemoteStatus = commands[id]?.takeIf { it.owner==p.userId && it.expires>System.currentTimeMillis() }?.status
         ?: reject(HttpStatus.NOT_FOUND,"Unknown or expired command")
+    @TransactionalEventListener
+    fun revoked(event: DeviceRevoked) { disconnect(event.deviceId) }
     fun disconnect(device: String) { connections.remove(device)?.socket?.let { runCatching { it.close(CloseStatus.NORMAL) } } }
     override fun beforeHandshake(request: ServerHttpRequest,response: ServerHttpResponse,handler: WebSocketHandler,attributes: MutableMap<String,Any>): Boolean {
         val raw=UriComponentsBuilder.fromUri(request.uri).build().queryParams.getFirst("ticket").orEmpty()
@@ -71,9 +74,15 @@ class RemoteControl(private val accounts: HomeAccounts,private val mapper: Objec
     override fun afterHandshake(request: ServerHttpRequest,response: ServerHttpResponse,handler: WebSocketHandler,exception: Exception?) {}
     override fun afterConnectionEstablished(session: WebSocketSession) {
         val principal=session.attributes["tvnext-principal"] as HomePrincipal
+        if(!active(principal)){session.close(CloseStatus.POLICY_VIOLATION);return}
         session.textMessageSizeLimit=8192
         val old=connections.put(principal.deviceId,Connection(principal,session))
         if(old?.socket?.id!=session.id) old?.socket?.let { runCatching { it.close(CloseStatus.NORMAL) } }
+        // Cover a revoke committed between the handshake check and registration.
+        if(!active(principal)) {
+            connections.computeIfPresent(principal.deviceId) { _,current -> if(current.socket.id==session.id)null else current }
+            session.close(CloseStatus.POLICY_VIOLATION)
+        }
     }
     override fun handleTextMessage(session: WebSocketSession,message: TextMessage) {
         synchronized(session) {

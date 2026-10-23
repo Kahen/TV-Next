@@ -22,8 +22,10 @@ class RemoteControlIntegrationTest @Autowired constructor(private val accounts:H
         val receiver=accounts.claim(PairingRequest("Receiver",accounts.pairing(p).code));val q=principal(receiver)
         val ticket=remote.ticket(q)
         val received=CompletableFuture<String>()
+        val closed=CompletableFuture<Int>()
         val listener=object:WebSocket.Listener {
             override fun onOpen(socket:WebSocket){socket.request(1)}
+            override fun onClose(socket:WebSocket,statusCode:Int,reason:String):java.util.concurrent.CompletionStage<*>? { closed.complete(statusCode);return null }
             override fun onText(socket:WebSocket,data:CharSequence,last:Boolean):java.util.concurrent.CompletionStage<*>? { received.complete(data.toString());socket.request(1);return null }
         }
         HttpClient.newHttpClient().use { client ->
@@ -40,6 +42,7 @@ class RemoteControlIntegrationTest @Autowired constructor(private val accounts:H
                 assertFailsWith<ResponseStatusException> { remote.status(outsider,status.id) }
                 assertFailsWith<ResponseStatusException> { remote.send(outsider,RemoteRequest(receiver.device.id,"PAUSE")) }
                 accounts.revoke(p,receiver.device.id)
+                assertEquals(1000,closed.get(5,TimeUnit.SECONDS))
                 assertFailsWith<ResponseStatusException> { remote.send(p,RemoteRequest(receiver.device.id,"PLAY")) }
             } finally { socket.abort() }
         }

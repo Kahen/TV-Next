@@ -587,6 +587,22 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/Credentials'
+  /api/v1/home/diagnostics:
+    get:
+      summary: Read aggregate process counters and only this user's device/library totals
+      security:
+      - deviceBearer: []
+      responses:
+        '200':
+          description: Aggregate diagnostics without tokens, media URLs or other users' data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HomeDiagnostics'
+        '401':
+          description: Missing, revoked or expired credentials
+        '429':
+          description: Request or concurrency limit
   /api/v1/home/devices:
     get:
       summary: List this user's active devices
@@ -1452,6 +1468,55 @@ components:
         deviceName:
           type: string
           maxLength: 80
+    HomeDiagnostics:
+      type: object
+      required:
+      - uptimeSeconds
+      - memoryUsedBytes
+      - memoryMaxBytes
+      - httpRequests
+      - httpClientErrors
+      - httpServerErrors
+      - devices
+      - onlineDevices
+      - libraryRevision
+      properties:
+        uptimeSeconds:
+          type: integer
+          format: int64
+          minimum: 0
+        memoryUsedBytes:
+          type: integer
+          format: int64
+          minimum: 0
+        memoryMaxBytes:
+          type: integer
+          format: int64
+          minimum: 0
+        httpRequests:
+          type: integer
+          format: int64
+          minimum: 0
+        httpClientErrors:
+          type: integer
+          format: int64
+          minimum: 0
+        httpServerErrors:
+          type: integer
+          format: int64
+          minimum: 0
+        devices:
+          type: integer
+          format: int64
+          minimum: 0
+        onlineDevices:
+          type: integer
+          format: int64
+          minimum: 0
+        libraryRevision:
+          type: integer
+          format: int64
+          minimum: 0
     HomeDevice:
       type: object
       required:

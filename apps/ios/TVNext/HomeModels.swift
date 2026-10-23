@@ -21,3 +21,9 @@ struct NativeRemotePacket: Decodable { let id: String; let type: String; let pos
 struct NativeRemoteDevice: Decodable, Identifiable { let id: String; let name: String; let current: Bool; let online: Bool }
 struct NativeRemoteStatus: Decodable { let id: String; let state: String; let message: String? }
 struct NativeRemoteRequest: Encodable { let targetDeviceId: String; let type: String; var position: Double? = nil; var url: String? = nil }
+
+struct NativeHomeDiagnostics: Decodable {
+    let uptimeSeconds: Int64; let memoryUsedBytes: Int64; let memoryMaxBytes: Int64
+    let httpRequests: Int64; let httpClientErrors: Int64; let httpServerErrors: Int64
+    let devices: Int; let onlineDevices: Int; let libraryRevision: Int64
+}

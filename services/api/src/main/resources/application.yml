@@ -1,5 +1,10 @@
 server:
   port: 8080
+  tomcat:
+    threads:
+      max: 32
+      min-spare: 4
+    accept-count: 64
 spring:
   application:
     name: tv-next-api
