@@ -41,3 +41,15 @@ jobs:
         with:
           gradle-version: "8.14.3"
       - run: gradle test bootJar --no-daemon
+      - name: Publish exact API test counts
+        if: always()
+        run: python ../../scripts/summarize_junit.py build/test-results/test
+      - name: Preserve API regression evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-test-reports
+          path: |
+            services/api/build/test-results/test
+            services/api/build/reports/tests/test
+          retention-days: 14

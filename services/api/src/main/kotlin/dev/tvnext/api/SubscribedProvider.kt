@@ -24,7 +24,7 @@ class SubscribedProvider(private val subscriptions: Subscriptions, private val m
     fun page(op: String, r: SiteRequest): ProviderPage {
         val site = site(r)
         val root = fetch(site, op, r)
-        val data = parser.read(root.toString(), true)
+        val data = parser.read(root.toString(), site.path("type").asInt() == 4, true)
         val total = root.path("total").asText().toIntOrNull()?.coerceIn(0, 10_000_000) ?: data.entries.size
         val pages = root.path("pagecount").asText().toIntOrNull()?.coerceAtLeast(1) ?: 1
         val allowed = site.path("categories").map { it.asText() }
@@ -35,13 +35,13 @@ class SubscribedProvider(private val subscriptions: Subscriptions, private val m
     }
     fun detail(r: SiteRequest): MediaDetail {
         val site = site(r)
-        val data = parser.read(fetch(site, "detail", r).toString(), true)
+        val data = parser.read(fetch(site, "detail", r).toString(), site.path("type").asInt() == 4, true)
         return parser.detail(data, MediaQuery(vodId = r.vodId)).copy(provider = r.siteKey)
     }
     fun play(r: SiteRequest): MediaPlayback {
         val site = site(r)
         val type = site.path("type").asInt()
-        val data = parser.read(fetch(site, "detail", r).toString(), true)
+        val data = parser.read(fetch(site, "detail", r).toString(), site.path("type").asInt() == 4, true)
         val entry = data.entries.firstOrNull { it.item.id == r.vodId } ?: reject("Unknown video", HttpStatus.NOT_FOUND)
         val line = entry.lines.getOrNull(r.lineIndex) ?: reject("Invalid lineIndex")
         val episode = line.episodes.getOrNull(r.episodeIndex) ?: reject("Invalid episodeIndex")

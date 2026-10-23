@@ -9,7 +9,7 @@ on:
       - "services/**"
       - "fixtures/**"
       - "compose.yaml"
-      - "scripts/compose_smoke.py"
+      - "scripts/**"
       - "packages/contracts/**"
       - ".github/workflows/**"
   pull_request:

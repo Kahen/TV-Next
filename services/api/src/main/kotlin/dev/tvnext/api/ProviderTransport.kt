@@ -11,7 +11,9 @@ import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
 import org.springframework.web.server.ResponseStatusException
 
-/** GET only, pinned IP, verified TLS hostname; no redirects, inherited proxy, cookies or caller headers. */
+data class FetchedText(val content: String, val uri: URI)
+private class ProviderRedirect(val location: String, val status: Int): java.io.IOException("Provider redirect")
+/** Pinned IP and verified TLS hostname, bounded redirects; no inherited proxy or cookie jar. */
 @Component
 open class ProviderTransport(@Value("\${TV_NEXT_LAN_ORIGINS:}") allowedPrivate: String = "") {
     private val lanOrigins = allowedPrivate.split(',').map { it.trim() }.filter { it.isNotEmpty() }.map { origin(Subscriptions.httpUri(it)) }.toSet()
@@ -20,23 +22,40 @@ open class ProviderTransport(@Value("\${TV_NEXT_LAN_ORIGINS:}") allowedPrivate: 
         origin(uri) in lanOrigins && address.isSiteLocalAddress && !address.isLoopbackAddress && !address.isLinkLocalAddress
 
     private val permits = Semaphore(8)
-    open fun get(uri: URI, headers: Map<String, String> = emptyMap(), form: String? = null): String = perform(uri, headers, form, "application/x-www-form-urlencoded")
-    open fun postJson(uri: URI, headers: Map<String,String>, json: String): String = perform(uri, headers, json, "application/json")
-    private fun perform(uri: URI, headers: Map<String,String>, form: String?, contentType: String): String {
-        Subscriptions.httpUri(uri.toString())
-        validateHeaders(headers)
+    open fun get(uri: URI, headers: Map<String, String> = emptyMap(), form: String? = null): String = perform(uri, headers, form, "application/x-www-form-urlencoded").content
+    open fun postJson(uri: URI, headers: Map<String,String>, json: String): String = perform(uri, headers, json, "application/json").content
+    fun getDocument(uri: URI, headers: Map<String,String> = emptyMap()): FetchedText = perform(uri,headers,null,"application/x-www-form-urlencoded")
+    private fun perform(initial: URI, initialHeaders: Map<String,String>, initialBody: String?, contentType: String): FetchedText {
+        Subscriptions.httpUri(initial.toString())
+        validateHeaders(initialHeaders)
         if (!permits.tryAcquire()) throw ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Provider concurrency limit")
         try {
-            val addresses = InetAddress.getAllByName(uri.host)
-            if (addresses.isEmpty() || addresses.any { !allowed(uri,it) })
-                throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "Forbidden provider address")
-            return exchange(uri, addresses.first(), headers, form, contentType)
+            var uri=initial; var headers=initialHeaders; var body=initialBody
+            val deadline=System.nanoTime()+8_000_000_000L
+            for (hop in 0..3) {
+                val addresses = InetAddress.getAllByName(uri.host)
+                if (addresses.isEmpty() || addresses.any { !allowed(uri,it) })
+                    throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "Forbidden provider address")
+                if (System.nanoTime()>=deadline) throw java.net.SocketTimeoutException()
+                try { return FetchedText(exchange(uri, addresses.first(), headers, body, contentType, deadline),uri) }
+                catch (redirect: ProviderRedirect) {
+                    if (hop==3) throw java.io.IOException("Redirect limit")
+                    val next=Subscriptions.httpUri(uri.resolve(redirect.location).toString())
+                    if (uri.scheme=="https" && next.scheme!="https") throw java.io.IOException("HTTPS downgrade")
+                    if (redirect.status in setOf(301,302,303)) body=null
+                    if (origin(uri)!=origin(next)) {
+                        if (body!=null) throw java.io.IOException("Cross-origin POST redirect")
+                        headers=emptyMap()
+                    }
+                    uri=next
+                }
+            }
+            throw java.io.IOException("Redirect limit")
         } catch (e: ResponseStatusException) { throw e }
         catch (_: Exception) { throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "Provider transport failed") }
         finally { permits.release() }
     }
-    internal fun exchange(uri: URI, address: InetAddress, headers: Map<String, String> = emptyMap(), form: String? = null, contentType: String = "application/x-www-form-urlencoded"): String {
-        val deadline = System.nanoTime() + 8_000_000_000L
+    internal fun exchange(uri: URI, address: InetAddress, headers: Map<String, String> = emptyMap(), form: String? = null, contentType: String = "application/x-www-form-urlencoded", deadline: Long = System.nanoTime()+8_000_000_000L): String {
         val port = if (uri.port != -1) uri.port else if (uri.scheme == "https") 443 else 80
         val plain = Socket()
         try {
@@ -114,7 +133,8 @@ open class ProviderTransport(@Value("\${TV_NEXT_LAN_ORIGINS:}") allowedPrivate: 
                     out.write(c)
                 }
             }
-            if (!line().matches(Regex("HTTP/1\\.[01] 200(?: .*)?"))) throw java.io.IOException("Only HTTP 200 accepted")
+            val status=Regex("HTTP/1\\.[01] ([0-9]{3})(?: .*)?").matchEntire(line())?.groupValues?.get(1)?.toInt()
+                ?: throw java.io.IOException("Invalid HTTP status")
             val headers = mutableMapOf<String, String>()
             while (true) {
                 val value = line()
@@ -123,6 +143,8 @@ open class ProviderTransport(@Value("\${TV_NEXT_LAN_ORIGINS:}") allowedPrivate: 
                 if (split < 1 || value[0].isWhitespace()) throw java.io.IOException("Malformed header")
                 if (headers.put(value.substring(0, split).lowercase(), value.substring(split + 1).trim()) != null) throw java.io.IOException("Duplicate header")
             }
+            if (status in setOf(301,302,303,307,308)) throw ProviderRedirect(headers["location"] ?: throw java.io.IOException("Redirect without Location"),status)
+            if (status != 200) throw java.io.IOException("Provider HTTP status")
             if (headers["content-encoding"]?.lowercase() !in listOf(null, "identity", "gzip")) throw java.io.IOException("Compressed response rejected")
             val transfer = headers["transfer-encoding"]?.lowercase()
             if (transfer != null && transfer != "chunked" || transfer != null && headers.containsKey("content-length")) throw java.io.IOException("Ambiguous body")

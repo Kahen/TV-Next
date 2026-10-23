@@ -52,7 +52,7 @@ class ConfigCatalog(private val mapper: ObjectMapper) {
             CatalogSite(
                 key, text(site.path("name"), 200).ifBlank { key },
                 site.path("type").takeIf { it.isInt }?.asInt(),
-                site.path("searchable").takeIf { it.isInt }?.asInt() != 0,
+                site.path("searchable").asInt(1) == 1,
                 site.path("hide").asInt(0) == 1, categories
             )
         }

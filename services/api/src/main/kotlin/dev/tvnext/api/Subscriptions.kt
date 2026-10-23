@@ -26,10 +26,12 @@ data class SubscriptionDocument(val content: String, val url: String, val sites:
 @Service
 class Subscriptions(private val mapper: ObjectMapper, private val transport: ProviderTransport) {
     fun load(request: SubscriptionRequest): SubscriptionDocument {
-        val base = request.url.takeIf { it.isNotBlank() }?.let { httpUri(it) }
+        var base = request.url.takeIf { it.isNotBlank() }?.let { httpUri(it) }
         val text = if (request.content.isNotBlank()) request.content else {
             if (base == null) bad("Provide subscription URL or content")
-            transport.get(base)
+            val fetched=transport.getDocument(base)
+            base=fetched.uri
+            fetched.content
         }
         val root = try { mapper.readTree(decode(text)) } catch (e: ResponseStatusException) { throw e }
             catch (_: Exception) { bad("Invalid subscription JSON") }

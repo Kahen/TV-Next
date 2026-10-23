@@ -99,7 +99,7 @@ class StaticFongMiProvider(private val mapper: ObjectMapper) : MediaProvider {
         private const val MAX_TEXT = 2_000
     }
 
-    fun read(content: String, resolveOpaque: Boolean = false): MediaContent {
+    fun read(content: String, resolveOpaque: Boolean = false, keepLongIds: Boolean = resolveOpaque): MediaContent {
         if (content.isBlank() || content.length > MAX_CONTENT || content.toByteArray(Charsets.UTF_8).size > MAX_CONTENT) bad("Media JSON must be 1..1048576 chars")
         val root = try { mapper.readTree(content) } catch (_: Exception) { bad("Invalid media JSON") }
         if (root == null || !root.isObject) bad("Expected JSON object")
@@ -118,7 +118,7 @@ class StaticFongMiProvider(private val mapper: ObjectMapper) : MediaProvider {
         }
         val ids = mutableSetOf<String>()
         val entries = videos.filter { it.isObject }.mapNotNull { node ->
-            val id = string(node.path("vod_id"), if (resolveOpaque) 16384 else 200)
+            val id = string(node.path("vod_id"), if (keepLongIds) 16384 else 200)
             val name = string(node.path("vod_name"), 200)
             if (id.isBlank() || name.isBlank() || !ids.add(id)) return@mapNotNull null
             val item = MediaItem(

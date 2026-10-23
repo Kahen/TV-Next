@@ -41,6 +41,11 @@ class ConfigCatalogTest {
         assertEquals(null, channels[2].directUrl)
     }
 
+    @Test fun originalSearchableStateTwoMeansDisabled() {
+        assertFalse(catalog.preview("""{"sites":[{"key":"disabled","searchable":2}]}""").sites.single().searchable)
+        assertTrue(catalog.preview("""{"sites":[{"key":"default"}]}""").sites.single().searchable)
+    }
+
     @Test
     fun rejectsInvalidConfigsAndTooLargeText() {
         assertTrue(catalog.preview("{}").sites.isEmpty())

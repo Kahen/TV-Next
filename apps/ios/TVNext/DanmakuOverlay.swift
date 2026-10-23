@@ -24,7 +24,7 @@ struct DanmakuOverlay: View {
 
     var body: some View {
         GeometryReader { geometry in
-            TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { _ in
+            TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !options.enabled || comments.isEmpty)) { _ in
                 Canvas { context, size in
                     let now = player.currentTime().seconds - options.offset
                     if options.enabled && now.isFinite {
@@ -43,7 +43,9 @@ struct DanmakuOverlay: View {
                             let y = c.mode == 4 ? size.height - Double(item.lane + 1) * (options.fontSize + 8) : Double(item.lane) * (options.fontSize + 8)
                             let color = Color(red: Double((c.color >> 16) & 255) / 255, green: Double((c.color >> 8) & 255) / 255, blue: Double(c.color & 255) / 255)
                             let text = Text(c.text).font(.system(size: options.fontSize)).foregroundColor(color)
-                            context.draw(text, at: CGPoint(x: x, y: y), anchor: .topLeading)
+                            var layer = context
+                            layer.addFilter(.shadow(color: c.color == 0 ? .white : .black, radius: 1))
+                            layer.draw(text, at: CGPoint(x: x, y: y), anchor: .topLeading)
                             index -= 1
                         }
                     }

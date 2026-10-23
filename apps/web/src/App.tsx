@@ -3,7 +3,7 @@ import Hls from "hls.js";
 import { postText, requestJson } from "./api";
 import type { Channel, CatalogPreview, ConfigPreview, PlaylistResult } from "./api";
 import {
-  addRecent, emptyLibrary, loadLibrary, normalizeLibrary, saveLibrary,
+  addRecent, emptyLibrary, loadLibrary, saveLibrary,
   setPosition, toggleFavorite, validMediaUrl
 } from "./library";
 import type { LibraryState } from "./library";
@@ -45,6 +45,8 @@ export default function App() {
   const [subtitleName, setSubtitleName] = useState("");
   const [storageWarning, setStorageWarning] = useState("");
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const mediaKey = selected?.url ?? localVideo?.url;
+  const mediaKeyRef = useRef(mediaKey); mediaKeyRef.current = mediaKey;
   const libraryRef = useRef(library);
   libraryRef.current = library;
   const channels = library.channels;
@@ -205,7 +207,8 @@ export default function App() {
   }
 
   async function loadSubtitleSource(url: string, name: string) {
-    try { const result=await requestJson<{content:string}>("/api/v1/resources/text",{url});setSubtitleOriginal(toWebVtt(result.content,"remote.srt"));setSubtitleOffset(0);setSubtitleName(name); }
+    const key=mediaKey;
+    try { const result=await requestJson<{content:string}>("/api/v1/resources/text",{url});if(key!==mediaKeyRef.current)return;setSubtitleOriginal(toWebVtt(result.content,"remote.srt"));setSubtitleOffset(0);setSubtitleName(name); }
     catch(e){setError(e instanceof Error?e.message:"字幕加载失败");}
   }
   async function loadDanmakuFile(file: File) {
@@ -213,7 +216,8 @@ export default function App() {
     catch(e) {setError(e instanceof Error?e.message:"弹幕导入失败");}
   }
   async function loadDanmakuSource(url: string) {
-    try { const result = await requestJson<{content:string}>("/api/v1/resources/text",{url});setDanmaku(parseDanmaku(result.content)); }
+    const key=mediaKey;
+    try { const result = await requestJson<{content:string}>("/api/v1/resources/text",{url});if(key!==mediaKeyRef.current)return;setDanmaku(parseDanmaku(result.content)); }
     catch(e) {setError(e instanceof Error?e.message:"弹幕加载失败");}
   }
 

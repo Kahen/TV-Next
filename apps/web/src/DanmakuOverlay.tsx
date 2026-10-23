@@ -11,6 +11,7 @@ export default function DanmakuOverlay({ video, comments, settings }: { video: R
     if (!surface || !media) return;
     const ctx = surface.getContext("2d");
     if (!ctx) return;
+    if (!settings.enabled || !comments.length) { ctx.clearRect(0,0,surface.width,surface.height); return; }
     let frame = 0, width = 0, height = 0;
     let schedule: ReturnType<typeof scheduleDanmaku> = [];
     const observer = new ResizeObserver(() => {
@@ -22,9 +23,11 @@ export default function DanmakuOverlay({ video, comments, settings }: { video: R
       const blocked = settings.blocked.split(/[,，\n]/).map(s => s.trim()).filter(Boolean);
       schedule = scheduleDanmaku(comments.filter(c => !blocked.some(word => c.text.includes(word))), width,
         Math.max(1, Math.floor(height * settings.area / (settings.fontSize + 8))), settings.duration, text => ctx.measureText(text).width);
+      draw();
     });
     observer.observe(surface);
     const draw = () => {
+      cancelAnimationFrame(frame);
       ctx.clearRect(0, 0, width, height);
       const now = media.currentTime - settings.offset;
       if (settings.enabled && Number.isFinite(now)) {
@@ -37,13 +40,15 @@ export default function DanmakuOverlay({ video, comments, settings }: { video: R
           const c = schedule[i], progress = (now - c.time) / settings.duration;
           const x = c.mode === 4 || c.mode === 5 ? (width - c.width) / 2 : c.mode === 6 ? -c.width + progress * (width + c.width) : width - progress * (width + c.width);
           const y = c.mode === 4 ? height - (c.lane + 1) * (settings.fontSize + 8) : c.lane * (settings.fontSize + 8);
+          ctx.strokeStyle = c.color === "#000000" ? "#fff" : "#000";
           ctx.fillStyle = c.color; ctx.strokeText(c.text, x, y); ctx.fillText(c.text, x, y);
         }
       }
-      frame = requestAnimationFrame(draw);
+      if (!media.paused && !media.ended) frame = requestAnimationFrame(draw);
     };
+    for (const event of ["play","pause","seeked","timeupdate"]) media.addEventListener(event,draw);
     frame = requestAnimationFrame(draw);
-    return () => { cancelAnimationFrame(frame); observer.disconnect(); ctx.clearRect(0, 0, width, height); };
+    return () => { for (const event of ["play","pause","seeked","timeupdate"]) media.removeEventListener(event,draw); cancelAnimationFrame(frame); observer.disconnect(); ctx.clearRect(0, 0, width, height); };
   }, [video, comments, settings]);
   return <canvas ref={canvas} className="danmaku-overlay" aria-hidden="true"/>;
 }

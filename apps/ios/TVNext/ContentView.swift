@@ -15,6 +15,7 @@ struct ContentView: View {
     @AppStorage("tv-next-api-url") private var serverURL = "http://localhost:8080"
     @State private var danmaku: [DanmakuComment] = []
     @State private var danmakuOptions = DanmakuOptions()
+    @State private var remoteResourceKey: String?
     @State private var remoteDanmaku: [NativePlaybackResource] = []
     @State private var choosingDanmaku = false
     @State private var manualURL = ""
@@ -73,6 +74,7 @@ struct ContentView: View {
                             return
                         }
                         library.play(TVChannel(name: title + " · " + playback.name, url: playback.url, group: playback.lineName, logo: nil, tvgId: nil))
+                        remoteResourceKey = playback.url
                         remoteDanmaku = playback.danmaku
                     }, onImport: { library.importChannels($0) })
                     MediaCatalogSection { channel in
@@ -146,7 +148,7 @@ struct ContentView: View {
                     danmaku = try DanmakuParser.parse(text)
                 } catch { errorMessage = error.localizedDescription }
             }
-            .onChange(of: library.current?.url) { _, _ in danmaku = [] }
+            .onChange(of: library.current?.url) { _, url in danmaku = []; if url != remoteResourceKey { remoteDanmaku = [] } }
             .onDisappear {
                 library.savePosition()
                 library.player.pause()
@@ -160,10 +162,12 @@ struct ContentView: View {
                 Button("导入 XML / JSON 弹幕") { choosingDanmaku = true }.buttonStyle(.bordered)
                 ForEach(remoteDanmaku) { resource in
                     Button("加载 " + resource.name) {
+                        let key = library.current?.url
                         Task { @MainActor in
                             do {
                                 guard let url = URL(string: serverURL) else { throw APIError.invalidServer }
                                 let result: NativeTextResponse = try await TVNextAPI(server: url).request("resources/text", body: NativeResourceRequest(url: resource.url))
+                                guard library.current?.url == key else { return }
                                 danmaku = try DanmakuParser.parse(result.content)
                             } catch { errorMessage = error.localizedDescription }
                         }

@@ -41,6 +41,37 @@ class TransportIntegrationTest {
             worker.join(3000)
         }
     }
+    @Test fun redirectsRevalidateDestinationStripCredentialsAndRetainFinalBaseUri() {
+        val address=java.net.NetworkInterface.getNetworkInterfaces().toList().flatMap { it.inetAddresses.toList() }
+            .firstOrNull { it is java.net.Inet4Address && it.isSiteLocalAddress && !it.isLoopbackAddress }
+        org.junit.jupiter.api.Assumptions.assumeTrue(address!=null,"LAN interface required for explicit-origin loopback-free test")
+        address!!
+        ServerSocket(0,1,address).use { first -> ServerSocket(0,1,address).use { second ->
+            first.soTimeout=3000;second.soTimeout=3000
+            val a="http://${address.hostAddress}:${first.localPort}"
+            val b="http://${address.hostAddress}:${second.localPort}"
+            val received=CompletableFuture<String>()
+            val one=Thread.ofVirtual().start {
+                first.accept().use { socket ->
+                    val reader=socket.getInputStream().bufferedReader()
+                    while(!reader.readLine().isNullOrEmpty()) {}
+                    socket.getOutputStream().write("HTTP/1.1 302 Found\r\nLocation: $b/path/config.json\r\nContent-Length: 0\r\n\r\n".toByteArray())
+                }
+            }
+            val two=Thread.ofVirtual().start {
+                second.accept().use { socket ->
+                    val reader=socket.getInputStream().bufferedReader();val lines=mutableListOf<String>()
+                    while(true){ val line=reader.readLine() ?: break;if(line.isEmpty())break;lines+=line }
+                    received.complete(lines.joinToString("\n"))
+                    socket.getOutputStream().write("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n{}".toByteArray())
+                }
+            }
+            val fetched=ProviderTransport("$a,$b").getDocument(URI("$a/start"),mapOf("Authorization" to "own-secret"))
+            assertEquals("{}",fetched.content);assertEquals("$b/path/config.json",fetched.uri.toString())
+            assertFalse(received.get(3,TimeUnit.SECONDS).contains("own-secret"))
+            one.join(3000);two.join(3000)
+        } }
+    }
     @Test fun envelopeLimitAlsoAppliesWhenLengthIsUnknownAndRateIsPerActualPeer() {
         val filter = ApiRequestLimits()
         val request = MockHttpServletRequest("POST","/api/v1/resources/text").apply { setContent(ByteArray(3_145_729));remoteAddr="127.0.0.1" }

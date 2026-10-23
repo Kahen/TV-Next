@@ -27,13 +27,13 @@ export default function SubscriptionBrowser({onPlay, onImport}: {onPlay: (channe
     try {
       const result = await requestJson<SubscriptionDocument>("/api/v1/subscriptions/load", { content, url: address }, controller.signal);
       if (id !== requestId.current) return;
-      setDoc(result); setPage(null); setDetail(null); setFound([]); setSite("");
+      setActionResult(""); setDoc(result); setPage(null); setDetail(null); setFound([]); setSite("");
     } catch (e) { if (id === requestId.current && !controller.signal.aborted) setError(e instanceof Error ? e.message : "订阅加载失败"); }
     finally { if (id === requestId.current) setBusy(false); }
   }
   async function browse(key: string, op = "home", nextPage = 1, type = category) {
     const {controller, id} = start();
-    setDetail(null); setFound([]);
+    setActionResult(""); setDetail(null); setFound([]);
     try {
       const result = await requestJson<MediaPage>("/api/v1/subscriptions/" + op, {...body(key), page: nextPage, categoryId: type, query}, controller.signal);
       if (id !== requestId.current) return;

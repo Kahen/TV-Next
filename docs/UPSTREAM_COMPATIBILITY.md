@@ -12,11 +12,11 @@ Reference source: [Kahen/TV release 0af3b31a1783b8fa4f0ce12e52ac9fad78ddfb1e](ht
 | bean/Flag.java; gson/DanmakuAdapter.java | SubscribedProvider.kt | opaque type 4 playback IDs (including cloud share/file IDs); string/array/encoded-array danmaku sources; subtitles; playback headers |
 | bean/DanmakuData.java | Web/Swift DanmakuParser | XML `p` fields in seconds, RGB color, modes 1/4/5/6, entity decoding; bounded dandanplay JSON extension |
 
-Both clients have subscription URL/paste inputs and original site selection. Web also has bounded concurrent cross-site search with cancellation. iOS uses the same server contract. User-supplied tokens and playback headers are not included in persistent local library snapshots.
+Both clients have subscription URL/paste inputs and original site selection. Web also has bounded concurrent cross-site search with cancellation. iOS uses the same server contract. Cookie/Authorization and other private playback headers are excluded from local snapshots. Web may retain User-Agent, Referer and Origin; a restored channel that required private headers asks for subscription reload.
 
 ## Network behavior
 
-The server pins a validated DNS answer to each socket, verifies TLS hostname/SNI, denies redirects, limits concurrent calls to 8, connect/read timeouts to 3 seconds and response wall time to 8 seconds (DNS lookup is OS-managed). Bodies are limited to 1 MiB compressed and decoded UTF-8; gzip is bounded. Hop-by-hop headers, Host overrides and CR/LF injection are rejected. Streaming media bytes do not go through this text transport.
+The server pins a validated DNS answer to each socket, verifies TLS hostname/SNI, revalidates and pins up to three redirects (stripping custom headers across origins and denying cross-origin POST replay/HTTPS downgrade), limits concurrent calls to 8, connect/read timeouts to 3 seconds and response wall time to 8 seconds (DNS lookup is OS-managed). Bodies are limited to 1 MiB compressed and decoded UTF-8; gzip is bounded. Hop-by-hop headers, Host overrides and CR/LF injection are rejected. Streaming media bytes do not go through this text transport.
 
 Private-address destinations are denied by default. For your own LAN OpenList/provider service, explicitly set `TV_NEXT_LAN_ORIGINS` to exact origins such as `http://192.168.2.10:5244`. Each socket remains DNS-pinned. Only site-local LAN addresses are permitted by this opt-in; loopback, link-local/metadata and multicast stay denied. Do not expose these development services publicly without authentication/TLS deployment controls.
 
@@ -31,7 +31,7 @@ Aliyun/Alipan, Quark, UC, 115 and other original TVBox cloud providers commonly 
 - Android type 3 JAR/QuickJS/Python activation and actual provider corpus; current isolation harness is bundled-fixture only.
 - WebView/sniffing parser chains (`parse`/`jx`/`playUrl`) and non-HTTP protocols; these fail explicitly rather than playing a webpage as video.
 - Request headers on native browser MP4/HLS and iOS playback need a media relay/resource adapter. hls.js can attach supported headers, subject to browser/CORS restrictions; header-dependent native playback currently reports the limit.
-- Subscription HTTP redirects; full live catchup, client category-filter controls, and interactive login/QR action workflows. Live TXT/M3U/nested JSON and external references, per-channel headers and type 4 folder navigation are implemented; HTTP actions return data without executing arbitrary UI instructions.
+- Full live catchup, client category-filter controls, and interactive login/QR action workflows. Live TXT/M3U/nested JSON and external references, per-channel headers and type 4 folder navigation are implemented; HTTP actions return data without executing arbitrary UI instructions.
 - ASS styling, automatic danmaku search endpoints and native PiP subtitle/danmaku composition.
 
 Synthetic protocol tests are derived from these source paths. Real cloud accounts, original external Spider artifacts and physical iPhone/iPad playback still require separate evidence. P1–P6 are not all complete.

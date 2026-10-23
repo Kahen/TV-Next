@@ -11,6 +11,13 @@ class LiveSubscriptionsTest {
         assertEquals(3,result.total);assertEquals(listOf("News","News","Other"),result.channels.map { it.group })
         assertTrue(result.warnings.isNotEmpty())
     }
+    @Test fun originalVlcAndInlineHeadersRemainAssociatedWithTheirChannel() {
+        val result=service.load(LiveImportRequest("#EXTM3U\n#EXTINF:-1,One\n#EXTVLCOPT:http-user-agent=TV-Next\n#EXTVLCOPT:http-cookie=own-cookie\nhttps://example.org/a|Referer=https://example.org/\n#EXTINF:-1,Two\nhttps://example.org/b"))
+        assertEquals("TV-Next",result.channels[0].headers["User-Agent"])
+        assertEquals("own-cookie",result.channels[0].headers["Cookie"])
+        assertEquals("https://example.org/",result.channels[0].headers["Referer"])
+        assertTrue(result.channels[1].headers.isEmpty())
+    }
     @Test fun originalNestedGroupJsonAndPlainM3u() {
         val content="""{"lives":[{"name":"IPTV","groups":[{"name":"News","channel":[{"name":"One","urls":["https://example.org/live","rtsp://example.org/live"]}]}]}]}"""
         val result=service.load(LiveImportRequest(content))
