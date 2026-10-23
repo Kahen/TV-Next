@@ -53,6 +53,19 @@ class SubscriptionCompatibilityTest {
         assertEquals(id,data.entries.single().item.id)
         assertTrue(data.entries.single().item.folder)
     }
+    @Test fun largeUpstreamPagesAreNotTruncatedOrRepaginatedLocally() {
+        val root=mapper.createObjectNode().put("pagecount",2).put("total",300).put("limit",150)
+        val list=root.putArray("list")
+        repeat(150) { list.addObject().put("vod_id",it.toString()).put("vod_name","Video $it") }
+        transport.answer=root.toString()
+        val result=provider.page("home",SiteRequest(content=config,siteKey="pan"))
+        assertEquals(150,result.items.size);assertEquals("149",result.items.last().id)
+        assertEquals(150,result.pageSize);assertTrue(result.hasMore)
+    }
+    @Test fun repeatableResponseHeadersAreAcceptedWhileFramingStaysUnambiguous() {
+        assertEquals("{}",ProviderTransport.parseResponse("HTTP/1.1 200 OK\r\nSet-Cookie: a=1\r\nSet-Cookie: b=2\r\nVary: Accept\r\nVary: Accept-Encoding\r\nContent-Length: 2\r\n\r\n{}".byteInputStream()))
+        assertFails { ProviderTransport.parseResponse("HTTP/1.1 200 OK\r\nContent-Length: 2\r\nContent-Length: 2\r\n\r\n{}".byteInputStream()) }
+    }
     @Test fun originalSiteApiParameterConventions() {
         assertEquals(mapOf("filter" to "true"), provider.params(4, "home", SiteRequest(), ""))
         assertEquals(emptyMap(), provider.params(1, "home", SiteRequest(), ""))

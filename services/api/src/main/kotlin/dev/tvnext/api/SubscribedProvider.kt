@@ -26,11 +26,12 @@ class SubscribedProvider(private val subscriptions: Subscriptions, private val m
         val root = fetch(site, op, r)
         val data = parser.read(root.toString(), site.path("type").asInt() == 4, true)
         val total = root.path("total").asText().toIntOrNull()?.coerceIn(0, 10_000_000) ?: data.entries.size
-        val pages = root.path("pagecount").asText().toIntOrNull()?.coerceAtLeast(1) ?: 1
+        val size=root.path("limit").asText().toIntOrNull()?.takeIf { it>0 }?.coerceAtMost(2000) ?: data.entries.size.coerceAtLeast(1)
+        val pages = root.path("pagecount").asText().toIntOrNull()?.takeIf { it>0 } ?: ((total+size-1)/size).coerceAtLeast(1)
         val allowed = site.path("categories").map { it.asText() }
         val categories = if (allowed.isEmpty()) data.categories else data.categories.filter { it.name in allowed }.ifEmpty { data.categories }
-        return ProviderPage(categories, data.entries.take(100).map { it.item }, total, r.page,
-            root.path("limit").asText().toIntOrNull()?.coerceIn(1, 100) ?: 40, r.page < pages,
+        return ProviderPage(categories, data.entries.map { it.item }, total, r.page,
+            size, r.page < pages,
             r.siteKey, root.path("filters"))
     }
     fun detail(r: SiteRequest): MediaDetail {

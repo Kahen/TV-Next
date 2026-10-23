@@ -141,7 +141,10 @@ open class ProviderTransport(@Value("\${TV_NEXT_LAN_ORIGINS:}") allowedPrivate: 
                 if (value.isEmpty()) break
                 val split = value.indexOf(':')
                 if (split < 1 || value[0].isWhitespace()) throw java.io.IOException("Malformed header")
-                if (headers.put(value.substring(0, split).lowercase(), value.substring(split + 1).trim()) != null) throw java.io.IOException("Duplicate header")
+                val name=value.substring(0,split).lowercase()
+                val previous=headers.put(name,value.substring(split+1).trim())
+                if (previous!=null && name in setOf("content-length","transfer-encoding","content-encoding","location"))
+                    throw java.io.IOException("Ambiguous consumed header")
             }
             if (status in setOf(301,302,303,307,308)) throw ProviderRedirect(headers["location"] ?: throw java.io.IOException("Redirect without Location"),status)
             if (status != 200) throw java.io.IOException("Provider HTTP status")

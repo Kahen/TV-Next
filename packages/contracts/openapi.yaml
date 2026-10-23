@@ -793,6 +793,7 @@ components:
           type: integer
         pageSize:
           type: integer
+          maximum: 2000
         hasMore:
           type: boolean
         provider:
