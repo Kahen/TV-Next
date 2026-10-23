@@ -45,7 +45,7 @@ struct EpgSection: View {
                 invalidate();xml=text
             } catch { self.error=error.localizedDescription }
         }
-        .onChange(of:channels.map(\.id)) { _,_ in invalidate() }
+        .onChange(of:channels) { _,_ in invalidate() }
         .onChange(of:xml) { _,_ in invalidate() }
         .onDisappear { task?.cancel();generation=UUID() }
     }

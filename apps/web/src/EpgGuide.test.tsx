@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import EpgGuide from "./EpgGuide";
 import type { Channel } from "./api";
 
@@ -117,4 +117,49 @@ it("enforces the pasted XML UTF-8 byte limit",async()=>{
   fireEvent.change(screen.getByLabelText("XMLTV 内容"),{target:{value:"<tv><!--"+"中".repeat(700000)+"--></tv>"}});
   fireEvent.click(screen.getByRole("button",{name:"解析节目表"}));
   expect(await screen.findByRole("alert")).toBeTruthy();expect(fetchMock).not.toHaveBeenCalled();
+});
+
+const homeSession={token:"test-token",user:{id:"owner",username:"user"},device:{id:"device",name:"Web",createdAt:0,expiresAt:9999999999999,current:true}};
+const savedFeed={id:"feed",name:"Saved feed",url:"https://example.org/guide",intervalMinutes:360,enabled:true,updatedAt:1,nextRefresh:9999999999999,lastError:null,available:true};
+const savedGuide={...fakeResponse,channels:[{...fakeResponse.channels[0],current:{...fakeResponse.channels[0].current,title:"Saved programme"}}]};
+
+it.each(["import","edit"])("discards pending saved guide after XML %s",async action=>{
+  let finish!:(value:unknown)=>void;
+  vi.stubGlobal("fetch",vi.fn(async(path:string)=>{
+    if(path.endsWith("/epg/feeds"))return {ok:true,json:async()=>[savedFeed]};
+    if(path.includes("/feeds/feed/guide"))return new Promise(resolve=>{finish=resolve;});
+    return {ok:true,json:async()=>fakeResponse};
+  }));
+  render(<EpgGuide channels={[channel]} onPlay={vi.fn()} session={homeSession}/>);
+  fireEvent.click(screen.getByRole("button",{name:"读取订阅"}));
+  await screen.findByText("Saved feed",{selector:"strong"});
+  fireEvent.click(screen.getByRole("button",{name:"显示节目表"}));
+  fireEvent.change(screen.getByLabelText("XMLTV 内容"),{target:{value:"<tv/>"}});
+  if(action==="import"){
+    fireEvent.click(screen.getByRole("button",{name:"解析节目表"}));
+    await screen.findByText("Current News");
+  }
+  await act(async()=>{finish({ok:true,json:async()=>savedGuide});});
+  expect(screen.queryByText("Saved programme")).toBeNull();
+  if(action==="import")expect(screen.getByText("Current News")).toBeTruthy();
+  else expect(screen.queryByRole("button",{name:"播放频道"})).toBeNull();
+});
+
+it("discards pending imported guide after a saved guide is requested",async()=>{
+  let finish!:(value:unknown)=>void;
+  vi.stubGlobal("fetch",vi.fn(async(path:string)=>{
+    if(path.endsWith("/epg/feeds"))return {ok:true,json:async()=>[savedFeed]};
+    if(path.includes("/feeds/feed/guide"))return {ok:true,json:async()=>savedGuide};
+    return new Promise(resolve=>{finish=resolve;});
+  }));
+  render(<EpgGuide channels={[channel]} onPlay={vi.fn()} session={homeSession}/>);
+  fireEvent.click(screen.getByRole("button",{name:"读取订阅"}));
+  await screen.findByText("Saved feed",{selector:"strong"});
+  fireEvent.change(screen.getByLabelText("XMLTV 内容"),{target:{value:"<tv/>"}});
+  fireEvent.click(screen.getByRole("button",{name:"解析节目表"}));
+  fireEvent.click(screen.getByRole("button",{name:"显示节目表"}));
+  await screen.findByText("Saved programme");
+  await act(async()=>{finish({ok:true,json:async()=>fakeResponse});});
+  expect(screen.queryByText("Current News")).toBeNull();
+  expect(screen.getByText("Saved programme")).toBeTruthy();
 });
