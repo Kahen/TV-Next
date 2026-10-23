@@ -23,6 +23,11 @@ jobs:
         run: |
           swiftc TVNext/TVNextAPI.swift TVNext/M3UParser.swift TVNext/M3UExport.swift tests/ParserSmoke.swift -o /tmp/tvnext-parser-tests
           /tmp/tvnext-parser-tests
+      - name: Run offline JSON config parser smoke tests
+        working-directory: apps/ios
+        run: |
+          swiftc TVNext/OfflineConfigPreview.swift tests/ConfigSmoke.swift -o /tmp/tvnext-config-tests
+          /tmp/tvnext-config-tests
       - name: Run caption parser smoke tests
         working-directory: apps/ios
         run: |
