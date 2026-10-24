@@ -36,3 +36,7 @@ __pycache__/
 # Generated dependency evidence (CI artifacts)
 npm-audit.json
 sbom-web.cdx.json
+
+# Browser acceptance evidence
+playwright-report/
+test-results/
