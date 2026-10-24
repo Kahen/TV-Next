@@ -177,6 +177,6 @@ class ApiCors : WebMvcConfigurer {
             ?.takeIf { it.isNotEmpty() }
             ?: listOf("http://localhost:5173", "http://127.0.0.1:5173")
         registry.addMapping("/api/**").allowedOrigins(*origins.toTypedArray())
-            .allowedMethods("GET", "POST", "OPTIONS").allowedHeaders("Content-Type", "Authorization").exposedHeaders("X-Request-Id")
+            .allowedMethods("GET", "HEAD", "POST", "OPTIONS").allowedHeaders("Content-Type", "Authorization", "Range").exposedHeaders("X-Request-Id", "Content-Length", "Content-Range", "Accept-Ranges")
     }
 }

@@ -40,6 +40,30 @@ final class MediaLibraryStore: ObservableObject {
     private let storageKey = "tv-next-library-v1"
     private var timeObserver: Any?
     private var statusObservation: NSKeyValueObservation?
+    private var relayAPI: TVNextAPI?
+    private var relayContext=""
+    private var relayTask: Task<Void,Never>?
+    private var relayGeneration=UUID()
+    private var activeRelay: (TVNextAPI,String)?
+
+    func configureRelay(server: String,session: NativeHomeSession?) {
+        let context=server+"|"+(session?.token ?? "")
+        guard context != relayContext else { return }
+        relayContext=context
+        savePosition()
+        cancelRelay()
+        if let session,let url=URL(string:server),["http","https"].contains(url.scheme?.lowercased() ?? "") {
+            relayAPI=TVNextAPI(server:url,token:session.token)
+        } else { relayAPI=nil }
+    }
+    private func release(_ api: TVNextAPI,_ ticket: String) {
+        Task { let _: [String:Bool]? = try? await api.request("home/media/"+ticket+"/close",body:EmptyHomeRequest()) }
+    }
+    private func cancelRelay() {
+        relayGeneration=UUID();relayTask?.cancel();relayTask=nil
+        if let (api,ticket)=activeRelay { player.pause();player.replaceCurrentItem(with:nil);release(api,ticket) }
+        activeRelay=nil
+    }
 
     init() {
         restore()
@@ -61,6 +85,7 @@ final class MediaLibraryStore: ObservableObject {
         if let timeObserver { player.removeTimeObserver(timeObserver) }
         if let captionObserver { player.removeTimeObserver(captionObserver) }
         statusObservation?.invalidate()
+        relayTask?.cancel()
         LocalMediaStager.discard(currentLocalFile)
     }
 
@@ -89,11 +114,30 @@ final class MediaLibraryStore: ObservableObject {
 
     func play(_ channel: TVChannel) {
         playbackError = nil
-        if channel.headersRequired == true || !(channel.headers ?? [:]).isEmpty {
-            playbackError = "此来源需要额外请求头，原生播放尚需服务端媒体适配。"
+        if channel.headersRequired == true {
+            playbackError = "媒体库未保存此来源的私密请求头，请重新加载订阅后播放。"
             return
         }
         guard MediaAddress.valid(channel.url), let url = URL(string: channel.url) else { return }
+        savePosition()
+        cancelRelay()
+        if !(channel.headers ?? [:]).isEmpty {
+            guard let api=relayAPI else { playbackError="请先登录当前家庭服务器，以适配此来源的播放请求头。";return }
+            let generation=relayGeneration
+            relayTask=Task { @MainActor in
+                do {
+                    let result: NativeRelayResponse=try await api.request("home/media/sessions",body:NativeRelayRequest(url:channel.url,headers:channel.headers ?? [:]))
+                    let address=try MediaRelayAddress.resolve(result.path,server:api.server)
+                    guard !Task.isCancelled,relayGeneration==generation else { release(api,address.ticket);return }
+                    activeRelay=(api,address.ticket)
+                    playResolved(channel,address.url)
+                } catch { if !Task.isCancelled,relayGeneration==generation { playbackError=error.localizedDescription } }
+            }
+            return
+        }
+        playResolved(channel,url)
+    }
+    private func playResolved(_ channel: TVChannel,_ url: URL) {
         savePosition()
         player.pause()
         player.replaceCurrentItem(with: nil)
@@ -126,6 +170,7 @@ final class MediaLibraryStore: ObservableObject {
 
     func playLocalFile(_ file: URL, name: String) {
         savePosition()
+        cancelRelay()
         player.pause()
         player.replaceCurrentItem(with: nil)
         LocalMediaStager.discard(currentLocalFile)
@@ -186,6 +231,7 @@ final class MediaLibraryStore: ObservableObject {
     }
 
     func clear() {
+        cancelRelay()
         player.pause()
         player.replaceCurrentItem(with: nil)
         LocalMediaStager.discard(currentLocalFile)

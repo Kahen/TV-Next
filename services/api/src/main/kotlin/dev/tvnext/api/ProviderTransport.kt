@@ -22,6 +22,13 @@ open class ProviderTransport(@Value("\${TV_NEXT_LAN_ORIGINS:}") allowedPrivate: 
         origin(uri) in lanOrigins && address.isSiteLocalAddress && !address.isLoopbackAddress && !address.isLinkLocalAddress
 
     private val permits = Semaphore(8)
+    internal open fun resolveAddress(uri: URI): InetAddress {
+        Subscriptions.httpUri(uri.toString())
+        val addresses = InetAddress.getAllByName(uri.host)
+        if (addresses.isEmpty() || addresses.any { !allowed(uri,it) })
+            throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "Forbidden provider address")
+        return addresses.first()
+    }
     open fun get(uri: URI, headers: Map<String, String> = emptyMap(), form: String? = null): String = perform(uri, headers, form, "application/x-www-form-urlencoded").content
     open fun postJson(uri: URI, headers: Map<String,String>, json: String): String = perform(uri, headers, json, "application/json").content
     fun getDocument(uri: URI, headers: Map<String,String> = emptyMap()): FetchedText = perform(uri,headers,null,"application/x-www-form-urlencoded")
@@ -33,11 +40,9 @@ open class ProviderTransport(@Value("\${TV_NEXT_LAN_ORIGINS:}") allowedPrivate: 
             var uri=initial; var headers=initialHeaders; var body=initialBody
             val deadline=System.nanoTime()+8_000_000_000L
             for (hop in 0..3) {
-                val addresses = InetAddress.getAllByName(uri.host)
-                if (addresses.isEmpty() || addresses.any { !allowed(uri,it) })
-                    throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "Forbidden provider address")
+                val address = resolveAddress(uri)
                 if (System.nanoTime()>=deadline) throw java.net.SocketTimeoutException()
-                try { return FetchedText(exchange(uri, addresses.first(), headers, body, contentType, deadline),uri) }
+                try { return FetchedText(exchange(uri, address, headers, body, contentType, deadline),uri) }
                 catch (redirect: ProviderRedirect) {
                     if (hop==3) throw java.io.IOException("Redirect limit")
                     val next=Subscriptions.httpUri(uri.resolve(redirect.location).toString())

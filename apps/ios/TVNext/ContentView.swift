@@ -68,17 +68,13 @@ struct ContentView: View {
                     quickPlaySection
                     localMediaSection
                     importSection
-                    HomeServerSection(serverURL:$serverURL,library:library,onSessionChange:{ homeSession=$0;remote.configure($0,server:$1) },remoteState:remote.state)
+                    HomeServerSection(serverURL:$serverURL,library:library,onSessionChange:{ homeSession=$0;remote.configure($0,server:$1);library.configureRelay(server:$1,session:$0) },remoteState:remote.state)
                     EpgSection(serverURL:serverURL,session:homeSession,channels:library.channels) { library.play($0) }
                         .id(serverURL+"|"+(homeSession?.token ?? ""))
                     ConfigPreviewSection()
                     CloudSection(serverURL: serverURL) { library.play($0) }
                     SubscriptionSection(serverURL: serverURL, onPlay: { playback, title in
-                        guard playback.headers.isEmpty else {
-                            errorMessage = "此来源需要额外播放请求头，尚需服务端媒体适配。"
-                            return
-                        }
-                        library.play(TVChannel(name: title + " · " + playback.name, url: playback.url, group: playback.lineName, logo: nil, tvgId: nil))
+                        library.play(TVChannel(name: title + " · " + playback.name, url: playback.url, group: playback.lineName, logo: nil, tvgId: nil, headers:playback.headers))
                         remoteResourceKey = playback.url
                         remoteDanmaku = playback.danmaku
                     }, onImport: { library.importChannels($0) })
