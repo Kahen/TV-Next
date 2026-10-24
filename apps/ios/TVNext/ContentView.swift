@@ -317,7 +317,7 @@ struct ContentView: View {
                     Button {
                         isShowingCaptionPicker = true
                     } label: {
-                        Label("导入 SRT / WebVTT 字幕", systemImage: "captions.bubble")
+                        Label("导入 SRT / VTT / ASS / SSA 字幕", systemImage: "captions.bubble")
                     }
                     .buttonStyle(.bordered)
                     if captionFileName != nil {
@@ -512,7 +512,7 @@ struct ContentView: View {
     private func importCaption(_ result: Result<[URL], Error>) {
         do {
             guard let url = try result.get().first else { return }
-            guard ["srt", "vtt"].contains(url.pathExtension.lowercased()) else {
+            guard ["srt", "vtt", "ass", "ssa"].contains(url.pathExtension.lowercased()) else {
                 throw CaptionError.invalidTimeline
             }
             let permission = url.startAccessingSecurityScopedResource()
