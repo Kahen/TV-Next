@@ -1,5 +1,6 @@
 import { expect,it } from "vitest";
-import fixture from "../../../fixtures/fongmi-filters-golden.json";
+import { readFileSync } from "node:fs";
+const fixture=JSON.parse(readFileSync(new URL("../../../fixtures/fongmi-filters-golden.json",import.meta.url),"utf8"));
 import { initialSiteFilters } from "./subscriptionFilters";
 
 it("uses original init values and leaves fields without init unfiltered",()=>{
