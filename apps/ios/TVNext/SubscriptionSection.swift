@@ -14,6 +14,7 @@ struct SubscriptionSection: View {
     @State private var category: String?
     @State private var filterCatalog: [String:[NativeSiteFilter]]=[:]
     @State private var filters: [String:String]=[:]
+    @State private var appliedFilters: [String:String]=[:]
     @State private var detail: NativeMediaDetail?
     @State private var line = 0
     @State private var error: String?
@@ -37,7 +38,7 @@ struct SubscriptionSection: View {
             }
         }
         .onDisappear { pending?.cancel() }
-        .onChange(of:serverURL) { _,_ in pending?.cancel();generation=UUID();busy=false;document=nil;page=nil;detail=nil;filterCatalog=[:];filters=[:];category=nil;siteKey="" }
+        .onChange(of:serverURL) { _,_ in pending?.cancel();generation=UUID();busy=false;document=nil;page=nil;detail=nil;filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;siteKey="" }
     }
     private func run(_ operation: @escaping (TVNextAPI, UUID) async throws -> Void) {
         pending?.cancel()
@@ -54,25 +55,30 @@ struct SubscriptionSection: View {
         run { api, id in
             let result: NativeSubscription = try await api.request("subscriptions/load", body: NativeSubscriptionRequest(content: url == nil ? content : "", url: url ?? address))
             guard generation == id, !Task.isCancelled else { return }
-            document = result; page = nil; detail = nil; siteKey = "";filterCatalog=[:];filters=[:];category=nil
+            document = result; page = nil; detail = nil; siteKey = "";filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil
         }
     }
     private func request(_ key: String? = nil) -> NativeSiteRequest {
         var r = NativeSiteRequest(); r.content = document?.content ?? ""; r.url = document?.url ?? ""
-        r.siteKey = key ?? siteKey; r.categoryId = category; r.query = query;r.filters=filters
+        r.siteKey = key ?? siteKey; r.categoryId = category; r.query = query;r.filters=appliedFilters
         return r
     }
     private func browse(_ key: String, operation: String = "home", number: Int = 1, type: String? = nil, selectedFilters: [String:String]? = nil) {
         let same=key==siteKey
+        let wasSameCategory = same && (type ?? category)==category && mode=="category"
         let nextCategory=type ?? category
-        let choices=operation != "category" ? [:] : selectedFilters ?? (same && nextCategory==category && mode=="category" ? filters : NativeSiteFilter.defaults((same ? filterCatalog:[:])[nextCategory ?? ""] ?? []))
+        let choices=operation != "category" ? [:] : selectedFilters ?? (same && nextCategory==category && mode=="category" ? appliedFilters : NativeSiteFilter.defaults((same ? filterCatalog:[:])[nextCategory ?? ""] ?? []))
         var r = request(key); r.page = number; r.categoryId = nextCategory;r.filters=choices
         run { api, id in
             let result: NativeMediaPage = try await api.request("subscriptions/" + operation, body: r)
             guard generation == id, !Task.isCancelled else { return }
             page = result; detail = nil; siteKey = key; mode = operation; category = operation=="home" ? nil:r.categoryId
             filterCatalog=same ? filterCatalog.merging(result.filters ?? [:],uniquingKeysWith:{ _,new in new }):result.filters ?? [:]
-            filters=choices
+            appliedFilters=operation=="category" ? choices:[:]
+            // Keep unsaved Picker edits local; paging uses only the last applied values.
+            if operation != "category" || number == 1 || !wasSameCategory {
+                filters=operation=="category" ? choices:[:]
+            }
         }
     }
     private func loadLive(_ index: Int) {
@@ -130,6 +136,9 @@ struct SubscriptionSection: View {
                         if !filter.value.contains(where:{ $0.v==(filters[filter.key] ?? filter.initial ?? "") }) { Text("默认").tag(filters[filter.key] ?? filter.initial ?? "") }
                         ForEach(filter.value,id:\.v) { value in Text(value.n.isEmpty ? (value.v.isEmpty ? "全部":value.v):value.n).tag(value.v) }
                     }.disabled(busy)
+                }
+                if entries.contains(where: { (filters[$0.key] ?? $0.initial ?? "") != (appliedFilters[$0.key] ?? $0.initial ?? "") }) {
+                    Text("筛选尚未应用，翻页仍使用已应用条件").font(.caption).foregroundStyle(.secondary)
                 }
                 HStack {
                     Button("应用筛选") { browse(siteKey,operation:"category",number:1,type:category,selectedFilters:NativeSiteFilter.defaults(entries).merging(filters,uniquingKeysWith:{ _,new in new })) }
