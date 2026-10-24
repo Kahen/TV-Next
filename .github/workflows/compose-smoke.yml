@@ -39,6 +39,30 @@ jobs:
         run: docker compose up --build -d
       - name: Probe public Web, internal REST proxy and XMLTV endpoint
         run: python3 scripts/compose_smoke.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install browser test dependencies
+        working-directory: apps/web
+        run: npm ci --no-audit --no-fund
+      - name: Install real browser engines and media fixture tool
+        working-directory: apps/web
+        run: |
+          npx playwright install --with-deps chromium firefox webkit
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+      - name: Exercise decoded MP4/HLS and persistent library in three browsers
+        working-directory: apps/web
+        run: npm run test:e2e
+      - name: Preserve browser failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-acceptance-evidence
+          path: |
+            apps/web/playwright-report
+            apps/web/test-results
+          retention-days: 14
       - name: Container logs after failure
         if: failure()
         run: docker compose logs --no-color --tail=120
