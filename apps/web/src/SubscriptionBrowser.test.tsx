@@ -74,3 +74,14 @@ it("applies original filter init, retains chosen values for pagination and reset
   await waitFor(()=>expect((screen.getByRole("button",{name:"剧集"}) as HTMLButtonElement).disabled).toBe(false));fireEvent.click(screen.getByRole("button",{name:"剧集"}));
   await screen.findByLabelText("筛选：排序");expect(request.mock.calls.at(-1)?.[1]).toEqual(expect.objectContaining({page:1,categoryId:"series",filters:{sort:""}}));
 });
+it("uses a bearer header argument and explicitly bypasses cached searches on refresh",async()=>{
+  const session={token:"x".repeat(43),user:{id:"u",username:"own"},device:{id:"d",name:"Web",createdAt:1,expiresAt:Date.now()+600000,current:true}};
+  request.mockImplementation(async(path,body)=>path.endsWith("/load")?doc:{categories:[],items:[],total:0,page:(body as {page?:number}).page||1,hasMore:false});
+  render(<SubscriptionBrowser session={session} onPlay={()=>{}}/>);
+  fireEvent.click(screen.getByText("加载订阅"));fireEvent.click(await screen.findByRole("button",{name:"Cloud"}));
+  await waitFor(()=>expect((screen.getByRole("button",{name:"Cloud"}) as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.change(screen.getByLabelText("搜索订阅站点"),{target:{value:"owned query"}});fireEvent.click(screen.getByText("当前站点搜索"));
+  const refresh=await screen.findByText("刷新搜索结果");await waitFor(()=>expect((refresh as HTMLButtonElement).disabled).toBe(false));fireEvent.click(refresh);
+  await waitFor(()=>expect(request.mock.calls.at(-1)?.[1]).toEqual(expect.objectContaining({bypassCache:true,query:"owned query"})));
+  expect(request.mock.calls.at(-1)?.[3]).toBe(session.token);
+});
