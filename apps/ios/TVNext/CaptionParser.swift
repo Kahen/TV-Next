@@ -112,10 +112,9 @@ enum CaptionParser {
                 .replacingOccurrences(of: "\\n", with: "\n")
                 .replacingOccurrences(of: "\\h", with: "\u{00A0}")
                 .trimmingCharacters(in: .whitespacesAndNewlines)
-            let range = NSRange(text.startIndex..<text.endIndex, in: text)
-            let safeText = tags.stringByReplacingMatches(in: text, range: range, withTemplate: "")
-            guard !safeText.isEmpty else { continue }
-            cues.append(CaptionCue(start: start, end: end, text: String(safeText.prefix(2_000))))
+            // SwiftUI Text renders literal angle brackets safely; only ASS overrides are removed.
+            guard !text.isEmpty else { continue }
+            cues.append(CaptionCue(start: start, end: end, text: String(text.prefix(2_000))))
             if cues.count >= 5_000 { break }
         }
         guard !cues.isEmpty else { throw CaptionError.invalidTimeline }
