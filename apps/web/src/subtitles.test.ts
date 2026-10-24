@@ -10,7 +10,7 @@ describe("text subtitle conversion", () => {
     expect(result).toContain("00:01:01.000 --> 00:01:05.250");
   });
   it("converts formatted ASS/SSA Dialogue with text commas but without executable styling", () => {
-    const source = "[Script Info]\nTitle: own fixture\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\nDialogue: 0,0:00:01.20,0:00:03.45,Default,,0,0,0,,{\\\\i1}Hello, <world>\\\\Nsecond line\nDialogue: 0,0:60:00.00,0:61:00.00,Default,,0,0,0,,bad";
+    const source = "[Script Info]\nTitle: own fixture\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\nDialogue: 0,0:00:01.20,0:00:03.45,Default,,0,0,0,,{\\i1}Hello, <world>\\Nsecond line\nDialogue: 0,0:60:00.00,0:61:00.00,Default,,0,0,0,,bad";
     const converted=toWebVtt(source,"demo.ass");
     expect(converted).toContain("00:00:01.200 --> 00:00:03.450");
     expect(converted).toContain("Hello, &lt;world&gt;\nsecond line");
