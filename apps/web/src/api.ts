@@ -65,6 +65,7 @@ export interface MediaLine { name: string; episodes: MediaEpisode[] }
 export interface MediaPage {
   categories: MediaCategory[]; items: MediaItem[]; total: number;
   page: number; pageSize: number; hasMore: boolean; provider: string;
+  filters?: import("./subscriptionFilters").SiteFilterMap;
 }
 export interface MediaDetail {
   item: MediaItem; description: string | null; director: string | null;

@@ -56,6 +56,11 @@ jobs:
         run: |
           swiftc TVNext/MediaRelayAddress.swift tests/MediaRelaySmoke.swift -o /tmp/tvnext-relay-tests
           /tmp/tvnext-relay-tests
+      - name: Validate original filter contract with shared JVM fixture
+        working-directory: apps/ios
+        run: |
+          swiftc TVNext/SubscriptionFilters.swift tests/FilterSmoke.swift -o /tmp/tvnext-filter-tests
+          /tmp/tvnext-filter-tests
       - name: Generate Xcode project
         working-directory: apps/ios
         run: xcodegen generate

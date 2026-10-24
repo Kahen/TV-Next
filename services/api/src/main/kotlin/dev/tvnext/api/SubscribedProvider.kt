@@ -32,7 +32,7 @@ class SubscribedProvider(private val subscriptions: Subscriptions, private val m
         val categories = if (allowed.isEmpty()) data.categories else data.categories.filter { it.name in allowed }.ifEmpty { data.categories }
         return ProviderPage(categories, data.entries.map { it.item }, total, r.page,
             size, r.page < pages,
-            r.siteKey, root.path("filters"))
+            r.siteKey, SubscriptionFilters.normalize(root.path("filters"),mapper))
     }
     fun detail(r: SiteRequest): MediaDetail {
         val site = site(r)

@@ -12,6 +12,8 @@ struct SubscriptionSection: View {
     @State private var page: NativeMediaPage?
     @State private var mode = "home"
     @State private var category: String?
+    @State private var filterCatalog: [String:[NativeSiteFilter]]=[:]
+    @State private var filters: [String:String]=[:]
     @State private var detail: NativeMediaDetail?
     @State private var line = 0
     @State private var error: String?
@@ -35,6 +37,7 @@ struct SubscriptionSection: View {
             }
         }
         .onDisappear { pending?.cancel() }
+        .onChange(of:serverURL) { _,_ in pending?.cancel();generation=UUID();busy=false;document=nil;page=nil;detail=nil;filterCatalog=[:];filters=[:];category=nil;siteKey="" }
     }
     private func run(_ operation: @escaping (TVNextAPI, UUID) async throws -> Void) {
         pending?.cancel()
@@ -51,20 +54,25 @@ struct SubscriptionSection: View {
         run { api, id in
             let result: NativeSubscription = try await api.request("subscriptions/load", body: NativeSubscriptionRequest(content: url == nil ? content : "", url: url ?? address))
             guard generation == id, !Task.isCancelled else { return }
-            document = result; page = nil; detail = nil; siteKey = ""
+            document = result; page = nil; detail = nil; siteKey = "";filterCatalog=[:];filters=[:];category=nil
         }
     }
     private func request(_ key: String? = nil) -> NativeSiteRequest {
         var r = NativeSiteRequest(); r.content = document?.content ?? ""; r.url = document?.url ?? ""
-        r.siteKey = key ?? siteKey; r.categoryId = category; r.query = query
+        r.siteKey = key ?? siteKey; r.categoryId = category; r.query = query;r.filters=filters
         return r
     }
-    private func browse(_ key: String, operation: String = "home", number: Int = 1, type: String? = nil) {
-        var r = request(key); r.page = number; r.categoryId = type ?? category
+    private func browse(_ key: String, operation: String = "home", number: Int = 1, type: String? = nil, selectedFilters: [String:String]? = nil) {
+        let same=key==siteKey
+        let nextCategory=type ?? category
+        let choices=operation != "category" ? [:] : selectedFilters ?? (same && nextCategory==category && mode=="category" ? filters : NativeSiteFilter.defaults((same ? filterCatalog:[:])[nextCategory ?? ""] ?? []))
+        var r = request(key); r.page = number; r.categoryId = nextCategory;r.filters=choices
         run { api, id in
             let result: NativeMediaPage = try await api.request("subscriptions/" + operation, body: r)
             guard generation == id, !Task.isCancelled else { return }
-            page = result; detail = nil; siteKey = key; mode = operation; category = r.categoryId
+            page = result; detail = nil; siteKey = key; mode = operation; category = operation=="home" ? nil:r.categoryId
+            filterCatalog=same ? filterCatalog.merging(result.filters ?? [:],uniquingKeysWith:{ _,new in new }):result.filters ?? [:]
+            filters=choices
         }
     }
     private func loadLive(_ index: Int) {
@@ -115,6 +123,20 @@ struct SubscriptionSection: View {
         ScrollView(.horizontal) { HStack { ForEach(page.categories) { type in
             Button(type.name) { browse(siteKey,operation:"category",type:type.id) }.buttonStyle(.bordered).disabled(busy)
         } } }
+        if mode=="category",let category,let entries=filterCatalog[category],!entries.isEmpty {
+            VStack(alignment:.leading) {
+                ForEach(entries) { filter in
+                    Picker(filter.name.isEmpty ? filter.key:filter.name,selection:Binding(get:{ filters[filter.key] ?? filter.initial ?? "" },set:{ filters[filter.key]=$0 })) {
+                        if !filter.value.contains(where:{ $0.v==(filters[filter.key] ?? filter.initial ?? "") }) { Text("默认").tag(filters[filter.key] ?? filter.initial ?? "") }
+                        ForEach(filter.value,id:\.v) { value in Text(value.n.isEmpty ? (value.v.isEmpty ? "全部":value.v):value.n).tag(value.v) }
+                    }.disabled(busy)
+                }
+                HStack {
+                    Button("应用筛选") { browse(siteKey,operation:"category",number:1,type:category,selectedFilters:NativeSiteFilter.defaults(entries).merging(filters,uniquingKeysWith:{ _,new in new })) }
+                    Button("重置筛选") { browse(siteKey,operation:"category",number:1,type:category,selectedFilters:NativeSiteFilter.defaults(entries)) }
+                }.disabled(busy)
+            }
+        }
         LazyVStack(alignment: .leading) { ForEach(page.items) { item in
             Button(item.name + (item.remarks.map { " · " + $0 } ?? "")) { inspect(item) }.disabled(busy).padding(.vertical,5)
         } }

@@ -15,6 +15,7 @@ struct NativeMediaItem: Decodable, Identifiable {
 struct NativeMediaPage: Decodable {
     struct Category: Decodable, Identifiable { let id: String; let name: String }
     let categories: [Category]; let items: [NativeMediaItem]; let total: Int; let page: Int; let hasMore: Bool
+    let filters: [String:[NativeSiteFilter]]?
 }
 struct NativeMediaDetail: Decodable {
     struct Episode: Decodable { let name: String; let playable: Bool }
@@ -29,6 +30,7 @@ struct NativeMediaPlayback: Decodable {
 struct NativeSiteRequest: Encodable {
     var content = ""; var url = ""; var siteKey = ""; var categoryId: String?; var query: String?; var vodId: String?
     var page = 1; var lineIndex = 0; var episodeIndex = 0
+    var filters: [String:String] = [:]
 }
 struct NativeSubscriptionRequest: Encodable { let content: String; let url: String }
 struct NativeResourceRequest: Encodable { let url: String }

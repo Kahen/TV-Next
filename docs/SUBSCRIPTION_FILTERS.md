@@ -1,0 +1,9 @@
+# Original category filters
+
+Web and native iOS subscription browsing now displays the selected category's filters. Choose options, then use **应用筛选** to request page 1 with those values; **重置筛选** restores the source's `init` values. Pagination keeps the applied choices. Changing category/site resets unrelated choices. Filter controls use the original category/key/value IDs, not translated labels or newly invented query fields.
+
+Compatibility is based on the pinned Android source `gson/FilterAdapter.java`, `bean/Filter.java` and `bean/Value.java`: category maps may contain a single filter object or an array; each filter contains `key`, `name`, optional `init` and `value:[{n,v}]`. Values are trimmed as in `Value.getV`; numeric scalar values are converted to strings, null list entries are ignored and duplicate values are collapsed. Missing `init` means an unfiltered empty value. Labels render as plain text.
+
+The API bounds definitions to 1,000 categories, 30 filters/category, 200 choices/filter, 100-character keys, 200-character labels and 1,000-character choice/init values. Invalid/oversized entries are omitted without breaking the rest of the catalog. Request validation retains its existing bounds. Type 1 sends JSON `f`; type 4 sends URL-safe Base64 JSON `ext`, while provider extension/config semantics remain unchanged.
+
+`fixtures/fongmi-filters-golden.json` checks original single-object/list forms, init values, trimmed/deduplicated choices and numeric values across Kotlin, Web and native Swift. Web UI regression checks defaults, apply, pagination and category changes. Actual third-party plugin/category behavior remains part of the permitted provider corpus and final manual acceptance; this increment does not implement parser/sniffing, cloud QR workflows or live catch-up.

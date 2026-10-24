@@ -1,0 +1,18 @@
+{
+  "input": {
+    "movie": [
+      {"key":"area","name":"地区","init":" cn ","value":[null,{"n":"全部","v":""},{"n":"中国","v":" cn "},{"n":"重复","v":"cn"},{"n":"美国","v":"us"}]},
+      {"key":"year","name":"年份","init":2026,"value":[{"n":"全部","v":""},{"n":2026,"v":2026}]}
+    ],
+    "series": {"key":"sort","name":"排序","value":[{"n":"默认","v":""},{"n":"最新","v":"time"}]},
+    "ignored": null
+  },
+  "expected": {
+    "movie": [
+      {"key":"area","name":"地区","init":"cn","value":[{"n":"全部","v":""},{"n":"中国","v":"cn"},{"n":"美国","v":"us"}]},
+      {"key":"year","name":"年份","init":"2026","value":[{"n":"全部","v":""},{"n":"2026","v":"2026"}]}
+    ],
+    "series": [{"key":"sort","name":"排序","value":[{"n":"默认","v":""},{"n":"最新","v":"time"}]}]
+  },
+  "initial": {"area":"cn","year":"2026"}
+}
