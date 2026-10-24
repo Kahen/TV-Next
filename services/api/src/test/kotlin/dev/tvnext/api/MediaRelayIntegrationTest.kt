@@ -34,8 +34,10 @@ class MediaRelayIntegrationTest @Autowired constructor(private val accounts: Hom
                 override fun read(): Int { entered.countDown();check(disconnected.await(5,TimeUnit.SECONDS));throw java.io.IOException("Fixture connection closed") }
             },Closeable { disconnected.countDown() })
             val manifest=initial.path.endsWith("m3u8")
-            val body=if(manifest)"#EXTM3U\n#EXT-X-KEY:METHOD=AES-128,URI=\"key.bin\"\n#EXTINF:6,\npiece.ts\nhttps://cdn.example.org/other.ts\n".toByteArray() else byteArrayOf(0,1,2,3)
-            return MediaResponse(initial,if(range!=null)206 else 200,mapOf("content-type" to if(manifest)"application/vnd.apple.mpegurl" else "video/mp4","content-length" to body.size.toString())+
+            val body=if(initial.path.endsWith("subtitles.m3u8"))"#EXTM3U\n#EXTINF:6,\ncaptions.vtt\n".toByteArray()
+                else if(initial.path.endsWith(".vtt"))"WEBVTT\n\n00:00.000 --> 00:06.000\nSubtitle fixture\n".toByteArray()
+                else if(manifest)"#EXTM3U\n#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID=\"subs\",URI=\"subtitles.m3u8\"\n#EXT-X-KEY:METHOD=AES-128,URI=\"key.bin\"\n#EXTINF:6,\npiece.ts\nhttps://cdn.example.org/other.ts\n".toByteArray() else byteArrayOf(0,1,2,3)
+            return MediaResponse(initial,if(range!=null)206 else 200,mapOf("content-type" to if(manifest)"application/vnd.apple.mpegurl" else if(initial.path.endsWith(".vtt"))"text/vtt; charset=utf-8" else "video/mp4","content-length" to body.size.toString())+
                 if(range!=null)mapOf("content-range" to "bytes 0-3/10") else emptyMap(),if(head)byteArrayOf().inputStream() else body.inputStream(),Closeable { })
         }
     }
@@ -62,6 +64,17 @@ class MediaRelayIntegrationTest @Autowired constructor(private val accounts: Hom
         mvc.perform(post(close).header("Authorization","Bearer "+stranger.token)).andExpect(status().isNotFound)
         mvc.perform(post(close).header("Authorization","Bearer "+owner.token)).andExpect(status().isOk)
         mvc.perform(get(path)).andExpect(status().isUnauthorized)
+    }
+    @Test fun nestedHlsSubtitleRenditionsAllowWebVttWithoutAcceptingAnArbitraryRootTextFile() {
+        val owner=user();val path=create(owner)
+        val master=mvc.perform(get(path)).andExpect(status().isOk).andReturn().response.contentAsString
+        val subtitle=Regex("#EXT-X-MEDIA:[^\n]*URI=\"([^\"]+)\"").find(master)!!.groupValues[1]
+        val playlist=mvc.perform(get(subtitle)).andExpect(status().isOk).andReturn().response.contentAsString
+        val segment=playlist.lines().first { it.startsWith("/api/") }
+        val response=mvc.perform(get(segment)).andExpect(status().isOk).andReturn().response
+        assertEquals("text/vtt",response.contentType);assertTrue(response.contentAsString.contains("Subtitle fixture"))
+        assertEquals("only-upstream",upstream.requests.last().headers["Cookie"])
+        mvc.perform(get(create(owner,"https://example.org/captions.vtt"))).andExpect(status().isBadGateway)
     }
     @Test fun supportsHeadAndRangeAndDeviceRevocationInvalidatesPreviouslyIssuedUrls() {
         val owner=user();val path=create(owner,"https://example.org/movie.mp4")

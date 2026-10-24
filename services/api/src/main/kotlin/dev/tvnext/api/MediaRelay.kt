@@ -44,7 +44,7 @@ class MediaRelay(private val accounts: HomeAccounts,private val transport: Media
         if(sessions.size>=128)reject(HttpStatus.TOO_MANY_REQUESTS,"Media session limit; stop an old player")
         val ticket=Base64.getUrlEncoder().withoutPadding().encodeToString(ByteArray(32).also { SecureRandom().nextBytes(it) })
         val session=Session(p,r.headers.toMap(),mediaOrigin(uri),now+6*60*60*1000L)
-        session.resources["0"]=uri;session.resourceBytes=uri.toString().length;sessions[hash(ticket)]=session
+        session.resources["0"]=uri;session.resourceBytes=uri.toString().toByteArray(UTF_8).size;sessions[hash(ticket)]=session
         return MediaRelaySession("/api/v1/home/media/$ticket/0",session.expires)
     }
     fun close(p: HomePrincipal,ticket: String) {
@@ -104,7 +104,7 @@ class MediaRelay(private val accounts: HomeAccounts,private val transport: Media
                         response.contentType="application/vnd.apple.mpegurl";response.setContentLength(body.size)
                         response.outputStream.write(body);return
                     }
-                    if(!manifest && !mime.startsWith("video/") && !mime.startsWith("audio/") && mime !in setOf("application/octet-stream","application/mp4","application/mp2t","binary/octet-stream",""))
+                    if(!manifest && !(mime=="text/vtt" && resource!="0") && !mime.startsWith("video/") && !mime.startsWith("audio/") && mime !in setOf("application/octet-stream","application/mp4","application/mp2t","binary/octet-stream",""))
                         reject(HttpStatus.BAD_GATEWAY,"Upstream is not a supported media resource")
                     response.status=upstream.status
                     response.contentType=if(manifest)"application/vnd.apple.mpegurl" else mime.ifEmpty { "application/octet-stream" }
@@ -132,8 +132,8 @@ class MediaRelay(private val accounts: HomeAccounts,private val transport: Media
         if(s.closed)reject(HttpStatus.UNAUTHORIZED,"Media session revoked")
         val existing=s.resources.entries.firstOrNull { it.value==uri }?.key
         val id=existing ?: s.resources.size.toString().also {
-            if(s.resources.size>=4096 || s.resourceBytes+uri.toString().length>524288)reject(HttpStatus.BAD_GATEWAY,"HLS resource limit")
-            s.resourceBytes+=uri.toString().length
+            if(s.resources.size>=4096 || s.resourceBytes+uri.toString().toByteArray(UTF_8).size>524288)reject(HttpStatus.BAD_GATEWAY,"HLS resource limit")
+            s.resourceBytes+=uri.toString().toByteArray(UTF_8).size
             s.resources[it]=uri
         }
         "/api/v1/home/media/$ticket/$id"
