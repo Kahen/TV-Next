@@ -1367,6 +1367,39 @@ components:
           type: boolean
         provider:
           type: string
+        filters:
+          type: object
+          additionalProperties:
+            type: array
+            maxItems: 30
+            items:
+              $ref: '#/components/schemas/SiteFilter'
+    SiteFilter:
+      type: object
+      required: [key, name, value]
+      properties:
+        key:
+          type: string
+          maxLength: 100
+        name:
+          type: string
+          maxLength: 200
+        init:
+          type: string
+          maxLength: 1000
+        value:
+          type: array
+          maxItems: 200
+          items:
+            type: object
+            required: [n, v]
+            properties:
+              n:
+                type: string
+                maxLength: 200
+              v:
+                type: string
+                maxLength: 1000
     MediaDetail:
       type: object
       required:

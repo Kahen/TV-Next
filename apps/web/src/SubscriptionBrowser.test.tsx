@@ -48,3 +48,29 @@ it("a canceled subscription response cannot replace current state",async()=>{
   resolve(doc);await new Promise(r=>setTimeout(r,0));
   expect(screen.queryByRole("button",{name:"Cloud"})).toBeNull();
 });
+it("applies original filter init, retains chosen values for pagination and resets at category changes",async()=>{
+  const definitions={movie:[{key:"area",name:"地区",init:"cn",value:[{n:"全部",v:""},{n:"中国",v:"cn"},{n:"美国",v:"us"}]}],series:[{key:"sort",name:"排序",value:[{n:"默认",v:""},{n:"最新",v:"time"}]}]};
+  request.mockImplementation(async(path,body)=>{
+    if(path.endsWith("/load"))return doc;
+    const r=body as {page?:number};
+    return {categories:[{id:"movie",name:"电影"},{id:"series",name:"剧集"}],items:[],total:30,page:r.page||1,pageSize:10,hasMore:true,provider:"cloud",filters:path.endsWith("/home")?definitions:{}};
+  });
+  render(<SubscriptionBrowser onPlay={()=>{}}/>);
+  fireEvent.click(screen.getByText("加载订阅"));fireEvent.click(await screen.findByRole("button",{name:"Cloud"}));
+  fireEvent.click(await screen.findByRole("button",{name:"电影"}));
+  const area=await screen.findByLabelText("筛选：地区");expect((area as HTMLSelectElement).value).toBe("cn");
+  expect(request.mock.calls.at(-1)?.[1]).toEqual(expect.objectContaining({categoryId:"movie",filters:{area:"cn"}}));
+  fireEvent.change(area,{target:{value:"us"}});
+  expect(screen.getByRole("status").textContent).toContain("筛选尚未应用");
+  // Moving to page 2 must use the committed China filter, not the unsubmitted US draft.
+  fireEvent.click(screen.getByRole("button",{name:"下一页"}));
+  await waitFor(()=>expect(request.mock.calls.at(-1)?.[1]).toEqual(expect.objectContaining({page:2,filters:{area:"cn"}})));
+  await waitFor(()=>expect((screen.getByLabelText("筛选：地区") as HTMLSelectElement).value).toBe("us"));
+  fireEvent.click(screen.getByRole("button",{name:"应用筛选"}));
+  await waitFor(()=>expect(request.mock.calls.at(-1)?.[1]).toEqual(expect.objectContaining({page:1,filters:{area:"us"}})));
+  await waitFor(()=>expect((screen.getByRole("button",{name:"下一页"}) as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(screen.getByRole("button",{name:"下一页"}));
+  await waitFor(()=>expect(request.mock.calls.at(-1)?.[1]).toEqual(expect.objectContaining({page:2,filters:{area:"us"}})));
+  await waitFor(()=>expect((screen.getByRole("button",{name:"剧集"}) as HTMLButtonElement).disabled).toBe(false));fireEvent.click(screen.getByRole("button",{name:"剧集"}));
+  await screen.findByLabelText("筛选：排序");expect(request.mock.calls.at(-1)?.[1]).toEqual(expect.objectContaining({page:1,categoryId:"series",filters:{sort:""}}));
+});
