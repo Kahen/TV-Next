@@ -351,20 +351,21 @@ export default function App() {
 
   return (
     <div className="layout">
+      <a className="skip-link" href="#main-content">跳转到主要内容</a>
       <aside className="sidebar">
         <div className="brand"><span className="brand-mark">▶</span><div><strong>TV-Next</strong><small>Personal media workspace</small></div></div>
         <p className="side-heading">LIBRARY</p>
-        <button className={tab === "playlist" && collection === "all" ? "nav active" : "nav"} onClick={() => { setTab("playlist"); setCollection("all"); setError(""); }}>☷ <span>播放列表</span></button>
-        <button className={tab === "playlist" && collection === "favorites" ? "nav active" : "nav"} onClick={() => { setTab("playlist"); setCollection("favorites"); setError(""); }}>☆ <span>我的收藏</span> <small>{library.favorites.length}</small></button>
-        <button className={tab === "playlist" && collection === "recent" ? "nav active" : "nav"} onClick={() => { setTab("playlist"); setCollection("recent"); setError(""); }}>◷ <span>最近播放</span></button>
+        <button className={tab === "playlist" && collection === "all" ? "nav active" : "nav"} aria-pressed={tab === "playlist" && collection === "all"} onClick={() => { setTab("playlist"); setCollection("all"); setError(""); }}>☷ <span>播放列表</span></button>
+        <button className={tab === "playlist" && collection === "favorites" ? "nav active" : "nav"} aria-pressed={tab === "playlist" && collection === "favorites"} onClick={() => { setTab("playlist"); setCollection("favorites"); setError(""); }}>☆ <span>我的收藏</span> <small>{library.favorites.length}</small></button>
+        <button className={tab === "playlist" && collection === "recent" ? "nav active" : "nav"} aria-pressed={tab === "playlist" && collection === "recent"} onClick={() => { setTab("playlist"); setCollection("recent"); setError(""); }}>◷ <span>最近播放</span></button>
         <p className="side-heading">TOOLS</p>
-        <button className={tab === "config" ? "nav active" : "nav"} onClick={() => { setTab("config"); setError(""); }}>⚙ <span>配置检查</span></button>
-        <button className={tab === "media" ? "nav active" : "nav"} onClick={() => { setTab("media"); setError(""); }}>▣ <span>影视目录</span></button>
-        <button className={tab === "epg" ? "nav active" : "nav"} onClick={() => { setTab("epg"); setError(""); }}>▤ <span>直播节目表</span></button>
-        <button className={tab === "home" ? "nav active" : "nav"} onClick={() => setTab("home")}>⌂ <span>家庭服务器</span></button>
+        <button className={tab === "config" ? "nav active" : "nav"} aria-pressed={tab === "config"} onClick={() => { setTab("config"); setError(""); }}>⚙ <span>配置检查</span></button>
+        <button className={tab === "media" ? "nav active" : "nav"} aria-pressed={tab === "media"} onClick={() => { setTab("media"); setError(""); }}>▣ <span>影视目录</span></button>
+        <button className={tab === "epg" ? "nav active" : "nav"} aria-pressed={tab === "epg"} onClick={() => { setTab("epg"); setError(""); }}>▤ <span>直播节目表</span></button>
+        <button className={tab === "home" ? "nav active" : "nav"} aria-pressed={tab === "home"} onClick={() => setTab("home")}>⌂ <span>家庭服务器</span></button>
         <div className="side-bottom"><p>Phase 1 · Local library</p><small>资料仅保存在此浏览器。不会自动同步到服务器。</small></div>
       </aside>
-      <main>
+      <main id="main-content" tabIndex={-1}>
         <header><div><p className="eyebrow">TV-NEXT / PLAYER</p><h1>你的媒体，随处播放。</h1><p className="subtitle">M3U 频道 · 收藏 · 最近播放 · 点播断点续播</p></div><span className="tag">P1 PREVIEW</span></header>
         {error && <div className="alert" role="alert">{error}</div>}
         {storageWarning && <div className="alert" role="status">{storageWarning}</div>}
@@ -483,7 +484,7 @@ export default function App() {
             <div className="library-toolbar"><input className="filter-input" aria-label="搜索频道" placeholder="按名称或分组搜索…" value={filter} onChange={(event) => setFilter(event.target.value)}/><button className="secondary danger" onClick={resetLibrary}>清空本地媒体库</button></div>
             {displayed.length === 0 && <p className="hint">{collection === "favorites" ? "还没有收藏的频道。" : collection === "recent" ? "还没有播放记录。" : "频道列表为空，请导入 M3U。"}</p>}
             <div className="channel-list">{displayed.map((channel, index) => <div className="channel-line" key={channel.url + index}>
-              <button className={selected?.url === channel.url ? "channel selected" : "channel"} onClick={() => playChannel(channel)}>
+              <button className={selected?.url === channel.url ? "channel selected" : "channel"} aria-pressed={selected?.url === channel.url} onClick={() => playChannel(channel)}>
                 <span className="channel-avatar">▶</span><span className="channel-name"><strong>{channel.name}</strong><small>{channel.group}{library.positions[channel.url] ? " · 已保存播放进度" : ""}</small></span><span className="channel-arrow">↗</span>
               </button>
               <button className="favorite-toggle" aria-label={library.favorites.includes(channel.url) ? "取消收藏 " + channel.name : "收藏 " + channel.name} aria-pressed={library.favorites.includes(channel.url)} onClick={() => setLibrary((state) => toggleFavorite(state, channel.url))}>
