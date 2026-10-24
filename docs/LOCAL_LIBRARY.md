@@ -11,6 +11,12 @@ Status: initial implementation. This is **local persistence**, NOT account-based
 - Resume time is saved periodically and on pause, for finite-duration items longer than 60 seconds. Live/infinite streams and nearly finished items do not retain progress.
 - Web exposes a confirmation before clearing data; iOS uses a destructive confirmation dialog.
 
+## Keyboard and screen-reader access (Web)
+
+- The first Tab stop is a visible-on-focus **Skip to main content** link. Sidebar view buttons and the selected channel expose their active state through `aria-pressed`.
+- M3U/JSON, local media, subtitles and danmaku file inputs remain keyboard-focusable (visually hidden rather than `display:none`); the enclosing picker shows a visible focus ring. Native browser file chooser behavior varies by browser and operating system.
+- Synthetic Playwright Chromium/Firefox/WebKit checks cover skip navigation, active-state announcements, M3U file-input tab order and selection. This does **not** establish a full WCAG audit, assistive-technology validation or physical-device acceptance.
+
 ## Local quotas and recovery
 
 - API M3U and JSON config imports reject inputs above **1,048,576 UTF-8 bytes**, matching the iOS parser's byte budget (the HTTP JSON envelope itself may be larger). This is a parsing limit, not an HTTP request-size or network-security guarantee. Input M3U text is capped at 1 MiB; iOS parser accepts up to 20,000 lines and stores a maximum of 1,500 channels. Web API may parse up to 5,000, but Web persists the first 1,500.

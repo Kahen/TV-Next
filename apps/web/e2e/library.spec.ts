@@ -64,3 +64,35 @@ test("local media, subtitle import and keyboard navigation work without storing 
   expect(await page.evaluate(key=>(localStorage.getItem(key)||"").includes("blob:"),key)).toBe(false);
   await page.reload();await expect(page.locator(".player-header")).toContainText("尚未选择媒体");
 });
+
+
+test("keyboard users can skip navigation, identify active view and reach M3U file picker",async({page})=>{
+  await page.keyboard.press("Tab");
+  const skip=page.getByRole("link",{name:"跳转到主要内容"});
+  await expect(skip).toBeFocused();
+  await expect(skip).toBeVisible();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#main-content")).toBeFocused();
+
+  const playlist=page.getByRole("button",{name:/播放列表/});
+  const favorites=page.getByRole("button",{name:/我的收藏/});
+  await expect(playlist).toHaveAttribute("aria-pressed","true");
+  await favorites.click();
+  await expect(favorites).toHaveAttribute("aria-pressed","true");
+  await expect(playlist).toHaveAttribute("aria-pressed","false");
+  await playlist.click();
+
+  await page.getByRole("textbox",{name:"M3U 内容"}).focus();
+  await page.keyboard.press("Tab");
+  const picker=page.getByLabel("选择 M3U 文件");
+  await expect(picker).toBeFocused();
+  await expect(page.locator(".file-picker").filter({has:picker})).toHaveCSS("outline-style","solid");
+  await picker.setInputFiles({name:"owned.m3u",mimeType:"text/plain",buffer:Buffer.from(`#EXTM3U\\n#EXTINF:-1,Fixture MP4\\n${media}`)});
+  await expect(page.getByRole("textbox",{name:"M3U 内容"})).toContainText("Fixture MP4");
+  await page.getByRole("button",{name:"导入频道",exact:true}).click();
+  const channel=page.locator("button.channel").filter({hasText:"Fixture MP4"});
+  await expect(channel).toBeVisible();
+  await expect(channel).toHaveAttribute("aria-pressed","false");
+  await channel.click();
+  await expect(channel).toHaveAttribute("aria-pressed","true");
+});
