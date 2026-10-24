@@ -11,6 +11,7 @@ struct HomeServerSection: View {
     @State private var claim=""
     @State private var session: NativeHomeSession?
     @State private var sessionServer=""
+    @State private var providers: [NativeProviderHealth]=[]
     @State private var devices: [NativeHomeDevice]=[]
     @State private var remote: NativeSyncedLibrary?
     @State private var diagnostics: NativeHomeDiagnostics?
@@ -71,6 +72,15 @@ struct HomeServerSection: View {
                 .font(.caption)
             Text("请求 \(diagnostics.httpRequests) · 4xx \(diagnostics.httpClientErrors) / 5xx \(diagnostics.httpServerErrors) · 本账号在线 \(diagnostics.onlineDevices)/\(diagnostics.devices) · 媒体库版本 \(diagnostics.libraryRevision)")
                 .font(.caption)
+        }
+        Button("刷新本设备来源状态") {
+            run(operation:{ api -> [NativeProviderHealth] in try await api.get("home/providers/health") }) { providers=$0 }
+        }.disabled(busy)
+        Button("清除来源状态和搜索缓存") {
+            run(operation:{ api -> [String:Bool] in try await api.request("home/providers/clear",body:EmptyHomeRequest()) }) { _ in providers=[];notice="本设备来源状态和搜索缓存已清除。" }
+        }.disabled(busy)
+        ForEach(providers) { provider in
+            Text(provider.siteKey+" · 网络 \(provider.networkCalls) / 缓存 \(provider.cacheHits) / 失败 \(provider.failures) · \(provider.lastLatencyMs) ms · "+(provider.lastError ?? (provider.lastSuccessAt == nil ? "尚无成功记录":"最近请求成功"))).font(.caption)
         }
         ForEach(devices) { device in
             HStack {
@@ -135,7 +145,7 @@ struct HomeServerSection: View {
         notice="设备已登录；同步由你主动发起。"
     }
     private func restoreSession() { session=HomeKeychain.read(serverURL);sessionServer=serverURL;onSessionChange?(session,serverURL) }
-    private func clearAccountState() { remote=nil;diagnostics=nil;devices=[];code="";claim="";online=[];target="";seek=0;media="";command="";notice=nil;error=nil }
+    private func clearAccountState() { providers=[];remote=nil;diagnostics=nil;devices=[];code="";claim="";online=[];target="";seek=0;media="";command="";notice=nil;error=nil }
     private func logout(revoke: Bool=true) {
         let previous=session
         let previousServer=sessionServer

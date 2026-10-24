@@ -31,6 +31,7 @@ struct NativeSiteRequest: Encodable {
     var content = ""; var url = ""; var siteKey = ""; var categoryId: String?; var query: String?; var vodId: String?
     var page = 1; var lineIndex = 0; var episodeIndex = 0
     var filters: [String:String] = [:]
+    var bypassCache = false
 }
 struct NativeSubscriptionRequest: Encodable { let content: String; let url: String }
 struct NativeResourceRequest: Encodable { let url: String }

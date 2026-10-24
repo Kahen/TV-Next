@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SubscriptionSection: View {
     let serverURL: String
+    var session: NativeHomeSession? = nil
     let onPlay: (NativeMediaPlayback, String) -> Void
     var onImport: (([TVChannel]) -> Void)? = nil
     @State private var address = ""
@@ -39,6 +40,7 @@ struct SubscriptionSection: View {
         }
         .onDisappear { pending?.cancel() }
         .onChange(of:serverURL) { _,_ in pending?.cancel();generation=UUID();busy=false;document=nil;page=nil;detail=nil;filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;siteKey="" }
+        .onChange(of:session?.token) { _,_ in pending?.cancel();generation=UUID();busy=false }
     }
     private func run(_ operation: @escaping (TVNextAPI, UUID) async throws -> Void) {
         pending?.cancel()
@@ -46,7 +48,7 @@ struct SubscriptionSection: View {
         pending = Task { @MainActor in
             do {
                 guard let url = URL(string: serverURL) else { throw APIError.invalidServer }
-                try await operation(TVNextAPI(server: url),id)
+                try await operation(TVNextAPI(server: url,token:session?.token),id)
             } catch { if generation == id && !Task.isCancelled { self.error = error.localizedDescription } }
             if generation == id { busy = false }
         }
@@ -63,12 +65,12 @@ struct SubscriptionSection: View {
         r.siteKey = key ?? siteKey; r.categoryId = category; r.query = query;r.filters=appliedFilters
         return r
     }
-    private func browse(_ key: String, operation: String = "home", number: Int = 1, type: String? = nil, selectedFilters: [String:String]? = nil) {
+    private func browse(_ key: String, operation: String = "home", number: Int = 1, type: String? = nil, selectedFilters: [String:String]? = nil,bypassCache: Bool=false) {
         let same=key==siteKey
         let wasSameCategory = same && (type ?? category)==category && mode=="category"
         let nextCategory=type ?? category
         let choices=operation != "category" ? [:] : selectedFilters ?? (same && nextCategory==category && mode=="category" ? appliedFilters : NativeSiteFilter.defaults((same ? filterCatalog:[:])[nextCategory ?? ""] ?? []))
-        var r = request(key); r.page = number; r.categoryId = nextCategory;r.filters=choices
+        var r = request(key); r.page = number; r.categoryId = nextCategory;r.filters=choices;r.bypassCache=bypassCache
         run { api, id in
             let result: NativeMediaPage = try await api.request("subscriptions/" + operation, body: r)
             guard generation == id, !Task.isCancelled else { return }
@@ -149,6 +151,7 @@ struct SubscriptionSection: View {
         LazyVStack(alignment: .leading) { ForEach(page.items) { item in
             Button(item.name + (item.remarks.map { " · " + $0 } ?? "")) { inspect(item) }.disabled(busy).padding(.vertical,5)
         } }
+        if mode=="search",session != nil { Button("刷新搜索结果") { browse(siteKey,operation:"search",number:page.page,bypassCache:true) }.disabled(busy) }
         HStack {
             Button("上一页") { browse(siteKey,operation:mode,number:page.page-1) }.disabled(busy || page.page <= 1)
             Spacer(); Text("第 \(page.page) 页").font(.caption); Spacer()
