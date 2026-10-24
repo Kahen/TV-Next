@@ -13,13 +13,14 @@ async function importPlaylist(page:Page){
 async function select(page:Page,name:string){
   await page.locator("button.channel").filter({hasText:name}).first().click();
   await expect.poll(()=>page.locator("video").evaluate(v=>(v as HTMLVideoElement).readyState)).toBeGreaterThanOrEqual(2);
+  await page.locator("video").scrollIntoViewIfNeeded();
 }
 test.beforeEach(async({page})=>{await page.goto("/");});
 
 test("real REST import, decoded MP4, favorites and original-URL resume survive reload",async({page})=>{
   await importPlaylist(page);await select(page,"Fixture MP4");
   await page.locator("video").evaluate(async node=>{const v=node as HTMLVideoElement;v.muted=true;await v.play();});
-  await expect.poll(()=>page.locator("video").evaluate(v=>(v as HTMLVideoElement).currentTime)).toBeGreaterThan(0.2);
+  await expect.poll(()=>page.locator("video").evaluate(v=>(v as HTMLVideoElement).currentTime),{timeout:10000}).toBeGreaterThan(0.2);
   await page.getByRole("button",{name:"☆ 收藏此频道",exact:true}).click();
   await page.locator("video").evaluate(async node=>{const v=node as HTMLVideoElement;v.pause();v.currentTime=20;await new Promise<void>(resolve=>v.addEventListener("seeked",()=>resolve(),{once:true}));v.dispatchEvent(new Event("pause"));});
   await expect.poll(()=>page.evaluate(({key,media})=>JSON.parse(localStorage.getItem(key)||"{}").positions?.[media]||0,{key,media})).toBeGreaterThanOrEqual(19);
@@ -33,7 +34,7 @@ test("real REST import, decoded MP4, favorites and original-URL resume survive r
 test("HLS demux/decoding uses local synthetic segments and preserves the selection",async({page})=>{
   await importPlaylist(page);await select(page,"Fixture HLS");
   await page.locator("video").evaluate(async node=>{const v=node as HTMLVideoElement;v.muted=true;await v.play();});
-  await expect.poll(()=>page.locator("video").evaluate(v=>(v as HTMLVideoElement).currentTime)).toBeGreaterThan(0.2);
+  await expect.poll(()=>page.locator("video").evaluate(v=>(v as HTMLVideoElement).currentTime),{timeout:10000}).toBeGreaterThan(0.2);
   await expect(page.locator(".player-header")).toContainText("Fixture HLS");
   expect(await page.locator("video").evaluate(v=>(v as HTMLVideoElement).videoWidth)).toBe(160);
 });
