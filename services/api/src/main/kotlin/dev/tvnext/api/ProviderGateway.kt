@@ -46,9 +46,9 @@ class ProviderGateway(private val accounts: HomeAccounts,private val provider: S
         val encoded=mapper.writeValueAsBytes(result)
         if(encoded.size<=1_048_576)synchronized(this) {
             prune()
-            cache.remove(cacheKey)?.let { bytes-=it.bytes.size }
             // Revoke may have committed while an upstream request was running.
             if(generations[p]!==generation || accounts.devices(p).none { it.id==p.deviceId })return@synchronized
+            cache.remove(cacheKey)?.let { bytes-=it.bytes.size }
             cache[cacheKey]=Cached(encoded,now()+60_000);bytes+=encoded.size
             while(cache.keys.count { it.principal==p }>16)remove(cache.keys.first { it.principal==p })
             while(cache.size>64 || bytes>8_388_608)remove(cache.keys.first())

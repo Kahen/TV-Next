@@ -68,10 +68,15 @@ class ProviderGatewayTest @Autowired constructor(private val accounts: HomeAccou
         try {
             java.util.concurrent.Executors.newSingleThreadExecutor().use { pool ->
                 val pending=pool.submit<ProviderPage> { gateway.page("search",request(),auth) }
-                assertTrue(enter.await(5,TimeUnit.SECONDS));gateway.clear(p);release.countDown();pending.get(5,TimeUnit.SECONDS)
+                assertTrue(enter.await(5,TimeUnit.SECONDS));gateway.clear(p)
+                transport.blocked=null
+                val fresh=gateway.page("search",request(),auth)
+                release.countDown();pending.get(5,TimeUnit.SECONDS)
+                val calls=transport.calls.get()
+                assertEquals(fresh,gateway.page("search",request(),auth));assertEquals(calls,transport.calls.get())
             }
         } finally { release.countDown();transport.blocked=null }
-        assertTrue(gateway.list(p).isEmpty());val calls=transport.calls.get()
-        gateway.page("search",request(),auth);assertEquals(calls+1,transport.calls.get())
+        assertEquals(1,gateway.list(p).single().networkCalls)
+        assertEquals(1,gateway.list(p).single().cacheHits)
     }
 }
