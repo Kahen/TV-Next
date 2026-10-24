@@ -60,7 +60,13 @@ it("applies original filter init, retains chosen values for pagination and reset
   fireEvent.click(await screen.findByRole("button",{name:"电影"}));
   const area=await screen.findByLabelText("筛选：地区");expect((area as HTMLSelectElement).value).toBe("cn");
   expect(request.mock.calls.at(-1)?.[1]).toEqual(expect.objectContaining({categoryId:"movie",filters:{area:"cn"}}));
-  fireEvent.change(area,{target:{value:"us"}});fireEvent.click(screen.getByRole("button",{name:"应用筛选"}));
+  fireEvent.change(area,{target:{value:"us"}});
+  expect(screen.getByRole("status").textContent).toContain("筛选尚未应用");
+  // Moving to page 2 must use the committed China filter, not the unsubmitted US draft.
+  fireEvent.click(screen.getByRole("button",{name:"下一页"}));
+  await waitFor(()=>expect(request.mock.calls.at(-1)?.[1]).toEqual(expect.objectContaining({page:2,filters:{area:"cn"}})));
+  await waitFor(()=>expect((screen.getByLabelText("筛选：地区") as HTMLSelectElement).value).toBe("us"));
+  fireEvent.click(screen.getByRole("button",{name:"应用筛选"}));
   await waitFor(()=>expect(request.mock.calls.at(-1)?.[1]).toEqual(expect.objectContaining({page:1,filters:{area:"us"}})));
   await waitFor(()=>expect((screen.getByRole("button",{name:"下一页"}) as HTMLButtonElement).disabled).toBe(false));
   fireEvent.click(screen.getByRole("button",{name:"下一页"}));
