@@ -30,8 +30,10 @@ Aliyun/Alipan, Quark, UC, 115 and other original TVBox cloud providers commonly 
 
 - Android type 3 JAR/QuickJS/Python activation and actual provider corpus; current isolation harness is bundled-fixture only.
 - WebView/sniffing parser chains (`parse`/`jx`/`playUrl`) and non-HTTP protocols; these fail explicitly rather than playing a webpage as video.
-- Request headers on native browser MP4/HLS and iOS playback need a media relay/resource adapter. hls.js can attach supported headers, subject to browser/CORS restrictions; header-dependent native playback currently reports the limit.
+- Authenticated Web/iOS media relay supports header-dependent HTTP byte ranges and HLS child playlists/segments/AES-128 identity keys. See [MEDIA_RELAY.md](MEDIA_RELAY.md) for limits, including redirects, opaque resource IDs and credential scope. Cross-origin headers are intentionally stripped. DASH, DRM, continuous raw live transport and oversized non-range responses remain unsupported.
 - Full live catchup, client category-filter controls, and interactive login/QR action workflows. Live TXT/M3U/nested JSON and external references, per-channel headers and type 4 folder navigation are implemented; HTTP actions return data without executing arbitrary UI instructions.
 - ASS styling, automatic danmaku search endpoints and native PiP subtitle/danmaku composition.
 
 Synthetic protocol tests are derived from these source paths. Real cloud accounts, original external Spider artifacts and physical iPhone/iPad playback still require separate evidence. P1–P6 are not all complete.
+
+Original player mapping: `player/exo/ExoMediaSourceFactory.java` calls `setDefaultRequestProperties` on its HTTP data source. TV-Next retains those playback-result headers and applies them on the server for original-origin media requests; Apple/browser players receive registered capability URLs instead of being given private HTTP headers. This is an HTTP/HLS subset, not a port of Android ExoPlayer.

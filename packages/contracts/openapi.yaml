@@ -587,6 +587,89 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/Credentials'
+  /api/v1/home/media/sessions:
+    post:
+      summary: Create an expiring device-bound media capability
+      description: Only registered HTTP(S) resources can be fetched. Source headers remain in memory. Playback URLs contain a separate capability, never the device bearer token.
+      security:
+      - deviceBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MediaRelayRequest'
+      responses:
+        '200':
+          description: Relative playback path and absolute session expiry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaRelaySession'
+        '400':
+          description: Invalid URL or request headers
+        '401':
+          description: Missing or revoked device bearer
+        '429':
+          description: Global session limit
+  /api/v1/home/media/{ticket}/close:
+    post:
+      summary: Close a media session created by the current device
+      security:
+      - deviceBearer: []
+      parameters:
+      - $ref: '#/components/parameters/MediaTicket'
+      responses:
+        '200':
+          description: Session closed or already absent
+        '401':
+          description: Invalid device credentials
+        '404':
+          description: Session belongs to another device
+  /api/v1/home/media/{ticket}/{resource}:
+    parameters:
+    - $ref: '#/components/parameters/MediaTicket'
+    - name: resource
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^[0-9]{1,4}$'
+    get:
+      summary: Read a registered media resource using its expiring capability
+      description: Single byte ranges are capped at 8 MiB; bodies at 32 MiB; HLS manifests at 1 MiB. Same-origin headers only, DNS pinned at each hop. 4 concurrent transfers globally, 4 GiB per session, 6-hour absolute and 30-minute idle expiry. No arbitrary URL parameter is accepted.
+      security: []
+      parameters:
+      - name: Range
+        in: header
+        schema:
+          type: string
+          maxLength: 40
+      responses:
+        '200':
+          description: Binary resource or rewritten UTF-8 HLS playlist
+        '206':
+          description: Validated single byte range
+        '401':
+          description: Capability expired, closed or device revoked
+        '404':
+          description: Resource was not registered in this session
+        '416':
+          description: Invalid or unsatisfiable range
+        '429':
+          description: Transfer, connection or session request quota
+        '502':
+          description: Unsupported media, denied address, redirect or bounded upstream failure
+    head:
+      summary: Inspect registered media metadata without transferring its body
+      security: []
+      responses:
+        '200':
+          description: Media metadata
+        '401':
+          description: Capability expired or revoked
+        '502':
+          description: Upstream metadata unavailable
   /api/v1/home/diagnostics:
     get:
       summary: Read aggregate process counters and only this user's device/library
@@ -1006,6 +1089,14 @@ paths:
             schema:
               $ref: '#/components/schemas/EpgFeedGuideRequest'
 components:
+  parameters:
+    MediaTicket:
+      name: ticket
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^[A-Za-z0-9_-]{43}$'
   schemas:
     TextImportRequest:
       type: object
@@ -1593,6 +1684,29 @@ components:
         deviceName:
           type: string
           maxLength: 80
+    MediaRelayRequest:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          maxLength: 4096
+        headers:
+          type: object
+          maxProperties: 32
+          additionalProperties:
+            type: string
+            maxLength: 16384
+    MediaRelaySession:
+      type: object
+      required: [path, expiresAt]
+      properties:
+        path:
+          type: string
+          pattern: '^/api/v1/home/media/[A-Za-z0-9_-]{43}/0$'
+        expiresAt:
+          type: integer
+          format: int64
     HomeDiagnostics:
       type: object
       required:

@@ -52,7 +52,7 @@ struct CloudSection: View {
                 if play {
                     let result: NativeCloudPlayback = try await api.request("cloud/play",body:payload)
                     guard revision == id, !Task.isCancelled else { return }
-                    onPlay(TVChannel(name:result.name,url:result.url,group:"网盘",logo:nil,tvgId:nil))
+                    onPlay(TVChannel(name:result.name,url:result.url,group:"网盘",logo:nil,tvgId:nil,headers:result.headers))
                 } else {
                     let result: NativeCloudPage = try await api.request("cloud/list",body:payload)
                     guard revision == id, !Task.isCancelled else { return }

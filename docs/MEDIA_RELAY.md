@@ -1,0 +1,22 @@
+# Header-dependent HTTP/HLS media
+
+Web and iOS can use the optional home server to supply playback headers that native video elements cannot attach. Log in to the same home server used for subscription browsing, then select the original episode/channel. AList/OpenList signed raw links normally need no relay. Restored entries marked `headersRequired` must be reloaded from their subscription because private headers are deliberately not stored in media-library backups.
+
+`POST /api/v1/home/media/sessions` requires a device bearer and accepts the original HTTP(S) URL plus headers. The result contains a relative playback path and expiry. That path contains a separate 256-bit capability, not the device token, source URL, Cookie or Authorization value. Credentials and registered resource maps live only in server memory. Restarting the API invalidates sessions. Switching media, logging out or changing server releases the client's previous session; device revocation closes active upstream sockets after commit. New sessions replace the least recently used session when that device already owns four, so canceled requests cannot permanently exhaust its slots.
+
+The players retain the original URL for history/favorites/resume and use the capability only for the active AVPlayer/video item. No custom Apple HTTP-header asset option is used. Web detects HLS from the original suffix or a best-effort relayed HEAD MIME type. Sources rejecting HEAD can still use GET; opaque URLs with incorrect MIME metadata may need source-specific format adaptation.
+
+## Network and resource rules
+
+- The media transport shares the subscription SSRF policy: validate every DNS answer, pin the connection to an approved address, verify TLS hostname/SNI, and revalidate up to three redirects. HTTPS downgrade is rejected. LAN destinations require the same exact `TV_NEXT_LAN_ORIGINS` opt-in; loopback/link-local remain denied.
+- Headers apply only to the original origin. Cross-origin redirects and playlist resources receive none of the original custom headers. A provider requiring authentication on a different CDN origin needs a future explicit per-origin credential contract; credentials are not guessed or forwarded broadly.
+- HTTP framing rejects ambiguous lengths/transfer encoding, malformed content ranges, compression, truncated/chunk-overflow responses and non-media HTML/JSON. Source Set-Cookie, redirect Location and arbitrary response headers are not forwarded. Binary payloads stream through a 64 KiB buffer; no whole movie is loaded into memory.
+- HLS playlists are bounded UTF-8. Relative lines and quoted `URI` attributes (nested playlists, audio, keys, maps, parts/preload hints) become registered local resource paths. Unknown ticket/resource pairs cannot supply an arbitrary URL. AES-128 identity keys can be fetched as binary resources. Registered HLS subtitle renditions may return `text/vtt`; unrelated root text files remain rejected. Variable expansion, non-HTTP keys and DRM are rejected explicitly.
+- Single ranges are clamped to 8 MiB. A successful upstream response body is capped at 32 MiB; a manifest at 1 MiB. Sources ignoring Range with a larger body fail instead of buffering a full film. Each response has a 60-second deadline, a 3-second connect and 5-second read timeout.
+- At most four transfers and 128 sessions exist globally. A session has a 4 GiB transfer allowance, 240 requests/minute, 4,096 registered resources, 512 KiB of resource-URL storage, six-hour absolute expiry and 30-minute idle expiry. Existing API envelope/admission/rate limits still apply. These are code limits, not NAS throughput measurements.
+
+The default nginx media location disables access logging and proxy buffering. API request logs use route templates. Keep any additional reverse proxy/CDN from logging capability paths and use HTTPS for access beyond a trusted development environment. The URL is a bearer capability until closed/expired; it is intended only for the authorized player's media requests, not sharing or bookmarks.
+
+## Remaining scope
+
+This implements HTTP range playback and bounded HLS adaptation. It does not add DRM decryption, DASH/MPD, sniffing/parser webpages, direct cloud account login, codec transcoding or continuous unbounded raw live transport. Native rendering, seeking, encrypted HLS and background/lifecycle behavior still require the final physical-device/media matrix. Fixture tests and unsigned builds do not prove real-source compatibility.

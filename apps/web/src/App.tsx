@@ -12,6 +12,7 @@ import { exportM3u } from "./playlistExport";
 import MediaBrowser from "./MediaBrowser";
 import HomeServerPanel from "./HomeServerPanel";
 import { useRemoteControl } from "./useRemoteControl";
+import { useMediaRelay } from "./useMediaRelay";
 import { loadHomeSession, saveHomeSession } from "./homeApi";
 import CloudBrowser from "./CloudBrowser";
 import SubscriptionBrowser from "./SubscriptionBrowser";
@@ -50,6 +51,7 @@ export default function App() {
   const [subtitleName, setSubtitleName] = useState("");
   const [storageWarning, setStorageWarning] = useState("");
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const relay=useMediaRelay(localVideo?null:selected,homeSession);
   const mediaKey = selected?.url ?? localVideo?.url;
   const mediaKeyRef = useRef(mediaKey); mediaKeyRef.current = mediaKey;
   const libraryRef = useRef(library);
@@ -123,9 +125,11 @@ export default function App() {
     setPlayerError("");
     if (!selected && !localVideo) return;
     const isLocal = !!localVideo;
-    const url = localVideo?.url ?? selected!.url;
+    if(!isLocal&&relay.required&&!relay.url){setPlayerError(relay.error||"正在适配播放请求头…");return;}
+    const url = localVideo?.url ?? relay.url ?? selected!.url;
+    const positionKey=selected?.url ?? url;
     if (!isLocal && !validMediaUrl(url)) return;
-    const isHls = !isLocal && new URL(url).pathname.toLowerCase().endsWith(".m3u8");
+    const isHls = !isLocal && (relay.hls || new URL(selected!.url).pathname.toLowerCase().endsWith(".m3u8"));
     let hls: Hls | null = null;
     let lastSavedAt = 0;
 
@@ -134,11 +138,11 @@ export default function App() {
       const now = Date.now();
       if (!force && now - lastSavedAt < 8000) return;
       lastSavedAt = now;
-      setLibrary((state) => setPosition(state, url, video.currentTime, video.duration));
+      setLibrary((state) => setPosition(state, positionKey, video.currentTime, video.duration));
     };
     const resume = () => {
       if (isLocal) return;
-      const position = libraryRef.current.positions[url];
+      const position = libraryRef.current.positions[positionKey];
       if (position && Number.isFinite(video.duration) && video.duration - position > 15) {
         try { video.currentTime = position; } catch { /* non-seekable stream */ }
       }
@@ -148,7 +152,7 @@ export default function App() {
     const onPause = () => remember(true);
     const onEnded = () => {
       if (!isLocal && Number.isFinite(video.duration)) {
-        setLibrary((state) => setPosition(state, url, video.duration, video.duration));
+        setLibrary((state) => setPosition(state, positionKey, video.duration, video.duration));
       }
     };
 
@@ -158,12 +162,13 @@ export default function App() {
     video.addEventListener("pause", onPause);
     video.addEventListener("ended", onEnded);
 
-    if (Object.keys(selected?.headers || {}).length && !(isHls && Hls.isSupported())) {
-      setPlayerError("此来源要求额外请求头；当前浏览器原生视频无法附加这些请求头。请使用受支持的服务端播放适配。");
-    } else if (isHls && !Object.keys(selected?.headers || {}).length && video.canPlayType("application/vnd.apple.mpegurl")) {
+    const playbackHeaders=relay.url?{}:selected?.headers||{};
+    if (Object.keys(playbackHeaders).length && !(isHls && Hls.isSupported())) {
+      setPlayerError("此来源要求额外请求头；请先登录家庭服务器，启用当前浏览器的媒体中转适配。");
+    } else if (isHls && !Object.keys(playbackHeaders).length && video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = url;
     } else if (isHls && Hls.isSupported()) {
-      hls = new Hls({ enableWorker: true, xhrSetup: (xhr) => { for (const [key, value] of Object.entries(selected?.headers || {})) xhr.setRequestHeader(key, value); } });
+      hls = new Hls({ enableWorker: true, xhrSetup: (xhr) => { for (const [key, value] of Object.entries(playbackHeaders)) xhr.setRequestHeader(key, value); } });
       hls.loadSource(url);
       hls.attachMedia(video);
       hls.on(Hls.Events.ERROR, (_, detail) => {
@@ -187,7 +192,7 @@ export default function App() {
       video.removeAttribute("src");
       video.load();
     };
-  }, [selected, localVideo]);
+  }, [selected, localVideo,relay.required,relay.url,relay.hls,relay.error]);
 
   function playLocalFile(file: File | undefined) {
     if (!file) return;
