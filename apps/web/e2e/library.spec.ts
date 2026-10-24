@@ -88,7 +88,7 @@ test("keyboard users can skip navigation, identify active view and reach M3U fil
   await expect(picker).toBeFocused();
   await expect(page.locator(".file-picker").filter({has:picker})).toHaveCSS("outline-style","solid");
   await picker.setInputFiles({name:"owned.m3u",mimeType:"text/plain",buffer:Buffer.from(`#EXTM3U\\n#EXTINF:-1,Fixture MP4\\n${media}`)});
-  await expect(page.getByRole("textbox",{name:"M3U 内容"})).toContainText("Fixture MP4");
+  await expect(page.getByRole("textbox",{name:"M3U 内容"})).toHaveValue(/Fixture MP4/);
   await page.getByRole("button",{name:"导入频道",exact:true}).click();
   const channel=page.locator("button.channel").filter({hasText:"Fixture MP4"});
   await expect(channel).toBeVisible();
