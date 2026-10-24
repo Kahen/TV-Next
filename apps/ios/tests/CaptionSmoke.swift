@@ -38,8 +38,8 @@ struct CaptionSmoke {
         let assCues = try CaptionParser.parse(Data(ass.utf8))
         precondition(assCues.count == 1)
         precondition(assCues[0].start == 1.2 && assCues[0].end == 3.45)
-        precondition(assCues[0].text == "Hello, world\nsecond line")
-        precondition(CaptionParser.activeText(assCues, at: 2) == "Hello, world\nsecond line")
+        precondition(assCues[0].text == "Hello, <world>\nsecond line")
+        precondition(CaptionParser.activeText(assCues, at: 2) == "Hello, <world>\nsecond line")
         do {
             _ = try CaptionParser.parse(Data("[Events]\nFormat: Start, End, Text\nDialogue: 0:00:02.00,0:00:01.00,invalid".utf8))
             fatalError("Invalid ASS timing accepted")
