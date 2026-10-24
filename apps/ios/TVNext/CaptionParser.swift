@@ -16,14 +16,14 @@ enum CaptionError: LocalizedError {
         switch self {
         case .empty: return "字幕文件为空。"
         case .tooLarge: return "字幕文件超过 1 MiB。"
-        case .invalidEncoding: return "字幕必须是 UTF-8 编码的 SRT 或 WebVTT。"
-        case .invalidTimeline: return "未识别有效的字幕时间轴；仅支持基础 SRT / WebVTT。"
+        case .invalidEncoding: return "字幕必须是 UTF-8 编码的 SRT、WebVTT 或 ASS/SSA。"
+        case .invalidTimeline: return "未识别有效的字幕时间轴；仅支持基础 SRT / WebVTT / ASS / SSA 文本字幕。"
         }
     }
 }
 
-/// Lightweight text-only SRT / WebVTT parser. Does not execute markup or load URLs.
-/// Rich styling, ASS and WebVTT cue positioning are intentionally out of scope.
+/// Bounded, text-only SRT / WebVTT / ASS / SSA parser. Never executes markup or loads URLs.
+/// Rich ASS styles, animation and WebVTT cue positioning are intentionally out of scope.
 enum CaptionParser {
     private static let timing = try! NSRegularExpression(
         pattern: #"^(\d{2,3}:\d{2}:\d{2}[.,]\d{3}|\d{2}:\d{2}[.,]\d{3})\s+-->\s+(\d{2,3}:\d{2}:\d{2}[.,]\d{3}|\d{2}:\d{2}[.,]\d{3})(?:\s+.*)?$"#
@@ -39,6 +39,9 @@ enum CaptionParser {
             .replacingOccurrences(of: "\r\n", with: "\n")
             .replacingOccurrences(of: "\r", with: "\n")
 
+        if input.range(of: #"(?im)^\[Events\]\s*$"#, options: .regularExpression) != nil {
+            return try parseAss(input)
+        }
         var result: [CaptionCue] = []
         let blocks = input.components(separatedBy: "\n\n")
         for block in blocks.prefix(12_000) {
@@ -72,6 +75,64 @@ enum CaptionParser {
         }
         guard !result.isEmpty else { throw CaptionError.invalidTimeline }
         return result.sorted { $0.start < $1.start }
+    }
+
+
+    /// ASS/SSA Dialogue records use the declared [Events] Format fields.
+    /// The final Text field may contain commas. Presentation overrides are stripped.
+    private static func parseAss(_ input: String) throws -> [CaptionCue] {
+        var inEvents = false
+        var fields: [String] = []
+        var cues: [CaptionCue] = []
+        for raw in input.split(separator: "\n", omittingEmptySubsequences: false) {
+            let line = String(raw).trimmingCharacters(in: .whitespacesAndNewlines)
+            if line.first == "[", line.last == "]" {
+                inEvents = line.lowercased() == "[events]"
+                continue
+            }
+            guard inEvents else { continue }
+            if line.lowercased().hasPrefix("format:") {
+                fields = line.dropFirst(7).split(separator: ",", omittingEmptySubsequences: false)
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+                continue
+            }
+            guard line.lowercased().hasPrefix("dialogue:"), fields.count >= 3,
+                  fields.last == "text", let startIndex = fields.firstIndex(of: "start"),
+                  let endIndex = fields.firstIndex(of: "end"), startIndex != endIndex else { continue }
+            let columns = line.dropFirst(9).split(separator: ",",
+                                                    maxSplits: fields.count - 1,
+                                                    omittingEmptySubsequences: false)
+            guard columns.count == fields.count,
+                  let start = assSeconds(String(columns[startIndex]).trimmingCharacters(in: .whitespaces)),
+                  let end = assSeconds(String(columns[endIndex]).trimmingCharacters(in: .whitespaces)),
+                  end > start else { continue }
+            let text = String(columns[fields.count - 1])
+                .replacingOccurrences(of: #"\{\\[^{}]*\}"#, with: "", options: .regularExpression)
+                .replacingOccurrences(of: "\\N", with: "\n")
+                .replacingOccurrences(of: "\\n", with: "\n")
+                .replacingOccurrences(of: "\\h", with: "\u{00A0}")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let range = NSRange(text.startIndex..<text.endIndex, in: text)
+            let safeText = tags.stringByReplacingMatches(in: text, range: range, withTemplate: "")
+            guard !safeText.isEmpty else { continue }
+            cues.append(CaptionCue(start: start, end: end, text: String(safeText.prefix(2_000))))
+            if cues.count >= 5_000 { break }
+        }
+        guard !cues.isEmpty else { throw CaptionError.invalidTimeline }
+        return cues.sorted { $0.start < $1.start }
+    }
+
+    private static func assSeconds(_ value: String) -> TimeInterval? {
+        let parts = value.split(separator: ":", omittingEmptySubsequences: false)
+        guard parts.count == 3,
+              let hour = Int(parts[0]), let minute = Int(parts[1]),
+              hour >= 0, hour <= 99, minute >= 0, minute < 60 else { return nil }
+        let secondParts = parts[2].split(separator: ".", omittingEmptySubsequences: false)
+        guard secondParts.count == 2, (1...2).contains(secondParts[1].count),
+              let second = Int(secondParts[0]), let fraction = Int(secondParts[1]),
+              second >= 0, second < 60 else { return nil }
+        return Double((hour * 60 + minute) * 60 + second) +
+            Double(fraction) / (secondParts[1].count == 1 ? 10 : 100)
     }
 
     /// Positive offset delays text relative to media time; negative advances it.
