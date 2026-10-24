@@ -670,6 +670,33 @@ paths:
           description: Capability expired or revoked
         '502':
           description: Upstream metadata unavailable
+  /api/v1/home/providers/health:
+    get:
+      summary: Read only the current device's observed provider health
+      security:
+      - deviceBearer: []
+      responses:
+        '200':
+          description: Bounded per-device counters; no URLs, queries, headers or credentials
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 32
+                items:
+                  $ref: '#/components/schemas/ProviderHealth'
+        '401':
+          description: Missing or revoked device token
+  /api/v1/home/providers/clear:
+    post:
+      summary: Clear this device's health and search cache, invalidating pending writes
+      security:
+      - deviceBearer: []
+      responses:
+        '200':
+          description: Device-private cache and observations cleared
+        '401':
+          description: Missing or revoked device token
   /api/v1/home/diagnostics:
     get:
       summary: Read aggregate process counters and only this user's device/library
@@ -1658,6 +1685,10 @@ components:
             maxLength: 1000
         quick:
           type: boolean
+        bypassCache:
+          type: boolean
+          default: false
+          description: Bypass this authenticated device's 60-second search cache
     CloudRequest:
       type: object
       required:
@@ -1740,6 +1771,33 @@ components:
         expiresAt:
           type: integer
           format: int64
+    ProviderHealth:
+      type: object
+      properties:
+        id:
+          type: string
+        siteKey:
+          type: string
+          maxLength: 200
+        networkCalls:
+          type: integer
+          format: int64
+        cacheHits:
+          type: integer
+          format: int64
+        failures:
+          type: integer
+          format: int64
+        lastAttemptAt:
+          type: integer
+          format: int64
+        lastLatencyMs:
+          type: integer
+          format: int64
+        lastSuccessAt:
+          type: [integer, 'null']
+        lastError:
+          type: [string, 'null']
     HomeDiagnostics:
       type: object
       required:

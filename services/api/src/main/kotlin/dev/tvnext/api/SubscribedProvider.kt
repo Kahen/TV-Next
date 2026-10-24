@@ -13,7 +13,7 @@ import org.springframework.web.server.ResponseStatusException
 
 data class SiteRequest(val content: String = "", val url: String = "", val siteKey: String = "", val categoryId: String? = null,
     val query: String? = null, val vodId: String? = null, val page: Int = 1, val lineIndex: Int = 0,
-    val episodeIndex: Int = 0, val action: String? = null, val filters: Map<String, String> = emptyMap(), val quick: Boolean = false)
+    val episodeIndex: Int = 0, val action: String? = null, val filters: Map<String, String> = emptyMap(), val quick: Boolean = false, val bypassCache: Boolean = false)
 data class ProviderPage(val categories: List<MediaCategory>, val items: List<MediaItem>, val total: Int, val page: Int,
     val pageSize: Int, val hasMore: Boolean, val provider: String, val filters: JsonNode)
 
@@ -137,11 +137,11 @@ class SubscribedProvider(private val subscriptions: Subscriptions, private val m
 }
 @RestController
 @RequestMapping("/api/v1/subscriptions")
-class SubscribedProviderController(private val service: SubscribedProvider) {
-    @PostMapping("/action") fun action(@RequestBody r: SiteRequest) = service.action(r)
-    @PostMapping("/home") fun home(@RequestBody r: SiteRequest) = service.page("home", r)
-    @PostMapping("/category") fun category(@RequestBody r: SiteRequest) = service.page("category", r)
-    @PostMapping("/search") fun search(@RequestBody r: SiteRequest) = service.page("search", r)
-    @PostMapping("/detail") fun detail(@RequestBody r: SiteRequest) = service.detail(r)
-    @PostMapping("/play") fun play(@RequestBody r: SiteRequest) = service.play(r)
+class SubscribedProviderController(private val gateway: ProviderGateway) {
+    @PostMapping("/action") fun action(@RequestBody r: SiteRequest,@RequestHeader("Authorization",required=false) auth: String?)=gateway.action(r,auth)
+    @PostMapping("/home") fun home(@RequestBody r: SiteRequest,@RequestHeader("Authorization",required=false) auth: String?)=gateway.page("home",r,auth)
+    @PostMapping("/category") fun category(@RequestBody r: SiteRequest,@RequestHeader("Authorization",required=false) auth: String?)=gateway.page("category",r,auth)
+    @PostMapping("/search") fun search(@RequestBody r: SiteRequest,@RequestHeader("Authorization",required=false) auth: String?)=gateway.page("search",r,auth)
+    @PostMapping("/detail") fun detail(@RequestBody r: SiteRequest,@RequestHeader("Authorization",required=false) auth: String?)=gateway.detail(r,auth)
+    @PostMapping("/play") fun play(@RequestBody r: SiteRequest,@RequestHeader("Authorization",required=false) auth: String?)=gateway.play(r,auth)
 }

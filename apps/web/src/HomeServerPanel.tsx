@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { homeRequest } from "./homeApi";
-import type { Device,HomeSession,RemoteLibrary,HomeDiagnostics } from "./homeApi";
+import type { Device,HomeSession,RemoteLibrary,HomeDiagnostics,ProviderHealth } from "./homeApi";
 import { normalizeLibrary } from "./library";
 import type { LibraryState } from "./library";
 export default function HomeServerPanel({library,onRestore,session,onSessionChange,remoteState="未连接"}:{library:LibraryState;onRestore:(s:LibraryState)=>void;session:HomeSession|null;onSessionChange:(s:HomeSession|null)=>void;remoteState?:string}){
   const [username,setUsername]=useState(""),[password,setPassword]=useState(""),[name,setName]=useState("Web browser");
+  const [providers,setProviders]=useState<ProviderHealth[]>([]);
   const [devices,setDevices]=useState<Device[]>([]);
   const [diagnostics,setDiagnostics]=useState<HomeDiagnostics|null>(null);
   const [remote,setRemote]=useState<RemoteLibrary|null>(null),[code,setCode]=useState(""),[claim,setClaim]=useState("");
@@ -12,12 +13,12 @@ export default function HomeServerPanel({library,onRestore,session,onSessionChan
   const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
   const epoch=useRef(0);useEffect(()=>()=>{epoch.current++},[]);
   async function run<T>(work:()=>Promise<T>,done:(v:T)=>void){const id=++epoch.current;setBusy(true);setError("");setNotice("");try{const result=await work();if(id===epoch.current)done(result);}catch(e){if(id===epoch.current)setError(e instanceof Error?e.message:"家庭服务器请求失败");}finally{if(id===epoch.current)setBusy(false);}}
-  function connected(result:HomeSession){onSessionChange(result);setPassword("");setCode("");setClaim("");setRemote(null);setDiagnostics(null);setDevices([]);setOnline([]);setTarget("");setSeek(0);setMedia("");setCommand("");setNotice("设备已登录；同步由你主动发起。");}
+  function connected(result:HomeSession){onSessionChange(result);setPassword("");setCode("");setClaim("");setRemote(null);setDiagnostics(null);setProviders([]);setDevices([]);setOnline([]);setTarget("");setSeek(0);setMedia("");setCommand("");setNotice("设备已登录；同步由你主动发起。");}
   function auth(register=false){void run(()=>homeRequest<HomeSession>("auth/"+(register?"register":"login"),{username,password,deviceName:name}),connected);}
   function refresh(){if(session)void run(()=>homeRequest<RemoteLibrary>("library",undefined,session.token),data=>{setRemote(data);setNotice("已读取云端版本 "+data.revision+"；本地尚未替换。");});}
   function push(){if(!session||!remote)return;void run(()=>homeRequest<RemoteLibrary>("library",{expectedRevision:remote.revision,library:normalizeLibrary(library)},session.token),data=>{setRemote(data);setNotice("已保存云端版本 "+data.revision);});}
   function pull(){if(remote){onRestore(normalizeLibrary(remote.library));setNotice("本地媒体库已替换为云端版本 "+remote.revision);}}
-  function logout(revoke=true){const prior=session;epoch.current++;setBusy(false);onSessionChange(null);setDevices([]);setRemote(null);setDiagnostics(null);setCode("");setClaim("");setPassword("");setOnline([]);setTarget("");setSeek(0);setMedia("");setCommand("");setNotice("");setError("");if(revoke&&prior)void homeRequest("devices/"+prior.device.id+"/revoke",{},prior.token).catch(()=>{});}
+  function logout(revoke=true){const prior=session;epoch.current++;setBusy(false);onSessionChange(null);setDevices([]);setRemote(null);setDiagnostics(null);setProviders([]);setCode("");setClaim("");setPassword("");setOnline([]);setTarget("");setSeek(0);setMedia("");setCommand("");setNotice("");setError("");if(revoke&&prior)void homeRequest("devices/"+prior.device.id+"/revoke",{},prior.token).catch(()=>{});}
   function download(){const url=URL.createObjectURL(new Blob([JSON.stringify(normalizeLibrary(library),null,2)],{type:"application/json"}));const a=document.createElement("a");a.href=url;a.download="tv-next-library.json";a.click();URL.revokeObjectURL(url);}
   return <section className="results"><h2>家庭服务器 · 账号与同步</h2>
     {!session?<><input aria-label="账号" autoComplete="username" value={username} onChange={e=>setUsername(e.target.value)} placeholder="账号"/><input aria-label="密码" type="password" autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="密码（注册至少 12 位）"/><input aria-label="设备名称" value={name} maxLength={80} onChange={e=>setName(e.target.value)}/><button disabled={busy} onClick={()=>auth()}>登录</button><button disabled={busy} onClick={()=>auth(true)}>注册账号</button>
@@ -36,6 +37,8 @@ export default function HomeServerPanel({library,onRestore,session,onSessionChan
       <button disabled={busy||!command} onClick={()=>void run(()=>homeRequest<{state:string;message?:string}>("remote/commands/"+command,undefined,session.token),r=>setNotice(r.state+(r.message?" · "+r.message:"")))}>查看遥控结果</button></div>
       <button disabled={busy} onClick={()=>void run(()=>homeRequest<HomeDiagnostics>("diagnostics",undefined,session.token),setDiagnostics)}>刷新服务器状态</button>
       {diagnostics&&<p role="status">运行 {diagnostics.uptimeSeconds} 秒 · 内存 {Math.round(diagnostics.memoryUsedBytes/1048576)} / {Math.round(diagnostics.memoryMaxBytes/1048576)} MiB · 请求 {diagnostics.httpRequests} · 4xx {diagnostics.httpClientErrors} / 5xx {diagnostics.httpServerErrors} · 本账号在线 {diagnostics.onlineDevices}/{diagnostics.devices} · 媒体库版本 {diagnostics.libraryRevision}</p>}
+      <div className="panel-actions"><button disabled={busy} onClick={()=>void run(()=>homeRequest<ProviderHealth[]>("providers/health",undefined,session.token),setProviders)}>刷新本设备来源状态</button><button disabled={busy} onClick={()=>void run(()=>homeRequest("providers/clear",{},session.token),()=>{setProviders([]);setNotice("本设备来源状态和搜索缓存已清除。");})}>清除来源状态和搜索缓存</button></div>
+      {providers.map(p=><p key={p.id}>{p.siteKey} · 网络 {p.networkCalls} / 缓存 {p.cacheHits} / 失败 {p.failures} · {p.lastLatencyMs} ms · {p.lastError|| (p.lastSuccessAt?"最近请求成功":"尚无成功记录")}</p>)}
       {devices.map(d=><div className="channel-line" key={d.id}><span>{d.name}{d.current?"（当前设备）":""}</span><button disabled={busy} onClick={()=>void run(()=>homeRequest("devices/"+d.id+"/revoke",{},session.token),()=>{if(d.current)logout(false);else setDevices(items=>items.filter(x=>x.id!==d.id));})}>撤销授权</button></div>)}
     </>}
     <div className="panel-actions"><button onClick={download}>导出本地备份</button><label className="file-picker">恢复备份<input type="file" accept=".json" onChange={e=>{const file=e.target.files?.[0];if(file&&file.size>2000000){setError("备份最多 2 MB");e.target.value="";return;}if(file)void file.text().then(text=>{const data:unknown=JSON.parse(text);if(!data||typeof data!=="object"||!("version" in data)||data.version!==1||!("channels" in data)||!Array.isArray(data.channels)||!("favorites" in data)||!Array.isArray(data.favorites)||!("recent" in data)||!Array.isArray(data.recent)||!("positions" in data)||!data.positions||typeof data.positions!=="object")throw Error("备份版本无效");onRestore(normalizeLibrary(data));setNotice("已恢复本地备份，尚未上传。");}).catch(err=>setError(err instanceof Error?err.message:"备份无效"));e.target.value="";}}/></label></div>

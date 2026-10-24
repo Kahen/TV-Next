@@ -73,7 +73,7 @@ struct ContentView: View {
                         .id(serverURL+"|"+(homeSession?.token ?? ""))
                     ConfigPreviewSection()
                     CloudSection(serverURL: serverURL) { library.play($0) }
-                    SubscriptionSection(serverURL: serverURL, onPlay: { playback, title in
+                    SubscriptionSection(serverURL: serverURL, session:homeSession, onPlay: { playback, title in
                         library.play(TVChannel(name: title + " · " + playback.name, url: playback.url, group: playback.lineName, logo: nil, tvgId: nil, headers:playback.headers))
                         remoteResourceKey = playback.url
                         remoteDanmaku = playback.danmaku

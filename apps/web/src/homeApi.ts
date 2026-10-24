@@ -20,3 +20,5 @@ export function loadHomeSession():HomeSession|null {
 export function saveHomeSession(session:HomeSession|null):void {try{if(session)window.sessionStorage.setItem(SESSION_KEY,JSON.stringify(session));else window.sessionStorage.removeItem(SESSION_KEY);}catch{/* tab remains usable in memory */}}
 
 export interface HomeDiagnostics {uptimeSeconds:number;memoryUsedBytes:number;memoryMaxBytes:number;httpRequests:number;httpClientErrors:number;httpServerErrors:number;devices:number;onlineDevices:number;libraryRevision:number}
+
+export interface ProviderHealth {id:string;siteKey:string;networkCalls:number;cacheHits:number;failures:number;lastAttemptAt:number;lastSuccessAt:number|null;lastLatencyMs:number;lastError:string|null}

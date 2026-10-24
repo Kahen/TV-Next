@@ -96,8 +96,8 @@ export async function postMedia<T>(path: string, body: MediaQuery): Promise<T> {
 export interface PlaybackResource { name: string; url: string; lang?: string | null }
 export interface SubscriptionSite { key: string; name: string; type: number; searchable: boolean; hidden: boolean; support: string }
 export interface SubscriptionDocument { content: string; url: string; sites: SubscriptionSite[]; depots: {name: string; url: string}[]; liveCount: number; warnings: string[] }
-export async function requestJson<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(base + path, { method: "POST", headers: { "Content-Type": "application/json" },
+export async function requestJson<T>(path: string, body: unknown, signal?: AbortSignal, token?: string): Promise<T> {
+  const response = await fetch(base + path, { method: "POST", headers: { "Content-Type": "application/json",...(token?{Authorization:"Bearer "+token}:{}) },
     body: JSON.stringify(body), signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(20000)]) : AbortSignal.timeout(20000) });
   if (!response.ok) {
     const data: unknown = await response.json().catch(() => null);

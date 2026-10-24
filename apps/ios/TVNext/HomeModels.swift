@@ -27,3 +27,8 @@ struct NativeHomeDiagnostics: Decodable {
     let httpRequests: Int64; let httpClientErrors: Int64; let httpServerErrors: Int64
     let devices: Int; let onlineDevices: Int; let libraryRevision: Int64
 }
+
+struct NativeProviderHealth: Decodable, Identifiable {
+    let id: String;let siteKey: String;let networkCalls: Int64;let cacheHits: Int64;let failures: Int64
+    let lastAttemptAt: Int64;let lastSuccessAt: Int64?;let lastLatencyMs: Int64;let lastError: String?
+}
