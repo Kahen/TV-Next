@@ -13,6 +13,7 @@ export default function SubscriptionBrowser({onPlay, onImport}: {onPlay: (channe
   const [category, setCategory] = useState("");
   const [filterCatalog,setFilterCatalog]=useState<SiteFilterMap>({});
   const [filters,setFilters]=useState<Record<string,string>>({});
+  const [appliedFilters,setAppliedFilters]=useState<Record<string,string>>({});
   const [query, setQuery] = useState("");
   const [mode, setMode] = useState("home");
   const [detail, setDetail] = useState<MediaDetail | null>(null);
@@ -31,13 +32,13 @@ export default function SubscriptionBrowser({onPlay, onImport}: {onPlay: (channe
     try {
       const result = await requestJson<SubscriptionDocument>("/api/v1/subscriptions/load", { content, url: address }, controller.signal);
       if (id !== requestId.current) return;
-      setActionResult(""); setDoc(result); setPage(null); setDetail(null); setFound([]); setSite("");setFilterCatalog({});setFilters({});setCategory("");
+      setActionResult(""); setDoc(result); setPage(null); setDetail(null); setFound([]); setSite("");setFilterCatalog({});setFilters({});setAppliedFilters({});setCategory("");
     } catch (e) { if (id === requestId.current && !controller.signal.aborted) setError(e instanceof Error ? e.message : "订阅加载失败"); }
     finally { if (id === requestId.current) setBusy(false); }
   }
   async function browse(key: string, op = "home", nextPage = 1, type = category, selectedFilters?:Record<string,string>) {
     const same=key===siteKey;
-    const choices=op!=="category"?{}:selectedFilters??(same&&type===category&&mode==="category"?filters:initialSiteFilters((same?filterCatalog:{})[type]||[]));
+    const choices=op!=="category"?{}:selectedFilters??(same&&type===category&&mode==="category"?appliedFilters:initialSiteFilters((same?filterCatalog:{})[type]||[]));
     const {controller, id} = start();
     setActionResult(""); setDetail(null); setFound([]);
     try {
@@ -45,7 +46,9 @@ export default function SubscriptionBrowser({onPlay, onImport}: {onPlay: (channe
       if (id !== requestId.current) return;
       setPage(result); setSite(key); setMode(op); setCategory(op==="home"?"":type);
       setFilterCatalog(same?{...filterCatalog,...result.filters}:result.filters||{});
-      setFilters(op==="category"?choices:{});
+      setAppliedFilters(op==="category"?choices:{});
+      // Paging must never submit unsaved dropdown edits. Keep drafts for explicit Apply/Reset.
+      if (op!=="category" || nextPage===1 || !same || type!==category || mode!=="category") setFilters(op==="category"?choices:{});
     } catch (e) { if (id === requestId.current && !controller.signal.aborted) setError(e instanceof Error ? e.message : "站点请求失败"); }
     finally { if (id === requestId.current) setBusy(false); }
   }
@@ -120,6 +123,7 @@ export default function SubscriptionBrowser({onPlay, onImport}: {onPlay: (channe
           {!filter.value.some(v=>v.v===(filters[filter.key]??filter.init??""))&&<option value={filters[filter.key]??filter.init??""}>默认</option>}
           {filter.value.map(value=><option key={value.v} value={value.v}>{value.n||value.v||"全部"}</option>)}
         </select></label>)}
+        {(filterCatalog[category]||[]).some(f=>(filters[f.key]??f.init??"")!==(appliedFilters[f.key]??f.init??""))&&<span role="status">筛选尚未应用，翻页仍使用已应用条件</span>}
         <button disabled={busy} onClick={()=>void browse(siteKey,"category",1,category,{...initialSiteFilters(filterCatalog[category]||[]),...filters})}>应用筛选</button>
         <button disabled={busy} onClick={()=>void browse(siteKey,"category",1,category,initialSiteFilters(filterCatalog[category]||[]))}>重置筛选</button>
       </div>}
