@@ -1,14 +1,17 @@
-/** Converts the common text-only SRT subset into browser WebVTT.
- * Styling/ASS/SSA and malformed legacy encodings are not yet supported.
+import { assToWebVtt } from "./assCaptions";
+
+/** Converts UTF-8 SRT and text-only ASS/SSA into browser WebVTT.
+ * Legacy encodings and ASS/SSA styling/animations are intentionally unsupported.
  */
 export function toWebVtt(text: string, filename: string): string {
-  if (!text.trim() || text.length > 1_048_576) throw new Error("字幕必须为 1 B 至 1 MiB 的 UTF-8 文本。");
+  if (!text.trim() || text.length > 1_048_576 || new TextEncoder().encode(text).byteLength > 1_048_576) throw new Error("字幕必须为 1 B 至 1 MiB 的 UTF-8 文本。");
   const normalized = text.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
   if (filename.toLowerCase().endsWith(".vtt") || /^\s*WEBVTT(?:[ \t\r\n]|$)/.test(normalized)) {
     if (!/^\s*WEBVTT(?:[ \t\r\n]|$)/.test(normalized)) throw new Error("VTT 文件缺少 WEBVTT 标识。");
     return normalized;
   }
-  if (!filename.toLowerCase().endsWith(".srt")) throw new Error("仅支持 UTF-8 SRT / WebVTT 字幕文件。");
+  if (/\.(ass|ssa)$/i.test(filename) || /^\s*\[(?:Script Info|Events)\]\s*$/mi.test(normalized)) return assToWebVtt(normalized);
+  if (!filename.toLowerCase().endsWith(".srt")) throw new Error("仅支持 UTF-8 SRT / WebVTT / ASS / SSA 字幕文件。");
   const blocks = normalized.trim().split(/\n[ \t]*\n+/);
   const cues: string[] = [];
   const timestamp = /^(?:(\d{2}):)?(\d{2}):(\d{2})[,.](\d{3})[ \t]+-->[ \t]+(?:(\d{2}):)?(\d{2}):(\d{2})[,.](\d{3})(?:[ \t].*)?$/;

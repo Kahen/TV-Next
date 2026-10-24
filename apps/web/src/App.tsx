@@ -226,7 +226,7 @@ export default function App() {
 
   async function loadSubtitleSource(url: string, name: string) {
     const key=mediaKey;
-    try { const result=await requestJson<{content:string}>("/api/v1/resources/text",{url});if(key!==mediaKeyRef.current)return;setSubtitleOriginal(toWebVtt(result.content,"remote.srt"));setSubtitleOffset(0);setSubtitleName(name); }
+    try { const result=await requestJson<{content:string}>("/api/v1/resources/text",{url});if(key!==mediaKeyRef.current)return;setSubtitleOriginal(toWebVtt(result.content, /\.(srt|vtt|ass|ssa)$/i.test(name) ? name : (/\.(srt|vtt|ass|ssa)$/i.test(new URL(url).pathname) ? new URL(url).pathname : "remote.srt")));setSubtitleOffset(0);setSubtitleName(name); }
     catch(e){setError(e instanceof Error?e.message:"字幕加载失败");}
   }
   async function loadDanmakuFile(file: File) {
@@ -380,8 +380,8 @@ export default function App() {
           {(selected || localVideo) && <div className="player-actions">
             <button className="secondary" onClick={() => void enterFullscreen()}>⛶ 全屏</button>
             <button className="secondary" onClick={() => void enterPictureInPicture()}>▣ 画中画</button>
-            <label className="file-picker">加载 SRT / VTT
-              <input type="file" accept=".srt,.vtt,text/vtt,application/x-subrip" onChange={(e) => { void importSubtitle(e.target.files?.[0]); e.target.value = ""; }} />
+            <label className="file-picker">加载 SRT / VTT / ASS / SSA
+              <input type="file" accept=".srt,.vtt,.ass,.ssa,text/vtt,application/x-subrip" onChange={(e) => { void importSubtitle(e.target.files?.[0]); e.target.value = ""; }} />
             </label>
             {selected?.subtitles?.map((source,i)=><button key={i} onClick={()=>void loadSubtitleSource(source.url,source.name)}>{source.name}</button>)}
             {subtitleUrl && <label>字幕偏移（正值延后） <input aria-label="字幕偏移" type="range" min="-10" max="10" step="0.5" value={subtitleOffset} onChange={(e) => setSubtitleOffset(Number(e.target.value))} /> {subtitleOffset.toFixed(1)} 秒</label>}

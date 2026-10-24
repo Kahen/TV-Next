@@ -9,12 +9,25 @@ describe("text subtitle conversion", () => {
     expect(result).toContain("Hello\nWorld");
     expect(result).toContain("00:01:01.000 --> 00:01:05.250");
   });
+  it("converts formatted ASS/SSA Dialogue with text commas but without executable styling", () => {
+    const source = "[Script Info]\nTitle: own fixture\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\nDialogue: 0,0:00:01.20,0:00:03.45,Default,,0,0,0,,{\\i1}Hello, <world>\\Nsecond line\nDialogue: 0,0:60:00.00,0:61:00.00,Default,,0,0,0,,bad";
+    const converted=toWebVtt(source,"demo.ass");
+    expect(converted).toContain("00:00:01.200 --> 00:00:03.450");
+    expect(converted).toContain("Hello, &lt;world&gt;\nsecond line");
+    expect(converted).not.toContain("i1");
+    expect(converted).not.toContain("bad");
+    expect(toWebVtt(source,"demo.ssa")).toBe(converted);
+  });
+  it("rejects malformed ASS records and UTF-8 multi-byte oversized files",()=>{
+    expect(()=>toWebVtt("[Events]\nFormat: Start,End,Text\nDialogue: 0:00:02.00,0:00:01.00,invalid","demo.ass")).toThrow("ASS/SSA");
+    expect(()=>toWebVtt("我".repeat(350_000),"demo.srt")).toThrow("1 MiB");
+  });
   it("passes through valid VTT", () => {
     expect(toWebVtt("WEBVTT\n\n00:00:00.000 --> 00:00:01.000\nHi", "en.vtt")).toMatch(/^WEBVTT/);
   });
   it("rejects unsupported or malformed captions", () => {
     expect(() => toWebVtt("broken", "broken.srt")).toThrow("时间轴");
-    expect(() => toWebVtt("TEXT", "broken.ass")).toThrow("仅支持");
+    expect(() => toWebVtt("TEXT", "broken.ass")).toThrow("ASS/SSA");
     expect(() => toWebVtt("", "empty.srt")).toThrow("字幕");
     expect(() => toWebVtt("A".repeat(1_048_577), "big.srt")).toThrow("1 MiB");
   });
