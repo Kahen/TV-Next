@@ -200,12 +200,9 @@ struct ContentView: View {
                     errorMessage = issue.localizedDescription
                 }
             }
-            .confirmationDialog(
-                "确定删除本机保存的播放列表、收藏和观看进度吗？",
-                isPresented: $isShowingClearConfirmation,
-                titleVisibility: .visible
-            ) {
+            .alert("删除本地媒体库？", isPresented: $isShowingClearConfirmation) {
                 Button("删除本地媒体库", role: .destructive) {
+                    isShowingClearConfirmation = false
                     importGeneration = UUID()
                     mediaGeneration = UUID()
                     isLoading = false
@@ -214,6 +211,9 @@ struct ContentView: View {
                     playlistText = ""
                     search = ""
                 }
+                Button("取消", role: .cancel) { }
+            } message: {
+                Text("确定删除本机保存的播放列表、收藏和观看进度吗？")
             }
             .fileImporter(isPresented: $choosingDanmaku, allowedContentTypes: [.xml, .json], allowsMultipleSelection: false) { result in
                 do {

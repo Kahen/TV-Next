@@ -23,6 +23,7 @@ final class LibraryUITests: XCTestCase {
     private func jump(_ name: String) {
         let menu = app.buttons["section-navigation"]
         XCTAssertTrue(menu.waitForExistence(timeout: 5))
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: menu)], timeout: 5), .completed)
         menu.tap()
         app.buttons[name].tap()
     }
@@ -62,7 +63,9 @@ final class LibraryUITests: XCTestCase {
         if clear.exists {
             reveal(clear)
             clear.tap()
-            app.buttons["删除本地媒体库"].tap()
+            app.alerts.buttons["删除本地媒体库"].tap()
+            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.alerts.firstMatch)], timeout: 5), .completed)
+            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: clear)], timeout: 5), .completed)
         }
     }
 
