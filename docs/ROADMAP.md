@@ -26,12 +26,12 @@ Tracking: https://github.com/Kahen/TV-Next/issues/2. Detailed implementation/aut
 - [x] Persistent playlists, favorites, history and bounded finite-VOD resume on Web/iOS; local files and private headers are excluded from persistence.
 - [x] M3U/static JSON file and paste imports, groups/search, M3U export, validation and invalid-import recovery.
 - [x] Local media inputs and external SRT/WebVTT text captions with timing offset.
-- [x] Speed controls; browser fullscreen/PiP APIs with unsupported feedback; native fullscreen retaining caption/danmaku overlays and portrait/landscape layout.
+- [x] Speed controls; browser fullscreen/PiP APIs with unsupported feedback; native fullscreen retaining caption/danmaku overlays, standard AVKit PiP on supported devices, and portrait/landscape layout.
 - [x] PWA manifest/raster icons and shell-only offline cache; no offline streaming claim.
 - [x] Keyboard/focus/active-view behavior on Web; labeled native controls, section navigation and large-text layout; lifecycle progress save and native background pause.
 - [x] Owned MP4/HLS playback regression on Chromium/Firefox/WebKit; native XCTest and production SwiftUI XCUI workflows for both iPhone/iPad simulators (PR #37 requires a passing final-head gate).
 
-Per explicit user instruction on 2026-10-25, close the implementation issue once code and automated acceptance pass; physical-device/installed-PWA acceptance is independently tracked in [#38](https://github.com/Kahen/TV-Next/issues/38). Native automatic PiP, background-media playback and AirPlay remain P4 implementation tasks (#5).
+Per explicit user instruction on 2026-10-25, close the implementation issue once code and automated acceptance pass; physical-device/installed-PWA acceptance is independently tracked in [#38](https://github.com/Kahen/TV-Next/issues/38). P1 basic system PiP is implemented; full background-media controls and AirPlay remain P4 implementation tasks (#5).
 
 ## P2 — FongMi core semantics
 

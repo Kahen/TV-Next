@@ -1,5 +1,6 @@
 import XCTest
 import AVFoundation
+import AVKit
 @testable import TVNext
 
 @MainActor
@@ -200,6 +201,28 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertNil(relayStore.player.currentItem)
         XCTAssertEqual(relayStore.player.rate, 0)
         XCTAssertTrue(relayStore.recent.isEmpty)
+    }
+
+    func testPictureInPictureBackgroundAndInterruptionPolicy() async throws {
+        store.playLocalFile(try fixture(), name: "fixture.mp4")
+        try await waitUntil { self.store.player.currentItem?.status == .readyToPlay && self.store.player.rate > 0 }
+        let coordinator = NativePlayerView.Coordinator(library: store, onRestore: {})
+        coordinator.playerViewControllerWillStartPictureInPicture(AVPlayerViewController())
+        store.suspendPlayback()
+        XCTAssertTrue(store.pictureInPictureActive)
+        XCTAssertGreaterThan(store.player.rate, 0, "Explicit PiP must survive backgrounding")
+        NotificationCenter.default.post(name: AVAudioSession.interruptionNotification, object: nil,
+            userInfo: [AVAudioSessionInterruptionTypeKey: AVAudioSession.InterruptionType.began.rawValue])
+        try await waitUntil { self.store.player.rate == 0 }
+        store.player.playImmediately(atRate: 1)
+        store.setPictureInPictureActive(false, appIsBackground: true)
+        XCTAssertEqual(store.player.rate, 0, "Stopping PiP in the background must pause")
+        var restored = false
+        let restoreCoordinator = NativePlayerView.Coordinator(library: store, onRestore: { restored = true })
+        var completed = false
+        restoreCoordinator.playerViewController(AVPlayerViewController(), restoreUserInterfaceForPictureInPictureStopWithCompletionHandler: { completed = $0 })
+        XCTAssertTrue(restored)
+        XCTAssertTrue(completed)
     }
 
 }

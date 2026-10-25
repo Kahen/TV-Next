@@ -287,7 +287,7 @@ struct ContentView: View {
     }
 
     private var playbackSurface: some View {
-        VideoPlayer(player: library.player)
+        NativePlayerView(library: library) { showingFullscreen = false; navigate(to: "player") }
                     .background(Color.black)
                     .overlay(alignment: .bottom) {
                         if !library.captionText.isEmpty {
@@ -320,6 +320,11 @@ struct ContentView: View {
                 }
                 .disabled(library.player.currentItem == nil)
                 .accessibilityIdentifier("enter-fullscreen")
+                Text(AVPictureInPictureController.isPictureInPictureSupported()
+                     ? "画中画：播放后使用系统播放器的画中画按钮。"
+                     : "此设备不支持系统画中画。")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("picture-in-picture-status")
 
                 HStack {
                     Text(library.localFileName ?? library.current?.name ?? "尚未选择媒体")

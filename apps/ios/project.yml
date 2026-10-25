@@ -22,6 +22,7 @@ targets:
       properties:
         CFBundleDisplayName: TV-Next
         UILaunchScreen: {}
+        UIBackgroundModes: [audio]
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationLandscapeLeft

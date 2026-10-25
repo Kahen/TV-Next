@@ -20,6 +20,8 @@ final class MediaLibraryStore: ObservableObject {
     @Published private(set) var current: TVChannel?
     @Published private(set) var localFileName: String?
     @Published private(set) var playbackError: String?
+    @Published private(set) var pictureInPictureActive = false
+    private var audioObservers: [NSObjectProtocol] = []
     @Published private(set) var captionText = ""
     @Published private(set) var captionOffset: TimeInterval = 0
 
@@ -76,6 +78,17 @@ final class MediaLibraryStore: ObservableObject {
         self.defaults = defaults
         self.createRelay = createRelay
         restore()
+        let center = NotificationCenter.default
+        audioObservers.append(center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] note in
+            guard let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+                  AVAudioSession.InterruptionType(rawValue: raw) == .began else { return }
+            Task { @MainActor [weak self] in self?.suspendPlayback(force: true) }
+        })
+        audioObservers.append(center.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) { [weak self] note in
+            guard let raw = note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
+                  AVAudioSession.RouteChangeReason(rawValue: raw) == .oldDeviceUnavailable else { return }
+            Task { @MainActor [weak self] in self?.suspendPlayback(force: true) }
+        })
         timeObserver = player.addPeriodicTimeObserver(
             forInterval: CMTime(seconds: 8, preferredTimescale: 600),
             queue: .main
@@ -91,6 +104,7 @@ final class MediaLibraryStore: ObservableObject {
     }
 
     deinit {
+        for observer in audioObservers { NotificationCenter.default.removeObserver(observer) }
         if let timeObserver { player.removeTimeObserver(timeObserver) }
         if let captionObserver { player.removeTimeObserver(captionObserver) }
         statusObservation?.invalidate()
@@ -168,6 +182,7 @@ final class MediaLibraryStore: ObservableObject {
         recentTimes[channel.url] = Date().timeIntervalSince1970 * 1000
         recentTimes = recentTimes.filter { key,_ in recent.contains(where: { $0.url == key }) }
 
+        guard prepareAudioSession() else { return }
         let item = AVPlayerItem(url: url)
         observe(item, resume: positions[channel.url])
         player.replaceCurrentItem(with: item)
@@ -188,6 +203,7 @@ final class MediaLibraryStore: ObservableObject {
         clearCaptions()
         statusObservation?.invalidate()
         playbackError = nil
+        guard prepareAudioSession() else { return }
         let item = AVPlayerItem(url: file)
         observe(item, resume: nil)
         player.replaceCurrentItem(with: item)
@@ -221,6 +237,7 @@ final class MediaLibraryStore: ObservableObject {
         else if let file = currentLocalFile, let name = localFileName {
             // Reuse the staged file; playLocalFile would discard it before reopening.
             playbackError = nil
+            guard prepareAudioSession() else { return }
             let item = AVPlayerItem(url: file)
             observe(item, resume: nil)
             player.replaceCurrentItem(with: item)
@@ -229,13 +246,31 @@ final class MediaLibraryStore: ObservableObject {
         }
     }
 
-    /// P1 pauses on background and never resumes without an explicit user action.
-    func suspendPlayback() {
+    private func prepareAudioSession() -> Bool {
+        do {
+            let audio = AVAudioSession.sharedInstance()
+            try audio.setCategory(.playback, mode: .moviePlayback)
+            try audio.setActive(true)
+            return true
+        } catch {
+            playbackError = "无法启用媒体音频，请重试播放。"
+            return false
+        }
+    }
+
+    func setPictureInPictureActive(_ active: Bool, appIsBackground: Bool = false) {
+        pictureInPictureActive = active
+        if !active && appIsBackground { suspendPlayback() }
+    }
+
+    /// Ordinary backgrounding pauses. An explicit PiP transition retains its installed item.
+    /// Pending requests are invalidated in either case and can never auto-start after suspension.
+    func suspendPlayback(force: Bool = false) {
         savePosition()
         relayGeneration = UUID()
         relayTask?.cancel()
         relayTask = nil
-        player.pause()
+        if force || !pictureInPictureActive { player.pause() }
     }
 
     func setCaptions(_ cues: [CaptionCue]) {
@@ -295,6 +330,7 @@ final class MediaLibraryStore: ObservableObject {
         statusObservation?.invalidate()
         current = nil
         requestedChannel = nil
+        pictureInPictureActive = false
         playbackError = nil
         channels = []
         favorites = []
