@@ -43,7 +43,7 @@ final class MediaLibraryStore: ObservableObject {
     private var timeObserver: Any?
     private var statusObservation: NSKeyValueObservation?
     private var requestedChannel: TVChannel?
-    private let createRelay: (TVNextAPI, NativeRelayRequest) async throws -> NativeRelayResponse
+    private let createRelay: @MainActor (TVNextAPI, NativeRelayRequest) async throws -> NativeRelayResponse
     private var relayAPI: TVNextAPI?
     private var relayContext=""
     private var relayTask: Task<Void,Never>?
@@ -70,7 +70,7 @@ final class MediaLibraryStore: ObservableObject {
     }
 
     init(defaults: UserDefaults = .standard,
-         createRelay: @escaping (TVNextAPI, NativeRelayRequest) async throws -> NativeRelayResponse = { api, request in
+         createRelay: @escaping @MainActor (TVNextAPI, NativeRelayRequest) async throws -> NativeRelayResponse = { api, request in
              try await api.request("home/media/sessions", body: request)
          }) {
         self.defaults = defaults

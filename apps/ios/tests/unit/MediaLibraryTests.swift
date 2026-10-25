@@ -142,6 +142,11 @@ final class MediaLibraryTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: empty) }
         do { _ = try await LocalMediaStager.stage(empty); XCTFail("Accepted an empty file") }
         catch { XCTAssertTrue(error is LocalMediaError) }
+        let handle = try FileHandle(forWritingTo: empty)
+        try handle.truncate(atOffset: 2_147_483_649) // Sparse file; no multi-GiB allocation.
+        try handle.close()
+        do { _ = try await LocalMediaStager.stage(empty); XCTFail("Accepted an oversized file") }
+        catch { XCTAssertTrue(error is LocalMediaError) }
         do { _ = try await LocalMediaStager.stage(empty.deletingPathExtension().appendingPathExtension("mkv")); XCTFail("Accepted unsupported format") }
         catch { XCTAssertTrue(error is LocalMediaError) }
     }
@@ -167,8 +172,11 @@ final class MediaLibraryTests: XCTestCase {
 
     func testSuspensionInvalidatesLateRelayCompletion() async throws {
         var pending: CheckedContinuation<NativeRelayResponse, Error>?
+        var returned = false
         let relayStore = MediaLibraryStore(defaults: defaults, createRelay: { _, _ in
-            try await withCheckedThrowingContinuation { pending = $0 }
+            let result: NativeRelayResponse = try await withCheckedThrowingContinuation { pending = $0 }
+            returned = true
+            return result
         })
         defer { relayStore.clear() }
         let session = NativeHomeSession(token: "unit-fixture", user: NativeHomeUser(id: "u", username: "fixture"),
@@ -182,6 +190,7 @@ final class MediaLibraryTests: XCTestCase {
         // Deliberately emulate a transport that finishes despite cancellation.
         pending?.resume(returning: NativeRelayResponse(path: "/api/v1/home/media/" + String(repeating: "a", count: 43) + "/0", expiresAt: Int64.max))
         pending = nil
+        try await waitUntil { returned }
         // Drain the actor so the late completion has been processed.
         for _ in 0..<10 { await Task.yield() }
         XCTAssertNil(relayStore.current)

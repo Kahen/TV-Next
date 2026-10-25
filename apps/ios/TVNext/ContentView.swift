@@ -23,6 +23,7 @@ struct ContentView: View {
     @State private var remoteDanmaku: [NativePlaybackResource] = []
     @State private var choosingDanmaku = false
     @State private var manualURL = ""
+    @State private var quickPlayError: String?
     @State private var playlistText = ""
     @State private var search = ""
     @State private var selection: LibraryView = .channels
@@ -365,9 +366,10 @@ struct ContentView: View {
                     dismissKeyboard()
                     let url = manualURL.trimmingCharacters(in: .whitespacesAndNewlines)
                     guard MediaAddress.valid(url) else {
-                        errorMessage = "请输入有效的 HTTP(S) 媒体地址。"
+                        quickPlayError = "请输入有效的 HTTP(S) 媒体地址。"
                         return
                     }
+                    quickPlayError = nil
                     errorMessage = nil
                     captionFileName = nil
                     library.play(TVChannel(name: "自定义播放地址", url: url,
@@ -375,6 +377,10 @@ struct ContentView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .accessibilityIdentifier("play-url")
+                if let quickPlayError {
+                    Text(quickPlayError).foregroundStyle(.red)
+                        .accessibilityIdentifier("quick-play-error")
+                }
             }
             .padding(.top, 8)
         }

@@ -106,6 +106,10 @@ final class LibraryUITests: XCTestCase {
 
     func testPlaybackErrorRetryFullscreenRotationAndBackgroundReturn() {
         jump("快速播放")
+        enter(app.textFields["manual-url"], "file:///not-allowed.mp4")
+        reveal(app.buttons["play-url"])
+        app.buttons["play-url"].tap()
+        XCTAssertTrue(app.staticTexts["quick-play-error"].exists)
         enter(app.textFields["manual-url"], "http://127.0.0.1:8765/missing.mp4")
         reveal(app.buttons["play-url"])
         app.buttons["play-url"].tap()
