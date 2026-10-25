@@ -11,6 +11,8 @@ private enum LibraryView: String, CaseIterable, Identifiable {
 }
 
 struct ContentView: View {
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var showingFullscreen = false
     @StateObject private var library = MediaLibraryStore()
     @StateObject private var remote = NativeRemoteControl()
     @AppStorage("tv-next-api-url") private var serverURL = "http://localhost:8080"
@@ -61,17 +63,18 @@ struct ContentView: View {
 
     var body: some View {
         NavigationStack {
+            ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     header
-                    playerSection
-                    quickPlaySection
-                    localMediaSection
-                    importSection
+                    playerSection.id("player")
+                    quickPlaySection.id("quick-play")
+                    localMediaSection.id("local-media")
+                    importSection.id("import")
                     HomeServerSection(serverURL:$serverURL,library:library,onSessionChange:{ homeSession=$0;remote.configure($0,server:$1);library.configureRelay(server:$1,session:$0) },remoteState:remote.state)
                     EpgSection(serverURL:serverURL,session:homeSession,channels:library.channels) { library.play($0) }
                         .id(serverURL+"|"+(homeSession?.token ?? ""))
-                    ConfigPreviewSection()
+                    ConfigPreviewSection().id("config")
                     CloudSection(serverURL: serverURL) { library.play($0) }
                     SubscriptionSection(serverURL: serverURL, session:homeSession, onPlay: { playback, title in
                         library.play(TVChannel(name: title + " · " + playback.name, url: playback.url, group: playback.lineName, logo: nil, tvgId: nil, headers:playback.headers))
@@ -84,7 +87,7 @@ struct ContentView: View {
                         library.play(channel)
                     }
                     danmakuSection
-                    librarySection
+                    librarySection.id("library")
 
                     Text("本地媒体库保存在这台设备；登录家庭服务器后可主动同步。不内置媒体源。")
                         .font(.caption)
@@ -94,7 +97,47 @@ struct ContentView: View {
                 .frame(maxWidth: .infinity)
                 .padding()
             }
+            .scrollDismissesKeyboard(.interactively)
             .navigationTitle("TV-Next")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Button("播放器") { proxy.scrollTo("player", anchor: .top) }
+                        Button("快速播放") { proxy.scrollTo("quick-play", anchor: .top) }
+                        Button("本机文件与字幕") { proxy.scrollTo("local-media", anchor: .top) }
+                        Button("导入播放列表") { proxy.scrollTo("import", anchor: .top) }
+                        Button("JSON 配置") { proxy.scrollTo("config", anchor: .top) }
+                        Button("媒体库") { proxy.scrollTo("library", anchor: .top) }
+                    } label: { Label("功能导航", systemImage: "line.3.horizontal") }
+                    .accessibilityIdentifier("section-navigation")
+                }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("收起键盘") { dismissKeyboard() }
+                }
+            }
+            .fullScreenCover(isPresented: $showingFullscreen) {
+                ZStack(alignment: .topTrailing) {
+                    Color.black.ignoresSafeArea()
+                    playbackSurface
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    Button { showingFullscreen = false } label: {
+                        Label("退出全屏", systemImage: "xmark.circle.fill")
+                            .padding().background(.ultraThinMaterial, in: Capsule())
+                    }
+                    .padding()
+                    .accessibilityIdentifier("exit-fullscreen")
+                }
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .inactive { library.savePosition() }
+                if phase == .background {
+                    library.suspendPlayback()
+                    remote.configure(nil, server: serverURL)
+                } else if phase == .active {
+                    remote.configure(homeSession, server: serverURL)
+                }
+            }
             .onAppear {
                 remote.receive = { packet in
                     switch packet.type {
@@ -169,10 +212,14 @@ struct ContentView: View {
             .onChange(of: library.current?.url) { _, url in danmaku = []; if url != remoteResourceKey { remoteDanmaku = [] } }
             .onDisappear {
                 remote.configure(nil,server:serverURL)
-                library.savePosition()
-                library.player.pause()
+                library.suspendPlayback()
+            }
             }
         }
+    }
+
+    private func dismissKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 
     private var danmakuSection: some View {
@@ -213,12 +260,8 @@ struct ContentView: View {
         }
     }
 
-    private var playerSection: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 12) {
-                VideoPlayer(player: library.player)
-                    .frame(minHeight: 215)
-                    .aspectRatio(16.0 / 9.0, contentMode: .fit)
+    private var playbackSurface: some View {
+        VideoPlayer(player: library.player)
                     .background(Color.black)
                     .overlay(alignment: .bottom) {
                         if !library.captionText.isEmpty {
@@ -237,10 +280,26 @@ struct ContentView: View {
                     .overlay { DanmakuOverlay(player: library.player, comments: danmaku, options: danmakuOptions).padding(.bottom, 44) }
                     .clipShape(RoundedRectangle(cornerRadius: 12))
 
+    }
+
+    private var playerSection: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 12) {
+                playbackSurface
+                    .frame(minHeight: 215)
+                    .aspectRatio(16.0 / 9.0, contentMode: .fit)
+                Button("全屏播放", systemImage: "arrow.up.left.and.arrow.down.right") {
+                    dismissKeyboard()
+                    showingFullscreen = true
+                }
+                .disabled(library.player.currentItem == nil)
+                .accessibilityIdentifier("enter-fullscreen")
+
                 HStack {
                     Text(library.localFileName ?? library.current?.name ?? "尚未选择媒体")
                         .font(.headline)
-                        .accessibilityLabel("正在播放：" + (library.localFileName ?? library.current?.name ?? "尚未选择媒体"))
+                        .accessibilityIdentifier("current-media")
+                    .accessibilityLabel("正在播放：" + (library.localFileName ?? library.current?.name ?? "尚未选择媒体"))
                     Spacer()
                     if let channel = library.current {
                         Button {
@@ -254,7 +313,12 @@ struct ContentView: View {
                         .buttonStyle(.bordered)
                     }
                 }
-                if let issue = library.playbackError { Text(issue).font(.caption).foregroundStyle(.red) }
+                if let issue = library.playbackError {
+                    Text(issue).font(.caption).foregroundStyle(.red)
+                        .accessibilityIdentifier("playback-error")
+                    Button("重试播放") { library.retryPlayback() }
+                        .accessibilityIdentifier("retry-playback")
+                }
                 Picker("播放速度", selection: $playbackSpeed) {
                     Text("0.75×").tag(Float(0.75))
                     Text("1×").tag(Float(1))
@@ -263,6 +327,7 @@ struct ContentView: View {
                     Text("2×").tag(Float(2))
                 }
                 .pickerStyle(.menu)
+                .accessibilityIdentifier("playback-speed")
                 .onChange(of: playbackSpeed) { _, speed in
                     library.setPlaybackSpeed(speed)
                 }
@@ -278,13 +343,16 @@ struct ContentView: View {
 
     private var quickPlaySection: some View {
         GroupBox("快速播放") {
-            HStack {
+            VStack(alignment: .leading, spacing: 10) {
                 TextField("https://example.org/movie.m3u8", text: $manualURL)
+                    .accessibilityLabel("媒体地址")
+                    .accessibilityIdentifier("manual-url")
                     .keyboardType(.URL)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .textFieldStyle(.roundedBorder)
                 Button("播放") {
+                    dismissKeyboard()
                     let url = manualURL.trimmingCharacters(in: .whitespacesAndNewlines)
                     guard MediaAddress.valid(url) else {
                         errorMessage = "请输入有效的 HTTP(S) 媒体地址。"
@@ -296,6 +364,7 @@ struct ContentView: View {
                                            group: "Manual", logo: nil, tvgId: nil))
                 }
                 .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("play-url")
             }
             .padding(.top, 8)
         }
@@ -360,8 +429,12 @@ struct ContentView: View {
                 .buttonStyle(.bordered)
 
                 TextEditor(text: $playlistText)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
                     .font(.system(.footnote, design: .monospaced))
                     .frame(height: 120)
+                    .accessibilityLabel("M3U 内容")
+                    .accessibilityIdentifier("playlist-input")
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(.gray.opacity(0.3)))
 
                 Toggle("使用自建 API 解析", isOn: $useRemoteParser)
@@ -388,14 +461,17 @@ struct ContentView: View {
                 }
 
                 Button(isLoading ? "解析中…" : "导入频道") {
+                    dismissKeyboard()
                     Task { await importPlaylist() }
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(isLoading)
+                .accessibilityIdentifier("import-playlist")
                 if let errorMessage {
                     Text(errorMessage)
                         .foregroundStyle(.red)
                         .font(.footnote)
+                        .accessibilityIdentifier("import-error")
                         .accessibilityAddTraits(.updatesFrequently)
                 }
             }
@@ -411,10 +487,12 @@ struct ContentView: View {
                         Text(tab.rawValue).tag(tab)
                     }
                 }
-                .pickerStyle(.segmented)
+                .pickerStyle(.menu)
+                .accessibilityIdentifier("library-collection")
 
                 TextField("按频道名称或分组搜索", text: $search)
                     .textFieldStyle(.roundedBorder)
+                    .accessibilityIdentifier("library-search")
 
                 if visibleChannels.isEmpty {
                     Text(selection == .favorites ? "还没有收藏的频道。" :
@@ -445,6 +523,9 @@ struct ContentView: View {
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
+                            .accessibilityLabel("播放 " + channel.name)
+                            .accessibilityIdentifier("channel-" + channel.name)
+                            .accessibilityAddTraits(library.current?.url == channel.url ? .isSelected : [])
 
                             Button {
                                 library.toggleFavorite(channel)
@@ -452,6 +533,8 @@ struct ContentView: View {
                                 Image(systemName: library.isFavorite(channel) ? "star.fill" : "star")
                                     .foregroundStyle(.yellow)
                             }
+                            .frame(minWidth: 44, minHeight: 44)
+                            .accessibilityIdentifier("favorite-" + channel.name)
                             .accessibilityLabel(library.isFavorite(channel) ?
                                 "取消收藏 " + channel.name : "收藏 " + channel.name)
                             .buttonStyle(.plain)
@@ -465,6 +548,7 @@ struct ContentView: View {
                         isShowingClearConfirmation = true
                     }
                     .font(.footnote)
+                    .accessibilityIdentifier("clear-library")
                 }
             }
             .padding(.top, 8)
@@ -485,7 +569,10 @@ struct ContentView: View {
             } else {
                 channels = try M3UParser.parse(playlistText)
             }
-            library.importChannels(channels)
+            guard library.importChannels(channels) else {
+                errorMessage = "未找到可播放的 HTTP(S) 频道，已保留原有媒体库。"
+                return
+            }
             selection = .channels
             search = ""
             errorMessage = channels.isEmpty ? "没有找到 HTTP(S) 频道。" : nil

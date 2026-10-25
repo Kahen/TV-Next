@@ -96,3 +96,46 @@ test("keyboard users can skip navigation, identify active view and reach M3U fil
   await channel.click();
   await expect(channel).toHaveAttribute("aria-pressed","true");
 });
+
+test("pagehide flushes the latest finite-VOD clock before React effects",async({page})=>{
+  await importPlaylist(page);await select(page,"Fixture MP4");
+  await page.locator("video").evaluate(async node=>{
+    const video=node as HTMLVideoElement;video.pause();video.currentTime=28;
+    await new Promise<void>(resolve=>video.addEventListener("seeked",()=>resolve(),{once:true}));
+    // Exercise the actual lifecycle listener; no pause event or React flush is required.
+    window.dispatchEvent(new PageTransitionEvent("pagehide"));
+    const value=JSON.parse(localStorage.getItem("tv-next-library-v1")||"{}");
+    if(value.positions?.["http://127.0.0.1:8765/fixture.mp4"]!==28)throw Error("Latest clock was not saved synchronously");
+  });
+  await page.reload();await select(page,"Fixture MP4");
+  await expect.poll(()=>page.locator("video").evaluate(v=>(v as HTMLVideoElement).currentTime)).toBeGreaterThanOrEqual(27);
+});
+
+test("production PWA has raster icons and reloads its shell offline without caching API or media",async({page,context})=>{
+  await page.evaluate(async()=>{await navigator.serviceWorker.ready;});
+  await page.reload();
+  await expect.poll(()=>page.evaluate(()=>!!navigator.serviceWorker.controller)).toBe(true);
+  await importPlaylist(page);await select(page,"Fixture MP4");
+  const manifest=await (await page.request.get("/manifest.webmanifest")).json();
+  expect(manifest.id).toBe("/");
+  for(const size of [192,512]){
+    const icon=manifest.icons.find((item:{sizes:string,type:string})=>item.sizes===`${size}x${size}`&&item.type==="image/png");
+    expect(icon).toBeTruthy();
+    const response=await page.request.get(icon.src);expect(response.ok()).toBe(true);
+    const bytes=await response.body();expect(bytes.readUInt32BE(16)).toBe(size);expect(bytes.readUInt32BE(20)).toBe(size);
+  }
+  // Fetch events finish their cache writes asynchronously, so wait for the built entry asset.
+  await expect.poll(()=>page.evaluate(async()=>{
+    const cache=await caches.open("tv-next-shell-v2");return (await cache.keys()).some(request=>new URL(request.url).pathname.endsWith(".js"));
+  })).toBe(true);
+  const cached=await page.evaluate(async()=>{
+    const names=await caches.keys();return (await Promise.all(names.map(async name=>(await (await caches.open(name)).keys()).map(r=>r.url)))).flat();
+  });
+  expect(cached.every(url=>!url.includes("/api/")&&!url.includes(":8765/")&&!/\.(mp4|m3u8|ts)(\?|$)/.test(url))).toBe(true);
+  await context.setOffline(true);
+  try{
+    await page.reload({waitUntil:"domcontentloaded"});
+    await expect(page.getByRole("textbox",{name:"M3U 内容"})).toBeVisible();
+    await expect(page.locator("button.channel").filter({hasText:"Fixture MP4"})).toBeVisible();
+  }finally{await context.setOffline(false);}
+});

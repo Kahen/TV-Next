@@ -1,6 +1,6 @@
 /* Minimal offline application shell; never cache media URLs, API responses, or user data. */
-const CACHE = "tv-next-shell-v1";
-const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/icon.svg"];
+const CACHE = "tv-next-shell-v2";
+const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/icon.svg", "/icon-180.png", "/icon-192.png", "/icon-512.png"];
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting()));
 });
@@ -28,8 +28,14 @@ self.addEventListener("fetch", (event) => {
     }));
     return;
   }
-  event.respondWith(fetch(request).catch(async () => {
-    const cached = await caches.match(url.pathname === "/" ? "/index.html" : request);
-    return cached || Response.error();
+  event.respondWith(caches.open(CACHE).then(async (cache) => {
+    const key = url.pathname === "/" ? "/index.html" : url.pathname;
+    try {
+      const response = await fetch(request);
+      if (response.ok) await cache.put(key, response.clone());
+      return response;
+    } catch {
+      return (await cache.match(key)) || Response.error();
+    }
   }));
 });

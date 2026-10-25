@@ -150,12 +150,25 @@ export default function App() {
     const onError = () => setPlayerError("播放失败：媒体地址不可访问、跨域限制或编解码不兼容。");
     const onTimeUpdate = () => remember(false);
     const onPause = () => remember(true);
+    // React effects may not flush during pagehide. Persist the latest clock synchronously.
+    const onPageHide = () => {
+      if (isLocal) return;
+      const next = setPosition(libraryRef.current, positionKey, video.currentTime, video.duration);
+      libraryRef.current = next;
+      saveLibrary(next);
+      setLibrary(next);
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") onPageHide();
+    };
     const onEnded = () => {
       if (!isLocal && Number.isFinite(video.duration)) {
         setLibrary((state) => setPosition(state, positionKey, video.duration, video.duration));
       }
     };
 
+    window.addEventListener("pagehide", onPageHide);
+    document.addEventListener("visibilitychange", onVisibilityChange);
     video.addEventListener("loadedmetadata", resume);
     video.addEventListener("error", onError);
     video.addEventListener("timeupdate", onTimeUpdate);
@@ -182,6 +195,8 @@ export default function App() {
 
     return () => {
       remember(true);
+      window.removeEventListener("pagehide", onPageHide);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       video.removeEventListener("loadedmetadata", resume);
       video.removeEventListener("error", onError);
       video.removeEventListener("timeupdate", onTimeUpdate);

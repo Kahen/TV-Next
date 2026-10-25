@@ -22,6 +22,48 @@ targets:
       properties:
         CFBundleDisplayName: TV-Next
         UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
         NSLocalNetworkUsageDescription: 用于连接你配置的局域网媒体服务器、网盘及遥控设备。
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
+  TVNextTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: tests/unit
+        excludes: [Fixtures]
+      - path: tests/unit/Fixtures
+        buildPhase: resources
+    dependencies:
+      - target: TVNext
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+  TVNextUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: tests/ui
+    dependencies:
+      - target: TVNext
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  TVNext:
+    build:
+      targets:
+        TVNext: all
+    test:
+      gatherCoverageData: true
+      targets:
+        - name: TVNextTests
+        - name: TVNextUITests

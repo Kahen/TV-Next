@@ -17,6 +17,7 @@ on:
 jobs:
   simulator-build:
     runs-on: macos-15
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - name: Install XcodeGen
@@ -67,3 +68,53 @@ jobs:
       - name: Build for iOS Simulator (unsigned)
         working-directory: apps/ios
         run: xcodebuild -project TVNext.xcodeproj -scheme TVNext -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+      - name: Install synthetic media fixture tool
+        run: brew install ffmpeg
+      - name: Exercise native store and production SwiftUI on iPhone and iPad
+        working-directory: apps/ios
+        run: |
+          set -euo pipefail
+          python3 ../../scripts/browser_media_fixture.py > /tmp/tvnext-native-fixture.log 2>&1 &
+          fixture_pid=$!
+          trap 'kill "$fixture_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..90}; do
+            if curl --fail --silent http://127.0.0.1:8765/fixture.mp4 -o tests/unit/Fixtures/fixture.mp4; then break; fi
+            sleep 1
+          done
+          test -s tests/unit/Fixtures/fixture.mp4
+          # Regenerate now that the owned synthetic resource exists.
+          xcodegen generate
+          xcrun simctl list devices available --json > /tmp/tvnext-simulators.json
+          python3 - <<'PYTHON'
+          import json
+          from pathlib import Path
+          devices = [d for group in json.loads(Path('/tmp/tvnext-simulators.json').read_text())['devices'].values() for d in group if d.get('isAvailable')]
+          selected = []
+          for family in ('iPhone', 'iPad'):
+              match = next((d for d in devices if d['name'].startswith(family)), None)
+              if match is None:
+                  raise SystemExit(f'No available {family} simulator: refuse to skip UI acceptance')
+              selected.append(match['udid'])
+          Path('/tmp/tvnext-destinations.txt').write_text('\n'.join(selected) + '\n')
+          PYTHON
+          index=0
+          while IFS= read -r device; do
+            index=$((index + 1))
+            xcrun simctl boot "$device" || true
+            xcrun simctl bootstatus "$device" -b
+            xcrun simctl ui "$device" appearance light
+            xcodebuild -project TVNext.xcodeproj -scheme TVNext -configuration Debug \
+              -destination "platform=iOS Simulator,id=$device" \
+              -parallel-testing-enabled NO -maximum-concurrent-test-simulator-destinations 1 \
+              -resultBundlePath "native-$index.xcresult" CODE_SIGNING_ALLOWED=NO test
+            xcrun simctl shutdown "$device"
+          done < /tmp/tvnext-destinations.txt
+      - name: Retain native test results and fixture diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-simulator-acceptance
+          path: |
+            apps/ios/*.xcresult
+            /tmp/tvnext-native-fixture.log
+          retention-days: 14
