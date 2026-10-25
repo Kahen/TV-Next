@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "test": "vitest run src",
     "preview": "vite preview --host 0.0.0.0",
-    "test:e2e": "tsc -p tsconfig.e2e.json && playwright test"
+    "test:e2e": "tsc -p tsconfig.e2e.json && playwright test",
+    "prebuild": "node scripts/generate-icons.mjs"
   },
   "dependencies": {
     "hls.js": "1.6.13",

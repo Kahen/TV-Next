@@ -20,6 +20,8 @@ final class MediaLibraryStore: ObservableObject {
     @Published private(set) var current: TVChannel?
     @Published private(set) var localFileName: String?
     @Published private(set) var playbackError: String?
+    @Published private(set) var pictureInPictureActive = false
+    private var audioObservers: [NSObjectProtocol] = []
     @Published private(set) var captionText = ""
     @Published private(set) var captionOffset: TimeInterval = 0
 
@@ -32,14 +34,18 @@ final class MediaLibraryStore: ObservableObject {
     @Published private(set) var playbackSpeed: Float = 1.0
 
     func setPlaybackSpeed(_ speed: Float) {
+        guard speed.isFinite else { return }
         let accepted = min(2, max(0.75, speed))
         playbackSpeed = accepted
         player.defaultRate = accepted
         if player.timeControlStatus == .playing { player.rate = accepted }
     }
     private let storageKey = "tv-next-library-v1"
+    private let defaults: UserDefaults
     private var timeObserver: Any?
     private var statusObservation: NSKeyValueObservation?
+    private var requestedChannel: TVChannel?
+    private let createRelay: @MainActor (TVNextAPI, NativeRelayRequest) async throws -> NativeRelayResponse
     private var relayAPI: TVNextAPI?
     private var relayContext=""
     private var relayTask: Task<Void,Never>?
@@ -65,8 +71,24 @@ final class MediaLibraryStore: ObservableObject {
         activeRelay=nil
     }
 
-    init() {
+    init(defaults: UserDefaults = .standard,
+         createRelay: @escaping @MainActor (TVNextAPI, NativeRelayRequest) async throws -> NativeRelayResponse = { api, request in
+             try await api.request("home/media/sessions", body: request)
+         }) {
+        self.defaults = defaults
+        self.createRelay = createRelay
         restore()
+        let center = NotificationCenter.default
+        audioObservers.append(center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] note in
+            guard let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+                  AVAudioSession.InterruptionType(rawValue: raw) == .began else { return }
+            Task { @MainActor [weak self] in self?.suspendPlayback(force: true) }
+        })
+        audioObservers.append(center.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) { [weak self] note in
+            guard let raw = note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
+                  AVAudioSession.RouteChangeReason(rawValue: raw) == .oldDeviceUnavailable else { return }
+            Task { @MainActor [weak self] in self?.suspendPlayback(force: true) }
+        })
         timeObserver = player.addPeriodicTimeObserver(
             forInterval: CMTime(seconds: 8, preferredTimescale: 600),
             queue: .main
@@ -82,6 +104,7 @@ final class MediaLibraryStore: ObservableObject {
     }
 
     deinit {
+        for observer in audioObservers { NotificationCenter.default.removeObserver(observer) }
         if let timeObserver { player.removeTimeObserver(timeObserver) }
         if let captionObserver { player.removeTimeObserver(captionObserver) }
         statusObservation?.invalidate()
@@ -89,16 +112,21 @@ final class MediaLibraryStore: ObservableObject {
         LocalMediaStager.discard(currentLocalFile)
     }
 
-    func importChannels(_ input: [TVChannel]) {
+    @discardableResult
+    func importChannels(_ input: [TVChannel]) -> Bool {
         // Preserve the original order and remove duplicate stream URLs.
         var seen = Set<String>()
-        channels = Array(input.filter {
+        let replacement = Array(input.filter {
             MediaAddress.valid($0.url) && seen.insert($0.url).inserted
         }.prefix(1500))
+        guard !replacement.isEmpty else { return false }
+        channels = replacement
         persist()
+        return true
     }
 
     func toggleFavorite(_ channel: TVChannel) {
+        guard MediaAddress.valid(channel.url) else { return }
         if favorites.contains(channel.url) {
             favorites.removeAll { $0 == channel.url }
         } else {
@@ -114,19 +142,23 @@ final class MediaLibraryStore: ObservableObject {
 
     func play(_ channel: TVChannel) {
         playbackError = nil
+        guard MediaAddress.valid(channel.url), let url = URL(string: channel.url) else { return }
+        savePosition()
+        cancelRelay()
+        statusObservation?.invalidate()
+        player.pause()
+        player.replaceCurrentItem(with: nil)
+        requestedChannel = channel
         if channel.headersRequired == true {
             playbackError = "媒体库未保存此来源的私密请求头，请重新加载订阅后播放。"
             return
         }
-        guard MediaAddress.valid(channel.url), let url = URL(string: channel.url) else { return }
-        savePosition()
-        cancelRelay()
         if !(channel.headers ?? [:]).isEmpty {
             guard let api=relayAPI else { playbackError="请先登录当前家庭服务器，以适配此来源的播放请求头。";return }
             let generation=relayGeneration
             relayTask=Task { @MainActor in
                 do {
-                    let result: NativeRelayResponse=try await api.request("home/media/sessions",body:NativeRelayRequest(url:channel.url,headers:channel.headers ?? [:]))
+                    let result: NativeRelayResponse=try await createRelay(api, NativeRelayRequest(url:channel.url,headers:channel.headers ?? [:]))
                     let address=try MediaRelayAddress.resolve(result.path,server:api.server)
                     guard !Task.isCancelled,relayGeneration==generation else { release(api,address.ticket);return }
                     activeRelay=(api,address.ticket)
@@ -153,22 +185,16 @@ final class MediaLibraryStore: ObservableObject {
         recentTimes[channel.url] = Date().timeIntervalSince1970 * 1000
         recentTimes = recentTimes.filter { key,_ in recent.contains(where: { $0.url == key }) }
 
+        guard prepareAudioSession() else { return }
         let item = AVPlayerItem(url: url)
-        let resume = positions[channel.url]
-        if let resume, resume >= 5 {
-            statusObservation = item.observe(\.status, options: [.new]) { [weak self] observed, _ in
-                guard observed.status == .readyToPlay else { return }
-                Task { @MainActor [weak self] in
-                    self?.player.seek(to: CMTime(seconds: resume, preferredTimescale: 600))
-                }
-            }
-        }
+        observe(item, resume: positions[channel.url])
         player.replaceCurrentItem(with: item)
         player.playImmediately(atRate: playbackSpeed)
         persist()
     }
 
     func playLocalFile(_ file: URL, name: String) {
+        requestedChannel = nil
         savePosition()
         cancelRelay()
         player.pause()
@@ -179,9 +205,75 @@ final class MediaLibraryStore: ObservableObject {
         current = nil
         clearCaptions()
         statusObservation?.invalidate()
-        player.replaceCurrentItem(with: AVPlayerItem(url: file))
+        playbackError = nil
+        guard prepareAudioSession() else { return }
+        let item = AVPlayerItem(url: file)
+        observe(item, resume: nil)
+        player.replaceCurrentItem(with: item)
         player.playImmediately(atRate: playbackSpeed)
         // Local sandbox files are intentionally NOT added to persistent library/history.
+    }
+
+    /// Status callbacks may arrive after another selection, clear or relay cancellation.
+    /// Only the currently installed item may change UI state or seek the player.
+    private func observe(_ item: AVPlayerItem, resume: Double?) {
+        statusObservation?.invalidate()
+        statusObservation = item.observe(\.status, options: [.initial, .new]) { [weak self] observed, _ in
+            Task { @MainActor [weak self] in
+                guard let self, self.player.currentItem === observed else { return }
+                if observed.status == .failed {
+                    self.playbackError = "播放失败：媒体不可访问或编解码不受支持。可重试或选择其他媒体。"
+                } else if observed.status == .readyToPlay {
+                    self.playbackError = nil
+                    if let resume, resume.isFinite, resume >= 5 {
+                        let duration = observed.duration.seconds
+                        guard duration.isFinite, duration >= 60, duration - resume >= 15 else { return }
+                        self.player.seek(to: CMTime(seconds: resume, preferredTimescale: 600))
+                    }
+                }
+            }
+        }
+    }
+
+    func retryPlayback() {
+        if let requestedChannel { play(requestedChannel) }
+        else if let file = currentLocalFile, let name = localFileName {
+            // Reuse the staged file; playLocalFile would discard it before reopening.
+            playbackError = nil
+            guard prepareAudioSession() else { return }
+            let item = AVPlayerItem(url: file)
+            observe(item, resume: nil)
+            player.replaceCurrentItem(with: item)
+            player.playImmediately(atRate: playbackSpeed)
+            localFileName = name
+        }
+    }
+
+    private func prepareAudioSession() -> Bool {
+        do {
+            let audio = AVAudioSession.sharedInstance()
+            try audio.setCategory(.playback, mode: .moviePlayback)
+            try audio.setActive(true)
+            return true
+        } catch {
+            playbackError = "无法启用媒体音频，请重试播放。"
+            return false
+        }
+    }
+
+    func setPictureInPictureActive(_ active: Bool, appIsBackground: Bool = false) {
+        pictureInPictureActive = active
+        if !active && appIsBackground { suspendPlayback() }
+    }
+
+    /// Ordinary backgrounding pauses. An explicit PiP transition retains its installed item.
+    /// Pending requests are invalidated in either case and can never auto-start after suspension.
+    func suspendPlayback(force: Bool = false) {
+        savePosition()
+        relayGeneration = UUID()
+        relayTask?.cancel()
+        relayTask = nil
+        if force || !pictureInPictureActive { player.pause() }
     }
 
     func setCaptions(_ cues: [CaptionCue]) {
@@ -240,28 +332,33 @@ final class MediaLibraryStore: ObservableObject {
         clearCaptions()
         statusObservation?.invalidate()
         current = nil
+        requestedChannel = nil
+        pictureInPictureActive = false
+        playbackError = nil
         channels = []
         favorites = []
         recent = []
         recentTimes = [:]
         positions = [:]
-        UserDefaults.standard.removeObject(forKey: storageKey)
+        defaults.removeObject(forKey: storageKey)
     }
 
     private func restore() {
-        guard let data = UserDefaults.standard.data(forKey: storageKey),
+        guard let data = defaults.data(forKey: storageKey),
               data.count <= 2_000_000,
               let saved = try? JSONDecoder().decode(SavedLibrary.self, from: data),
               saved.version == 1 else { return }
-        channels = Array(saved.channels.filter { MediaAddress.valid($0.url) }.prefix(1500))
+        var seenChannels = Set<String>()
+        channels = Array(saved.channels.filter { MediaAddress.valid($0.url) && seenChannels.insert($0.url).inserted }.prefix(1500))
         var seenFavorites = Set<String>()
         favorites = Array(saved.favorites.filter {
             MediaAddress.valid($0) && seenFavorites.insert($0).inserted
         }.prefix(300))
-        recent = Array(saved.recent.filter { MediaAddress.valid($0.url) }.prefix(100))
-        recentTimes = saved.recentTimes ?? [:]
-        positions = saved.positions.filter { MediaAddress.valid($0.key) && $0.value.isFinite &&
-            $0.value >= 0 && $0.value < 604800 }
+        var seenRecent = Set<String>()
+        recent = Array(saved.recent.filter { MediaAddress.valid($0.url) && seenRecent.insert($0.url).inserted }.prefix(100))
+        recentTimes = (saved.recentTimes ?? [:]).filter { MediaAddress.valid($0.key) && $0.value.isFinite && $0.value >= 0 }
+        positions = Dictionary(uniqueKeysWithValues: saved.positions.filter { MediaAddress.valid($0.key) && $0.value.isFinite &&
+            $0.value >= 0 && $0.value < 604800 }.sorted { $0.key < $1.key }.prefix(250).map { ($0.key, $0.value) })
     }
 
     func syncedSnapshot() -> NativeLibrarySnapshot {
@@ -289,6 +386,6 @@ final class MediaLibraryStore: ObservableObject {
             recent: recent.map(safeSnapshot), positions: positions, recentTimes: recentTimes
         )
         guard let data = try? JSONEncoder().encode(value), data.count <= 2_000_000 else { return }
-        UserDefaults.standard.set(data, forKey: storageKey)
+        defaults.set(data, forKey: storageKey)
     }
 }

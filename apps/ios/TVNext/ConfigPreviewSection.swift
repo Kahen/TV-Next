@@ -37,18 +37,25 @@ struct ConfigPreviewSection: View {
             }
             .buttonStyle(.bordered)
             TextEditor(text: $configText)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
                 .font(.system(.footnote, design: .monospaced))
                 .frame(height: 120)
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(.gray.opacity(0.3)))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(.gray.opacity(0.3)).allowsHitTesting(false))
                 .accessibilityLabel("JSON 配置内容")
+                .accessibilityIdentifier("config-input")
                 .onChange(of: configText) { _, _ in
                     preview = nil
                     errorMessage = nil
                 }
+            Button("清空输入") { configText = "" }
+                .disabled(configText.isEmpty)
+                .accessibilityIdentifier("clear-config-input")
             Button("检查 JSON 配置") {
                 inspect()
             }
             .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier("inspect-config")
         }
     }
 
@@ -56,6 +63,7 @@ struct ConfigPreviewSection: View {
     private var resultDetails: some View {
         if let errorMessage {
             Text(errorMessage)
+                .accessibilityIdentifier("config-error")
                 .foregroundStyle(.red)
                 .font(.footnote)
         }

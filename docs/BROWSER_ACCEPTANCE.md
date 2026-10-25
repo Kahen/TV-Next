@@ -21,3 +21,5 @@ npm run test:e2e
 ```
 
 Install FFmpeg on the host first. The test fixture server starts/stops with Playwright. `TV_NEXT_TEST_WEB_URL` can override `http://127.0.0.1:3000`. Use an isolated fixture deployment and fresh browser contexts; these tests must not run against an account containing personal media. This is code-level browser evidence, not physical Apple-device, Safari/macOS, DRM, real IPTV/cloud-provider, PiP/background, energy or accessibility certification.
+
+P1 completion adds pagehide clock persistence, deterministic raster PWA icons and controlled offline-shell reload tests on each engine. Cache inspection rejects API/media entries. Physical installed-PWA acceptance is tracked separately in #38; the service worker never provides offline media streaming.

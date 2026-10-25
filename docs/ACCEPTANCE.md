@@ -1,6 +1,6 @@
 # TV-Next P0–P6 acceptance gates
 
-**A committed feature is not proof of a working feature.** Do not close milestones without reproducible CI, device tests where applicable, compatibility fixtures, security evidence and updated docs.
+**A committed feature is not proof of a working feature.** Implementation completion requires reproducible automated evidence, compatibility fixtures and updated docs. Per explicit user instruction (2026-10-25), implementation issues may close after code/automated acceptance, while physical-device testing stays in a separate open issue. P1 physical acceptance is #38; release acceptance still requires applicable device/security/signing evidence.
 
 ## Required for every PR
 
@@ -17,7 +17,7 @@
 | Phase | Completion gate | Current blocker |
 | --- | --- | --- |
 | P0 | Clean checkout, Docker smoke, API/Web/iOS build | GitHub Linux Docker Compose smoke verified; independent NAS deployment and Apple real-device behavior not yet verified |
-| P1 | Real iPhone/iPad and browsers HLS/MP4/local media, subtitle/PiP, PWA/a11y, persistence | Physical Apple device/browser matrix pending |
+| P1 | Implementation: persistent library/import/player/UI plus browser E2E and iPhone/iPad simulator tests (PR #37). Physical: separate #38 | Final-head automation must pass to close #2; physical codec/lifecycle/installed-PWA acceptance remains #38 |
 | P2 | Real permitted FongMi corpus: home, category, search, details, episodes, line selection, IPTV XMLTV/EPG; Web and iOS parity | Type 0/1/2/4 source browsing, native guide and feed cache/scheduler implemented; real corpus and remaining search/filter/catch-up required |
 | P3 | Java/JAR, JS and Python permitted Spider fixtures; isolated runtime; egress deny, crash, quota and timeout tests; Android-specific plugin limits disclosed | Bundled fixed-data Node/Python/Java Docker process harness prototyped; dynamic Java/JAR adapter, real Spider compatibility corpus, runtime integration and security review missing; non-executing JVM bytecode preflight is available but is not security approval |
 | P4 | Real-device codecs, ASS/danmaku, PiP/background, AirPlay/DLNA, SMB/WebDAV, transcoding when claimed | Major advanced modules unimplemented |
@@ -64,3 +64,7 @@ Reference Android source is pinned to `Kahen/TV` commit `0af3b31a1783b8fa4f0ce12
 Local Web: 27 tests and production build passed. Local API: initial suite successful with 43 cases, 42 passed and 1 LAN-interface-dependent redirect integration check skipped; later source-page and repeatable-header regressions add 2 cases; skipped is not acceptance evidence. CI now publishes exact pass/fail/skip counts and preserves JUnit/HTML artifacts. The final PR head must pass the complete workflow before merge; previous green runs are not proof for later commits.
 
 This does not complete P1–P6: actual type 3 Spider, direct cloud login/QR/OAuth, native header-dependent media adaptation, remaining advanced modules, account/sync services, physical playback, independent security review and signed releases remain outstanding. No issues or milestones are closed on the basis of these fixtures.
+
+## P1 implementation / physical acceptance split — 2026-10-25
+
+[P1_IMPLEMENTATION.md](P1_IMPLEMENTATION.md) maps every implementation task to automated checks. [PR #37](https://github.com/Kahen/TV-Next/pull/37) adds iPhone/iPad XCTest/XCUI, fullscreen, lifecycle/error recovery and PWA shell acceptance. The final-head aggregate workflow must pass before implementation issue #2 closes. Physical hardware and installed-PWA checks remain explicitly open in [#38](https://github.com/Kahen/TV-Next/issues/38). This split was requested by the user; it does not establish physical playback or P4/P6 completion.

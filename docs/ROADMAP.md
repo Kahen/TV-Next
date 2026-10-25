@@ -21,17 +21,17 @@ Acceptance: Web dev server works; API tests pass; import an explicitly provided 
 
 ## P1 — Media browsing and playback MVP
 
-Tracking: https://github.com/Kahen/TV-Next/issues/2
+Tracking: https://github.com/Kahen/TV-Next/issues/2. Detailed implementation/automation map: [P1_IMPLEMENTATION.md](P1_IMPLEMENTATION.md).
 
-- [x] Implement device-local persistence for playlists, recents, favorites and finite-VOD playback progress (Web unit-tested, iOS simulator build-tested; cross-device sync not yet available)
-- [x] Support JSON config import (file/paste) and site metadata display on Web/iOS, with bounded input (iOS parser smoke tests; unsigned simulator build, real-device validation pending)
-- [x] Initial playlist group display, search, and favorites on Web/iOS (full accessibility audit pending)
-- [ ] Web compatible local file picker and iOS security-scoped local-file staging implemented; codec/format playback and device storage testing remain
-- [ ] Web and iOS speed selectors, Web fullscreen/PiP best-effort controls added; native and device verification still pending
-- [ ] PWA manifest + shell-only service worker added; real install tests, iPad Split View, orientation and accessibility remain
-- [ ] UTF-8 SRT/WebVTT implemented on Web and iOS (native caption overlay); M3U export on both, E2E and API contract tests remain
+- [x] Persistent playlists, favorites, history and bounded finite-VOD resume on Web/iOS; local files and private headers are excluded from persistence.
+- [x] M3U/static JSON file and paste imports, groups/search, M3U export, validation and invalid-import recovery.
+- [x] Local media inputs and external SRT/WebVTT text captions with timing offset.
+- [x] Speed controls; browser fullscreen/PiP APIs with unsupported feedback; native fullscreen retaining caption/danmaku overlays, standard AVKit PiP on supported devices, and portrait/landscape layout.
+- [x] PWA manifest/raster icons and shell-only offline cache; no offline streaming claim.
+- [x] Keyboard/focus/active-view behavior on Web; labeled native controls, section navigation and large-text layout; lifecycle progress save and native background pause.
+- [x] Owned MP4/HLS playback regression on Chromium/Firefox/WebKit; native XCTest and production SwiftUI XCUI workflows for both iPhone/iPad simulators (PR #37 requires a passing final-head gate).
 
-Acceptance pending: equivalent catalog handling and history semantics across Web/iOS using golden fixtures, browser restrictions (CORS/codecs) documented, actual device tests. Device-local storage is NOT synchronization.
+Per explicit user instruction on 2026-10-25, close the implementation issue once code and automated acceptance pass; physical-device/installed-PWA acceptance is independently tracked in [#38](https://github.com/Kahen/TV-Next/issues/38). P1 basic system PiP is implemented; full background-media controls and AirPlay remain P4 implementation tasks (#5).
 
 ## P2 — FongMi core semantics
 
