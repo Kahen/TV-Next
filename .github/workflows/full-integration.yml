@@ -1,6 +1,6 @@
 name: Full Cross-Platform Integration Gate
 
-# A code-level integration gate. Real-browser and Apple-device E2E remain P6 gates.
+# Code + real-browser + iPhone/iPad simulator acceptance. Physical Apple acceptance is separate.
 on:
   push:
     branches: [main]
@@ -73,12 +73,12 @@ jobs:
             echo "| Subsystem | Result |"
             echo "| --- | --- |"
             echo "| Web + Kotlin API tests/build | $WEB_API |"
-            echo "| Swift parser smoke + unsigned iOS simulator | $IOS |"
+            echo "| Swift contracts + XCTest/XCUI on iPhone/iPad simulator | $IOS |"
             echo "| Real Docker Compose/nginx/API golden HTTP checks | $COMPOSE |"
             echo "| Node/Python/Java isolation and JAR inspection | $SPIDER |"
             echo "| PostgreSQL NAS HTTP/WS/restart/backup restore | $NAS |"
             echo ""
-            echo "This gate does not validate actual browser codecs, physical Apple playback,"
+            echo "This gate validates synthetic browser codecs and native simulators; it does not validate physical Apple playback,"
             echo "authorized third-party Spider compatibility, security audit or signed distribution."
           } >> "$GITHUB_STEP_SUMMARY"
           for outcome in "$WEB_API" "$IOS" "$COMPOSE" "$SPIDER" "$NAS"; do

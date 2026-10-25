@@ -39,6 +39,8 @@ struct ContentView: View {
     @State private var isShowingClearConfirmation = false
     @State private var errorMessage: String?
     @State private var isLoading = false
+    @State private var importGeneration = UUID()
+    @State private var mediaGeneration = UUID()
 
     private var visibleChannels: [TVChannel] {
         let entries: [TVChannel]
@@ -132,6 +134,8 @@ struct ContentView: View {
             .onChange(of: scenePhase) { _, phase in
                 if phase == .inactive { library.savePosition() }
                 if phase == .background {
+                    mediaGeneration = UUID()
+                    isLoadingMedia = false
                     library.suspendPlayback()
                     remote.configure(nil, server: serverURL)
                 } else if phase == .active {
@@ -192,6 +196,10 @@ struct ContentView: View {
                 titleVisibility: .visible
             ) {
                 Button("删除本地媒体库", role: .destructive) {
+                    importGeneration = UUID()
+                    mediaGeneration = UUID()
+                    isLoading = false
+                    isLoadingMedia = false
                     library.clear()
                     playlistText = ""
                     search = ""
@@ -211,6 +219,8 @@ struct ContentView: View {
             }
             .onChange(of: library.current?.url) { _, url in danmaku = []; if url != remoteResourceKey { remoteDanmaku = [] } }
             .onDisappear {
+                // Presenting fullscreen keeps the same selected item and overlay state.
+                guard !showingFullscreen else { return }
                 remote.configure(nil,server:serverURL)
                 library.suspendPlayback()
             }
@@ -557,8 +567,10 @@ struct ContentView: View {
 
     @MainActor
     private func importPlaylist() async {
+        let generation = UUID()
+        importGeneration = generation
         isLoading = true
-        defer { isLoading = false }
+        defer { if importGeneration == generation { isLoading = false } }
         do {
             let channels: [TVChannel]
             if useRemoteParser {
@@ -569,6 +581,7 @@ struct ContentView: View {
             } else {
                 channels = try M3UParser.parse(playlistText)
             }
+            guard importGeneration == generation else { return }
             guard library.importChannels(channels) else {
                 errorMessage = "未找到可播放的 HTTP(S) 频道，已保留原有媒体库。"
                 return
@@ -577,22 +590,25 @@ struct ContentView: View {
             search = ""
             errorMessage = channels.isEmpty ? "没有找到 HTTP(S) 频道。" : nil
         } catch {
-            errorMessage = error.localizedDescription
+            if importGeneration == generation { errorMessage = error.localizedDescription }
         }
     }
 
     @MainActor
     private func importLocalMedia(_ result: Result<[URL], Error>) async {
+        let generation = UUID()
+        mediaGeneration = generation
         isLoadingMedia = true
-        defer { isLoadingMedia = false }
+        defer { if mediaGeneration == generation { isLoadingMedia = false } }
         do {
             guard let source = try result.get().first else { return }
             let localFile = try await LocalMediaStager.stage(source)
+            guard mediaGeneration == generation else { LocalMediaStager.discard(localFile); return }
             library.playLocalFile(localFile, name: source.lastPathComponent)
             captionFileName = nil
             errorMessage = nil
         } catch {
-            errorMessage = error.localizedDescription
+            if mediaGeneration == generation { errorMessage = error.localizedDescription }
         }
     }
 

@@ -145,4 +145,49 @@ final class MediaLibraryTests: XCTestCase {
         do { _ = try await LocalMediaStager.stage(empty.deletingPathExtension().appendingPathExtension("mkv")); XCTFail("Accepted unsupported format") }
         catch { XCTAssertTrue(error is LocalMediaError) }
     }
+    func testRetryTargetsFailedRelaySelectionRatherThanPreviousMedia() async throws {
+        var requests: [String] = []
+        let relayStore = MediaLibraryStore(defaults: defaults, createRelay: { _, request in
+            requests.append(request.url)
+            throw URLError(.cannotConnectToHost)
+        })
+        defer { relayStore.clear() }
+        let session = NativeHomeSession(token: "unit-fixture", user: NativeHomeUser(id: "u", username: "fixture"),
+            device: NativeHomeDevice(id: "d", name: "fixture", createdAt: 0, expiresAt: Int64.max, current: true))
+        relayStore.configureRelay(server: "http://127.0.0.1:8765", session: session)
+        relayStore.playLocalFile(try fixture(), name: "previous.mp4")
+        var target = channel("Needs headers")
+        target.headers = ["Referer": "https://example.invalid/"]
+        relayStore.play(target)
+        try await waitUntil { relayStore.playbackError != nil }
+        relayStore.retryPlayback()
+        try await waitUntil { requests.count == 2 && relayStore.playbackError != nil }
+        XCTAssertEqual(requests, [target.url, target.url])
+    }
+
+    func testSuspensionInvalidatesLateRelayCompletion() async throws {
+        var pending: CheckedContinuation<NativeRelayResponse, Error>?
+        let relayStore = MediaLibraryStore(defaults: defaults, createRelay: { _, _ in
+            try await withCheckedThrowingContinuation { pending = $0 }
+        })
+        defer { relayStore.clear() }
+        let session = NativeHomeSession(token: "unit-fixture", user: NativeHomeUser(id: "u", username: "fixture"),
+            device: NativeHomeDevice(id: "d", name: "fixture", createdAt: 0, expiresAt: Int64.max, current: true))
+        relayStore.configureRelay(server: "http://127.0.0.1:8765", session: session)
+        var target = channel("Delayed relay")
+        target.headers = ["Referer": "https://example.invalid/"]
+        relayStore.play(target)
+        try await waitUntil { pending != nil }
+        relayStore.suspendPlayback()
+        // Deliberately emulate a transport that finishes despite cancellation.
+        pending?.resume(returning: NativeRelayResponse(path: "/api/v1/home/media/" + String(repeating: "a", count: 43) + "/0", expiresAt: Int64.max))
+        pending = nil
+        // Drain the actor so the late completion has been processed.
+        for _ in 0..<10 { await Task.yield() }
+        XCTAssertNil(relayStore.current)
+        XCTAssertNil(relayStore.player.currentItem)
+        XCTAssertEqual(relayStore.player.rate, 0)
+        XCTAssertTrue(relayStore.recent.isEmpty)
+    }
+
 }

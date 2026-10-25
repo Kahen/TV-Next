@@ -1,15 +1,15 @@
-# Implementation status — 2026-10-23
+# Implementation status — 2026-10-25
 
-This is the current code backlog. Physical Apple/device acceptance is deferred to the user after code completion; compile/simulator/fixture results do not close that gate.
+This is the current code backlog. Physical Apple/device acceptance is deferred to the user after code completion and tracked separately in [#38](https://github.com/Kahen/TV-Next/issues/38). Per user instruction, implementation issues may close after their code and automated checks pass; simulator/fixture results do not close the physical acceptance issue.
 
 | Phase | Implemented code | Remaining implementation / automated coverage |
 | --- | --- | --- |
-| P1 | Persistent Web/iOS library, favorites/recents/resume, local files, M3U, JSON, SRT/VTT, speed, Web fullscreen/PiP, PWA shell | Browser navigation/playback E2E, SwiftUI navigation automation, accessibility/lifecycle/error recovery coverage |
+| P1 | Persistent Web/iOS library, favorites/recents/resume, local files, M3U/JSON, SRT/VTT, speed, browser fullscreen/PiP APIs, native fullscreen/navigation, lifecycle/error recovery, PWA shell/icons; three-browser E2E and iPhone/iPad XCTest/XCUI gate in PR #37 | Final-head automated gate must pass before closing #2; physical/installed-PWA acceptance is separate #38. See P1_IMPLEMENTATION.md |
 | P2 | Source-derived type 0/1/2/4 subscription transport and browsing, live M3U/TXT/JSON, shared Result fixtures, Web/iOS XMLTV, saved XMLTV.gz feeds and scheduled updates | Interactive action/complete catch-up UI, cross-provider cancellable search, larger permitted corpus, subtitle/audio preferences |
 | P3 | Java/Node/Python fixed fixture isolation, Java SPI and nonexecuting JAR preflight | Real type 3 JVM/Android/QuickJS/Python adapters, API runtime activation and controlled egress, permitted plugin corpus, security review |
-| P4 | SRT/VTT offset, danmaku parser/overlays, AList/OpenList browsing | ASS/SSA, embedded track selection, native PiP/background/AirPlay controls, DLNA, SMB/WebDAV, optional transcoding/offline lifecycle, direct cloud login/QR/OAuth |
-| P5 | Accounts, hashed device tokens, one-use pairing, per-user CAS sync, authenticated WS remote control, H2/PostgreSQL migrations, NAS restart/backup restore, diagnostics, EPG feed scheduling | Provider health/search cache and remaining deployment hardening; relay implementation is described below |
-| P6 | npm lockfile/ci install, Web dependency audit and CycloneDX SBOM gate, all-or-nothing Web/API/iOS/Compose/Spider/PostgreSQL gate | JVM/container dependency and license/provenance audit, pinned container digests/actions, browser E2E, benchmarks, versioned artifacts/rollback and native signing pipeline |
+| P4 | SRT/VTT offset, danmaku parser/overlays, AList/OpenList browsing | Styled ASS/SSA (bounded Dialogue text already implemented), embedded track selection, native PiP/background/AirPlay controls, DLNA, SMB/WebDAV, optional transcoding/offline lifecycle, direct cloud login/QR/OAuth |
+| P5 | Accounts, hashed device tokens, one-use pairing, per-user CAS sync, authenticated WS remote control, H2/PostgreSQL migrations, NAS restart/backup restore, diagnostics, EPG feed scheduling | Remaining remote-access deployment hardening and security/operational acceptance; device-private provider health/search cache shipped in #35 |
+| P6 | npm lockfile/ci install, Web dependency audit and CycloneDX SBOM gate, all-or-nothing Web/API/iOS/Compose/Spider/PostgreSQL gate | JVM/container dependency and license/provenance audit, pinned container digests/actions, benchmarks, versioned artifacts/rollback and native signing pipeline |
 
 P5 account core merged in PR #27 after final-head full integration succeeded. Its review finding about a non-writable `/data` default was fixed to a working-directory-relative H2 path; Docker/NAS explicit URLs remain deployment-specific.
 

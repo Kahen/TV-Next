@@ -42,6 +42,8 @@ final class MediaLibraryStore: ObservableObject {
     private let defaults: UserDefaults
     private var timeObserver: Any?
     private var statusObservation: NSKeyValueObservation?
+    private var requestedChannel: TVChannel?
+    private let createRelay: (TVNextAPI, NativeRelayRequest) async throws -> NativeRelayResponse
     private var relayAPI: TVNextAPI?
     private var relayContext=""
     private var relayTask: Task<Void,Never>?
@@ -67,8 +69,12 @@ final class MediaLibraryStore: ObservableObject {
         activeRelay=nil
     }
 
-    init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults = .standard,
+         createRelay: @escaping (TVNextAPI, NativeRelayRequest) async throws -> NativeRelayResponse = { api, request in
+             try await api.request("home/media/sessions", body: request)
+         }) {
         self.defaults = defaults
+        self.createRelay = createRelay
         restore()
         timeObserver = player.addPeriodicTimeObserver(
             forInterval: CMTime(seconds: 8, preferredTimescale: 600),
@@ -122,11 +128,12 @@ final class MediaLibraryStore: ObservableObject {
 
     func play(_ channel: TVChannel) {
         playbackError = nil
+        guard MediaAddress.valid(channel.url), let url = URL(string: channel.url) else { return }
+        requestedChannel = channel
         if channel.headersRequired == true {
             playbackError = "媒体库未保存此来源的私密请求头，请重新加载订阅后播放。"
             return
         }
-        guard MediaAddress.valid(channel.url), let url = URL(string: channel.url) else { return }
         savePosition()
         cancelRelay()
         if !(channel.headers ?? [:]).isEmpty {
@@ -134,7 +141,7 @@ final class MediaLibraryStore: ObservableObject {
             let generation=relayGeneration
             relayTask=Task { @MainActor in
                 do {
-                    let result: NativeRelayResponse=try await api.request("home/media/sessions",body:NativeRelayRequest(url:channel.url,headers:channel.headers ?? [:]))
+                    let result: NativeRelayResponse=try await createRelay(api, NativeRelayRequest(url:channel.url,headers:channel.headers ?? [:]))
                     let address=try MediaRelayAddress.resolve(result.path,server:api.server)
                     guard !Task.isCancelled,relayGeneration==generation else { release(api,address.ticket);return }
                     activeRelay=(api,address.ticket)
@@ -169,6 +176,7 @@ final class MediaLibraryStore: ObservableObject {
     }
 
     func playLocalFile(_ file: URL, name: String) {
+        requestedChannel = nil
         savePosition()
         cancelRelay()
         player.pause()
@@ -209,7 +217,7 @@ final class MediaLibraryStore: ObservableObject {
     }
 
     func retryPlayback() {
-        if let current { play(current) }
+        if let requestedChannel { play(requestedChannel) }
         else if let file = currentLocalFile, let name = localFileName {
             // Reuse the staged file; playLocalFile would discard it before reopening.
             playbackError = nil
@@ -224,6 +232,9 @@ final class MediaLibraryStore: ObservableObject {
     /// P1 pauses on background and never resumes without an explicit user action.
     func suspendPlayback() {
         savePosition()
+        relayGeneration = UUID()
+        relayTask?.cancel()
+        relayTask = nil
         player.pause()
     }
 
@@ -283,6 +294,7 @@ final class MediaLibraryStore: ObservableObject {
         clearCaptions()
         statusObservation?.invalidate()
         current = nil
+        requestedChannel = nil
         playbackError = nil
         channels = []
         favorites = []

@@ -39,3 +39,5 @@ This feature never requests Spider URLs, downloads external configs or artwork, 
 A shared synthetic [golden Result](../../fixtures/p2-fongmi-result.json) is exercised by native Swift parser smoke tests and Spring MockMvc API integration tests. This ensures consistency for the tested subset but is not proof of real provider compatibility or physical Apple device playback.
 
 Native external-caption synchronization supports -10..+10 seconds with a 0.5-second step (positive = delayed captions). This adjusts text overlay timing only, not AVPlayer seek position or embedded media subtitle tracks. The new boundary checks run with the Swift parser smoke suite; actual-device results are still pending.
+
+P1 now has XCTest store/AVPlayer/local-file tests and production SwiftUI XCUI acceptance on both iPhone/iPad simulator families. See [P1_IMPLEMENTATION.md](../../docs/P1_IMPLEMENTATION.md) for the owned media fixture setup and reproducible `xcodebuild test` command. Physical acceptance is tracked separately in issue #38.
