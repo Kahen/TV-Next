@@ -143,9 +143,12 @@ final class LibraryUITests: XCTestCase {
         fullscreen.tap()
         let close = app.buttons["exit-fullscreen"]
         XCTAssertTrue(close.waitForExistence(timeout: 5))
+        let hittable = NSPredicate(format: "hittable == true")
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: hittable, object: close)], timeout: 5), .completed)
         XCUIDevice.shared.orientation = .landscapeLeft
-        XCTAssertTrue(close.isHittable)
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: hittable, object: close)], timeout: 5), .completed, close.debugDescription)
         close.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: close)], timeout: 5), .completed)
         XCUIDevice.shared.press(.home)
         app.activate()
         XCTAssertTrue(app.buttons["section-navigation"].waitForExistence(timeout: 5))

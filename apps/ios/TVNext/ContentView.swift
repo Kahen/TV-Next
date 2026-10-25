@@ -107,7 +107,7 @@ struct ContentView: View {
                 // Defer scrolling until the toolbar Menu has dismissed its presentation.
                 try? await Task.sleep(for: .milliseconds(200))
                 guard !Task.isCancelled else { return }
-                withAnimation { proxy.scrollTo(destination, anchor: .top) }
+                proxy.scrollTo(destination, anchor: .top)
             }
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle("TV-Next")
