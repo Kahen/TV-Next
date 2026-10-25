@@ -225,4 +225,32 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertTrue(completed)
     }
 
+    func testRejectedSelectionInvalidatesPreviousPendingRelay() async throws {
+        var pending: CheckedContinuation<NativeRelayResponse, Error>?
+        var returned = false
+        let relayStore = MediaLibraryStore(defaults: defaults, createRelay: { _, _ in
+            let result: NativeRelayResponse = try await withCheckedThrowingContinuation { pending = $0 }
+            returned = true
+            return result
+        })
+        defer { relayStore.clear() }
+        let session = NativeHomeSession(token: "unit-fixture", user: NativeHomeUser(id: "u", username: "fixture"),
+            device: NativeHomeDevice(id: "d", name: "fixture", createdAt: 0, expiresAt: Int64.max, current: true))
+        relayStore.configureRelay(server: "http://127.0.0.1:8765", session: session)
+        var first = channel("Pending")
+        first.headers = ["Referer": "https://example.invalid/"]
+        relayStore.play(first)
+        try await waitUntil { pending != nil }
+        var rejected = channel("Reload required", url: "https://example.invalid/second.mp4")
+        rejected.headersRequired = true
+        relayStore.play(rejected)
+        pending?.resume(returning: NativeRelayResponse(path: "/api/v1/home/media/" + String(repeating: "a", count: 43) + "/0", expiresAt: Int64.max))
+        pending = nil
+        try await waitUntil { returned }
+        for _ in 0..<10 { await Task.yield() }
+        XCTAssertNil(relayStore.player.currentItem)
+        XCTAssertTrue(relayStore.recent.isEmpty)
+        XCTAssertNotNil(relayStore.playbackError)
+    }
+
 }

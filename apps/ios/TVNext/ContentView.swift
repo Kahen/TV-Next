@@ -382,6 +382,9 @@ struct ContentView: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .textFieldStyle(.roundedBorder)
+                Button("清空地址") { manualURL = ""; quickPlayError = nil }
+                    .disabled(manualURL.isEmpty)
+                    .accessibilityIdentifier("clear-manual-url")
                 Button("播放") {
                     dismissKeyboard()
                     let url = manualURL.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -473,6 +476,14 @@ struct ContentView: View {
                     .accessibilityIdentifier("playlist-input")
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(.gray.opacity(0.3)).allowsHitTesting(false))
 
+                Button("清空输入") {
+                    importGeneration = UUID()
+                    isLoading = false
+                    playlistText = ""
+                    errorMessage = nil
+                }
+                .disabled(playlistText.isEmpty)
+                .accessibilityIdentifier("clear-playlist-input")
                 Toggle("使用自建 API 解析", isOn: $useRemoteParser)
                     .font(.subheadline)
 
@@ -529,9 +540,13 @@ struct ContentView: View {
                 TextField("按频道名称或分组搜索", text: $search)
                     .textFieldStyle(.roundedBorder)
                     .accessibilityIdentifier("library-search")
+                Button("清空搜索") { search = "" }
+                    .disabled(search.isEmpty)
+                    .accessibilityIdentifier("clear-library-search")
 
                 if visibleChannels.isEmpty {
-                    Text(selection == .favorites ? "还没有收藏的频道。" :
+                    Text(!search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "没有匹配的频道，请调整搜索。" :
+                            selection == .favorites ? "还没有收藏的频道。" :
                             selection == .recent ? "还没有播放记录。" : "请先导入播放列表。")
                         .font(.subheadline).foregroundStyle(.secondary)
                 }

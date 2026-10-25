@@ -48,6 +48,9 @@ struct ConfigPreviewSection: View {
                     preview = nil
                     errorMessage = nil
                 }
+            Button("清空输入") { configText = "" }
+                .disabled(configText.isEmpty)
+                .accessibilityIdentifier("clear-config-input")
             Button("检查 JSON 配置") {
                 inspect()
             }

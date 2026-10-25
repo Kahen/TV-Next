@@ -28,6 +28,9 @@ final class LibraryUITests: XCTestCase {
     }
 
     private func reveal(_ element: XCUIElement) {
+        // Menu dismissal and ScrollViewReader animation settle after the action returns.
+        let reachable = NSPredicate(format: "hittable == true")
+        if XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: reachable, object: element)], timeout: 3) == .completed { return }
         for _ in 0..<8 {
             if element.isHittable { return }
             print("Reveal target \(element.identifier): exists=\(element.exists) frame=\(element.frame)")
@@ -38,16 +41,16 @@ final class LibraryUITests: XCTestCase {
                 app.swipeUp()
             }
         }
+        if XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: reachable, object: element)], timeout: 2) == .completed { return }
         if !element.isHittable { print("Unreachable element: \(element.debugDescription)\n\(app.debugDescription)") }
         XCTAssertTrue(element.isHittable)
     }
 
     private func enter(_ element: XCUIElement, _ text: String) {
+        let clear = app.buttons["clear-" + element.identifier]
+        if clear.exists && clear.isEnabled { reveal(clear); clear.tap() }
         reveal(element)
         element.tap()
-        if let current = element.value as? String, !current.isEmpty {
-            element.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count))
-        }
         element.typeText(text)
         let done = app.buttons["收起键盘"]
         if done.exists { done.tap() }
@@ -87,7 +90,7 @@ final class LibraryUITests: XCTestCase {
         chooseCollection("收藏")
         XCTAssertTrue(channel.exists)
         enter(app.textFields["library-search"], "missing")
-        XCTAssertTrue(app.staticTexts["还没有收藏的频道。"].exists)
+        XCTAssertTrue(app.staticTexts["没有匹配的频道，请调整搜索。"].exists)
         enter(app.textFields["library-search"], "Fixture")
         reveal(channel)
         channel.tap()

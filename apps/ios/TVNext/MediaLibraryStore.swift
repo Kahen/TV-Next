@@ -143,13 +143,16 @@ final class MediaLibraryStore: ObservableObject {
     func play(_ channel: TVChannel) {
         playbackError = nil
         guard MediaAddress.valid(channel.url), let url = URL(string: channel.url) else { return }
+        savePosition()
+        cancelRelay()
+        statusObservation?.invalidate()
+        player.pause()
+        player.replaceCurrentItem(with: nil)
         requestedChannel = channel
         if channel.headersRequired == true {
             playbackError = "媒体库未保存此来源的私密请求头，请重新加载订阅后播放。"
             return
         }
-        savePosition()
-        cancelRelay()
         if !(channel.headers ?? [:]).isEmpty {
             guard let api=relayAPI else { playbackError="请先登录当前家庭服务器，以适配此来源的播放请求头。";return }
             let generation=relayGeneration

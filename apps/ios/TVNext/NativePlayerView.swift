@@ -25,7 +25,7 @@ struct NativePlayerView: UIViewControllerRepresentable {
     }
 
     @MainActor
-    final class Coordinator: NSObject, AVPlayerViewControllerDelegate {
+    final class Coordinator: NSObject, @preconcurrency AVPlayerViewControllerDelegate {
         let library: MediaLibraryStore
         var onRestore: () -> Void
         init(library: MediaLibraryStore, onRestore: @escaping () -> Void) {

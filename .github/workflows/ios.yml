@@ -9,8 +9,13 @@ concurrency:
   cancel-in-progress: true
 jobs:
   simulator-build:
+    name: ${{ matrix.family }} simulator acceptance
     runs-on: macos-15
-    timeout-minutes: 45
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        family: [iPhone, iPad]
     steps:
       - uses: actions/checkout@v4
       - name: Install XcodeGen
@@ -65,6 +70,8 @@ jobs:
         run: brew install ffmpeg
       - name: Exercise native store and production SwiftUI on iPhone and iPad
         working-directory: apps/ios
+        env:
+          TV_NEXT_SIMULATOR_FAMILY: ${{ matrix.family }}
         run: |
           set -euo pipefail
           python3 ../../scripts/browser_media_fixture.py > /tmp/tvnext-native-fixture.log 2>&1 &
@@ -79,11 +86,11 @@ jobs:
           xcodegen generate
           xcrun simctl list devices available --json > /tmp/tvnext-simulators.json
           python3 - <<'PYTHON'
-          import json
+          import json, os
           from pathlib import Path
           devices = [d for group in json.loads(Path('/tmp/tvnext-simulators.json').read_text())['devices'].values() for d in group if d.get('isAvailable')]
           selected = []
-          for family in ('iPhone', 'iPad'):
+          for family in (os.environ['TV_NEXT_SIMULATOR_FAMILY'],):
               match = next((d for d in devices if d['name'].startswith(family)), None)
               if match is None:
                   raise SystemExit(f'No available {family} simulator: refuse to skip UI acceptance')
@@ -107,7 +114,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: native-simulator-acceptance
+          name: native-${{ matrix.family }}-simulator-acceptance
           path: |
             apps/ios/*.xcresult
             /tmp/tvnext-native-fixture.log
