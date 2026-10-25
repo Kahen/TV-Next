@@ -41,7 +41,7 @@ struct ConfigPreviewSection: View {
                 .autocorrectionDisabled()
                 .font(.system(.footnote, design: .monospaced))
                 .frame(height: 120)
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(.gray.opacity(0.3)))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(.gray.opacity(0.3)).allowsHitTesting(false))
                 .accessibilityLabel("JSON 配置内容")
                 .accessibilityIdentifier("config-input")
                 .onChange(of: configText) { _, _ in

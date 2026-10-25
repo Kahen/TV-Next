@@ -30,8 +30,15 @@ final class LibraryUITests: XCTestCase {
     private func reveal(_ element: XCUIElement) {
         for _ in 0..<8 {
             if element.isHittable { return }
-            app.swipeUp()
+            print("Reveal target \(element.identifier): exists=\(element.exists) frame=\(element.frame)")
+            let frame = element.frame
+            if element.exists && frame.maxY < app.windows.firstMatch.frame.minY + 100 {
+                app.swipeDown()
+            } else {
+                app.swipeUp()
+            }
         }
+        if !element.isHittable { print("Unreachable element: \(element.debugDescription)\n\(app.debugDescription)") }
         XCTAssertTrue(element.isHittable)
     }
 

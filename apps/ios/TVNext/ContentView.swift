@@ -13,6 +13,8 @@ private enum LibraryView: String, CaseIterable, Identifiable {
 struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var showingFullscreen = false
+    @State private var scrollDestination: String?
+    @State private var navigationRequest = UUID()
     @StateObject private var library = MediaLibraryStore()
     @StateObject private var remote = NativeRemoteControl()
     @AppStorage("tv-next-api-url") private var serverURL = "http://localhost:8080"
@@ -100,17 +102,24 @@ struct ContentView: View {
                 .frame(maxWidth: .infinity)
                 .padding()
             }
+            .task(id: navigationRequest) {
+                guard let destination = scrollDestination else { return }
+                // Defer scrolling until the toolbar Menu has dismissed its presentation.
+                try? await Task.sleep(for: .milliseconds(200))
+                guard !Task.isCancelled else { return }
+                withAnimation { proxy.scrollTo(destination, anchor: .top) }
+            }
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle("TV-Next")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
-                        Button("播放器") { proxy.scrollTo("player", anchor: .top) }
-                        Button("快速播放") { proxy.scrollTo("quick-play", anchor: .top) }
-                        Button("本机文件与字幕") { proxy.scrollTo("local-media", anchor: .top) }
-                        Button("导入播放列表") { proxy.scrollTo("import", anchor: .top) }
-                        Button("JSON 配置") { proxy.scrollTo("config", anchor: .top) }
-                        Button("媒体库") { proxy.scrollTo("library", anchor: .top) }
+                        Button("播放器") { navigate(to: "player") }
+                        Button("快速播放") { navigate(to: "quick-play") }
+                        Button("本机文件与字幕") { navigate(to: "local-media") }
+                        Button("导入播放列表") { navigate(to: "import") }
+                        Button("JSON 配置") { navigate(to: "config") }
+                        Button("媒体库") { navigate(to: "library") }
                     } label: { Label("功能导航", systemImage: "line.3.horizontal") }
                     .accessibilityIdentifier("section-navigation")
                 }
@@ -227,6 +236,12 @@ struct ContentView: View {
             }
             }
         }
+    }
+
+    private func navigate(to destination: String) {
+        dismissKeyboard()
+        scrollDestination = destination
+        navigationRequest = UUID()
     }
 
     private func dismissKeyboard() {
@@ -451,7 +466,7 @@ struct ContentView: View {
                     .frame(height: 120)
                     .accessibilityLabel("M3U 内容")
                     .accessibilityIdentifier("playlist-input")
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(.gray.opacity(0.3)))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(.gray.opacity(0.3)).allowsHitTesting(false))
 
                 Toggle("使用自建 API 解析", isOn: $useRemoteParser)
                     .font(.subheadline)

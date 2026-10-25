@@ -1,19 +1,12 @@
 name: iOS Simulator and Parser CI
+# The aggregate gate runs automatically for PR/main code changes and calls this workflow.
+# Avoid starting duplicate simulator suites for the same push and PR.
 on:
-  push:
-    branches:
-      - main
-      - feat/**
-    paths:
-      - apps/ios/**
-      - fixtures/**
-      - .github/workflows/ios.yml
-  pull_request:
-    paths:
-      - apps/ios/**
-      - .github/workflows/ios.yml
   workflow_call:
   workflow_dispatch:
+concurrency:
+  group: native-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   simulator-build:
     runs-on: macos-15

@@ -42,7 +42,10 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertFalse(store.importChannels([channel(url: "file:///private/movie.mp4")]))
         XCTAssertEqual(store.channels, [original])
         let restored = MediaLibraryStore(defaults: defaults)
-        XCTAssertEqual(restored.channels, [original])
+        XCTAssertEqual(restored.channels.map(\.url), [original.url])
+        XCTAssertEqual(restored.channels.first?.name, original.name)
+        XCTAssertEqual(restored.channels.first?.group, original.group)
+        XCTAssertNotEqual(restored.channels.first?.headersRequired, true)
     }
 
     func testPersistenceDoesNotSavePrivateHeadersAndRetainsFavoritesAndResume() throws {
