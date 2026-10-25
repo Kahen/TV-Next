@@ -85,3 +85,26 @@ it("uses a bearer header argument and explicitly bypasses cached searches on ref
   await waitFor(()=>expect(request.mock.calls.at(-1)?.[1]).toEqual(expect.objectContaining({bypassCache:true,query:"owned query"})));
   expect(request.mock.calls.at(-1)?.[3]).toBe(session.token);
 });
+
+it("cross-site search preserves distinct source IDs, searches a second page and reports partial failures",async()=>{
+  const second={...doc.sites[0],key:"other",name:"Other"};
+  const sources={...doc,sites:[doc.sites[0],second]};
+  request.mockImplementation(async(path,body)=>{
+    if(path.endsWith("/load"))return sources;
+    const query=body as {siteKey:string;page:number};
+    if(query.siteKey==="other")throw new Error("private upstream token");
+    if(query.page===1)return {categories:[],items:[{id:"same",name:"First"}],total:2,page:1,hasMore:true};
+    return {categories:[],items:[{id:"same",name:"Duplicate"},{id:"next",name:"Second"}],total:2,page:2,hasMore:false};
+  });
+  render(<SubscriptionBrowser onPlay={()=>{}}/>);
+  fireEvent.click(screen.getByText("加载订阅"));
+  await screen.findByRole("button",{name:"Cloud"});
+  fireEvent.change(screen.getByLabelText("搜索订阅站点"),{target:{value:"owned"}});
+  fireEvent.click(screen.getByText("跨站搜索"));
+  await screen.findByText("First");
+  expect(screen.getByText("Second")).toBeTruthy();
+  expect(screen.queryByText("Duplicate")).toBeNull();
+  expect(screen.getByRole("alert").textContent).toContain("Other");
+  expect(screen.getByRole("alert").textContent).not.toContain("private upstream token");
+  expect(request.mock.calls.some(([path,body])=>path.endsWith("/search")&&(body as {page:number}).page===2)).toBe(true);
+});

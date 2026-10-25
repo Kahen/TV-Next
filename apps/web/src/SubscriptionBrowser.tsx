@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { requestJson } from "./api";
 import type { Channel, MediaDetail, MediaItem, MediaPage, MediaPlayback, SubscriptionDocument } from "./api";
 import { initialSiteFilters } from "./subscriptionFilters";
+import { searchAcrossSites } from "./crossSiteSearch";
 import type { SiteFilterMap } from "./subscriptionFilters";
 import type { HomeSession } from "./homeApi";
-interface Found { siteKey: string; item: MediaItem }
 export default function SubscriptionBrowser({onPlay, onImport,session}: {session?:HomeSession|null;onPlay: (channel: Channel) => void; onImport?: (channels: Channel[]) => void}) {
   const [url, setUrl] = useState("");
   const [text, setText] = useState("");
@@ -20,7 +20,7 @@ export default function SubscriptionBrowser({onPlay, onImport,session}: {session
   const [detail, setDetail] = useState<MediaDetail | null>(null);
   const [line, setLine] = useState(0);
   const [actionResult, setActionResult] = useState("");
-  const [found, setFound] = useState<Found[]>([]);
+  const [found, setFound] = useState<import("./crossSiteSearch").CrossSiteHit[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const active = useRef<AbortController | null>(null);
@@ -87,21 +87,26 @@ export default function SubscriptionBrowser({onPlay, onImport,session}: {session
   }
   async function searchAll() {
     if (!doc || !query.trim()) return;
-    const {controller, id} = start(); setFound([]); setDetail(null); setPage(null);
-    const queue = doc.sites.filter(s => s.searchable && !s.hidden && [0,1,2,4].includes(s.type));
-    const items: Found[] = [], failed: string[] = [];
-    let cursor = 0;
-    await Promise.all(Array.from({length: Math.min(4, queue.length)}, async () => {
-      while (cursor < queue.length && !controller.signal.aborted) {
-        const site = queue[cursor++];
-        try {
-          const result = await sourceRequest<MediaPage>("/api/v1/subscriptions/search", {...body(site.key), query}, controller.signal);
-          for (const item of result.items) if (!items.some(x => x.siteKey === site.key && x.item.id === item.id)) items.push({siteKey:site.key,item});
-          if (id === requestId.current) setFound([...items]);
-        } catch { failed.push(site.name); }
-      }
-    }));
-    if (id === requestId.current) { setBusy(false); if (failed.length) setError("以下站点未返回结果：" + failed.join("、")); }
+    const { controller, id } = start();
+    setFound([]); setDetail(null); setPage(null);
+    try {
+      const result = await searchAcrossSites(doc.sites,
+        (site, page, signal) => sourceRequest<MediaPage>("/api/v1/subscriptions/search",
+          { ...body(site.key), query: query.trim(), page, pageSize: 40 }, signal),
+        controller.signal);
+      if (id !== requestId.current) return;
+      setFound(result.items);
+      const messages = [
+        ...(result.failed.length ? ["以下站点未返回结果：" + result.failed.join("、")] : []),
+        ...result.warnings
+      ];
+      if (messages.length) setError(messages.join(" · "));
+    } catch (e) {
+      if (id === requestId.current && !controller.signal.aborted)
+        setError(e instanceof Error ? e.message : "跨站搜索失败");
+    } finally {
+      if (id === requestId.current) setBusy(false);
+    }
   }
   return <section className="results media-browser">
     <div className="section-heading"><h2>TVBox / FongMi 订阅</h2><span>原版协议</span></div>
