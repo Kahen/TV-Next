@@ -16,6 +16,7 @@ struct SubscriptionSection: View {
     @State private var filterCatalog: [String:[NativeSiteFilter]]=[:]
     @State private var filters: [String:String]=[:]
     @State private var appliedFilters: [String:String]=[:]
+    @State private var actionResult: NativeSubscriptionAction?
     @State private var detail: NativeMediaDetail?
     @State private var crossSiteResults: [NativeSearchHit<NativeMediaItem>] = []
     @State private var crossSiteFailures: [String] = []
@@ -36,6 +37,7 @@ struct SubscriptionSection: View {
                     if busy { Button("取消") { pending?.cancel(); generation = UUID(); busy = false } }
                 }
                 if let error { Text(error).font(.caption).foregroundStyle(.red) }
+                if let actionResult { actionView(actionResult) }
                 if let document { documentView(document) }
                 if let page { pageView(page) }
                 if !crossSiteFailures.isEmpty {
@@ -57,13 +59,13 @@ struct SubscriptionSection: View {
                 if let detail { detailView(detail) }
             }
         }
-        .onDisappear { pending?.cancel() }
-        .onChange(of:serverURL) { _,_ in pending?.cancel();generation=UUID();busy=false;document=nil;page=nil;detail=nil;filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;siteKey="";clearCrossSiteSearch() }
-        .onChange(of:session?.token) { _,_ in pending?.cancel();generation=UUID();busy=false;clearCrossSiteSearch() }
+        .onDisappear { pending?.cancel(); actionResult = nil; clearCrossSiteSearch() }
+        .onChange(of:serverURL) { _,_ in pending?.cancel();generation=UUID();busy=false;document=nil;page=nil;detail=nil;actionResult=nil;filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;siteKey="";clearCrossSiteSearch() }
+        .onChange(of:session?.token) { _,_ in pending?.cancel();generation=UUID();busy=false;actionResult=nil;clearCrossSiteSearch() }
     }
     private func run(_ operation: @escaping (TVNextAPI, UUID) async throws -> Void) {
         pending?.cancel()
-        let id = UUID(); generation = id; busy = true; error = nil
+        let id = UUID(); generation = id; busy = true; error = nil; actionResult = nil
         pending = Task { @MainActor in
             do {
                 guard let url = URL(string: serverURL) else { throw APIError.invalidServer }
@@ -74,6 +76,17 @@ struct SubscriptionSection: View {
     }
     private func clearCrossSiteSearch() {
         crossSiteResults = []; crossSiteFailures = []; crossSiteWarnings = []
+    }
+    private func switchDetailSite(_ key: String) {
+        var scope = NativeSiteBrowsingContext(
+            siteKey: siteKey, category: category, mode: mode,
+            filterCatalog: filterCatalog, filters: filters, appliedFilters: appliedFilters
+        )
+        if scope.switchToDetailSite(key) {
+            siteKey = scope.siteKey; category = scope.category; mode = scope.mode
+            filterCatalog = scope.filterCatalog; filters = scope.filters
+            appliedFilters = scope.appliedFilters; page = nil
+        }
     }
     private func load(_ url: String? = nil) {
         run { api, id in
@@ -138,27 +151,22 @@ struct SubscriptionSection: View {
     private func inspect(_ item: NativeMediaItem, from key: String? = nil) {
         let targetKey = key ?? siteKey
         if item.folder == true { browse(targetKey,operation:"category",type:item.id); return }
+        if let action = item.action, !action.isEmpty {
+            var r = request(targetKey); r.action = action
+            run { api, id in
+                let result: NativeSubscriptionAction = try await api.request("subscriptions/action",body:r)
+                guard generation == id, !Task.isCancelled else { return }
+                switchDetailSite(targetKey)
+                detail = nil; actionResult = result
+            }
+            return
+        }
         var r = request(targetKey); r.vodId = item.id
         run { api, id in
             let result: NativeMediaDetail = try await api.request("subscriptions/detail",body:r)
             guard generation == id, !Task.isCancelled else { return }
-            // A cross-site hit can belong to a different provider than the last
-            // browsed page. Never carry that provider's category/filter state over.
-            var scope = NativeSiteBrowsingContext(
-                siteKey: siteKey, category: category, mode: mode,
-                filterCatalog: filterCatalog, filters: filters,
-                appliedFilters: appliedFilters
-            )
-            if scope.switchToDetailSite(targetKey) {
-                siteKey = scope.siteKey
-                category = scope.category
-                mode = scope.mode
-                filterCatalog = scope.filterCatalog
-                filters = scope.filters
-                appliedFilters = scope.appliedFilters
-                page = nil
-            }
-            detail = result; line = 0; siteKey = targetKey
+            switchDetailSite(targetKey)
+            detail = result; line = 0
         }
     }
     private func play(_ index: Int) {
@@ -169,6 +177,23 @@ struct SubscriptionSection: View {
             guard generation == id, !Task.isCancelled else { return }
             onPlay(result, detail.item.name)
         }
+    }
+    @ViewBuilder private func actionView(_ result: NativeSubscriptionAction) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let message = result.message { Text(message).font(.callout) }
+            if let link = result.link {
+                Link("在外部浏览器打开站点网页", destination: link)
+                    .accessibilityHint("会离开当前应用，不会自动登录或同步 Cookie")
+            }
+            if result.limitedBrowserFeatures {
+                Text("原版内嵌视图或 Cookie 自动关闭尚未支持；仅手动打开外部浏览器，不同步凭据。")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            if result.unsupported {
+                Text("站点返回了未支持的操作指令或不安全的网址，未执行。")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }.accessibilityElement(children: .contain)
     }
     @ViewBuilder private func documentView(_ doc: NativeSubscription) -> some View {
         ForEach(0..<min(doc.liveCount,50),id: \.self) { index in

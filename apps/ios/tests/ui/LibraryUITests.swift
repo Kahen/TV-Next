@@ -29,52 +29,22 @@ final class LibraryUITests: XCTestCase {
     }
 
     private func reveal(_ element: XCUIElement) {
-        // Offscreen SwiftUI elements can report an invalid activation point on iPhone.
-        // Check visible geometry before asking XCTest for hittability; keep failing if
-        // scrolling cannot actually reveal a tappable production control.
-        let window = app.windows.firstMatch.frame
-        for _ in 0..<12 {
+        // Menu dismissal and ScrollViewReader animation settle after the action returns.
+        let reachable = NSPredicate(format: "hittable == true")
+        if XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: reachable, object: element)], timeout: 3) == .completed { return }
+        for _ in 0..<8 {
+            if element.isHittable { return }
+            print("Reveal target \(element.identifier): exists=\(element.exists) frame=\(element.frame)")
             let frame = element.frame
-            let intersection = frame.intersection(window)
-            if element.exists && intersection.width >= 20 && intersection.height >= 20 {
-                if element.isHittable { return }
-            }
-            print("Reveal target \(element.identifier): exists=\(element.exists) frame=\(frame)")
-            if frame.width > 0 && frame.maxY < window.minY + 100 {
+            if element.exists && frame.maxY < app.windows.firstMatch.frame.minY + 100 {
                 app.swipeDown()
             } else {
                 app.swipeUp()
             }
         }
-        print("Unreachable element: \(element.debugDescription)\n\(app.debugDescription)")
-        XCTFail("Could not reveal a hittable \(element.identifier) after scrolling")
-    }
-
-    /// Tap the actual visible production control even when XCTest incorrectly reports
-    /// a non-hittable SwiftUI button on iPad. The resulting fullscreen cover is asserted
-    /// by the caller; a blocked/disabled control must still fail the UI test.
-    private func tapVisible(_ element: XCUIElement) {
-        XCTAssertTrue(element.waitForExistence(timeout: 5))
-        XCTAssertTrue(element.isEnabled)
-        let window = app.windows.firstMatch
-        let viewport = window.frame.insetBy(dx: 0, dy: 80)
-        for _ in 0..<12 {
-            let frame = element.frame
-            let visible = frame.intersection(viewport)
-            if visible.width >= 20 && visible.height >= 20 {
-                if element.isHittable {
-                    element.tap()
-                } else {
-                    print("Coordinate-tapping visible but non-hittable control: \(element.identifier), frame=\(frame)")
-                    let origin = window.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
-                    origin.withOffset(CGVector(dx: visible.midX - window.frame.minX,
-                                               dy: visible.midY - window.frame.minY)).tap()
-                }
-                return
-            }
-            if frame.maxY < viewport.minY { app.swipeDown() } else { app.swipeUp() }
-        }
-        XCTFail("Could not reveal visible control \(element.identifier)")
+        if XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: reachable, object: element)], timeout: 2) == .completed { return }
+        if !element.isHittable { print("Unreachable element: \(element.debugDescription)\n\(app.debugDescription)") }
+        XCTAssertTrue(element.isHittable)
     }
 
     private func enter(_ element: XCUIElement, _ text: String) {
@@ -169,7 +139,8 @@ final class LibraryUITests: XCTestCase {
         jump("播放器")
         XCTAssertFalse(error.exists)
         let fullscreen = app.buttons["enter-fullscreen"]
-        tapVisible(fullscreen)
+        reveal(fullscreen)
+        fullscreen.tap()
         let close = app.buttons["exit-fullscreen"]
         XCTAssertTrue(close.waitForExistence(timeout: 5))
         let hittable = NSPredicate(format: "hittable == true")
