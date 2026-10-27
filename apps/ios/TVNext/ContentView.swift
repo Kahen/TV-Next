@@ -76,22 +76,22 @@ struct ContentView: View {
                     quickPlaySection.id("quick-play")
                     localMediaSection.id("local-media")
                     importSection.id("import")
-                    HomeServerSection(serverURL:$serverURL,library:library,onSessionChange:{ homeSession=$0;remote.configure($0,server:$1);library.configureRelay(server:$1,session:$0) },remoteState:remote.state)
+                    HomeServerSection(serverURL:$serverURL,library:library,onSessionChange:{ homeSession=$0;remote.configure($0,server:$1);library.configureRelay(server:$1,session:$0) },remoteState:remote.state).id("home-server")
                     EpgSection(serverURL:serverURL,session:homeSession,channels:library.channels) { library.play($0) }
                         .id(serverURL+"|"+(homeSession?.token ?? ""))
                     ConfigPreviewSection().id("config")
-                    CloudSection(serverURL: serverURL) { library.play($0) }
+                    CloudSection(serverURL: serverURL) { library.play($0) }.id("cloud")
                     SubscriptionSection(serverURL: serverURL, session:homeSession, onPlay: { playback, title in
                         library.play(TVChannel(name: title + " · " + playback.name, url: playback.url, group: playback.lineName, logo: nil, tvgId: nil, headers:playback.headers))
                         remoteResourceKey = playback.url
                         remoteDanmaku = playback.danmaku
-                    }, onImport: { library.importChannels($0) })
+                    }, onImport: { library.importChannels($0) }).id("subscription")
                     MediaCatalogSection { channel in
                         errorMessage = nil
                         captionFileName = nil
                         library.play(channel)
                     }
-                    danmakuSection
+                    danmakuSection.id("danmaku")
                     librarySection.id("library")
 
                     Text("本地媒体库保存在这台设备；登录家庭服务器后可主动同步。不内置媒体源。")
@@ -119,6 +119,11 @@ struct ContentView: View {
                         Button("本机文件与字幕") { navigate(to: "local-media") }
                         Button("导入播放列表") { navigate(to: "import") }
                         Button("JSON 配置") { navigate(to: "config") }
+                        Button("TVBox 订阅") { navigate(to: "subscription") }
+                        Button("网盘文件") { navigate(to: "cloud") }
+                        Button("直播节目表") { navigate(to: serverURL+"|"+(homeSession?.token ?? "")) }
+                        Button("家庭服务器") { navigate(to: "home-server") }
+                        Button("弹幕设置") { navigate(to: "danmaku") }
                         Button("媒体库") { navigate(to: "library") }
                     } label: { Label("功能导航", systemImage: "line.3.horizontal") }
                     .accessibilityIdentifier("section-navigation")
