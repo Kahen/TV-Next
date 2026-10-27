@@ -18,6 +18,9 @@ struct SubscriptionSection: View {
     @State private var appliedFilters: [String:String]=[:]
     @State private var actionResult: NativeSubscriptionAction?
     @State private var detail: NativeMediaDetail?
+    @State private var crossSiteResults: [NativeSearchHit<NativeMediaItem>] = []
+    @State private var crossSiteFailures: [String] = []
+    @State private var crossSiteWarnings: [String] = []
     @State private var line = 0
     @State private var error: String?
     @State private var busy = false
@@ -37,12 +40,28 @@ struct SubscriptionSection: View {
                 if let actionResult { actionView(actionResult) }
                 if let document { documentView(document) }
                 if let page { pageView(page) }
+                if !crossSiteFailures.isEmpty {
+                    Text("以下站点未返回结果：" + crossSiteFailures.joined(separator: "、"))
+                        .font(.caption).foregroundStyle(.orange)
+                }
+                ForEach(crossSiteWarnings, id: \.self) { Text($0).font(.caption).foregroundStyle(.secondary) }
+                if !crossSiteResults.isEmpty {
+                    LazyVStack(alignment: .leading) {
+                        Text("跨站搜索结果").font(.headline)
+                        ForEach(crossSiteResults.indices, id: \.self) { index in
+                            let hit = crossSiteResults[index]
+                            Button(hit.item.name + " · " + (document?.sites.first(where: { $0.key == hit.siteKey })?.name ?? hit.siteKey)) {
+                                inspect(hit.item, from: hit.siteKey)
+                            }.disabled(busy).padding(.vertical, 4)
+                        }
+                    }
+                }
                 if let detail { detailView(detail) }
             }
         }
-        .onDisappear { pending?.cancel(); actionResult = nil }
-        .onChange(of:serverURL) { _,_ in pending?.cancel();generation=UUID();busy=false;document=nil;page=nil;detail=nil;actionResult=nil;filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;siteKey="" }
-        .onChange(of:session?.token) { _,_ in pending?.cancel();generation=UUID();busy=false;actionResult=nil }
+        .onDisappear { pending?.cancel(); actionResult = nil; clearCrossSiteSearch() }
+        .onChange(of:serverURL) { _,_ in pending?.cancel();generation=UUID();busy=false;document=nil;page=nil;detail=nil;actionResult=nil;filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;siteKey="";clearCrossSiteSearch() }
+        .onChange(of:session?.token) { _,_ in pending?.cancel();generation=UUID();busy=false;actionResult=nil;clearCrossSiteSearch() }
     }
     private func run(_ operation: @escaping (TVNextAPI, UUID) async throws -> Void) {
         pending?.cancel()
@@ -55,11 +74,25 @@ struct SubscriptionSection: View {
             if generation == id { busy = false }
         }
     }
+    private func clearCrossSiteSearch() {
+        crossSiteResults = []; crossSiteFailures = []; crossSiteWarnings = []
+    }
+    private func switchDetailSite(_ key: String) {
+        var scope = NativeSiteBrowsingContext(
+            siteKey: siteKey, category: category, mode: mode,
+            filterCatalog: filterCatalog, filters: filters, appliedFilters: appliedFilters
+        )
+        if scope.switchToDetailSite(key) {
+            siteKey = scope.siteKey; category = scope.category; mode = scope.mode
+            filterCatalog = scope.filterCatalog; filters = scope.filters
+            appliedFilters = scope.appliedFilters; page = nil
+        }
+    }
     private func load(_ url: String? = nil) {
         run { api, id in
             let result: NativeSubscription = try await api.request("subscriptions/load", body: NativeSubscriptionRequest(content: url == nil ? content : "", url: url ?? address))
             guard generation == id, !Task.isCancelled else { return }
-            document = result; page = nil; detail = nil; siteKey = "";filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil
+            document = result; page = nil; detail = nil; siteKey = "";filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;clearCrossSiteSearch()
         }
     }
     private func request(_ key: String? = nil) -> NativeSiteRequest {
@@ -76,13 +109,34 @@ struct SubscriptionSection: View {
         run { api, id in
             let result: NativeMediaPage = try await api.request("subscriptions/" + operation, body: r)
             guard generation == id, !Task.isCancelled else { return }
-            page = result; detail = nil; siteKey = key; mode = operation; category = operation=="home" ? nil:r.categoryId
+            page = result; detail = nil; siteKey = key; mode = operation; category = operation=="home" ? nil:r.categoryId;clearCrossSiteSearch()
             filterCatalog=same ? filterCatalog.merging(result.filters ?? [:],uniquingKeysWith:{ _,new in new }):result.filters ?? [:]
             appliedFilters=operation=="category" ? choices:[:]
             // Keep unsaved Picker edits local; paging uses only the last applied values.
             if operation != "category" || number == 1 || !wasSameCategory {
                 filters=operation=="category" ? choices:[:]
             }
+        }
+    }
+    private func searchAll() {
+        guard let document else { return }
+        let keyword = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !keyword.isEmpty else { return }
+        let sources = document.sites.filter { $0.searchable && !$0.hidden && $0.supported }
+            .map { NativeSearchSource(key: $0.key, name: $0.name) }
+        clearCrossSiteSearch(); page = nil; detail = nil
+        run { api, id in
+            let result = try await NativeCrossSiteSearch.search(sources: sources, fetch: { source, number in
+                var r = NativeSiteRequest()
+                r.content = document.content; r.url = document.url
+                r.siteKey = source.key; r.query = keyword; r.page = number
+                let response: NativeMediaPage = try await api.request("subscriptions/search", body: r)
+                return NativeSearchPage(items: response.items, hasMore: response.hasMore)
+            }, identity: { $0.id })
+            guard generation == id, !Task.isCancelled else { return }
+            crossSiteResults = result.items
+            crossSiteFailures = result.failed
+            crossSiteWarnings = result.warnings
         }
     }
     private func loadLive(_ index: Int) {
@@ -94,21 +148,24 @@ struct SubscriptionSection: View {
             if !result.warnings.isEmpty { error = result.warnings.joined(separator: " · ") }
         }
     }
-    private func inspect(_ item: NativeMediaItem) {
-        if item.folder == true { browse(siteKey,operation:"category",type:item.id); return }
+    private func inspect(_ item: NativeMediaItem, from key: String? = nil) {
+        let targetKey = key ?? siteKey
+        if item.folder == true { browse(targetKey,operation:"category",type:item.id); return }
         if let action = item.action, !action.isEmpty {
-            var r = request(); r.action = action
+            var r = request(targetKey); r.action = action
             run { api, id in
                 let result: NativeSubscriptionAction = try await api.request("subscriptions/action",body:r)
                 guard generation == id, !Task.isCancelled else { return }
+                switchDetailSite(targetKey)
                 detail = nil; actionResult = result
             }
             return
         }
-        var r = request(); r.vodId = item.id
+        var r = request(targetKey); r.vodId = item.id
         run { api, id in
             let result: NativeMediaDetail = try await api.request("subscriptions/detail",body:r)
             guard generation == id, !Task.isCancelled else { return }
+            switchDetailSite(targetKey)
             detail = result; line = 0
         }
     }
@@ -152,7 +209,8 @@ struct SubscriptionSection: View {
         }
         HStack {
             TextField("搜索当前站点",text:$query).textFieldStyle(.roundedBorder)
-            Button("搜索") { browse(siteKey,operation:"search") }.disabled(busy || siteKey.isEmpty || query.isEmpty)
+            Button("搜索") { browse(siteKey,operation:"search") }.disabled(busy || siteKey.isEmpty || query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            Button("跨站搜索") { searchAll() }.disabled(busy || query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
     }
     @ViewBuilder private func pageView(_ page: NativeMediaPage) -> some View {
