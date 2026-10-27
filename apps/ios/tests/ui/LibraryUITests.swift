@@ -50,6 +50,33 @@ final class LibraryUITests: XCTestCase {
         XCTFail("Could not reveal a hittable \(element.identifier) after scrolling")
     }
 
+    /// Tap the actual visible production control even when XCTest incorrectly reports
+    /// a non-hittable SwiftUI button on iPad. The resulting fullscreen cover is asserted
+    /// by the caller; a blocked/disabled control must still fail the UI test.
+    private func tapVisible(_ element: XCUIElement) {
+        XCTAssertTrue(element.waitForExistence(timeout: 5))
+        XCTAssertTrue(element.isEnabled)
+        let window = app.windows.firstMatch
+        let viewport = window.frame.insetBy(dx: 0, dy: 80)
+        for _ in 0..<12 {
+            let frame = element.frame
+            let visible = frame.intersection(viewport)
+            if visible.width >= 20 && visible.height >= 20 {
+                if element.isHittable {
+                    element.tap()
+                } else {
+                    print("Coordinate-tapping visible but non-hittable control: \\(element.identifier), frame=\\(frame)")
+                    let origin = window.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
+                    origin.withOffset(CGVector(dx: visible.midX - window.frame.minX,
+                                               dy: visible.midY - window.frame.minY)).tap()
+                }
+                return
+            }
+            if frame.maxY < viewport.minY { app.swipeDown() } else { app.swipeUp() }
+        }
+        XCTFail("Could not reveal visible control \\(element.identifier)")
+    }
+
     private func enter(_ element: XCUIElement, _ text: String) {
         let clear = app.buttons["clear-" + element.identifier]
         if clear.exists && clear.isEnabled { reveal(clear); clear.tap() }
@@ -142,8 +169,7 @@ final class LibraryUITests: XCTestCase {
         jump("播放器")
         XCTAssertFalse(error.exists)
         let fullscreen = app.buttons["enter-fullscreen"]
-        reveal(fullscreen)
-        fullscreen.tap()
+        tapVisible(fullscreen)
         let close = app.buttons["exit-fullscreen"]
         XCTAssertTrue(close.waitForExistence(timeout: 5))
         let hittable = NSPredicate(format: "hittable == true")
