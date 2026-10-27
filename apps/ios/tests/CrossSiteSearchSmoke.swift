@@ -51,6 +51,19 @@ private actor RequestCounter {
         },identity:{$0.id}) }
         task.cancel()
         do { _ = try await task.value; fatalError("Cancellation was ignored") } catch is CancellationError {}
-        print("Native cross-provider search: ordering, concurrency, bounds, failures, duplicates and cancellation passed")
+        // Opening a search hit from B after browsing A must not leak A's
+        // category filters into subsequent B requests. Same-site detail keeps them.
+        var scope = NativeSiteBrowsingContext<String>(
+            siteKey: "A", category: "shared", mode: "category",
+            filterCatalog: ["shared": ["A-only"]],
+            filters: ["quality": "A"], appliedFilters: ["quality": "A"]
+        )
+        precondition(!scope.switchToDetailSite("A"))
+        precondition(scope.category == "shared" && scope.filters["quality"] == "A")
+        precondition(scope.switchToDetailSite("B"))
+        precondition(scope.siteKey == "B" && scope.category == nil && scope.mode == "home")
+        precondition(scope.filterCatalog.isEmpty && scope.filters.isEmpty && scope.appliedFilters.isEmpty)
+        precondition(!scope.switchToDetailSite("B"))
+        print("Native cross-provider search: ordering, concurrency, bounds, failures, duplicates, site scope and cancellation passed")
     }
 }

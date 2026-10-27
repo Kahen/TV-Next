@@ -142,6 +142,22 @@ struct SubscriptionSection: View {
         run { api, id in
             let result: NativeMediaDetail = try await api.request("subscriptions/detail",body:r)
             guard generation == id, !Task.isCancelled else { return }
+            // A cross-site hit can belong to a different provider than the last
+            // browsed page. Never carry that provider's category/filter state over.
+            var scope = NativeSiteBrowsingContext(
+                siteKey: siteKey, category: category, mode: mode,
+                filterCatalog: filterCatalog, filters: filters,
+                appliedFilters: appliedFilters
+            )
+            if scope.switchToDetailSite(targetKey) {
+                siteKey = scope.siteKey
+                category = scope.category
+                mode = scope.mode
+                filterCatalog = scope.filterCatalog
+                filters = scope.filters
+                appliedFilters = scope.appliedFilters
+                page = nil
+            }
             detail = result; line = 0; siteKey = targetKey
         }
     }
