@@ -78,6 +78,8 @@ jobs:
         run: xcodebuild -project TVNext.xcodeproj -scheme TVNext -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
       - name: Install synthetic media fixture tool
         run: brew install ffmpeg
+      # Large Dynamic Type UI tests import/clear/relaunch real app state; on macOS CI iPad
+      # this can exceed 180s although assertions pass. Retain a hard 300s per-test cap.
       - name: Exercise native store and production SwiftUI on iPhone and iPad
         working-directory: apps/ios
         env:
@@ -107,6 +109,8 @@ jobs:
               selected.append(match['udid'])
           Path('/tmp/tvnext-destinations.txt').write_text('\n'.join(selected) + '\n')
           PYTHON
+          # Keychain integration tests need a simulator-local ad-hoc identity. No Apple
+          # team, provisioning profile, device IPA or distribution signing is used.
           index=0
           while IFS= read -r device; do
             index=$((index + 1))
@@ -115,9 +119,9 @@ jobs:
             xcrun simctl ui "$device" appearance light
             xcodebuild -project TVNext.xcodeproj -scheme TVNext -configuration Debug \
               -destination "platform=iOS Simulator,id=$device" \
-              -test-timeouts-enabled YES -default-test-execution-time-allowance 180 -maximum-test-execution-time-allowance 180 \
+              -test-timeouts-enabled YES -default-test-execution-time-allowance 300 -maximum-test-execution-time-allowance 300 \
               -parallel-testing-enabled NO -maximum-concurrent-test-simulator-destinations 1 \
-              -resultBundlePath "native-$index.xcresult" CODE_SIGNING_ALLOWED=NO test
+              -resultBundlePath "native-$index.xcresult" CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual test
             xcrun simctl shutdown "$device"
           done < /tmp/tvnext-destinations.txt
       - name: Retain native test results and fixture diagnostics
