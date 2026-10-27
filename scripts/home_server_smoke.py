@@ -98,6 +98,16 @@ def send(peer, payload):
     peer.sendall(header + mask + bytes(value ^ mask[index % 4] for index, value in enumerate(body)))
 
 
+def wait_remote_receiver(token, device_id, attempts=40, delay=0.1):
+    """A 101 upgrade can arrive before the server has registered the receiver."""
+    for _ in range(attempts):
+        devices = request("remote/devices", token=token)
+        if any(device.get("id") == device_id and device.get("online") is True for device in devices):
+            return
+        time.sleep(delay)
+    raise AssertionError("WebSocket receiver never became online")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--restart-api", action="store_true", help="Restart only the isolated CI NAS API to prove persistence")
@@ -123,6 +133,7 @@ def main():
 
     ticket = request("remote/ticket", {}, a)["ticket"]
     with upgrade(ticket) as peer:
+        wait_remote_receiver(a, first["device"]["id"])
         command = request("remote/commands", {"targetDeviceId": first["device"]["id"], "type": "PAUSE"}, a)
         packet = receive(peer)
         assert packet["id"] == command["id"] and packet["type"] == "PAUSE"
