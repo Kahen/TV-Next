@@ -36,6 +36,12 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertTrue(condition(), "AVPlayer did not reach the expected state")
     }
 
+    func testSystemAirPlayIsAllowedForAVPlayer() {
+        // A simulator may not advertise any actual AirPlay destination.
+        // Verify only that the production player permits the system route.
+        XCTAssertTrue(store.player.allowsExternalPlayback)
+    }
+
     func testEmptyOrInvalidImportPreservesLibraryAndDeduplicates() {
         let original = channel()
         XCTAssertTrue(store.importChannels([original, original]))
