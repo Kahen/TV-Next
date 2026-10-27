@@ -31,3 +31,14 @@ manual device evidence in #38. This navigation improvement does not create an
 installable signed IPA. Use Xcode signing with your own Apple team for a
 physical-device development build; Apple TestFlight/App Store distribution
 needs separate signing/provisioning and policy verification.
+
+## CI note — 2026-10-27
+
+The original iPad acceptance gate on PR #47 exceeded the former 180-second
+XCTest per-method allowance during the real import/favorite/relaunch test.
+The log shows the test completing media library checks at ~190s, followed by
+an XCTest termination failure after the watchdog fired. The new native gate
+sets a still-bounded 300-second per-test limit; no UI assertions, device
+families or production operations are skipped. This change is not evidence
+of physical-device performance. Record and fix genuinely slow product
+interactions separately if repeated test timings exceed the new cap.

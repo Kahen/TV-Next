@@ -325,6 +325,11 @@ struct ContentView: View {
                 }
                 .disabled(library.player.currentItem == nil)
                 .accessibilityIdentifier("enter-fullscreen")
+                HStack(spacing: 8) {
+                    Text("AirPlay 输出").font(.subheadline)
+                    NativeAirPlayRoutePicker()
+                        .frame(width: 44, height: 44)
+                }
                 Text(AVPictureInPictureController.isPictureInPictureSupported()
                      ? "画中画：播放后使用系统播放器的画中画按钮。"
                      : "此设备不支持系统画中画。")

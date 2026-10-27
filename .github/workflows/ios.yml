@@ -60,6 +60,11 @@ jobs:
         run: |
           swiftc TVNext/SubscriptionFilters.swift tests/FilterSmoke.swift -o /tmp/tvnext-filter-tests
           /tmp/tvnext-filter-tests
+      - name: Verify native bounded cross-provider search
+        working-directory: apps/ios
+        run: |
+          swiftc -warnings-as-errors TVNext/NativeCrossSiteSearch.swift TVNext/NativeSiteBrowsingContext.swift tests/CrossSiteSearchSmoke.swift -o /tmp/tvnext-cross-site-tests
+          /tmp/tvnext-cross-site-tests
       - name: Validate native FongMi action web subset against shared fixture
         working-directory: apps/ios
         run: |
@@ -73,6 +78,8 @@ jobs:
         run: xcodebuild -project TVNext.xcodeproj -scheme TVNext -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
       - name: Install synthetic media fixture tool
         run: brew install ffmpeg
+      # Large Dynamic Type UI tests import/clear/relaunch real app state; on macOS CI iPad
+      # this can exceed 180s although assertions pass. Retain a hard 300s per-test cap.
       - name: Exercise native store and production SwiftUI on iPhone and iPad
         working-directory: apps/ios
         env:
@@ -110,7 +117,7 @@ jobs:
             xcrun simctl ui "$device" appearance light
             xcodebuild -project TVNext.xcodeproj -scheme TVNext -configuration Debug \
               -destination "platform=iOS Simulator,id=$device" \
-              -test-timeouts-enabled YES -default-test-execution-time-allowance 180 -maximum-test-execution-time-allowance 180 \
+              -test-timeouts-enabled YES -default-test-execution-time-allowance 300 -maximum-test-execution-time-allowance 300 \
               -parallel-testing-enabled NO -maximum-concurrent-test-simulator-destinations 1 \
               -resultBundlePath "native-$index.xcresult" CODE_SIGNING_ALLOWED=NO test
             xcrun simctl shutdown "$device"
