@@ -69,6 +69,17 @@ final class LibraryUITests: XCTestCase {
         }
     }
 
+    func testNativeNavigationMenuExposesSubscriptionCloudAndGuide() {
+        let menu = app.buttons["section-navigation"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 5))
+        menu.tap()
+        for label in ["TVBox 订阅", "网盘文件", "直播节目表", "家庭服务器", "弹幕设置"] {
+            XCTAssertTrue(app.buttons[label].exists, "Missing native navigation: \(label)")
+        }
+        app.buttons["TVBox 订阅"].tap()
+        XCTAssertTrue(app.staticTexts["TVBox / FongMi 原版订阅"].waitForExistence(timeout: 5))
+    }
+
     private func importPlaylist(_ text: String) {
         jump("导入播放列表")
         enter(app.textViews["playlist-input"], text)
