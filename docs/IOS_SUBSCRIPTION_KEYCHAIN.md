@@ -16,8 +16,9 @@ The native TVBox/FongMi subscription view now includes an explicit
   when-unlocked Apple Keychain**, not UserDefaults, logs, analytics or backups.
   Any server-side HTTP source access still uses the existing transport policy.
 - Disabling the switch deletes the saved URL. The clear action also removes
-  the currently filled address. Neither action changes an already-open
-  ephemeral subscription or media library.
+  the currently filled address. If Keychain deletion fails, the UI reports
+  that the URL may remain and does not claim it was erased. Neither action
+  changes an already-open ephemeral subscription or media library.
 - Local paste/import keeps functioning with no Keychain permission. Keychain
   failure is reported after a successful load; the app does not claim the URL
   was persisted.

@@ -55,9 +55,12 @@ final class MediaLibraryTests: XCTestCase {
         let second = "http://192.168.2.10:8080/config.json"
         XCTAssertTrue(store.save(first))
         XCTAssertEqual(store.read(), first)
+        XCTAssertFalse(store.save("https://user:pass@example.org/unsafe"))
+        XCTAssertEqual(store.read(), first, "Invalid updates must not replace a saved URL")
         XCTAssertTrue(store.save(second), "Expected in-place Keychain update")
         XCTAssertEqual(store.read(), second)
         XCTAssertTrue(store.clear())
+        XCTAssertTrue(store.clear(), "Clearing an absent Keychain item should be idempotent")
         XCTAssertNil(store.read())
     }
 

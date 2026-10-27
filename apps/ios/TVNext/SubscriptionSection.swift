@@ -35,12 +35,19 @@ struct SubscriptionSection: View {
                 TextEditor(text: $content).frame(height: 100).font(.system(.footnote, design: .monospaced)).accessibilityLabel("订阅配置内容")
                 Toggle("记住订阅地址（仅 URL，存入本机钥匙串）", isOn: $rememberURL)
                     .onChange(of: rememberURL) { _, enabled in
-                        if !enabled { _ = NativeSubscriptionURLStore().clear() }
+                        if !enabled && !NativeSubscriptionURLStore().clear() {
+                            // A failed delete must not silently imply that a secret was erased.
+                            rememberURL = true
+                            error = "钥匙串删除失败，订阅地址仍可能保留。请稍后重试。"
+                        }
                     }
                 Button("清除保存的订阅地址") {
-                    _ = NativeSubscriptionURLStore().clear()
-                    rememberURL = false
-                    address = ""
+                    if NativeSubscriptionURLStore().clear() {
+                        rememberURL = false
+                        address = ""
+                    } else {
+                        error = "钥匙串删除失败，订阅地址仍可能保留。请稍后重试。"
+                    }
                 }.buttonStyle(.bordered).accessibilityIdentifier("clear-saved-subscription-url")
                 Text("粘贴的配置正文不会保存；只有开启记住且使用订阅 URL 成功加载后，才保存地址。")
                     .font(.caption).foregroundStyle(.secondary)
