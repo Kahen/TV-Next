@@ -108,3 +108,44 @@ it("cross-site search preserves distinct source IDs, searches a second page and 
   expect(screen.getByRole("alert").textContent).not.toContain("private upstream token");
   expect(request.mock.calls.some(([path,body])=>path.endsWith("/search")&&(body as {page:number}).page===2)).toBe(true);
 });
+
+it("renders FongMi type-4 action web result as an opt-in isolated link, not raw JSON",async()=>{
+  const onPlay=vi.fn();
+  request.mockResolvedValueOnce(doc)
+    .mockResolvedValueOnce({categories:[],items:[{id:"login",name:"Login",action:"https://example.org/action"}],page:1,hasMore:false,filters:{}})
+    .mockResolvedValueOnce({msg:"<script>untrusted</script>",web:{url:"https://example.org/login",mode:"view",cookie:[{keys:["sid"]}]}});
+  const {container}=render(<SubscriptionBrowser onPlay={onPlay}/>);
+  fireEvent.click(screen.getByText("加载订阅"));
+  fireEvent.click(await screen.findByRole("button",{name:"Cloud"}));
+  fireEvent.click(await screen.findByText("Login"));
+  const link=await screen.findByRole("link",{name:"在外部浏览器打开站点网页"});
+  expect(link.getAttribute("href")).toBe("https://example.org/login");
+  expect(link.getAttribute("target")).toBe("_blank");
+  expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+  expect(container.querySelector("script")).toBeNull();
+  expect(screen.getByRole("status").textContent).toContain("<script>untrusted</script>");
+  expect(screen.getByRole("status").textContent).toContain("不同步凭据");
+  expect(onPlay).not.toHaveBeenCalled();
+  expect(request.mock.calls.at(-1)?.[1]).toEqual(expect.objectContaining({siteKey:"cloud",action:"https://example.org/action"}));
+  fireEvent.click(screen.getByRole("button",{name:"Cloud"}));
+  expect(screen.queryByRole("link",{name:"在外部浏览器打开站点网页"})).toBeNull();
+});
+
+it("does not render unsafe action links or restore canceled action results",async()=>{
+  let finish!: (result:unknown)=>void;
+  request.mockResolvedValueOnce(doc)
+    .mockResolvedValueOnce({categories:[],items:[{id:"bad",name:"Bad",action:"https://example.org/action"}],page:1,hasMore:false,filters:{}})
+    .mockResolvedValueOnce({web:{url:"javascript:alert(1)"}})
+    .mockImplementationOnce(()=>new Promise(r=>{finish=r;}));
+  render(<SubscriptionBrowser onPlay={()=>{}}/>);
+  fireEvent.click(screen.getByText("加载订阅"));
+  fireEvent.click(await screen.findByRole("button",{name:"Cloud"}));
+  fireEvent.click(await screen.findByText("Bad"));
+  expect((await screen.findByRole("status")).textContent).toContain("不安全的网址");
+  expect(screen.queryByRole("link",{name:"在外部浏览器打开站点网页"})).toBeNull();
+  fireEvent.click(screen.getByText("Bad"));
+  fireEvent.click(await screen.findByText("取消请求"));
+  finish({web:{url:"https://example.org/late"}});
+  await new Promise(r=>setTimeout(r,0));
+  expect(screen.queryByRole("link",{name:"在外部浏览器打开站点网页"})).toBeNull();
+});
