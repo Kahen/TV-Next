@@ -16,6 +16,7 @@ struct SubscriptionSection: View {
     @State private var filterCatalog: [String:[NativeSiteFilter]]=[:]
     @State private var filters: [String:String]=[:]
     @State private var appliedFilters: [String:String]=[:]
+    @State private var actionResult: NativeSubscriptionAction?
     @State private var detail: NativeMediaDetail?
     @State private var line = 0
     @State private var error: String?
@@ -33,18 +34,19 @@ struct SubscriptionSection: View {
                     if busy { Button("取消") { pending?.cancel(); generation = UUID(); busy = false } }
                 }
                 if let error { Text(error).font(.caption).foregroundStyle(.red) }
+                if let actionResult { actionView(actionResult) }
                 if let document { documentView(document) }
                 if let page { pageView(page) }
                 if let detail { detailView(detail) }
             }
         }
-        .onDisappear { pending?.cancel() }
-        .onChange(of:serverURL) { _,_ in pending?.cancel();generation=UUID();busy=false;document=nil;page=nil;detail=nil;filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;siteKey="" }
-        .onChange(of:session?.token) { _,_ in pending?.cancel();generation=UUID();busy=false }
+        .onDisappear { pending?.cancel(); actionResult = nil }
+        .onChange(of:serverURL) { _,_ in pending?.cancel();generation=UUID();busy=false;document=nil;page=nil;detail=nil;actionResult=nil;filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;siteKey="" }
+        .onChange(of:session?.token) { _,_ in pending?.cancel();generation=UUID();busy=false;actionResult=nil }
     }
     private func run(_ operation: @escaping (TVNextAPI, UUID) async throws -> Void) {
         pending?.cancel()
-        let id = UUID(); generation = id; busy = true; error = nil
+        let id = UUID(); generation = id; busy = true; error = nil; actionResult = nil
         pending = Task { @MainActor in
             do {
                 guard let url = URL(string: serverURL) else { throw APIError.invalidServer }
@@ -94,6 +96,15 @@ struct SubscriptionSection: View {
     }
     private func inspect(_ item: NativeMediaItem) {
         if item.folder == true { browse(siteKey,operation:"category",type:item.id); return }
+        if let action = item.action, !action.isEmpty {
+            var r = request(); r.action = action
+            run { api, id in
+                let result: NativeSubscriptionAction = try await api.request("subscriptions/action",body:r)
+                guard generation == id, !Task.isCancelled else { return }
+                detail = nil; actionResult = result
+            }
+            return
+        }
         var r = request(); r.vodId = item.id
         run { api, id in
             let result: NativeMediaDetail = try await api.request("subscriptions/detail",body:r)
@@ -109,6 +120,23 @@ struct SubscriptionSection: View {
             guard generation == id, !Task.isCancelled else { return }
             onPlay(result, detail.item.name)
         }
+    }
+    @ViewBuilder private func actionView(_ result: NativeSubscriptionAction) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let message = result.message { Text(message).font(.callout) }
+            if let link = result.link {
+                Link("在外部浏览器打开站点网页", destination: link)
+                    .accessibilityHint("会离开当前应用，不会自动登录或同步 Cookie")
+            }
+            if result.limitedBrowserFeatures {
+                Text("原版内嵌视图或 Cookie 自动关闭尚未支持；仅手动打开外部浏览器，不同步凭据。")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            if result.unsupported {
+                Text("站点返回了未支持的操作指令或不安全的网址，未执行。")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }.accessibilityElement(children: .contain)
     }
     @ViewBuilder private func documentView(_ doc: NativeSubscription) -> some View {
         ForEach(0..<min(doc.liveCount,50),id: \.self) { index in
