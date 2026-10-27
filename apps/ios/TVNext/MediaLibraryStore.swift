@@ -77,6 +77,7 @@ final class MediaLibraryStore: ObservableObject {
          }) {
         self.defaults = defaults
         self.createRelay = createRelay
+        player.allowsExternalPlayback = true
         restore()
         let center = NotificationCenter.default
         audioObservers.append(center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] note in
