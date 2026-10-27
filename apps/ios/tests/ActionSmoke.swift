@@ -48,7 +48,7 @@ import Foundation
             let result = try JSONDecoder().decode(NativeSubscriptionAction.self, from: item.body.raw)
             precondition(result.link?.absoluteString == item.url, "URL mismatch: \(item.name)")
             precondition(result.message == item.message, "Message mismatch: \(item.name)")
-            precondition(result.unsupported || result.limitedBrowserFeatures == item.warning, "Warning mismatch: \(item.name)")
+            precondition((result.unsupported || result.limitedBrowserFeatures) == item.warning, "Warning mismatch: \(item.name)")
         }
         print("Native/Web FongMi action web contract passed")
     }
