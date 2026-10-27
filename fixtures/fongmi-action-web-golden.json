@@ -1,0 +1,13 @@
+{
+  "cases": [
+    {"name":"browser","body":{"msg":"请在浏览器登录","web":{"url":"https://example.org/login?source=tv","mode":"browser"}},"url":"https://example.org/login?source=tv","message":"请在浏览器登录","warning":false},
+    {"name":"view and cookies","body":{"web":{"url":"https://example.org/game","mode":"view","cookie":[{"keys":["sid"]}]}},"url":"https://example.org/game","message":null,"warning":true},
+    {"name":"javascript","body":{"web":{"url":"javascript:alert(1)"}},"url":null,"message":null,"warning":true},
+    {"name":"embedded credentials","body":{"web":{"url":"https://u:secret@example.org/"}},"url":null,"message":null,"warning":true},
+    {"name":"backslash","body":{"web":{"url":"https://example.org\\@evil.example/"}},"url":null,"message":null,"warning":true},
+    {"name":"unknown mode","body":{"web":{"url":"https://example.org/","mode":"script"}},"url":null,"message":null,"warning":true},
+    {"name":"missing target","body":{"msg":"操作完成"},"url":null,"message":"操作完成","warning":false},
+    {"name":"invalid object","body":{"web":{"url":"file:///etc/passwd"}},"url":null,"message":null,"warning":true},
+    {"name":"html","body":{"msg":"<script>do-not-render</script>","web":{"url":"https://example.org/"}},"url":"https://example.org/","message":"<script>do-not-render</script>","warning":false}
+  ]
+}

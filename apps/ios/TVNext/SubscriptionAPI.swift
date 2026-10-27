@@ -29,7 +29,7 @@ struct NativeMediaPlayback: Decodable {
 }
 struct NativeSiteRequest: Encodable {
     var content = ""; var url = ""; var siteKey = ""; var categoryId: String?; var query: String?; var vodId: String?
-    var page = 1; var lineIndex = 0; var episodeIndex = 0
+    var page = 1; var lineIndex = 0; var episodeIndex = 0; var action: String?
     var filters: [String:String] = [:]
     var bypassCache = false
 }
