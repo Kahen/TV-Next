@@ -29,22 +29,25 @@ final class LibraryUITests: XCTestCase {
     }
 
     private func reveal(_ element: XCUIElement) {
-        // Menu dismissal and ScrollViewReader animation settle after the action returns.
-        let reachable = NSPredicate(format: "hittable == true")
-        if XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: reachable, object: element)], timeout: 3) == .completed { return }
-        for _ in 0..<8 {
-            if element.isHittable { return }
-            print("Reveal target \(element.identifier): exists=\(element.exists) frame=\(element.frame)")
+        // Offscreen SwiftUI elements can report an invalid activation point on iPhone.
+        // Check visible geometry before asking XCTest for hittability; keep failing if
+        // scrolling cannot actually reveal a tappable production control.
+        let window = app.windows.firstMatch.frame
+        for _ in 0..<12 {
             let frame = element.frame
-            if element.exists && frame.maxY < app.windows.firstMatch.frame.minY + 100 {
+            let intersection = frame.intersection(window)
+            if element.exists && intersection.width >= 20 && intersection.height >= 20 {
+                if element.isHittable { return }
+            }
+            print("Reveal target \(element.identifier): exists=\(element.exists) frame=\(frame)")
+            if frame.width > 0 && frame.maxY < window.minY + 100 {
                 app.swipeDown()
             } else {
                 app.swipeUp()
             }
         }
-        if XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: reachable, object: element)], timeout: 2) == .completed { return }
-        if !element.isHittable { print("Unreachable element: \(element.debugDescription)\n\(app.debugDescription)") }
-        XCTAssertTrue(element.isHittable)
+        print("Unreachable element: \(element.debugDescription)\n\(app.debugDescription)")
+        XCTFail("Could not reveal a hittable \(element.identifier) after scrolling")
     }
 
     private func enter(_ element: XCUIElement, _ text: String) {
