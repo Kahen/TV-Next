@@ -7,6 +7,7 @@ struct SubscriptionSection: View {
     var onImport: (([TVChannel]) -> Void)? = nil
     @State private var address = ""
     @State private var content = ""
+    @State private var rememberURL = false
     @State private var document: NativeSubscription?
     @State private var siteKey = ""
     @State private var query = ""
@@ -32,6 +33,24 @@ struct SubscriptionSection: View {
             VStack(alignment: .leading, spacing: 12) {
                 TextField("订阅 URL / 相对路径基准", text: $address).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled().textFieldStyle(.roundedBorder)
                 TextEditor(text: $content).frame(height: 100).font(.system(.footnote, design: .monospaced)).accessibilityLabel("订阅配置内容")
+                Toggle("记住订阅地址（仅 URL，存入本机钥匙串）", isOn: $rememberURL)
+                    .onChange(of: rememberURL) { _, enabled in
+                        if !enabled && !NativeSubscriptionURLStore().clear() {
+                            // A failed delete must not silently imply that a secret was erased.
+                            rememberURL = true
+                            error = "钥匙串删除失败，订阅地址仍可能保留。请稍后重试。"
+                        }
+                    }
+                Button("清除保存的订阅地址") {
+                    if NativeSubscriptionURLStore().clear() {
+                        rememberURL = false
+                        address = ""
+                    } else {
+                        error = "钥匙串删除失败，订阅地址仍可能保留。请稍后重试。"
+                    }
+                }.buttonStyle(.bordered).accessibilityIdentifier("clear-saved-subscription-url")
+                Text("粘贴的配置正文不会保存；只有开启记住且使用订阅 URL 成功加载后，才保存地址。")
+                    .font(.caption).foregroundStyle(.secondary)
                 HStack {
                     Button("加载订阅") { load() }.buttonStyle(.borderedProminent).disabled(busy)
                     if busy { Button("取消") { pending?.cancel(); generation = UUID(); busy = false } }
@@ -57,6 +76,12 @@ struct SubscriptionSection: View {
                     }
                 }
                 if let detail { detailView(detail) }
+            }
+        }
+        .onAppear {
+            if address.isEmpty, let stored = NativeSubscriptionURLStore().read() {
+                address = stored
+                rememberURL = true
             }
         }
         .onDisappear { pending?.cancel(); actionResult = nil; clearCrossSiteSearch() }
@@ -89,10 +114,18 @@ struct SubscriptionSection: View {
         }
     }
     private func load(_ url: String? = nil) {
+        let targetURL = url ?? address
+        let inlineContent = url == nil ? content : ""
+        let shouldSaveURL = rememberURL && inlineContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         run { api, id in
-            let result: NativeSubscription = try await api.request("subscriptions/load", body: NativeSubscriptionRequest(content: url == nil ? content : "", url: url ?? address))
+            let result: NativeSubscription = try await api.request("subscriptions/load", body: NativeSubscriptionRequest(content: inlineContent, url: targetURL))
             guard generation == id, !Task.isCancelled else { return }
             document = result; page = nil; detail = nil; siteKey = "";filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;clearCrossSiteSearch()
+            // URL is only saved after a successful, current-generation remote load.
+            // Never save pasted configurations or a URL on a failed/canceled request.
+            if shouldSaveURL && rememberURL && !NativeSubscriptionURLStore().save(targetURL) {
+                error = "订阅已加载，但无法安全保存地址。请检查 URL 和钥匙串权限。"
+            }
         }
     }
     private func request(_ key: String? = nil) -> NativeSiteRequest {
