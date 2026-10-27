@@ -65,7 +65,7 @@ final class LibraryUITests: XCTestCase {
                 if element.isHittable {
                     element.tap()
                 } else {
-                    print("Coordinate-tapping visible but non-hittable control: \\(element.identifier), frame=\\(frame)")
+                    print("Coordinate-tapping visible but non-hittable control: \(element.identifier), frame=\(frame)")
                     let origin = window.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
                     origin.withOffset(CGVector(dx: visible.midX - window.frame.minX,
                                                dy: visible.midY - window.frame.minY)).tap()
@@ -74,7 +74,7 @@ final class LibraryUITests: XCTestCase {
             }
             if frame.maxY < viewport.minY { app.swipeDown() } else { app.swipeUp() }
         }
-        XCTFail("Could not reveal visible control \\(element.identifier)")
+        XCTFail("Could not reveal visible control \(element.identifier)")
     }
 
     private func enter(_ element: XCUIElement, _ text: String) {
