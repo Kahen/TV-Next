@@ -42,6 +42,25 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertTrue(store.player.allowsExternalPlayback)
     }
 
+    func testSubscriptionKeychainOnlyStoresValidExplicitURLsAndCanClear() {
+        let store = NativeSubscriptionURLStore(account: "xcuitest-" + UUID().uuidString)
+        defer { _ = store.clear() }
+        XCTAssertNil(store.read())
+        for invalid in [
+            "javascript:alert(1)", "file:///secret", "https://a:b@example.org/config",
+            "https://example.org/\\\\@another.example/", "https://example.org/config#token",
+            "https://example.org/space here", "https://example.org/" + String(repeating: "x", count: 5000)
+        ] { XCTAssertFalse(store.save(invalid), "Unexpectedly persisted an unsafe URL") }
+        let first = "https://example.org/config.json?token=synthetic"
+        let second = "http://192.168.2.10:8080/config.json"
+        XCTAssertTrue(store.save(first))
+        XCTAssertEqual(store.read(), first)
+        XCTAssertTrue(store.save(second), "Expected in-place Keychain update")
+        XCTAssertEqual(store.read(), second)
+        XCTAssertTrue(store.clear())
+        XCTAssertNil(store.read())
+    }
+
     func testEmptyOrInvalidImportPreservesLibraryAndDeduplicates() {
         let original = channel()
         XCTAssertTrue(store.importChannels([original, original]))
