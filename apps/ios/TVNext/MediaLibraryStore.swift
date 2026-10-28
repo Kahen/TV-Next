@@ -1,5 +1,6 @@
 import AVFoundation
 import Combine
+import CryptoKit
 import Foundation
 
 private struct SavedLibrary: Codable {
@@ -9,6 +10,17 @@ private struct SavedLibrary: Codable {
     let recent: [TVChannel]
     let positions: [String: Double]
     let recentTimes: [String:Double]?
+}
+
+private struct NativeAudioPreference: Codable {
+    let urlDigest: String
+    let displayName: String
+    let languageTag: String?
+}
+
+private struct NativeAudioPreferenceSnapshot: Codable {
+    let version: Int
+    let entries: [NativeAudioPreference]
 }
 
 struct NativeAudioTrack: Identifiable, Equatable {
@@ -47,6 +59,41 @@ final class MediaLibraryStore: ObservableObject {
     private var audioTrackTask: Task<Void, Never>?
     private var audioTrackItem: AVPlayerItem?
     private var audioTrackGroup: AVMediaSelectionGroup?
+    private let audioPreferenceStorageKey = "tv-next-native-audio-preferences-v1"
+    private var audioPreferences: [NativeAudioPreference] = []
+
+    private func audioPreferenceKey() -> String? {
+        guard let channel = current, channel.replay == nil, currentLocalFile == nil,
+              MediaAddress.valid(channel.url) else { return nil }
+        return SHA256.hash(data: Data(channel.url.utf8))
+            .map { String(format: "%02x", $0) }.joined()
+    }
+
+    private func restoreAudioPreferences() {
+        guard let data = defaults.data(forKey: audioPreferenceStorageKey), data.count <= 64_000,
+              let snapshot = try? JSONDecoder().decode(NativeAudioPreferenceSnapshot.self, from: data),
+              snapshot.version == 1 else { return }
+        var seen = Set<String>()
+        audioPreferences = Array(snapshot.entries.reversed().filter { entry in
+            entry.urlDigest.count == 64 && entry.urlDigest.allSatisfy(\.isHexDigit) &&
+            !entry.displayName.isEmpty && entry.displayName.count <= 80 &&
+            (entry.languageTag?.count ?? 0) <= 64 &&
+            seen.insert(entry.urlDigest).inserted
+        }.prefix(100).reversed())
+    }
+
+    private func rememberAudioPreference(_ option: AVMediaSelectionOption) {
+        guard let key = audioPreferenceKey() else { return }
+        let name = String(option.displayName.prefix(80))
+        guard !name.isEmpty, (option.extendedLanguageTag?.count ?? 0) <= 64 else { return }
+        audioPreferences.removeAll { $0.urlDigest == key }
+        audioPreferences.append(NativeAudioPreference(urlDigest: key,
+            displayName: name, languageTag: option.extendedLanguageTag))
+        audioPreferences = Array(audioPreferences.suffix(100))
+        let snapshot = NativeAudioPreferenceSnapshot(version: 1, entries: audioPreferences)
+        guard let data = try? JSONEncoder().encode(snapshot), data.count <= 64_000 else { return }
+        defaults.set(data, forKey: audioPreferenceStorageKey)
+    }
     @Published private(set) var subtitleTracks: [NativeSubtitleTrack] = []
     @Published private(set) var selectedSubtitleTrack: Int?
     @Published private(set) var canDisableEmbeddedSubtitles = false
@@ -110,6 +157,7 @@ final class MediaLibraryStore: ObservableObject {
         player.appliesMediaSelectionCriteriaAutomatically = false
         item.select(group.options[index], in: group)
         selectedAudioTrack = index
+        rememberAudioPreference(group.options[index])
         return true
     }
 
@@ -149,6 +197,19 @@ final class MediaLibraryStore: ObservableObject {
                     })?.id
                 } else {
                     self.selectedAudioTrack = nil
+                }
+                // Reapply only a unique, exact match. Never use a stale numeric index.
+                if let key = self.audioPreferenceKey(),
+                   let preference = self.audioPreferences.first(where: { $0.urlDigest == key }) {
+                    let matches = Array(group.options.prefix(16).enumerated()).filter {
+                        $0.element.displayName == preference.displayName &&
+                        $0.element.extendedLanguageTag == preference.languageTag
+                    }
+                    if matches.count == 1, let match = matches.first {
+                        self.player.appliesMediaSelectionCriteriaAutomatically = false
+                        item.select(match.element, in: group)
+                        self.selectedAudioTrack = match.offset
+                    }
                 }
             } catch {
                 // Some codecs/containers expose no AVFoundation media-selection group.
@@ -211,6 +272,7 @@ final class MediaLibraryStore: ObservableObject {
         self.resolveReplay = resolveReplay
         player.allowsExternalPlayback = true
         restore()
+        restoreAudioPreferences()
         let center = NotificationCenter.default
         audioObservers.append(center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] note in
             guard let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
@@ -531,6 +593,8 @@ final class MediaLibraryStore: ObservableObject {
         recentTimes = [:]
         positions = [:]
         defaults.removeObject(forKey: storageKey)
+        audioPreferences = []
+        defaults.removeObject(forKey: audioPreferenceStorageKey)
     }
 
     private func restore() {

@@ -118,6 +118,39 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertTrue(store.audioTracks.isEmpty)
     }
 
+    func testPerTitleAudioChoiceRestoresWithoutPersistingMediaURL() async throws {
+        let mediaURL = "http://127.0.0.1:8766/master.m3u8"
+        XCTAssertFalse(store.selectAudioTrack(1))
+        store.play(channel("Synthetic HLS", url: mediaURL))
+        try await waitUntil({ self.store.audioTracks.count == 2 }, timeout: 15)
+        XCTAssertFalse(store.selectAudioTrack(99))
+        XCTAssertNil(defaults.data(forKey: "tv-next-native-audio-preferences-v1"))
+        XCTAssertTrue(store.selectAudioTrack(1))
+        let bytes = try XCTUnwrap(defaults.data(forKey: "tv-next-native-audio-preferences-v1"))
+        XCTAssertLessThanOrEqual(bytes.count, 64_000)
+        XCTAssertFalse(String(decoding: bytes, as: UTF8.self).contains(mediaURL),
+                       "Only a URL digest, never the media URL, may be stored")
+        let restored = MediaLibraryStore(defaults: defaults)
+        restored.play(channel("Synthetic HLS", url: mediaURL))
+        try await waitUntil({ restored.audioTracks.count == 2 && restored.selectedAudioTrack == 1 },
+                            timeout: 15)
+        XCTAssertFalse(restored.player.appliesMediaSelectionCriteriaAutomatically,
+                       "The saved exact track match must be actively restored")
+        restored.playLocalFile(try fixture(), name: "fixture.mp4")
+        XCTAssertTrue(restored.player.appliesMediaSelectionCriteriaAutomatically,
+                      "Unrelated local files must not inherit an HLS preference")
+        restored.clear()
+        XCTAssertNil(defaults.data(forKey: "tv-next-native-audio-preferences-v1"))
+    }
+
+    func testCorruptedAudioPreferenceIsIgnoredWithoutChangingPlayback() async throws {
+        defaults.set(Data("not-json".utf8), forKey: "tv-next-native-audio-preferences-v1")
+        let restored = MediaLibraryStore(defaults: defaults)
+        restored.play(channel("Synthetic HLS", url: "http://127.0.0.1:8766/master.m3u8"))
+        try await waitUntil({ restored.audioTracks.count == 2 }, timeout: 15)
+        XCTAssertTrue(restored.player.appliesMediaSelectionCriteriaAutomatically)
+    }
+
     func testEmbeddedHlsSubtitlesAreItemScopedAndCanBeDisabled() async throws {
         XCTAssertFalse(store.selectSubtitleTrack(0), "No installed item must reject selection")
         XCTAssertFalse(store.selectSubtitleTrack(nil), "No installed item must reject off")
