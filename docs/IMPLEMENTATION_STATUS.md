@@ -15,6 +15,10 @@ Verified repository baseline at the start of this slice: `main` at `a9797ef` (PR
 
 A dedicated SwiftUI WebDAV browser provides bounded RFC 4918 Depth:1 listings and optional HTTPS Basic credentials held in view memory. Only same-origin immediate descendants under the configured root are displayed; unsafe XML, cross-origin paths and redirects are rejected. Media selection reuses AVPlayer and the existing authenticated capability relay for header-protected resources. See [IOS_WEBDAV.md](IOS_WEBDAV.md). Positive/negative Swift smoke tests, iPhone/iPad XCTest/XCUI and final-head integration CI are required before closing #66. No SMB, real-device/provider or security-audit acceptance is claimed.
 
+## Native manual intro/outro markers (P4, PR #69)
+
+Explicit per-title SwiftUI intro-end/outro-start markers now drive bounded AVPlayer seeking without automatic detection. Only ready finite remote VOD is eligible; URL digests and duration-matched numeric markers are stored locally (100 records/64 KiB), with invalid snapshots ignored and clear-library cleanup. Standalone Swift smoke passed locally; final-head iPhone/iPad XCTest/XCUI and aggregate CI are required before merging. No physical-device, provider-supplied chapter, automatic skip, or release claim. See [IOS_INTRO_OUTRO.md](IOS_INTRO_OUTRO.md).
+
 ## Native inline seeking increment (P4)
 
 The SwiftUI iPhone/iPad player now exposes explicit 15-second backward and
