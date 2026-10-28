@@ -126,9 +126,12 @@ final class MediaLibraryStore: ObservableObject {
         let languageTag = option.extendedLanguageTag
         // An unpersistable explicit choice must also invalidate any previous
         // choice for this title, rather than restoring a now-stale track later.
-        let saved = name != nil && (languageTag?.count ?? 0) <= 64
-            ? [NativeAudioPreference(urlDigest: key, displayName: name!, languageTag: languageTag)]
-            : []
+        let saved: [NativeAudioPreference]
+        if let name, (languageTag?.count ?? 0) <= 64 {
+            saved = [NativeAudioPreference(urlDigest: key, displayName: name, languageTag: languageTag)]
+        } else {
+            saved = []
+        }
         let updated = Array((audioPreferences.filter { $0.urlDigest != key } + saved).suffix(100))
         let snapshot = NativeAudioPreferenceSnapshot(version: 1, entries: updated)
         guard let data = try? JSONEncoder().encode(snapshot), data.count <= 64_000 else { return }
