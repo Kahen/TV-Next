@@ -17,6 +17,10 @@ async function select(page:Page,name:string){
 }
 test.beforeEach(async({page})=>{await page.goto("/");});
 
+test.describe("live replay controls",()=>{
+  // Keep synthetic route fixtures independent of service-worker request ownership in WebKit.
+  // The separate production PWA test below still exercises real service workers.
+  test.use({serviceWorkers:"block"});
 test("explicit live replay uses a capability while keeping original library identity and preserves playback on resolution errors",async({page})=>{
   const token="r".repeat(43),ticket="c".repeat(43),path="/api/v1/home/media/"+ticket+"/0";
   const now=Date.now();let fail=false;const requested:number[]=[];
@@ -46,6 +50,8 @@ test("explicit live replay uses a capability while keeping original library iden
   fail=true;await page.getByRole("button",{name:"回到直播",exact:true}).click();
   await expect(page.getByRole("alert").filter({hasText:"Fixture replay unavailable"})).toBeVisible();
   expect(await page.locator("video").evaluate(v=>(v as HTMLVideoElement).currentSrc)).toBe(before);
+});
+
 });
 
 test("real REST import, decoded MP4, favorites and original-URL resume survive reload",async({page})=>{
