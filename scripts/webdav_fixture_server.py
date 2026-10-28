@@ -25,6 +25,21 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(302)
             self.send_header('Location', 'https://foreign.example/dav/')
             self.end_headers()
+        elif self.path == '/dav/large-declared/':
+            # The client must reject this declared size before reading the body.
+            self.send_response(207)
+            self.send_header('Content-Type', 'application/xml')
+            self.send_header('Content-Length', str(1_048_577))
+            self.end_headers()
+        elif self.path == '/dav/large-streamed/':
+            # No Content-Length: exercise the actual incremental byte limit.
+            self.send_response(207)
+            self.send_header('Content-Type', 'application/xml')
+            self.end_headers()
+            try:
+                self.wfile.write(b'x' * 1_048_577)
+            except (BrokenPipeError, ConnectionResetError):
+                pass  # Expected when the bounded client cancels its transfer.
         else:
             self.send_error(404)
 
