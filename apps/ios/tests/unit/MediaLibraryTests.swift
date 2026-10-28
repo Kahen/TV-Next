@@ -118,6 +118,30 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertTrue(store.audioTracks.isEmpty)
     }
 
+    func testEmbeddedHlsSubtitlesAreItemScopedAndCanBeDisabled() async throws {
+        XCTAssertFalse(store.selectSubtitleTrack(0), "No installed item must reject selection")
+        XCTAssertFalse(store.selectSubtitleTrack(nil), "No installed item must reject off")
+        // The loopback-only HLS master declares one synthetic WebVTT rendition.
+        store.play(channel("Synthetic subtitle rendition", url: "http://127.0.0.1:8766/master.m3u8"))
+        try await waitUntil({ self.store.subtitleTracks.count == 1 }, timeout: 15)
+        XCTAssertFalse(store.selectSubtitleTrack(-1))
+        XCTAssertFalse(store.selectSubtitleTrack(1))
+        XCTAssertTrue(store.selectSubtitleTrack(0))
+        XCTAssertEqual(store.selectedSubtitleTrack, 0)
+        XCTAssertFalse(store.player.appliesMediaSelectionCriteriaAutomatically)
+        XCTAssertTrue(store.canDisableEmbeddedSubtitles)
+        XCTAssertTrue(store.selectSubtitleTrack(nil))
+        XCTAssertNil(store.selectedSubtitleTrack)
+        store.playLocalFile(try fixture(), name: "fixture.mp4")
+        XCTAssertTrue(store.subtitleTracks.isEmpty, "Old item's subtitles must clear immediately")
+        XCTAssertNil(store.selectedSubtitleTrack)
+        XCTAssertFalse(store.selectSubtitleTrack(0), "Replaced item must reject stale selection")
+        XCTAssertFalse(store.selectSubtitleTrack(nil))
+        store.clear()
+        XCTAssertTrue(store.subtitleTracks.isEmpty)
+        XCTAssertTrue(store.player.appliesMediaSelectionCriteriaAutomatically)
+    }
+
     func testPlaybackSpeedBoundsAndInvalidNumbers() {
         store.setPlaybackSpeed(1.5)
         store.setPlaybackSpeed(.nan)

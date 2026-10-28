@@ -41,7 +41,7 @@ Tracking: https://github.com/Kahen/TV-Next/issues/3
 - [x] Home/category/filter/search/detail/episodes/lines, native/Web bounded cross-provider search with cancellation and partial failure, and the documented HTTP action web workflow.
 - [x] M3U/TXT/nested JSON live imports, offline and subscribed XMLTV/XMLTV.gz, persistent guide scheduling/cache and Web/iOS guide UI.
 - [x] Explicit timeshift Result RPC, bounded programme catchup subset, historical XMLTV and Web/iOS replay controls; see LIVE_REPLAY.md.
-- [ ] Embedded subtitle/audio selection and per-title preferences.
+- [ ] Embedded subtitle/audio selection and per-title preferences. Native audio and HLS legible-track menus implemented in separate P4 slices; persistent preferences and wider container/codec support remain open.
 - [ ] Broader permitted real-provider corpus, interactive QR/login workflows, parser chains and long-tail replay formats; device validation remains separate.
 
 Acceptance: comparison snapshots for home/category/detail/search/player APIs against a documented compatibility subset.

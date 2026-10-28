@@ -395,6 +395,37 @@ struct ContentView: View {
                     }
                     .accessibilityIdentifier("audio-track-menu")
                 }
+                if !library.subtitleTracks.isEmpty {
+                    Menu {
+                        if library.canDisableEmbeddedSubtitles {
+                            Button {
+                                _ = library.selectSubtitleTrack(nil)
+                            } label: {
+                                if library.selectedSubtitleTrack == nil {
+                                    Label("关闭内嵌字幕", systemImage: "checkmark")
+                                } else {
+                                    Text("关闭内嵌字幕")
+                                }
+                            }
+                        }
+                        ForEach(library.subtitleTracks) { track in
+                            Button {
+                                _ = library.selectSubtitleTrack(track.id)
+                            } label: {
+                                if library.selectedSubtitleTrack == track.id {
+                                    Label(track.title, systemImage: "checkmark")
+                                } else {
+                                    Text(track.title)
+                                }
+                            }
+                        }
+                    } label: {
+                        Label("内嵌字幕：" + (library.subtitleTracks.first(where: {
+                            $0.id == library.selectedSubtitleTrack
+                        })?.title ?? "系统默认或关闭"), systemImage: "captions.bubble")
+                    }
+                    .accessibilityIdentifier("embedded-subtitle-menu")
+                }
 
                 if let channel = library.current,
                    let seconds = library.positions[channel.url] {

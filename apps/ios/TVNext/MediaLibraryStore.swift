@@ -16,6 +16,11 @@ struct NativeAudioTrack: Identifiable, Equatable {
     let title: String
 }
 
+struct NativeSubtitleTrack: Identifiable, Equatable {
+    let id: Int
+    let title: String
+}
+
 @MainActor
 final class MediaLibraryStore: ObservableObject {
     @Published private(set) var playbackGeneration=0
@@ -42,6 +47,60 @@ final class MediaLibraryStore: ObservableObject {
     private var audioTrackTask: Task<Void, Never>?
     private var audioTrackItem: AVPlayerItem?
     private var audioTrackGroup: AVMediaSelectionGroup?
+    @Published private(set) var subtitleTracks: [NativeSubtitleTrack] = []
+    @Published private(set) var selectedSubtitleTrack: Int?
+    @Published private(set) var canDisableEmbeddedSubtitles = false
+    private var subtitleTrackTask: Task<Void, Never>?
+    private var subtitleTrackItem: AVPlayerItem?
+    private var subtitleTrackGroup: AVMediaSelectionGroup?
+
+    /// Only the installed item may receive a legible-track selection.
+    /// nil explicitly disables subtitles when the media group permits it.
+    func selectSubtitleTrack(_ index: Int?) -> Bool {
+        guard let item = subtitleTrackItem, player.currentItem === item,
+              let group = subtitleTrackGroup else { return false }
+        if let index {
+            guard index >= 0, index < subtitleTracks.count,
+                  index < group.options.count else { return false }
+            player.appliesMediaSelectionCriteriaAutomatically = false
+            item.select(group.options[index], in: group)
+            selectedSubtitleTrack = index
+        } else {
+            guard group.allowsEmptySelection else { return false }
+            player.appliesMediaSelectionCriteriaAutomatically = false
+            item.select(nil, in: group)
+            selectedSubtitleTrack = nil
+        }
+        return true
+    }
+
+    private func discoverEmbeddedSubtitles(for item: AVPlayerItem) {
+        subtitleTrackTask?.cancel()
+        subtitleTrackTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                guard let group = try await item.asset.loadMediaSelectionGroup(for: .legible),
+                      !Task.isCancelled, self.player.currentItem === item else { return }
+                self.subtitleTrackItem = item
+                self.subtitleTrackGroup = group
+                self.canDisableEmbeddedSubtitles = group.allowsEmptySelection
+                self.subtitleTracks = Array(group.options.prefix(16).enumerated().map { index, option in
+                    let label = String(option.displayName.prefix(80))
+                    return NativeSubtitleTrack(id: index,
+                        title: "字幕 \(index + 1) · " + (label.isEmpty ? "未命名" : label))
+                })
+                if let selected = item.currentMediaSelection.selectedMediaOption(in: group) {
+                    self.selectedSubtitleTrack = self.subtitleTracks.first(where: {
+                        group.options[$0.id] === selected
+                    })?.id
+                } else {
+                    self.selectedSubtitleTrack = nil
+                }
+            } catch {
+                // No selectable legible group: retain native playback and external caption support.
+            }
+        }
+    }
 
     /// Media selection is ephemeral and scoped to the installed AVPlayerItem.
     func selectAudioTrack(_ index: Int) -> Bool {
@@ -54,7 +113,14 @@ final class MediaLibraryStore: ObservableObject {
         return true
     }
 
-    private func resetAudioTracks() {
+    private func resetMediaSelections() {
+        subtitleTrackTask?.cancel()
+        subtitleTrackTask = nil
+        subtitleTrackItem = nil
+        subtitleTrackGroup = nil
+        subtitleTracks = []
+        selectedSubtitleTrack = nil
+        canDisableEmbeddedSubtitles = false
         player.appliesMediaSelectionCriteriaAutomatically = true
         audioTrackTask?.cancel()
         audioTrackTask = nil
@@ -129,7 +195,7 @@ final class MediaLibraryStore: ObservableObject {
     private func cancelRelay() {
         relayGeneration=UUID();relayTask?.cancel();relayTask=nil
         if let (api,ticket)=activeRelay {
-            player.pause();player.replaceCurrentItem(with:nil);resetAudioTracks();release(api,ticket)
+            player.pause();player.replaceCurrentItem(with:nil);resetMediaSelections();release(api,ticket)
         }
         activeRelay=nil
     }
@@ -177,6 +243,7 @@ final class MediaLibraryStore: ObservableObject {
         statusObservation?.invalidate()
         relayTask?.cancel()
         audioTrackTask?.cancel()
+        subtitleTrackTask?.cancel()
         LocalMediaStager.discard(currentLocalFile)
     }
 
@@ -229,7 +296,7 @@ final class MediaLibraryStore: ObservableObject {
         statusObservation?.invalidate()
         player.pause()
         player.replaceCurrentItem(with: nil)
-        resetAudioTracks()
+        resetMediaSelections()
         requestedChannel = channel
         if channel.headersRequired == true {
             playbackError = "媒体库未保存此来源的私密请求头，请重新加载订阅后播放。"
@@ -301,7 +368,7 @@ final class MediaLibraryStore: ObservableObject {
     /// Status callbacks may arrive after another selection, clear or relay cancellation.
     /// Only the currently installed item may change UI state or seek the player.
     private func observe(_ item: AVPlayerItem, resume: Double?) {
-        resetAudioTracks()
+        resetMediaSelections()
         statusObservation?.invalidate()
         statusObservation = item.observe(\.status, options: [.initial, .new]) { [weak self] observed, _ in
             Task { @MainActor [weak self] in
@@ -311,6 +378,7 @@ final class MediaLibraryStore: ObservableObject {
                 } else if observed.status == .readyToPlay {
                     self.playbackError = nil
                     self.discoverAudioTracks(for: observed)
+                    self.discoverEmbeddedSubtitles(for: observed)
                     if let resume, resume.isFinite, resume >= 5 {
                         let duration = observed.duration.seconds
                         guard duration.isFinite, duration >= 60, duration - resume >= 15 else { return }
@@ -447,7 +515,7 @@ final class MediaLibraryStore: ObservableObject {
         cancelRelay()
         player.pause()
         player.replaceCurrentItem(with: nil)
-        resetAudioTracks()
+        resetMediaSelections()
         LocalMediaStager.discard(currentLocalFile)
         currentLocalFile = nil
         localFileName = nil
