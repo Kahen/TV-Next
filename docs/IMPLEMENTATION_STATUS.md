@@ -11,6 +11,10 @@ Verified repository baseline at the start of this slice: `main` at `a9797ef` (PR
 | P5 | Accounts, hashed device tokens, pairing/revocation, per-user CAS sync, authenticated WS remote, H2/PostgreSQL/NAS persistence and restore, diagnostics, EPG scheduling, device-private provider health/search cache, bounded HTTP/HLS capability media relay | Remote-access deployment hardening, security/operational assessment and actual NAS/remote-network acceptance (#6) |
 | P6 | Committed npm lockfile, npm audit/CycloneDX SBOM, aggregate Web/API/PostgreSQL/browser/iOS/Compose/NAS/sandbox CI | JVM/container dependency and licence/provenance audit, immutable image/action pins, performance/reliability benchmarks, reproducible versioned artifacts/rollback, native signing/TestFlight/distribution (#7) |
 
+## Native WebDAV incremental response cap (P4)
+
+The native WebDAV `PROPFIND` transport now rejects oversized declared responses and reads unknown-length XML bodies incrementally, aborting after 1 MiB instead of allocating the entire body through `URLSession.data(for:)`. A localhost fixture tests both size cases, a successful listing after rejection, existing redirect/auth policy and bounded parser behavior. See [IOS_WEBDAV.md](IOS_WEBDAV.md) and issue #70. This is not a full network resource quota, physical-device acceptance, or independent security audit. Final-head CI evidence belongs to the associated PR.
+
 ## Native read-only WebDAV increment (P4)
 
 A dedicated SwiftUI WebDAV browser provides bounded RFC 4918 Depth:1 listings and optional HTTPS Basic credentials held in view memory. Only same-origin immediate descendants under the configured root are displayed; unsafe XML, cross-origin paths and redirects are rejected. Media selection reuses AVPlayer and the existing authenticated capability relay for header-protected resources. See [IOS_WEBDAV.md](IOS_WEBDAV.md). Positive/negative Swift smoke tests, iPhone/iPad XCTest/XCUI and final-head integration CI are required before closing #66. No SMB, real-device/provider or security-audit acceptance is claimed.

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Owned, localhost-only RFC 4918 fixture for native WebDAV CI."""
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 XML = b'''<?xml version="1.0" encoding="utf-8"?>
 <d:multistatus xmlns:d="DAV:">
@@ -25,6 +25,31 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(302)
             self.send_header('Location', 'https://foreign.example/dav/')
             self.end_headers()
+        elif self.path == '/dav/no-length/':
+            # A valid multistatus without a declared length must still parse.
+            self.send_response(207)
+            self.send_header('Content-Type', 'application/xml')
+            self.end_headers()
+            self.wfile.write(XML.replace(b'/dav/', b'/dav/no-length/'))
+        elif self.path == '/dav/large-declared/':
+            # The client must reject this declared size before reading the body.
+            self.send_response(207)
+            self.send_header('Content-Type', 'application/xml')
+            self.send_header('Content-Length', str(1_048_577))
+            self.end_headers()
+            try:
+                self.wfile.write(b'x' * 1_048_577)
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+        elif self.path == '/dav/large-streamed/':
+            # No Content-Length: exercise the actual incremental byte limit.
+            self.send_response(207)
+            self.send_header('Content-Type', 'application/xml')
+            self.end_headers()
+            try:
+                self.wfile.write(b'x' * 1_048_577)
+            except (BrokenPipeError, ConnectionResetError):
+                pass  # Expected when the bounded client cancels its transfer.
         else:
             self.send_error(404)
 
@@ -32,4 +57,4 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
 if __name__ == '__main__':
-    HTTPServer(('127.0.0.1', 8767), Handler).serve_forever()
+    ThreadingHTTPServer(('127.0.0.1', 8767), Handler).serve_forever()

@@ -144,17 +144,100 @@ enum NativeWebDAV {
         request.httpBody = Data("<?xml version=\"1.0\" encoding=\"utf-8\"?><d:propfind xmlns:d=\"DAV:\"><d:prop><d:resourcetype/></d:prop></d:propfind>".utf8)
         if let auth { request.setValue(auth, forHTTPHeaderField: "Authorization") }
         request.timeoutInterval = 15
-        let session = URLSession(configuration: .ephemeral, delegate: WebDAVNoRedirect(), delegateQueue: nil)
-        defer { session.invalidateAndCancel() }
-        let (data, response) = try await session.data(for: request)
-        guard let response = response as? HTTPURLResponse else { throw NativeWebDAVError.invalidResponse }
-        if response.statusCode == 401 || response.statusCode == 403 { throw NativeWebDAVError.unauthorized }
-        guard response.statusCode == 207 else { throw NativeWebDAVError.httpStatus(response.statusCode) }
+        // The URLSession data delegate enforces the cap per received chunk,
+        // before a server-controlled body can accumulate in application memory.
+        let data = try await WebDAVBoundedTransport.load(request, maxBytes: 1_048_576)
         return try parse(data, root: root, folder: folder)
     }
 }
 
-private final class WebDAVNoRedirect: NSObject, URLSessionTaskDelegate {
+/// Receives WebDAV XML in URLSession's bounded data chunks rather than
+/// buffering an entire server response or iterating a million async bytes.
+/// The URLSession delegate queue is serial; finish() is idempotent because
+/// cancel/error callbacks may follow a rejected oversized response.
+private final class WebDAVBoundedTransport: NSObject, URLSessionDataDelegate, @unchecked Sendable {
+    private let maxBytes: Int
+    private var received = Data()
+    private var continuation: CheckedContinuation<Data, Error>?
+    private var finished = false
+    private var acceptedResponse = false
+
+    private init(maxBytes: Int) { self.maxBytes = maxBytes }
+
+    static func load(_ request: URLRequest, maxBytes: Int) async throws -> Data {
+        let transport = WebDAVBoundedTransport(maxBytes: maxBytes)
+        return try await transport.perform(request)
+    }
+
+    private func perform(_ request: URLRequest) async throws -> Data {
+        let session = URLSession(configuration: .ephemeral, delegate: self, delegateQueue: nil)
+        defer { session.invalidateAndCancel() }
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
+                self.continuation = continuation
+                session.dataTask(with: request).resume()
+            }
+        } onCancel: {
+            session.invalidateAndCancel()
+        }
+    }
+
+    private func finish(_ result: Result<Data, Error>) {
+        guard !finished else { return }
+        finished = true
+        let pending = continuation
+        continuation = nil
+        pending?.resume(with: result)
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask,
+                    didReceive response: URLResponse,
+                    completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+        guard let http = response as? HTTPURLResponse else {
+            completionHandler(.cancel)
+            finish(.failure(NativeWebDAVError.invalidResponse))
+            return
+        }
+        let failure: NativeWebDAVError?
+        if http.statusCode == 401 || http.statusCode == 403 {
+            failure = .unauthorized
+        } else if http.statusCode != 207 {
+            failure = .httpStatus(http.statusCode)
+        } else if response.expectedContentLength > Int64(maxBytes) {
+            failure = .responseTooLarge
+        } else {
+            failure = nil
+        }
+        if let failure {
+            completionHandler(.cancel)
+            finish(.failure(failure))
+        } else {
+            acceptedResponse = true
+            completionHandler(.allow)
+        }
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        guard !finished else { return }
+        guard data.count <= maxBytes - received.count else {
+            finish(.failure(NativeWebDAVError.responseTooLarge))
+            dataTask.cancel()
+            return
+        }
+        received.append(data)
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask,
+                    didCompleteWithError error: Error?) {
+        if let error {
+            finish(.failure(error))
+        } else if acceptedResponse {
+            finish(.success(received))
+        } else {
+            finish(.failure(NativeWebDAVError.invalidResponse))
+        }
+    }
+
     func urlSession(_ session: URLSession, task: URLSessionTask,
                     willPerformHTTPRedirection response: HTTPURLResponse,
                     newRequest request: URLRequest,
