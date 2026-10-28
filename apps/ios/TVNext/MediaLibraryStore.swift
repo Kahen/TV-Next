@@ -48,12 +48,14 @@ final class MediaLibraryStore: ObservableObject {
         guard let item = audioTrackItem, player.currentItem === item,
               let group = audioTrackGroup,
               index >= 0, index < audioTracks.count, index < group.options.count else { return false }
+        player.appliesMediaSelectionCriteriaAutomatically = false
         item.select(group.options[index], in: group)
         selectedAudioTrack = index
         return true
     }
 
     private func resetAudioTracks() {
+        player.appliesMediaSelectionCriteriaAutomatically = true
         audioTrackTask?.cancel()
         audioTrackTask = nil
         audioTrackItem = nil
@@ -126,7 +128,9 @@ final class MediaLibraryStore: ObservableObject {
     }
     private func cancelRelay() {
         relayGeneration=UUID();relayTask?.cancel();relayTask=nil
-        if let (api,ticket)=activeRelay { player.pause();player.replaceCurrentItem(with:nil);release(api,ticket) }
+        if let (api,ticket)=activeRelay {
+            player.pause();player.replaceCurrentItem(with:nil);resetAudioTracks();release(api,ticket)
+        }
         activeRelay=nil
     }
 
