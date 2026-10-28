@@ -17,9 +17,25 @@ function localDateValue(time: number): string {
   return new Date(time - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 19);
 }
 
-export default function LiveReplayControls({ channel, session, onPlay, programme, cancellationKey = 0 }: {
+/** One owner per guide, shared by all programme replay buttons. */
+export interface ReplayRequestCoordinator {
+  begin(): number;
+  isCurrent(id: number): boolean;
+  invalidate(): void;
+}
+export function createReplayRequestCoordinator(): ReplayRequestCoordinator {
+  let generation = 0;
+  return {
+    begin: () => ++generation,
+    isCurrent: id => id === generation,
+    invalidate: () => { generation++; }
+  };
+}
+
+export default function LiveReplayControls({ channel, session, onPlay, programme, cancellationKey = 0, coordinator }: {
   channel: Channel; session: HomeSession | null; onPlay: (channel: Channel) => void;
   cancellationKey?: number;
+  coordinator?: ReplayRequestCoordinator;
   programme?: { start: string; stop: string; title: string };
 }) {
   const [now, setNow] = useState(Date.now);
@@ -48,7 +64,7 @@ export default function LiveReplayControls({ channel, session, onPlay, programme
       setError("请选择提供方允许的回放时间。"); return;
     }
     pending.current?.abort(); const controller = new AbortController(); pending.current = controller;
-    const id = ++generation.current; setBusy(true); setError("");
+    const id = ++generation.current; const owner = coordinator?.begin(); setBusy(true); setError("");
     try {
       const result = await requestJson<LiveReplaySession>("/api/v1/subscriptions/replay", {
         channel: { name: channel.name, url: channel.url, group: channel.group, headers: channel.headers || {}, timeshift: channel.timeshift, catchup: channel.catchup },
@@ -56,7 +72,7 @@ export default function LiveReplayControls({ channel, session, onPlay, programme
       }, controller.signal, session.token);
       const address = mediaRelayAddress(result.path);
       if (!Number.isSafeInteger(result.expiresAt) || result.expiresAt <= Date.now()) throw new Error("回放会话已过期，请重新选择时间。");
-      if (id !== generation.current || controller.signal.aborted) {
+      if (id !== generation.current || controller.signal.aborted || (owner !== undefined && !coordinator?.isCurrent(owner))) {
         void homeRequest("media/" + address.ticket + "/close", {}, session.token).catch(() => {}); return;
       }
       onPlay({ ...channel, replay: result });

@@ -52,3 +52,8 @@ Original live URLs retain library identity. Replay templates, replay capability 
 Shared synthetic contract: `fixtures/fongmi-live-replay-golden.json`. Kotlin checks actual Result resolution, secret isolation, window boundaries, unsupported modes, UTC/Hong Kong/DST, M3U/nested JSON metadata and bounded historical XMLTV. MockMvc checks authorize-before-I/O, capability registration, response redaction and device revocation. Vitest checks no-session, zero sentinel, errors, late-response cleanup, EPG bounds and persistence. Swift smoke checks range/inheritance/ephemeral capability encoding; XCTest checks snapshot sanitization and player preservation on rejected replay. The existing final-head integration gate builds both native simulator families and executes real browsers/Compose/NAS/isolation.
 
 Only synthetic fixtures are used. This increment does not establish real-provider compatibility, physical device quality, a signed build or completion of P2/P3/P4.
+
+## Replay retry and concurrent selections
+
+- Native iOS replay retry requests a **new** server capability for the same ephemeral selected time, stop and timezone. The previous capability is closed; a replay without original selection metadata requires the user to choose a time again. The selection and capability are excluded from local snapshots.
+- Web XMLTV programme buttons share a guide-scoped request owner. When a newer programme is selected, a slower previous response is discarded and its returned relay ticket is closed. Switching guides/channels or leaving the view invalidates pending selections. This does not assert real-provider or physical-device playback.

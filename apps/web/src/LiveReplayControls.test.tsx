@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import LiveReplayControls, { timeshiftRange } from "./LiveReplayControls";
+import LiveReplayControls, { createReplayRequestCoordinator, timeshiftRange } from "./LiveReplayControls";
 import type { Channel } from "./api";
 import { addRecent, emptyLibrary, normalizeLibrary } from "./library";
 import { readFileSync } from "node:fs";
@@ -86,4 +86,38 @@ it("invalidates a pending programme replay when another source is selected elsew
   view.rerender(<LiveReplayControls channel={channel} session={session} programme={programme} cancellationKey={1} onPlay={play}/>);
   await act(async()=>{finish({ok:true,json:async()=>replay});});
   expect(play).not.toHaveBeenCalled();expect(fetcher.mock.calls.some(([url])=>url.endsWith("/close"))).toBe(true);
+});
+
+it("only the latest of two sibling EPG programme requests may start playback", async () => {
+  vi.spyOn(Date, "now").mockReturnValue(golden.now);
+  const owners = createReplayRequestCoordinator();
+  const finishes = new Map<number, (value: unknown) => void>();
+  const fetcher = vi.fn((path: string, options?: RequestInit) => {
+    if (path.endsWith("/replay")) {
+      const time = JSON.parse(String(options?.body)).time as number;
+      return new Promise(resolve => { finishes.set(time, resolve); });
+    }
+    return Promise.resolve({ok: true, json: async () => ({closed: true})});
+  });
+  vi.stubGlobal("fetch", fetcher);
+  const play = vi.fn();
+  const older = golden.time - 60_000;
+  const a = {start: new Date(older).toISOString(), stop: new Date(golden.time).toISOString(), title: "Programme A"};
+  const b = {start: new Date(golden.time).toISOString(), stop: new Date(golden.stop).toISOString(), title: "Programme B"};
+  render(<>
+    <LiveReplayControls channel={channel} session={session} programme={a} onPlay={play} coordinator={owners}/>
+    <LiveReplayControls channel={channel} session={session} programme={b} onPlay={play} coordinator={owners}/>
+  </>);
+  fireEvent.click(screen.getByRole("button", {name: "回看 · Programme A"}));
+  fireEvent.click(screen.getByRole("button", {name: "回看 · Programme B"}));
+  expect(finishes.size).toBe(2);
+  const ticketA = "b".repeat(43), ticketB = "c".repeat(43);
+  const resultA = {...replay, path: "/api/v1/home/media/" + ticketA + "/0"};
+  const resultB = {...replay, path: "/api/v1/home/media/" + ticketB + "/0"};
+  await act(async () => { finishes.get(golden.time)?.({ok: true, json: async () => resultB}); });
+  await waitFor(() => expect(play).toHaveBeenCalledTimes(1));
+  expect(play.mock.calls[0][0].replay.path).toBe(resultB.path);
+  await act(async () => { finishes.get(older)?.({ok: true, json: async () => resultA}); });
+  await waitFor(() => expect(fetcher.mock.calls.some(([url]) => url.endsWith(ticketA + "/close"))).toBe(true));
+  expect(play).toHaveBeenCalledTimes(1);
 });
