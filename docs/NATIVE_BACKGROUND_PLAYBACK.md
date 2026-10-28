@@ -43,6 +43,11 @@ controller's automatic metadata publishing remains disabled.
 
 ## Native inline 15-second seek controls
 
+Original [FongMi PlayerManager.canSeek / seekTo](https://github.com/FongMi/TV/blob/123cc086159b0f13bf54bdf64bacbc259ca47c88/app/src/main/java/com/fongmi/android/tv/player/PlayerManager.java)
+checks seek capability and delegates to the player (or timeshift).
+TV-Next implements the same user-facing seek intent through AVPlayer for finite
+media; its live timeshift controls remain a separate explicit P2 workflow.
+
 The SwiftUI player now offers explicit **后退 15 秒** and **前进 15 秒**
 buttons alongside its playback speed menu. These actions call the same
 `MediaLibraryStore.handleSystemPlaybackCommand(.skip)` path as the system
