@@ -59,6 +59,13 @@ struct NativeWebDAVSection: View {
     }
 
     private func connect() {
+        task?.cancel()
+        requestID = UUID()
+        root = nil
+        folder = nil
+        entries = []
+        busy = false
+        error = nil
         do {
             let url = try NativeWebDAV.rootURL(address, username: username, password: password)
             root = url
