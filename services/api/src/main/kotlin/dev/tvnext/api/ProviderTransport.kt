@@ -32,18 +32,24 @@ open class ProviderTransport(@Value("\${TV_NEXT_LAN_ORIGINS:}") allowedPrivate: 
     open fun get(uri: URI, headers: Map<String, String> = emptyMap(), form: String? = null): String = perform(uri, headers, form, "application/x-www-form-urlencoded").content
     open fun postJson(uri: URI, headers: Map<String,String>, json: String): String = perform(uri, headers, json, "application/json").content
     open fun getDocument(uri: URI, headers: Map<String,String> = emptyMap()): FetchedText = perform(uri,headers,null,"application/x-www-form-urlencoded",true)
-    private fun perform(initial: URI, initialHeaders: Map<String,String>, initialBody: String?, contentType: String, binaryEnvelope: Boolean = false): FetchedText {
+    internal open fun bridgeRequest(uri: URI, headers: Map<String,String>, body: String?, method: String, deadline: Long): String {
+        require(method in setOf("GET", "POST", "DELETE"))
+        return perform(uri,headers,body,"application/json",httpMethod=method,requestDeadline=deadline,followRedirects=false).content
+    }
+    private fun perform(initial: URI, initialHeaders: Map<String,String>, initialBody: String?, contentType: String, binaryEnvelope: Boolean = false,
+        httpMethod: String? = null, requestDeadline: Long = Long.MAX_VALUE, followRedirects: Boolean = true): FetchedText {
         Subscriptions.httpUri(initial.toString())
         validateHeaders(initialHeaders)
         if (!permits.tryAcquire()) throw ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Provider concurrency limit")
         try {
             var uri=initial; var headers=initialHeaders; var body=initialBody
-            val deadline=System.nanoTime()+8_000_000_000L
+            val deadline=minOf(System.nanoTime()+8_000_000_000L,requestDeadline)
             for (hop in 0..3) {
                 val address = resolveAddress(uri)
                 if (System.nanoTime()>=deadline) throw java.net.SocketTimeoutException()
-                try { return FetchedText(exchange(uri, address, headers, body, contentType, deadline, binaryEnvelope),uri) }
+                try { return FetchedText(exchange(uri, address, headers, body, contentType, deadline, binaryEnvelope, httpMethod),uri) }
                 catch (redirect: ProviderRedirect) {
+                    if (!followRedirects) throw java.io.IOException("Spider host redirects rejected")
                     if (hop==3) throw java.io.IOException("Redirect limit")
                     val next=Subscriptions.httpUri(uri.resolve(redirect.location).toString())
                     if (uri.scheme=="https" && next.scheme!="https") throw java.io.IOException("HTTPS downgrade")
@@ -60,7 +66,7 @@ open class ProviderTransport(@Value("\${TV_NEXT_LAN_ORIGINS:}") allowedPrivate: 
         catch (_: Exception) { throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "Provider transport failed") }
         finally { permits.release() }
     }
-    internal fun exchange(uri: URI, address: InetAddress, headers: Map<String, String> = emptyMap(), form: String? = null, contentType: String = "application/x-www-form-urlencoded", deadline: Long = System.nanoTime()+8_000_000_000L, binaryEnvelope: Boolean = false): String {
+    internal fun exchange(uri: URI, address: InetAddress, headers: Map<String, String> = emptyMap(), form: String? = null, contentType: String = "application/x-www-form-urlencoded", deadline: Long = System.nanoTime()+8_000_000_000L, binaryEnvelope: Boolean = false, httpMethod: String? = null): String {
         val port = if (uri.port != -1) uri.port else if (uri.scheme == "https") 443 else 80
         val plain = Socket()
         try {
@@ -83,7 +89,7 @@ open class ProviderTransport(@Value("\${TV_NEXT_LAN_ORIGINS:}") allowedPrivate: 
                 val body = form?.toByteArray(StandardCharsets.UTF_8)
                 if ((body?.size ?: 0) > MAX_BYTES) throw java.io.IOException("Request body limit")
                 val extra = headers.entries.joinToString("") { h -> "${h.key}: ${h.value}\r\n" }
-                val request = "${if (body == null) "GET" else "POST"} $path HTTP/1.1\r\nHost: $authority\r\n" +
+                val request = "${httpMethod ?: if (body == null) "GET" else "POST"} $path HTTP/1.1\r\nHost: $authority\r\n" +
                     "Accept: application/json, application/xml, text/plain\r\nAccept-Encoding: gzip\r\nConnection: close\r\n" +
                     extra + (if (body == null) "" else "Content-Type: $contentType\r\nContent-Length: ${body.size}\r\n") + "\r\n"
                 it.getOutputStream().write(request.toByteArray(StandardCharsets.ISO_8859_1))

@@ -30,6 +30,16 @@ private actor RequestCounter {
         precondition(peak > 1 && peak <= 4, "Concurrent site count outside 2...4")
         precondition(calls.contains("0:2"))
 
+        let androidCounter = RequestCounter()
+        let android = try await NativeCrossSiteSearch.search(sources:sources,concurrency:2,fetch:{ source,_ in
+            await androidCounter.begin(source.key)
+            try await Task.sleep(for:.milliseconds(3))
+            await androidCounter.end()
+            return NativeSearchPage(items:[Item(id:"own")],hasMore:false)
+        },identity:{$0.id})
+        let (androidPeak,_) = await androidCounter.snapshot()
+        precondition(androidPeak == 2 && android.items.count == 6)
+
         let bounded = try await NativeCrossSiteSearch.search(sources:(0..<20).map { NativeSearchSource(key:String($0),name:String($0)) }, fetch: { source, page in
             NativeSearchPage(items:[Item(id:"\(source.key)-\(page)")],hasMore:true)
         }, identity: { $0.id })

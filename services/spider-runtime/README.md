@@ -1,5 +1,10 @@
 # P3 — Bundled fixture runtime isolation (experimental)
 
+The API also has a separate, default-off [Android Spider bridge](../../docs/ANDROID_SPIDER_BRIDGE.md)
+for exact administrator-approved `csp_*` init bindings on an existing FongMi
+Android host. It does not alter this Docker fixture harness or make DEX/native
+plugins executable in a JVM. Real ARM-host verification remains pending.
+
 **Scope limitation:** This is an operating-system isolation prototype for three reviewable, in-repo fixture workers (Node.js, Python and Java 21), **not an arbitrary Spider plugin runtime**. It does not download code, execute user-supplied scripts, fetch URLs, talk to an external site, or implement FongMi Android SDK APIs. There is no network API route to the runner. It is not part of production Compose and must not be exposed publicly.
 
 ## Architecture / contract

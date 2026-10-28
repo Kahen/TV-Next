@@ -74,4 +74,16 @@ describe("bounded cross-provider search", () => {
     await searchAcrossSites(sources, async source => { keys.push(source.key); return page([]); }, new AbortController().signal);
     expect(keys).toEqual(["a"]);
   });
+  it("includes only server-approved Android sites and bounds their host concurrency", async () => {
+    const sources = [{...site("disabled"),type:3}, ...Array.from({length:5},(_,i)=>({...site(String(i)),type:3,support:"android-spider"}))];
+    let active=0,peak=0;
+    const calls:string[]=[];
+    const result=await searchAcrossSites(sources,async source=>{
+      calls.push(source.key);active++;peak=Math.max(peak,active);
+      await new Promise(resolve=>setTimeout(resolve,1));active--;
+      return page([item("ok")]);
+    },new AbortController().signal);
+    expect(calls).not.toContain("disabled");expect(calls).toHaveLength(5);
+    expect(peak).toBe(2);expect(result.items).toHaveLength(5);
+  });
 });

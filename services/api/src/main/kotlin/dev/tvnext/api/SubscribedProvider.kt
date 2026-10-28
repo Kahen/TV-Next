@@ -20,11 +20,13 @@ data class ProviderPage(val categories: List<MediaCategory>, val items: List<Med
 /** Original SiteApi type 0/1/2/4 request conventions, not a new subscription schema. */
 @Service
 class SubscribedProvider(private val subscriptions: Subscriptions, private val mapper: ObjectMapper,
-    private val parser: StaticFongMiProvider, private val transport: ProviderTransport, private val xml: XmlVodAdapter) {
+    private val parser: StaticFongMiProvider, private val transport: ProviderTransport, private val xml: XmlVodAdapter,
+    private val androidSpider: AndroidSpiderBridge? = null) {
+    fun requiresAuthentication(r: SiteRequest): Boolean = r.content.isNotBlank() && subscriptions.site(r.content,r.url,r.siteKey).path("type").asInt() == 3
     fun page(op: String, r: SiteRequest): ProviderPage {
         val site = site(r)
         val root = fetch(site, op, r)
-        val data = parser.read(root.toString(), site.path("type").asInt() == 4, true)
+        val data = parser.read(root.toString(), site.path("type").asInt() in setOf(3,4), true)
         val total = root.path("total").asText().toIntOrNull()?.coerceIn(0, 10_000_000) ?: data.entries.size
         val size=root.path("limit").asText().toIntOrNull()?.takeIf { it>0 }?.coerceAtMost(2000) ?: data.entries.size.coerceAtLeast(1)
         val pages = root.path("pagecount").asText().toIntOrNull()?.takeIf { it>0 } ?: ((total+size-1)/size).coerceAtLeast(1)
@@ -36,24 +38,25 @@ class SubscribedProvider(private val subscriptions: Subscriptions, private val m
     }
     fun detail(r: SiteRequest): MediaDetail {
         val site = site(r)
-        val data = parser.read(fetch(site, "detail", r).toString(), site.path("type").asInt() == 4, true)
+        val data = parser.read(fetch(site, "detail", r).toString(), site.path("type").asInt() in setOf(3,4), true)
         return parser.detail(data, MediaQuery(vodId = r.vodId)).copy(provider = r.siteKey)
     }
     fun play(r: SiteRequest): MediaPlayback {
         val site = site(r)
         val type = site.path("type").asInt()
-        val data = parser.read(fetch(site, "detail", r).toString(), site.path("type").asInt() == 4, true)
+        val deadline = System.nanoTime() + 15_000_000_000L
+        val data = parser.read(fetch(site, "detail", r, deadline=deadline).toString(), type in setOf(3,4), true)
         val entry = data.entries.firstOrNull { it.item.id == r.vodId } ?: reject("Unknown video", HttpStatus.NOT_FOUND)
         val line = entry.lines.getOrNull(r.lineIndex) ?: reject("Invalid lineIndex")
         val episode = line.episodes.getOrNull(r.episodeIndex) ?: reject("Invalid episodeIndex")
         val target = entry.urls.getOrNull(r.lineIndex)?.getOrNull(r.episodeIndex) ?: reject("Unsupported episode", HttpStatus.UNPROCESSABLE_ENTITY)
         val headers = header(site.path("header"))
-        if (type != 4) {
+        if (type !in setOf(3,4)) {
             if (site.path("playUrl").asText("").isNotBlank()) reject("This site requires an external parser", HttpStatus.UNPROCESSABLE_ENTITY)
             Subscriptions.httpUri(target)
             return MediaPlayback(target, episode.name, line.name, r.siteKey, headers)
         }
-        val root = fetch(site, "play", r, mapOf("play" to target, "flag" to line.name))
+        val root = fetch(site, "play", r, mapOf("play" to target, "flag" to line.name),deadline)
         if (root.path("parse").asInt(0) != 0 || root.path("jx").asInt(0) == 1 || root.path("playUrl").asText("").isNotBlank())
             reject("Playback requires an unsupported parser or WebView", HttpStatus.UNPROCESSABLE_ENTITY)
         val resultUrl = root.path("url").let { node ->
@@ -101,11 +104,16 @@ class SubscribedProvider(private val subscriptions: Subscriptions, private val m
         if (r.content.isBlank() || r.page !in 1..1000 || (r.query?.length ?: 0) > 120 || (r.vodId?.length ?: 0) > 16384 ||
             (r.categoryId?.length ?: 0) > 4096 || r.filters.size > 30 || r.filters.any { it.key.length > 100 || it.value.length > 1000 }) reject("Invalid site request")
         val site = subscriptions.site(r.content, r.url, r.siteKey)
-        if (site.path("type").asInt(0) !in setOf(0, 1, 2, 4)) reject("This site requires a server Spider adapter", HttpStatus.UNPROCESSABLE_ENTITY)
+        if (site.path("type").asInt(0) !in setOf(0, 1, 2, 3, 4)) reject("This site requires a server Spider adapter", HttpStatus.UNPROCESSABLE_ENTITY)
         return site
     }
-    private fun fetch(site: JsonNode, op: String, r: SiteRequest, extra: Map<String, String> = emptyMap()): JsonNode {
+    private fun fetch(site: JsonNode, op: String, r: SiteRequest, extra: Map<String, String> = emptyMap(), deadline: Long = Long.MAX_VALUE): JsonNode {
         val type = site.path("type").asInt(0)
+        if (type == 3) {
+            if (op == "category" && r.categoryId.isNullOrBlank() || op == "search" && r.query.isNullOrBlank() || op == "detail" && r.vodId.isNullOrBlank()) reject("Missing Spider request argument")
+            return androidSpider?.invoke(SpiderSpec.from(site,flags=site.path("__spiderFlags")),op,r,extra,deadline)
+                ?: reject("This site requires a server Spider adapter",HttpStatus.UNPROCESSABLE_ENTITY)
+        }
         var ext = site.path("ext").let { if (it.isContainerNode) it.toString() else it.asText("") }
         if (type == 4 && ext.startsWith("http")) ext = transport.get(Subscriptions.httpUri(ext))
         val p = params(type, op, r, ext) + extra

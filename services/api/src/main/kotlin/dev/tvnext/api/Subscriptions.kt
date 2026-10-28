@@ -27,7 +27,7 @@ data class SubscriptionDocument(val content: String, val url: String, val sites:
 
 /** Port of Decoder/VodConfig/Site/ExtAdapter semantics from Kahen/TV release 0af3b31 (GPL-3.0). */
 @Service
-class Subscriptions(private val mapper: ObjectMapper, private val transport: ProviderTransport) {
+class Subscriptions(private val mapper: ObjectMapper, private val transport: ProviderTransport, private val spiderPolicy: SpiderPolicy = SpiderPolicy()) {
     // Upstream Gson accepts comments. Keep this compatibility local to subscription
     // documents: authentication, RPC and other JSON endpoints remain strict.
     private val configReader = mapper.reader()
@@ -61,9 +61,10 @@ class Subscriptions(private val mapper: ObjectMapper, private val transport: Pro
                 node.path("jar").asText("").ifBlank { spider }, node.path("searchable").asInt(1) == 1,
                 node.path("quickSearch").asInt(1) == 1, node.path("changeable").asInt(1) == 1,
                 node.path("hide").asInt(0) == 1, node.path("categories").take(100).map { it.asText().take(150) },
-                when(type) { 0 -> "xml-api"; 1, 2 -> "json-api"; 4 -> "http-spider"; 3 -> "requires-spider-runtime"; else -> "unsupported-type" })
+                when(type) { 0 -> "xml-api"; 1, 2 -> "json-api"; 4 -> "http-spider"; 3 -> if (spiderPolicy.allows(SpiderSpec.from(node,spider,root.path("flags")))) "android-spider" else "requires-spider-runtime"; else -> "unsupported-type" })
         }.orEmpty()
-        if (sites.any { it.type == 3 }) warnings += "Type 3 requires a compatible server Spider runtime; metadata import does not execute its JAR/JS/Python."
+        if (sites.any { it.type == 3 && it.support != "android-spider" }) warnings += "Type 3 requires an administrator-approved server Spider runtime; metadata import does not execute its JAR/JS/Python."
+        if (sites.any { it.support == "android-spider" }) warnings += "Approved Spider sites use a separate experimental Android host and require a signed-in device; stateless HTTP(S) results only."
         if (root.has("parses")) warnings += "Parser definitions preserved; Android WebView sniffing needs an adapter."
         val depots = root.path("urls").takeIf { it.isArray }?.mapNotNull {
             val url = it.path("url").asText("")
@@ -76,8 +77,13 @@ class Subscriptions(private val mapper: ObjectMapper, private val transport: Pro
     }
     fun site(content: String, base: String, key: String): JsonNode {
         val doc = load(SubscriptionRequest(content, base))
-        return mapper.readTree(doc.content).path("sites").firstOrNull { it.path("key").asText() == key }
+        val root = mapper.readTree(doc.content)
+        val site = root.path("sites").firstOrNull { it.path("key").asText() == key }
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown subscription site")
+        return site.deepCopy<ObjectNode>().apply {
+            if (path("jar").asText("").isBlank()) put("jar",root.path("spider").asText(""))
+            set<JsonNode>("__spiderFlags",root.path("flags"))
+        }
     }
     internal fun decode(raw: String): String {
         if (raw.toByteArray(Charsets.UTF_8).size > 1_048_576) bad("Subscription exceeds 1 MiB")

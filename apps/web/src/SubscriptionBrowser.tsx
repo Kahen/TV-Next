@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { requestJson } from "./api";
+import { requestJson, supportedSubscriptionSite } from "./api";
 import type { Channel, MediaDetail, MediaItem, MediaPage, MediaPlayback, SubscriptionDocument } from "./api";
 import { initialSiteFilters } from "./subscriptionFilters";
 import { searchAcrossSites } from "./crossSiteSearch";
@@ -92,7 +92,7 @@ export default function SubscriptionBrowser({onPlay, onImport,session}: {session
     const { controller, id } = start();
     setFound([]); setDetail(null); setPage(null);
     try {
-      const result = await searchAcrossSites(doc.sites,
+      const result = await searchAcrossSites(doc.sites.filter(site => site.type !== 3 || session?.token),
         (site, page, signal) => sourceRequest<MediaPage>("/api/v1/subscriptions/search",
           { ...body(site.key), query: query.trim(), page, pageSize: 40 }, signal),
         controller.signal);
@@ -128,7 +128,7 @@ export default function SubscriptionBrowser({onPlay, onImport,session}: {session
       {Array.from({length:Math.min(doc.liveCount,50)},(_,i)=><button key={i} disabled={busy} onClick={()=>void loadLive(i)}>导入直播源 {i+1}</button>)}
       {doc.warnings.map((w,i)=><p className="hint" key={i}>{w}</p>)}
       {doc.depots.length>0 && <div className="media-controls">{doc.depots.map(d=><button key={d.url} disabled={busy} onClick={()=>{setUrl(d.url);setText("");void load("",d.url);}}>{d.name}</button>)}</div>}
-      <div className="media-controls">{doc.sites.filter(s=>!s.hidden).map(s=><button className={siteKey===s.key?"secondary media-selected":"secondary"} key={s.key} disabled={busy||![0,1,2,4].includes(s.type)} title={s.support} onClick={()=>void browse(s.key)}>{s.name}{s.type===3?" · 需 Spider 适配":""}</button>)}</div>
+      <div className="media-controls">{doc.sites.filter(s=>!s.hidden).map(s=><button className={siteKey===s.key?"secondary media-selected":"secondary"} key={s.key} disabled={busy||!supportedSubscriptionSite(s)||s.type===3&&!session?.token} title={s.support} onClick={()=>void browse(s.key)}>{s.name}{s.type===3?(s.support==="android-spider"?(session?.token?"":" · 请先登录"):" · 需 Spider 适配"):""}</button>)}</div>
       <div className="inline-controls"><input className="filter-input" aria-label="搜索订阅站点" value={query} onChange={e=>setQuery(e.target.value)}/><button disabled={busy||!query.trim()||!siteKey} onClick={()=>void browse(siteKey,"search")}>当前站点搜索</button><button disabled={busy||!query.trim()} onClick={()=>void searchAll()}>跨站搜索</button></div>
     </>}
     {page && <>

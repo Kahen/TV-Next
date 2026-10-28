@@ -4,7 +4,7 @@ struct NativeSubscription: Decodable {
     struct Site: Decodable, Identifiable {
         let key: String; let name: String; let type: Int; let searchable: Bool; let hidden: Bool; let support: String
         var id: String { key }
-        var supported: Bool { [0,1,2,4].contains(type) }
+        var supported: Bool { [0,1,2,4].contains(type) || (type == 3 && support == "android-spider") }
     }
     struct Depot: Decodable, Identifiable { let name: String; let url: String; var id: String { url } }
     let content: String; let url: String; let sites: [Site]; let depots: [Depot]; let liveCount: Int; let warnings: [String]

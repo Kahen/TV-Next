@@ -31,7 +31,7 @@ Reference: [FongMi/TV `123cc086`](https://github.com/FongMi/TV/tree/123cc086159b
 | `catvod/.../utils/Json.java`: Gson parsing accepts comments | Subscription-specific Jackson reader allows Java-style comments; other API parsers remain strict and trailing JSON documents fail |
 | `app/.../api/config/VodConfig.java`: sites and inherited spider JAR | Existing normalized site metadata, inherited JAR, relative resources and explicit depot selection |
 | `app/.../api/loader/JarLoader.java`: `DexClassLoader`, `csp_` class names and Android Context | Requires an Android runtime for this sample; a pure JVM loader cannot substitute for Android DEX and native libraries |
-| `app/.../server/process/SpiderTest.java`, `SpiderTestSession.java` | Original Android host exposes session/create/load/run/poll/cancel/delete operations; a separate optional bridge is being implemented |
+| `app/.../server/process/SpiderTest.java`, `SpiderTestSession.java` | Optional [Android bridge](ANDROID_SPIDER_BRIDGE.md) implements the original session/load/run/poll/delete contract for approved stateless type-3 sites; real ARM-host validation remains pending |
 
 Unicode DNS names are normalized to IDNA ASCII before DNS resolution. Raw URL
 paths/queries are preserved; userinfo, fragments, malformed ports, escaped
@@ -51,6 +51,10 @@ The first command prints counts/fingerprints only. It does not download or run
 plugins. The second scans a local ZIP without executing it, including detection
 of DEX mixed into an otherwise JVM-compatible archive. `unsupported` is expected
 for this Android/native sample and exits 2.
+
+Built API evidence: [run 40675302304](https://github.com/Kahen/TV-Next/actions/runs/40675302304)
+loaded 49 type-3 sites successfully; normalized-config SHA-256
+`2984deb655ea494621985bf0b48deae34839526672c79991e01d3dbd643d0acf`.
 
 Actual ARM Android plugin execution, home/search/detail/player behavior and real
 Apple playback remain unverified until the Android host and device media matrix
