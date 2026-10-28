@@ -99,15 +99,28 @@ jobs:
             sleep 1
           done
           test -s tests/unit/Fixtures/fixture.mp4
-          # Generate two synthetic AAC tracks, without downloading external media.
+          # AVFoundation exposes selectable audio options reliably when the HLS
+          # master declares EXT-X-MEDIA renditions. All segments are synthetic.
+          mkdir -p /tmp/tvnext-audio-hls
           ffmpeg -nostdin -hide_banner -loglevel error -y \
             -f lavfi -i 'color=c=black:s=320x180:r=15:d=4' \
             -f lavfi -i 'sine=frequency=440:duration=4' \
             -f lavfi -i 'sine=frequency=880:duration=4' \
-            -map 0:v -map 1:a -map 2:a -t 4 -c:v libx264 -pix_fmt yuv420p -c:a aac \
-            -metadata:s:a:0 language=eng -metadata:s:a:1 language=jpn \
-            -movflags +faststart tests/unit/Fixtures/audio-tracks.mp4
-          test -s tests/unit/Fixtures/audio-tracks.mp4
+            -map 0:v -map 1:a -map 2:a -c:v libx264 -pix_fmt yuv420p -c:a aac -t 4 \
+            -f hls -hls_time 2 -hls_playlist_type vod \
+            -var_stream_map 'a:0,agroup:aud,default:yes,language:eng a:1,agroup:aud,default:no,language:jpn v:0,agroup:aud' \
+            -master_pl_name master.m3u8 \
+            -hls_segment_filename '/tmp/tvnext-audio-hls/stream_%v_%03d.ts' \
+            '/tmp/tvnext-audio-hls/stream_%v.m3u8'
+          grep -q 'EXT-X-MEDIA:TYPE=AUDIO' /tmp/tvnext-audio-hls/master.m3u8
+          python3 -m http.server 8766 --bind 127.0.0.1 --directory /tmp/tvnext-audio-hls > /tmp/tvnext-audio-server.log 2>&1 &
+          audio_pid=$!
+          trap 'kill "$fixture_pid" "$audio_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8766/master.m3u8 -o /dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:8766/master.m3u8 -o /dev/null
           # Regenerate now that the owned synthetic resource exists.
           xcodegen generate
           xcrun simctl list devices available --json > /tmp/tvnext-simulators.json

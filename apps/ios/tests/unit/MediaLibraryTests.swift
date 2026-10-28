@@ -99,8 +99,9 @@ final class MediaLibraryTests: XCTestCase {
 
     func testAudioTrackSelectionIsItemScopedAndRejectsInvalidIndices() async throws {
         XCTAssertFalse(store.selectAudioTrack(0), "No player item must never accept a track")
-        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "audio-tracks", withExtension: "mp4"))
-        store.playLocalFile(url, name: "audio-tracks.mp4")
+        // An HLS master explicitly declares two alternative audio renditions.
+        // A multi-audio MP4 does not consistently expose AVMediaSelectionGroup on iOS.
+        store.play(channel("Two audio renditions", url: "http://127.0.0.1:8766/master.m3u8"))
         try await waitUntil({ self.store.audioTracks.count == 2 }, timeout: 15)
         XCTAssertFalse(store.selectAudioTrack(-1))
         XCTAssertFalse(store.selectAudioTrack(2))

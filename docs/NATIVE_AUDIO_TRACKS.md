@@ -6,6 +6,6 @@ The list is limited to the first 16 options. Unsupported codecs, containers with
 
 ## Automated acceptance
 
-The iOS CI creates a source-free 4-second MP4 with two synthetic sine-wave AAC tracks using FFmpeg, then regenerates the Xcode project so XCTest can load the fixture. `MediaLibraryTests.testAudioTrackSelectionIsItemScopedAndRejectsInvalidIndices` covers discovery, selection, negative/out-of-range indices, switching items and clearing the library. The same workflow builds the production SwiftUI app and runs XCTest/XCUI on iPhone/iPad simulators.
+The iOS CI creates a source-free 4-second HLS master playlist with two alternate synthetic sine-wave AAC renditions using FFmpeg, served from a loopback-only HTTP fixture. The master declares two `EXT-X-MEDIA:TYPE=AUDIO` options so AVFoundation can expose a media-selection group. `MediaLibraryTests.testAudioTrackSelectionIsItemScopedAndRejectsInvalidIndices` covers discovery, selection, negative/out-of-range indices, switching items and clearing the library. The same workflow builds the production SwiftUI app and runs XCTest/XCUI on iPhone/iPad simulators.
 
 These checks do **not** establish physical Apple codec compatibility, audio quality, energy use, AirPlay route behavior or accessibility validation with VoiceOver. Record those separately in #38. No signed IPA/Release is produced.
