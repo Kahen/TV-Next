@@ -69,6 +69,11 @@ jobs:
           done
           swiftc -warnings-as-errors TVNext/NativeWebDAV.swift tests/WebDAVNetworkSmoke.swift -o /tmp/tvnext-webdav-network-tests
           /tmp/tvnext-webdav-network-tests
+      - name: Verify manual intro/outro marker bounds and local persistence
+        working-directory: apps/ios
+        run: |
+          swiftc -warnings-as-errors TVNext/NativeIntroOutroMarkers.swift tests/IntroOutroSmoke.swift -o /tmp/tvnext-intro-outro-tests
+          /tmp/tvnext-intro-outro-tests
       - name: Validate original filter contract with shared JVM fixture
         working-directory: apps/ios
         run: |
