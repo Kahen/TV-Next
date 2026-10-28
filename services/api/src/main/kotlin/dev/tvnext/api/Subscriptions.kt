@@ -41,7 +41,7 @@ class Subscriptions(private val mapper: ObjectMapper, private val transport: Pro
             base=fetched.uri
             fetched.content
         }
-        val root = try { configReader.readTree<JsonNode>(decode(text)) } catch (e: ResponseStatusException) { throw e }
+        val root = try { configReader.readTree(decode(text)) } catch (e: ResponseStatusException) { throw e }
             catch (_: Exception) { bad("Invalid subscription JSON") }
         if (root == null || !root.isObject) bad("Expected subscription object")
         if (root.has("msg")) bad(root.path("msg").asText("Subscription returned an error").take(200))
