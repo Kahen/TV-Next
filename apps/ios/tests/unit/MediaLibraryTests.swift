@@ -94,6 +94,12 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertFalse(store.handleSystemPlaybackCommand(.skip(61)))
         XCTAssertTrue(store.handleSystemPlaybackCommand(.seek(1)))
         try await waitUntil { abs(self.store.player.currentTime().seconds-1) < 0.1 }
+        XCTAssertTrue(store.handleSystemPlaybackCommand(.skip(-15)), "Back skip clamps to zero")
+        try await waitUntil { self.store.player.currentTime().seconds < 0.1 }
+        XCTAssertTrue(store.handleSystemPlaybackCommand(.skip(15)), "Forward skip clamps to duration")
+        try await waitUntil { self.store.player.currentTime().seconds >= duration - 0.2 }
+        XCTAssertTrue(store.handleSystemPlaybackCommand(.seek(1)))
+        try await waitUntil { abs(self.store.player.currentTime().seconds-1) < 0.1 }
         XCTAssertFalse(store.handleSystemPlaybackCommand(.rate(.nan)))
         XCTAssertFalse(store.handleSystemPlaybackCommand(.rate(3)))
         XCTAssertTrue(store.handleSystemPlaybackCommand(.rate(1.5)))
