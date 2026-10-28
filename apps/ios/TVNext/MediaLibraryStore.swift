@@ -90,27 +90,61 @@ final class MediaLibraryStore: ObservableObject {
     private func restoreAudioPreferences() {
         guard let data = defaults.data(forKey: audioPreferenceStorageKey), data.count <= 64_000,
               let snapshot = try? JSONDecoder().decode(NativeAudioPreferenceSnapshot.self, from: data),
-              snapshot.version == 1 else { return }
+              snapshot.version == 1 || snapshot.version == 2 else { return }
         var seen = Set<String>()
         audioPreferences = Array(snapshot.entries.reversed().filter { entry in
             entry.urlDigest.count == 64 && entry.urlDigest.allSatisfy(\.isHexDigit) &&
-            !entry.displayName.isEmpty && entry.displayName.count <= 80 &&
+            Self.isValidStoredAudioDisplayName(entry.displayName, version: snapshot.version) &&
             (entry.languageTag?.count ?? 0) <= 64 &&
             seen.insert(entry.urlDigest).inserted
         }.prefix(100).reversed())
     }
 
+    /// The menu may abbreviate labels, but the saved identity must be complete.
+    /// Truncated names could otherwise select a different provider rendition.
+    static func persistableAudioDisplayName(_ name: String) -> String? {
+        guard !name.isEmpty, name.count <= 80 else { return nil }
+        return name
+    }
+
+    /// V1 stored a truncated 80-character prefix. Such entries cannot be
+    /// distinguished from a legitimate 80-character name, so drop them when
+    /// migrating; V2 stores only complete identities.
+    static func isValidStoredAudioDisplayName(_ name: String, version: Int) -> Bool {
+        guard persistableAudioDisplayName(name) != nil else { return false }
+        return version == 2 || (version == 1 && name.count < 80)
+    }
+
+    /// Match full AVFoundation identities, never menu labels or stale indices.
+    /// Duplicate name/language pairs are ambiguous and must not auto-select.
+    static func uniqueAudioPreferenceIndex(
+        in options: [(name: String, languageTag: String?)],
+        name: String, languageTag: String?
+    ) -> Int? {
+        guard persistableAudioDisplayName(name) != nil else { return nil }
+        let matches = options.enumerated().filter {
+            $0.element.name == name && $0.element.languageTag == languageTag
+        }
+        return matches.count == 1 ? matches[0].offset : nil
+    }
+
     private func rememberAudioPreference(_ option: AVMediaSelectionOption) {
         guard let key = mediaPreferenceKey() else { return }
-        let name = String(option.displayName.prefix(80))
-        guard !name.isEmpty, (option.extendedLanguageTag?.count ?? 0) <= 64 else { return }
-        audioPreferences.removeAll { $0.urlDigest == key }
-        audioPreferences.append(NativeAudioPreference(urlDigest: key,
-            displayName: name, languageTag: option.extendedLanguageTag))
-        audioPreferences = Array(audioPreferences.suffix(100))
-        let snapshot = NativeAudioPreferenceSnapshot(version: 1, entries: audioPreferences)
+        let name = Self.persistableAudioDisplayName(option.displayName)
+        let languageTag = option.extendedLanguageTag
+        // An unpersistable explicit choice must also invalidate any previous
+        // choice for this title, rather than restoring a now-stale track later.
+        let saved: [NativeAudioPreference]
+        if let name, (languageTag?.count ?? 0) <= 64 {
+            saved = [NativeAudioPreference(urlDigest: key, displayName: name, languageTag: languageTag)]
+        } else {
+            saved = []
+        }
+        let updated = Array((audioPreferences.filter { $0.urlDigest != key } + saved).suffix(100))
+        let snapshot = NativeAudioPreferenceSnapshot(version: 2, entries: updated)
         guard let data = try? JSONEncoder().encode(snapshot), data.count <= 64_000 else { return }
         defaults.set(data, forKey: audioPreferenceStorageKey)
+        audioPreferences = updated
     }
     @Published private(set) var subtitleTracks: [NativeSubtitleTrack] = []
     @Published private(set) var selectedSubtitleTrack: Int?
@@ -281,14 +315,14 @@ final class MediaLibraryStore: ObservableObject {
                 // Reapply only a unique, exact match. Never use a stale numeric index.
                 if let key = self.mediaPreferenceKey(),
                    let preference = self.audioPreferences.first(where: { $0.urlDigest == key }) {
-                    let matches = Array(group.options.prefix(16).enumerated()).filter {
-                        String($0.element.displayName.prefix(80)) == preference.displayName &&
-                        $0.element.extendedLanguageTag == preference.languageTag
-                    }
-                    if matches.count == 1, let match = matches.first {
+                    let options = Array(group.options.prefix(16))
+                    if let index = Self.uniqueAudioPreferenceIndex(
+                        in: options.map { (name: $0.displayName, languageTag: $0.extendedLanguageTag) },
+                        name: preference.displayName, languageTag: preference.languageTag
+                    ) {
                         self.player.appliesMediaSelectionCriteriaAutomatically = false
-                        item.select(match.element, in: group)
-                        self.selectedAudioTrack = match.offset
+                        item.select(options[index], in: group)
+                        self.selectedAudioTrack = index
                     }
                 }
             } catch {

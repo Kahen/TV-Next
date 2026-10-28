@@ -232,6 +232,50 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertNil(defaults.data(forKey: "tv-next-native-audio-preferences-v1"))
     }
 
+    func testAudioPreferenceIdentityNeverTruncatesOrMatchesAmbiguousNames() {
+        let prefix = String(repeating: "A", count: 80)
+        let first = prefix + " - English"
+        let second = prefix + " - Commentary"
+        XCTAssertNotEqual(first, second)
+        XCTAssertNil(MediaLibraryStore.persistableAudioDisplayName(first))
+        XCTAssertNil(MediaLibraryStore.persistableAudioDisplayName(second))
+        XCTAssertEqual(MediaLibraryStore.persistableAudioDisplayName(prefix), prefix)
+        XCTAssertNil(MediaLibraryStore.persistableAudioDisplayName(""))
+        XCTAssertNil(MediaLibraryStore.persistableAudioDisplayName(String(repeating: "x", count: 81)))
+        // V1 could have stored a truncated 80-character prefix; drop it
+        // during migration. V2 may safely store an exact 80-character name.
+        XCTAssertTrue(MediaLibraryStore.isValidStoredAudioDisplayName("English", version: 1))
+        XCTAssertFalse(MediaLibraryStore.isValidStoredAudioDisplayName(prefix, version: 1))
+        XCTAssertTrue(MediaLibraryStore.isValidStoredAudioDisplayName(prefix, version: 2))
+        XCTAssertFalse(MediaLibraryStore.isValidStoredAudioDisplayName(first, version: 2))
+        XCTAssertFalse(MediaLibraryStore.isValidStoredAudioDisplayName("English", version: 99))
+
+        let longOptions: [(name: String, languageTag: String?)] = [
+            (name: first, languageTag: "en"),
+            (name: second, languageTag: "en")
+        ]
+        // A legacy truncated preference must not select either long rendition.
+        XCTAssertNil(MediaLibraryStore.uniqueAudioPreferenceIndex(
+            in: longOptions, name: prefix, languageTag: "en"))
+        XCTAssertNil(MediaLibraryStore.uniqueAudioPreferenceIndex(
+            in: longOptions, name: first, languageTag: "en"))
+
+        let options: [(name: String, languageTag: String?)] = [
+            (name: "Original", languageTag: "en"),
+            (name: "Original", languageTag: "fr"),
+            (name: "Commentary", languageTag: "en")
+        ]
+        XCTAssertEqual(MediaLibraryStore.uniqueAudioPreferenceIndex(
+            in: options, name: "Original", languageTag: "fr"), 1)
+        XCTAssertEqual(MediaLibraryStore.uniqueAudioPreferenceIndex(
+            in: options, name: "Commentary", languageTag: "en"), 2)
+        XCTAssertNil(MediaLibraryStore.uniqueAudioPreferenceIndex(
+            in: options, name: "Original", languageTag: nil))
+        XCTAssertNil(MediaLibraryStore.uniqueAudioPreferenceIndex(
+            in: options + [(name: "Original", languageTag: "en")],
+            name: "Original", languageTag: "en"))
+    }
+
     func testCorruptedAudioPreferenceIsIgnoredWithoutChangingPlayback() async throws {
         defaults.set(Data("not-json".utf8), forKey: "tv-next-native-audio-preferences-v1")
         let restored = MediaLibraryStore(defaults: defaults)
