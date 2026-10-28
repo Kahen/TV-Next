@@ -54,6 +54,49 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertNotNil(NativeSubscriptionURLStore.validated("http://www.饭太硬.net/tv"))
     }
 
+    func testWebDAVDisconnectRevokesPlaybackAndRecentWithoutAffectingOtherSources() throws {
+        let root = try NativeWebDAV.rootURL("https://example.invalid/dav/")
+        let otherRoot = try NativeWebDAV.rootURL("https://example.invalid/other/")
+        let dav = TVChannel(name: "WebDAV owned", url: "https://example.invalid/dav/owned.mp4",
+                            group: "WebDAV", logo: nil, tvgId: nil)
+        store.play(dav)
+        XCTAssertEqual(store.current?.url, dav.url)
+        XCTAssertEqual(store.recent.first?.url, dav.url)
+
+        // Disconnecting another root must not revoke the active player.
+        store.revokeWebDAV(root: otherRoot)
+        XCTAssertEqual(store.current?.url, dav.url)
+
+        store.revokeWebDAV(root: root)
+        XCTAssertNil(store.current)
+        XCTAssertNil(store.player.currentItem)
+        XCTAssertFalse(store.recent.contains(where: { $0.url == dav.url }))
+        store.retryPlayback()
+        XCTAssertNil(store.current, "Revoked WebDAV media must not be replayable from retry")
+
+        // An unrelated source, even on the same host, remains playable.
+        let other = channel("Unrelated", url: "https://example.invalid/dav/other.mp4")
+        store.play(other)
+        store.revokeWebDAV(root: root)
+        XCTAssertEqual(store.current?.url, other.url)
+        XCTAssertTrue(store.recent.contains(where: { $0.url == other.url }))
+    }
+
+    func testWebDAVDisconnectInvalidatesPendingProtectedRetry() throws {
+        let root = try NativeWebDAV.rootURL("https://example.invalid/dav/")
+        let protected = TVChannel(name: "Protected", url: "https://example.invalid/dav/private.mp4",
+                                  group: "WebDAV", logo: nil, tvgId: nil,
+                                  headers: ["Authorization": "Basic YWxpY2U6cHc="])
+        store.play(protected)
+        XCTAssertNotNil(store.playbackError, "No home-server relay is configured")
+        store.revokeWebDAV(root: root)
+        XCTAssertNil(store.playbackError)
+        XCTAssertNil(store.player.currentItem)
+        store.retryPlayback()
+        XCTAssertNil(store.playbackError, "Retry must not recover a revoked Basic header")
+        XCTAssertNil(store.current)
+    }
+
     func testOptInBackgroundAudioPersistsAndInterruptionStillPauses() async throws {
         XCTAssertFalse(store.backgroundPlaybackEnabled)
         store.playLocalFile(try fixture(), name:"Owned fixture.mp4")
