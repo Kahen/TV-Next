@@ -38,7 +38,6 @@ struct ContentView: View {
     @State private var captionOffsetSeconds: Double = 0
     @State private var isShowingExporter = false
     @State private var exportDocument: M3UExportDocument?
-    @State private var playbackSpeed: Float = 1.0
     @State private var isShowingClearConfirmation = false
     @State private var errorMessage: String?
     @State private var isLoading = false
@@ -151,9 +150,10 @@ struct ContentView: View {
                 if phase == .background {
                     mediaGeneration = UUID()
                     isLoadingMedia = false
-                    library.suspendPlayback()
+                    library.setApplicationBackground(true)
                     remote.configure(nil, server: serverURL)
                 } else if phase == .active {
+                    library.setApplicationBackground(false)
                     remote.configure(homeSession, server: serverURL)
                 }
             }
@@ -335,6 +335,14 @@ struct ContentView: View {
                      : "此设备不支持系统画中画。")
                     .font(.caption).foregroundStyle(.secondary)
                     .accessibilityIdentifier("picture-in-picture-status")
+                HStack {
+                    Text("后台继续播放音频").frame(maxWidth:.infinity,alignment:.leading)
+                    Toggle("后台继续播放音频",isOn:Binding(get:{library.backgroundPlaybackEnabled},set:{library.setBackgroundPlaybackEnabled($0)}))
+                        .labelsHidden().fixedSize().frame(minHeight:44)
+                        .accessibilityIdentifier("background-playback-toggle")
+                }
+                Text("开启后，已开始播放的媒体可在锁屏或切换应用时继续输出音频；系统中断和耳机断开仍会暂停。")
+                    .font(.caption).foregroundStyle(.secondary)
 
                 HStack {
                     Text(library.localFileName ?? library.current?.name ?? "尚未选择媒体")
@@ -363,7 +371,7 @@ struct ContentView: View {
                 if let channel = library.current {
                     NativeLiveReplayControls(channel:channel,serverURL:serverURL,session:homeSession,onPlay:{ library.play($0) },playbackGeneration:library.playbackGeneration)
                 }
-                Picker("播放速度", selection: $playbackSpeed) {
+                Picker("播放速度", selection: Binding(get:{library.playbackSpeed},set:{library.setPlaybackSpeed($0)})) {
                     Text("0.75×").tag(Float(0.75))
                     Text("1×").tag(Float(1))
                     Text("1.25×").tag(Float(1.25))
@@ -372,9 +380,6 @@ struct ContentView: View {
                 }
                 .pickerStyle(.menu)
                 .accessibilityIdentifier("playback-speed")
-                .onChange(of: playbackSpeed) { _, speed in
-                    library.setPlaybackSpeed(speed)
-                }
                 if !library.audioTracks.isEmpty {
                     Menu {
                         ForEach(library.audioTracks) { track in

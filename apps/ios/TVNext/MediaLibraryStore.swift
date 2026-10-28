@@ -56,6 +56,12 @@ final class MediaLibraryStore: ObservableObject {
     @Published private(set) var localFileName: String?
     @Published private(set) var playbackError: String?
     @Published private(set) var pictureInPictureActive = false
+    @Published private(set) var backgroundPlaybackEnabled = false
+    @Published private(set) var applicationInBackground = false
+    private let backgroundStorageKey = "tv-next-background-audio-v1"
+    private var mediaControls: NativeMediaControls?
+    private var rateObservation: NSKeyValueObservation?
+    private var mediaTimeObserver: Any?
     private var audioObservers: [NSObjectProtocol] = []
     @Published private(set) var captionText = ""
     @Published private(set) var captionOffset: TimeInterval = 0
@@ -300,6 +306,7 @@ final class MediaLibraryStore: ObservableObject {
         playbackSpeed = accepted
         player.defaultRate = accepted
         if player.timeControlStatus == .playing { player.rate = accepted }
+        updateSystemMetadata()
     }
     private let storageKey = "tv-next-library-v1"
     private let defaults: UserDefaults
@@ -348,6 +355,13 @@ final class MediaLibraryStore: ObservableObject {
         restore()
         restoreAudioPreferences()
         restoreSubtitlePreferences()
+        setBackgroundPlaybackEnabled(defaults.bool(forKey: backgroundStorageKey))
+        rateObservation = player.observe(\.rate, options: [.new]) { [weak self] _, _ in
+            Task { @MainActor [weak self] in self?.updateSystemMetadata() }
+        }
+        mediaTimeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 1, preferredTimescale: 600), queue: .main) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.updateSystemMetadata() }
+        }
         let center = NotificationCenter.default
         audioObservers.append(center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] note in
             guard let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
@@ -363,13 +377,13 @@ final class MediaLibraryStore: ObservableObject {
             forInterval: CMTime(seconds: 8, preferredTimescale: 600),
             queue: .main
         ) { [weak self] _ in
-            self?.savePosition()
+            Task { @MainActor [weak self] in self?.savePosition() }
         }
         captionObserver = player.addPeriodicTimeObserver(
             forInterval: CMTime(seconds: 0.2, preferredTimescale: 600),
             queue: .main
         ) { [weak self] _ in
-            self?.refreshCaptions()
+            Task { @MainActor [weak self] in self?.refreshCaptions() }
         }
     }
 
@@ -377,6 +391,8 @@ final class MediaLibraryStore: ObservableObject {
         for observer in audioObservers { NotificationCenter.default.removeObserver(observer) }
         if let timeObserver { player.removeTimeObserver(timeObserver) }
         if let captionObserver { player.removeTimeObserver(captionObserver) }
+        if let mediaTimeObserver { player.removeTimeObserver(mediaTimeObserver) }
+        rateObservation?.invalidate()
         statusObservation?.invalidate()
         relayTask?.cancel()
         audioTrackTask?.cancel()
@@ -477,6 +493,7 @@ final class MediaLibraryStore: ObservableObject {
         observe(item, resume: channel.replay == nil ? positions[channel.url] : nil)
         player.replaceCurrentItem(with: item)
         player.playImmediately(atRate: playbackSpeed)
+        activateSystemControls()
         persist()
     }
 
@@ -499,6 +516,7 @@ final class MediaLibraryStore: ObservableObject {
         observe(item, resume: nil)
         player.replaceCurrentItem(with: item)
         player.playImmediately(atRate: playbackSpeed)
+        activateSystemControls()
         // Local sandbox files are intentionally NOT added to persistent library/history.
     }
 
@@ -512,8 +530,10 @@ final class MediaLibraryStore: ObservableObject {
                 guard let self, self.player.currentItem === observed else { return }
                 if observed.status == .failed {
                     self.playbackError = "播放失败：媒体不可访问或编解码不受支持。可重试或选择其他媒体。"
+                    self.updateSystemMetadata()
                 } else if observed.status == .readyToPlay {
                     self.playbackError = nil
+                    self.updateSystemMetadata()
                     self.discoverAudioTracks(for: observed)
                     self.discoverEmbeddedSubtitles(for: observed)
                     if let resume, resume.isFinite, resume >= 5 {
@@ -571,6 +591,7 @@ final class MediaLibraryStore: ObservableObject {
             player.replaceCurrentItem(with: item)
             player.playImmediately(atRate: playbackSpeed)
             localFileName = name
+            activateSystemControls()
         }
     }
 
@@ -588,17 +609,80 @@ final class MediaLibraryStore: ObservableObject {
 
     func setPictureInPictureActive(_ active: Bool, appIsBackground: Bool = false) {
         pictureInPictureActive = active
-        if !active && appIsBackground { suspendPlayback() }
+        if !active && appIsBackground { setApplicationBackground(true) }
     }
 
-    /// Ordinary backgrounding pauses. An explicit PiP transition retains its installed item.
+    func setBackgroundPlaybackEnabled(_ enabled: Bool) {
+        backgroundPlaybackEnabled = enabled
+        defaults.set(enabled,forKey:backgroundStorageKey)
+        player.audiovisualBackgroundPlaybackPolicy = enabled ? .continuesIfPossible : .automatic
+        if !enabled && applicationInBackground && !pictureInPictureActive { player.pause() }
+        updateSystemMetadata()
+    }
+
+    func setApplicationBackground(_ background: Bool) {
+        applicationInBackground = background
+        if background { suspendPlayback() }
+        else { updateSystemMetadata() }
+    }
+
+    /// Opt-in background audio and explicit PiP retain the installed item.
     /// Pending requests are invalidated in either case and can never auto-start after suspension.
     func suspendPlayback(force: Bool = false) {
         savePosition()
         relayGeneration = UUID()
         relayTask?.cancel()
         relayTask = nil
-        if force || !pictureInPictureActive { player.pause() }
+        if force || !(pictureInPictureActive || backgroundPlaybackEnabled && applicationInBackground) { player.pause() }
+        updateSystemMetadata()
+    }
+
+    private func activateSystemControls() {
+        if mediaControls == nil { mediaControls = NativeMediaControls() }
+        mediaControls?.activate(self)
+        updateSystemMetadata()
+    }
+
+    private func updateSystemMetadata() {
+        guard let item = player.currentItem, item.status != .failed else { mediaControls?.publish(nil);return }
+        let snapshot = NativeNowPlayingSnapshot(title:localFileName ?? current?.name ?? "TV-Next 媒体",
+            elapsed:player.currentTime().seconds,duration:item.duration.seconds,rate:player.rate,defaultRate:playbackSpeed)
+        mediaControls?.publish(snapshot)
+    }
+
+    @discardableResult
+    func handleSystemPlaybackCommand(_ command: NativePlaybackCommand) -> Bool {
+        guard let item = player.currentItem, item.status != .failed else { return false }
+        switch command {
+        case .play:
+            guard item.status == .readyToPlay,
+                  !applicationInBackground || backgroundPlaybackEnabled || pictureInPictureActive,
+                  prepareAudioSession() else { return false }
+            player.playImmediately(atRate:playbackSpeed)
+        case .pause:
+            player.pause();savePosition()
+        case .toggle:
+            return handleSystemPlaybackCommand(player.rate > 0 || player.timeControlStatus == .waitingToPlayAtSpecifiedRate ? .pause : .play)
+        case .seek(let value):
+            let duration=item.duration.seconds
+            guard value.isFinite,value >= 0,duration.isFinite,duration > 0,duration < 604_800,value <= duration else { return false }
+            player.seek(to:CMTime(seconds:value,preferredTimescale:600),toleranceBefore:.zero,toleranceAfter:.zero) { [weak self,weak item] finished in
+                Task { @MainActor [weak self,weak item] in
+                    guard finished,let self,let item,self.player.currentItem === item else { return }
+                    self.updateSystemMetadata()
+                }
+            }
+        case .skip(let interval):
+            let current=player.currentTime().seconds,duration=item.duration.seconds
+            guard interval.isFinite,abs(interval)<=60,current.isFinite,duration.isFinite,duration>0 else { return false }
+            return handleSystemPlaybackCommand(.seek(min(duration,max(0,current+interval))))
+        case .rate(let rate):
+            let duration=item.duration.seconds
+            guard rate.isFinite,(0.75...2).contains(rate),duration.isFinite,duration>0,duration<604_800 else { return false }
+            setPlaybackSpeed(rate)
+        }
+        updateSystemMetadata()
+        return true
     }
 
     func setCaptions(_ cues: [CaptionCue]) {
@@ -661,6 +745,10 @@ final class MediaLibraryStore: ObservableObject {
         current = nil
         requestedChannel = nil
         pictureInPictureActive = false
+        mediaControls?.invalidate()
+        backgroundPlaybackEnabled = false
+        player.audiovisualBackgroundPlaybackPolicy = .automatic
+        defaults.removeObject(forKey:backgroundStorageKey)
         playbackError = nil
         channels = []
         favorites = []

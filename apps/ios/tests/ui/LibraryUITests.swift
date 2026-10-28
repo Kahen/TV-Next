@@ -80,6 +80,25 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["TVBox / FongMi 原版订阅"].waitForExistence(timeout: 5))
     }
 
+    func testBackgroundAudioTogglePersistsAcrossRelaunch() {
+        jump("播放器")
+        let toggle=app.switches["background-playback-toggle"]
+        reveal(toggle)
+        func expectValue(_ value: String) {
+            let expected=XCTNSPredicateExpectation(predicate:NSPredicate(format:"value == %@",value),object:toggle)
+            XCTAssertEqual(XCTWaiter.wait(for:[expected],timeout:5),.completed)
+        }
+        if toggle.value as? String == "1" { toggle.tap() }
+        expectValue("0")
+        toggle.tap()
+        expectValue("1")
+        app.terminate();app.launch();jump("播放器")
+        reveal(toggle)
+        expectValue("1")
+        toggle.tap()
+        expectValue("0")
+    }
+
     private func importPlaylist(_ text: String) {
         jump("导入播放列表")
         enter(app.textViews["playlist-input"], text)

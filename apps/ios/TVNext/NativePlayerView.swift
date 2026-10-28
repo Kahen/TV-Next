@@ -11,7 +11,7 @@ struct NativePlayerView: UIViewControllerRepresentable {
 
     func makeUIViewController(context: Context) -> AVPlayerViewController {
         let controller = AVPlayerViewController()
-        controller.player = library.player
+        controller.player = displayPlayer
         controller.delegate = context.coordinator
         controller.allowsPictureInPicturePlayback = true
         controller.canStartPictureInPictureAutomaticallyFromInline = false
@@ -20,8 +20,12 @@ struct NativePlayerView: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ controller: AVPlayerViewController, context: Context) {
-        if controller.player !== library.player { controller.player = library.player }
+        if controller.player !== displayPlayer { controller.player = displayPlayer }
         context.coordinator.onRestore = onRestore
+    }
+
+    private var displayPlayer: AVPlayer? {
+        library.applicationInBackground && library.backgroundPlaybackEnabled && !library.pictureInPictureActive ? nil : library.player
     }
 
     @MainActor

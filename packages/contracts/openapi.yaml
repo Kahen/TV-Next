@@ -1,10 +1,11 @@
 openapi: 3.1.0
 info:
   title: TV-Next API
-  version: 0.3.0-preview
+  version: 0.3.1-preview
   description: Bounded offline imports plus DNS-pinned TVBox/FongMi type 0/1/2/4 subscription
-    and AList/OpenList metadata operations. Type 3 remote code activation and media
-    arbitrary media forwarding are not implemented. Authenticated bounded HTTP/HLS relay
+    and AList/OpenList metadata operations. Optional administrator-approved stateless type 3
+    media methods delegate to a separate Android host and require device authentication;
+    arbitrary plugin activation and arbitrary media forwarding are not implemented. Authenticated bounded HTTP/HLS relay
     and original live timeshift/programme catchup subsets are available. Network destinations are public by default;
     explicit LAN origins are configured by the administrator. POST envelopes are limited
     to 3 MiB and peers to 300 requests/minute. Home accounts, device pairing, revision-based
@@ -203,6 +204,9 @@ paths:
   /api/v1/subscriptions/load:
     post:
       summary: Decode and normalize an original TVBox subscription or depot
+      description: IDNA DNS names and binary image-prefixed Base64 configurations
+        are accepted. Java-style JSON comments are subscription-specific; decoded
+        JSON remains strict UTF-8. Loading metadata never executes a Spider.
       requestBody:
         required: true
         content:
@@ -223,6 +227,23 @@ paths:
                 - depots
                 - liveCount
                 - warnings
+                properties:
+                  sites:
+                    type: array
+                    maxItems: 1000
+                    items:
+                      type: object
+                      required: [key, type, support]
+                      properties:
+                        key:
+                          type: string
+                          maxLength: 200
+                        type:
+                          type: integer
+                        support:
+                          type: string
+                          enum: [xml-api, json-api, http-spider, requires-spider-runtime, android-spider, unsupported-type]
+                          description: android-spider indicates a configured approved binding, not verified host reachability or actual provider compatibility.
         '400':
           description: Invalid input or semantic limit
         '413':
@@ -237,6 +258,12 @@ paths:
   /api/v1/subscriptions/home:
     post:
       summary: Original SiteApi home operation
+      description: Type 0/1/2/4 operations remain available without login. Type 3
+        requires a valid device bearer and an exact administrator-approved Android
+        binding; only stateless direct HTTP(S) media results are supported.
+      security:
+      - {}
+      - deviceBearer: []
       requestBody:
         required: true
         content:
@@ -252,6 +279,12 @@ paths:
                 $ref: '#/components/schemas/MediaPage'
         '400':
           description: Invalid input or semantic limit
+        '401':
+          description: Missing type-3 device bearer or invalid, expired or revoked supplied bearer
+        '408':
+          description: Android Spider operation interrupted
+        '504':
+          description: Android Spider request budget expired
         '413':
           description: Envelope exceeds 3 MiB
         '422':
@@ -263,7 +296,13 @@ paths:
             response
   /api/v1/subscriptions/category:
     post:
-      summary: Original type 0/1/2/4 category and filters
+      summary: Original HTTP or approved Android Spider category and filters
+      description: Type 0/1/2/4 operations remain available without login. Type 3
+        requires a valid device bearer and an exact administrator-approved Android
+        binding; only stateless direct HTTP(S) media results are supported.
+      security:
+      - {}
+      - deviceBearer: []
       requestBody:
         required: true
         content:
@@ -279,6 +318,12 @@ paths:
                 $ref: '#/components/schemas/MediaPage'
         '400':
           description: Invalid input or semantic limit
+        '401':
+          description: Missing type-3 device bearer or invalid, expired or revoked supplied bearer
+        '408':
+          description: Android Spider operation interrupted
+        '504':
+          description: Android Spider request budget expired
         '413':
           description: Envelope exceeds 3 MiB
         '422':
@@ -291,6 +336,12 @@ paths:
   /api/v1/subscriptions/search:
     post:
       summary: Original wd/quick/pg search semantics
+      description: Type 0/1/2/4 operations remain available without login. Type 3
+        requires a valid device bearer and an exact administrator-approved Android
+        binding; only stateless direct HTTP(S) media results are supported.
+      security:
+      - {}
+      - deviceBearer: []
       requestBody:
         required: true
         content:
@@ -306,6 +357,12 @@ paths:
                 $ref: '#/components/schemas/MediaPage'
         '400':
           description: Invalid input or semantic limit
+        '401':
+          description: Missing type-3 device bearer or invalid, expired or revoked supplied bearer
+        '408':
+          description: Android Spider operation interrupted
+        '504':
+          description: Android Spider request budget expired
         '413':
           description: Envelope exceeds 3 MiB
         '422':
@@ -318,6 +375,12 @@ paths:
   /api/v1/subscriptions/detail:
     post:
       summary: Video or cloud directory item details
+      description: Type 0/1/2/4 operations remain available without login. Type 3
+        requires a valid device bearer and an exact administrator-approved Android
+        binding; only stateless direct HTTP(S) media results are supported.
+      security:
+      - {}
+      - deviceBearer: []
       requestBody:
         required: true
         content:
@@ -333,6 +396,12 @@ paths:
                 $ref: '#/components/schemas/MediaDetail'
         '400':
           description: Invalid input or semantic limit
+        '401':
+          description: Missing type-3 device bearer or invalid, expired or revoked supplied bearer
+        '408':
+          description: Android Spider operation interrupted
+        '504':
+          description: Android Spider request budget expired
         '413':
           description: Envelope exceeds 3 MiB
         '422':
@@ -345,6 +414,12 @@ paths:
   /api/v1/subscriptions/play:
     post:
       summary: Resolve opaque type 4 cloud IDs and preserve playback resources
+      description: Type 0/1/2/4 operations remain available without login. Type 3
+        requires a valid device bearer and an exact administrator-approved Android
+        binding; only stateless direct HTTP(S) media results are supported.
+      security:
+      - {}
+      - deviceBearer: []
       requestBody:
         required: true
         content:
@@ -360,6 +435,12 @@ paths:
                 $ref: '#/components/schemas/MediaPlayback'
         '400':
           description: Invalid input or semantic limit
+        '401':
+          description: Missing type-3 device bearer or invalid, expired or revoked supplied bearer
+        '408':
+          description: Android Spider operation interrupted
+        '504':
+          description: Android Spider request budget expired
         '413':
           description: Envelope exceeds 3 MiB
         '422':
@@ -372,6 +453,11 @@ paths:
   /api/v1/subscriptions/action:
     post:
       summary: Fetch a type 4 action result as JSON; no UI script execution
+      description: Type 3 requests require device authentication but interactive
+        Spider actions are not implemented and return 422 after authentication.
+      security:
+      - {}
+      - deviceBearer: []
       requestBody:
         required: true
         content:
@@ -387,6 +473,12 @@ paths:
                 type: object
         '400':
           description: Invalid input or semantic limit
+        '401':
+          description: Missing type-3 device bearer or invalid, expired or revoked supplied bearer
+        '408':
+          description: Android Spider operation interrupted
+        '504':
+          description: Android Spider request budget expired
         '413':
           description: Envelope exceeds 3 MiB
         '422':
@@ -1691,8 +1783,9 @@ components:
           type: string
           maxLength: 4096
       description: Provide content or URL. Optional URL supplies relative-path base.
-        Plain, original Base64-wrapper and AES-CBC subscriptions supported; max 1
-        MiB UTF-8 input.
+        IDNA hosts, binary image-prefixed Base64, Java-style JSON comments and original
+        AES-CBC subscriptions supported. HTTP and decoded bodies are bounded to 1 MiB;
+        malformed decoded UTF-8 and trailing documents are rejected.
     SiteRequest:
       type: object
       required:
