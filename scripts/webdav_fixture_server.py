@@ -37,6 +37,10 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header('Content-Type', 'application/xml')
             self.send_header('Content-Length', str(1_048_577))
             self.end_headers()
+            try:
+                self.wfile.write(b'x' * 1_048_577)
+            except (BrokenPipeError, ConnectionResetError):
+                pass
         elif self.path == '/dav/large-streamed/':
             # No Content-Length: exercise the actual incremental byte limit.
             self.send_response(207)
