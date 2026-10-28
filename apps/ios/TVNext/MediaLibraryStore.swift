@@ -202,7 +202,7 @@ final class MediaLibraryStore: ObservableObject {
                 if let key = self.audioPreferenceKey(),
                    let preference = self.audioPreferences.first(where: { $0.urlDigest == key }) {
                     let matches = Array(group.options.prefix(16).enumerated()).filter {
-                        $0.element.displayName == preference.displayName &&
+                        String($0.element.displayName.prefix(80)) == preference.displayName &&
                         $0.element.extendedLanguageTag == preference.languageTag
                     }
                     if matches.count == 1, let match = matches.first {
