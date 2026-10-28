@@ -47,6 +47,7 @@ final class MediaLibraryStore: ObservableObject {
     private var statusObservation: NSKeyValueObservation?
     private var requestedChannel: TVChannel?
     private let createRelay: @MainActor (TVNextAPI, NativeRelayRequest) async throws -> NativeRelayResponse
+    private let resolveReplay: @MainActor (TVNextAPI, NativeReplayRequest) async throws -> NativeReplaySession
     private var relayAPI: TVNextAPI?
     private var relayContext=""
     private var relayTask: Task<Void,Never>?
@@ -75,9 +76,12 @@ final class MediaLibraryStore: ObservableObject {
     init(defaults: UserDefaults = .standard,
          createRelay: @escaping @MainActor (TVNextAPI, NativeRelayRequest) async throws -> NativeRelayResponse = { api, request in
              try await api.request("home/media/sessions", body: request)
+         }, resolveReplay: @escaping @MainActor (TVNextAPI, NativeReplayRequest) async throws -> NativeReplaySession = { api, request in
+             try await api.request("subscriptions/replay", body: request)
          }) {
         self.defaults = defaults
         self.createRelay = createRelay
+        self.resolveReplay = resolveReplay
         player.allowsExternalPlayback = true
         restore()
         let center = NotificationCenter.default
@@ -148,6 +152,7 @@ final class MediaLibraryStore: ObservableObject {
         playbackGeneration += 1
         if let replay = channel.replay {
             guard let api=relayAPI else { playbackError="请先登录家庭服务器以播放回放。";return }
+            requestedChannel=channel
             do {
                 let address=try MediaRelayAddress.resolve(replay.path,server:api.server)
                 guard replay.expiresAt > Int64(Date().timeIntervalSince1970*1000) else { throw NativeRequestError.message("回放会话已过期，请重新选择时间。") }
@@ -252,7 +257,41 @@ final class MediaLibraryStore: ObservableObject {
     }
 
     func retryPlayback() {
-        if let requestedChannel { play(requestedChannel) }
+        if let requestedChannel, requestedChannel.replay != nil {
+            guard let selection=requestedChannel.replaySelection else {
+                playbackError="回放会话不可直接重试，请重新选择回放时间。"
+                return
+            }
+            guard let api=relayAPI else {
+                playbackError="请先登录家庭服务器后重试回放。"
+                return
+            }
+            // A closed or expired capability is never reusable. Re-resolve the original
+            // user-selected time before installing a new AVPlayerItem.
+            cancelRelay()
+            let generation=relayGeneration
+            relayTask=Task { @MainActor in
+                do {
+                    let request=NativeReplayRequest(channel:requestedChannel,time:selection.time,
+                        stop:selection.stop,timezone:selection.timezone)
+                    let fresh=try await resolveReplay(api,request)
+                    let address=try MediaRelayAddress.resolve(fresh.path,server:api.server)
+                    guard !Task.isCancelled,relayGeneration==generation else {
+                        release(api,address.ticket);return
+                    }
+                    guard fresh.expiresAt > Int64(Date().timeIntervalSince1970*1000) else {
+                        release(api,address.ticket)
+                        throw NativeRequestError.message("回放会话已过期，请重新选择时间。")
+                    }
+                    var renewed=requestedChannel
+                    renewed.replay=fresh
+                    play(renewed)
+                } catch {
+                    if !Task.isCancelled,relayGeneration==generation { playbackError=error.localizedDescription }
+                }
+            }
+        }
+        else if let requestedChannel { play(requestedChannel) }
         else if let file = currentLocalFile, let name = localFileName {
             // Reuse the staged file; playLocalFile would discard it before reopening.
             playbackError = nil
@@ -396,6 +435,7 @@ final class MediaLibraryStore: ObservableObject {
         result.headersRequired = channel.headersRequired == true || !(channel.headers ?? [:]).isEmpty
         result.headers = nil
         result.replay = nil
+        result.replaySelection = nil
         result.timeshift = nil
         result.catchup = nil
         return result

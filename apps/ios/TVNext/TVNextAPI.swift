@@ -14,6 +14,11 @@ struct NativeCatchup: Codable, Equatable {
 struct NativeReplaySession: Codable, Equatable {
     let path: String; let expiresAt: Int64; let hls: Bool; let time: Int64
 }
+struct NativeReplaySelection: Equatable {
+    let time: Int64
+    let stop: Int64?
+    let timezone: String
+}
 struct NativeReplayRequest: Encodable {
     let channel: TVChannel; let time: Int64; let stop: Int64?; let timezone: String
 }
@@ -30,6 +35,8 @@ struct TVChannel: Codable, Identifiable, Equatable {
     var catchup: NativeCatchup? = nil
     // A relay capability belongs to the active player only and is never encoded.
     var replay: NativeReplaySession? = nil
+    // Ephemeral selection for retry. Never encoded or written to UserDefaults.
+    var replaySelection: NativeReplaySelection? = nil
     private enum CodingKeys: String, CodingKey { case name, url, group, logo, tvgId, headers, headersRequired, timeshift, catchup }
 
     var id: String { group + "|" + name + "|" + url }

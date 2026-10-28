@@ -71,7 +71,9 @@ struct NativeLiveReplayControls: View {
                     let _: [String:Bool]? = try? await api.request("home/media/"+address.ticket+"/close",body:EmptyHomeRequest())
                     return
                 }
-                var replaying=channel;replaying.replay=result;onPlay(replaying)
+                var replaying=channel;replaying.replay=result
+                replaying.replaySelection=NativeReplaySelection(time:time,stop:stop,timezone:TimeZone.current.identifier)
+                onPlay(replaying)
             } catch { if !Task.isCancelled,generation==id { self.error=error.localizedDescription } }
         }
     }

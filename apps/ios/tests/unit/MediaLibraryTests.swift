@@ -296,6 +296,43 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertFalse(encoded.contains("/api/v1/home/media/"))
     }
 
+    func testReplayRetryRenewsTicketAndPreservesOriginalSelection() async throws {
+        var calls: [NativeReplaySelection] = []
+        let freshPath="/api/v1/home/media/"+String(repeating:"c",count:43)+"/0"
+        let relayStore=MediaLibraryStore(defaults:defaults,resolveReplay:{ _,request in
+            calls.append(NativeReplaySelection(time:request.time,stop:request.stop,timezone:request.timezone))
+            return NativeReplaySession(path:freshPath,expiresAt:Int64.max,hls:false,time:request.time)
+        })
+        defer { relayStore.clear() }
+        let session=NativeHomeSession(token:"unit-fixture",user:NativeHomeUser(id:"u",username:"fixture"),
+            device:NativeHomeDevice(id:"d",name:"fixture",createdAt:0,expiresAt:Int64.max,current:true))
+        relayStore.configureRelay(server:"http://127.0.0.1:8765",session:session)
+        var target=channel("Replay")
+        let selection=NativeReplaySelection(time:123456,stop:234567,timezone:"Asia/Hong_Kong")
+        target.replaySelection=selection
+        target.replay=NativeReplaySession(path:"/api/v1/home/media/"+String(repeating:"a",count:43)+"/0",
+            expiresAt:Int64.max,hls:false,time:selection.time)
+        relayStore.play(target)
+        relayStore.retryPlayback()
+        try await waitUntil { relayStore.current?.replay?.path == freshPath }
+        XCTAssertEqual(calls,[selection])
+        XCTAssertEqual(relayStore.current?.url,target.url)
+        XCTAssertEqual(relayStore.recent.first?.url,target.url)
+        XCTAssertNil(relayStore.syncedSnapshot().channels.first?.replay)
+    }
+
+    func testReplayWithoutSelectionCannotReuseClosedTicket() {
+        let session=NativeHomeSession(token:"unit-fixture",user:NativeHomeUser(id:"u",username:"fixture"),
+            device:NativeHomeDevice(id:"d",name:"fixture",createdAt:0,expiresAt:Int64.max,current:true))
+        store.configureRelay(server:"http://127.0.0.1:8765",session:session)
+        var target=channel("Replay")
+        target.replay=NativeReplaySession(path:"/api/v1/home/media/"+String(repeating:"a",count:43)+"/0",
+            expiresAt:Int64.max,hls:false,time:1)
+        store.play(target)
+        store.retryPlayback()
+        XCTAssertEqual(store.playbackError,"回放会话不可直接重试，请重新选择回放时间。")
+    }
+
     func testInvalidReplayKeepsExistingPlayerAndHistory() throws {
         let original=channel("Live")
         store.play(original)
