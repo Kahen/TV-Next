@@ -348,6 +348,7 @@ final class MediaLibraryStore: ObservableObject {
     @Published private(set) var introOutroMarkers: NativeIntroOutroMarkers?
     private var timeObserver: Any?
     private var statusObservation: NSKeyValueObservation?
+    private var durationObservation: NSKeyValueObservation?
     private var requestedChannel: TVChannel?
     private let createRelay: @MainActor (TVNextAPI, NativeRelayRequest) async throws -> NativeRelayResponse
     private let resolveReplay: @MainActor (TVNextAPI, NativeReplayRequest) async throws -> NativeReplaySession
@@ -431,6 +432,7 @@ final class MediaLibraryStore: ObservableObject {
         if let mediaTimeObserver { player.removeTimeObserver(mediaTimeObserver) }
         rateObservation?.invalidate()
         statusObservation?.invalidate()
+        durationObservation?.invalidate()
         relayTask?.cancel()
         audioTrackTask?.cancel()
         subtitleTrackTask?.cancel()
@@ -484,6 +486,7 @@ final class MediaLibraryStore: ObservableObject {
         savePosition()
         cancelRelay()
         statusObservation?.invalidate()
+        durationObservation?.invalidate()
         player.pause()
         player.replaceCurrentItem(with: nil)
         resetMediaSelections()
@@ -517,6 +520,7 @@ final class MediaLibraryStore: ObservableObject {
         localFileName = nil
         clearCaptions()
         statusObservation?.invalidate()
+        durationObservation?.invalidate()
         current = channel
         introOutroMarkers = nil
         recent.removeAll { $0.url == channel.url }
@@ -556,6 +560,7 @@ final class MediaLibraryStore: ObservableObject {
             player.replaceCurrentItem(with: nil)
             resetMediaSelections()
             statusObservation?.invalidate()
+            durationObservation?.invalidate()
             statusObservation = nil
             current = nil
             requestedChannel = nil
@@ -588,6 +593,7 @@ final class MediaLibraryStore: ObservableObject {
         introOutroMarkers = nil
         clearCaptions()
         statusObservation?.invalidate()
+        durationObservation?.invalidate()
         playbackError = nil
         guard prepareAudioSession() else { return }
         let item = AVPlayerItem(url: file)
@@ -603,6 +609,7 @@ final class MediaLibraryStore: ObservableObject {
     private func observe(_ item: AVPlayerItem, resume: Double?) {
         resetMediaSelections()
         statusObservation?.invalidate()
+        durationObservation?.invalidate()
         statusObservation = item.observe(\.status, options: [.initial, .new]) { [weak self] observed, _ in
             Task { @MainActor [weak self] in
                 guard let self, self.player.currentItem === observed else { return }
@@ -612,7 +619,7 @@ final class MediaLibraryStore: ObservableObject {
                 } else if observed.status == .readyToPlay {
                     self.playbackError = nil
                     self.updateSystemMetadata()
-                    self.refreshIntroOutroMarkers(duration: observed.duration.seconds)
+                    self.refreshIntroOutroMarkers(for: observed)
                     self.discoverAudioTracks(for: observed)
                     self.discoverEmbeddedSubtitles(for: observed)
                     if let resume, resume.isFinite, resume >= 5 {
@@ -623,6 +630,19 @@ final class MediaLibraryStore: ObservableObject {
                 }
             }
         }
+        durationObservation = item.observe(\.duration, options: [.initial, .new]) { [weak self] observed, _ in
+            Task { @MainActor [weak self] in
+                self?.refreshIntroOutroMarkers(for: observed)
+            }
+        }
+    }
+
+    /// AVPlayerItem may become ready while its duration is still indefinite.
+    /// A later KVO duration update restores saved markers for this exact item.
+    /// Never let a superseded player item update the current title's controls.
+    private func refreshIntroOutroMarkers(for item: AVPlayerItem) {
+        guard player.currentItem === item, item.status == .readyToPlay else { return }
+        refreshIntroOutroMarkers(duration: item.duration.seconds)
     }
 
     private func refreshIntroOutroMarkers(duration: Double) {
@@ -880,6 +900,7 @@ final class MediaLibraryStore: ObservableObject {
         localFileName = nil
         clearCaptions()
         statusObservation?.invalidate()
+        durationObservation?.invalidate()
         current = nil
         requestedChannel = nil
         introOutroMarkers = nil
