@@ -146,10 +146,21 @@ enum NativeWebDAV {
         request.timeoutInterval = 15
         let session = URLSession(configuration: .ephemeral, delegate: WebDAVNoRedirect(), delegateQueue: nil)
         defer { session.invalidateAndCancel() }
-        let (data, response) = try await session.data(for: request)
+        // data(for:) buffers the *entire* response before parse() can enforce its
+        // limit. Read incrementally so even a server with no Content-Length cannot
+        // make a directory listing allocate an unbounded response body.
+        let (bytes, response) = try await session.bytes(for: request)
         guard let response = response as? HTTPURLResponse else { throw NativeWebDAVError.invalidResponse }
         if response.statusCode == 401 || response.statusCode == 403 { throw NativeWebDAVError.unauthorized }
         guard response.statusCode == 207 else { throw NativeWebDAVError.httpStatus(response.statusCode) }
+        let maxBytes = 1_048_576
+        guard response.expectedContentLength <= Int64(maxBytes) else { throw NativeWebDAVError.responseTooLarge }
+        var data = Data()
+        for try await byte in bytes {
+            try Task.checkCancellation()
+            guard data.count < maxBytes else { throw NativeWebDAVError.responseTooLarge }
+            data.append(byte)
+        }
         return try parse(data, root: root, folder: folder)
     }
 }
