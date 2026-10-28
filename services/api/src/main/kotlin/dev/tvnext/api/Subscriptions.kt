@@ -4,6 +4,9 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.databind.node.ArrayNode
+import com.fasterxml.jackson.core.json.JsonReadFeature
+import com.fasterxml.jackson.databind.DeserializationFeature
+import java.net.IDN
 import java.net.URI
 import java.util.Base64
 import javax.crypto.Cipher
@@ -25,6 +28,11 @@ data class SubscriptionDocument(val content: String, val url: String, val sites:
 /** Port of Decoder/VodConfig/Site/ExtAdapter semantics from Kahen/TV release 0af3b31 (GPL-3.0). */
 @Service
 class Subscriptions(private val mapper: ObjectMapper, private val transport: ProviderTransport) {
+    // Upstream Gson accepts comments. Keep this compatibility local to subscription
+    // documents: authentication, RPC and other JSON endpoints remain strict.
+    private val configReader = mapper.reader()
+        .with(JsonReadFeature.ALLOW_JAVA_COMMENTS.mappedFeature())
+        .with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
     fun load(request: SubscriptionRequest): SubscriptionDocument {
         var base = request.url.takeIf { it.isNotBlank() }?.let { httpUri(it) }
         val text = if (request.content.isNotBlank()) request.content else {
@@ -33,7 +41,7 @@ class Subscriptions(private val mapper: ObjectMapper, private val transport: Pro
             base=fetched.uri
             fetched.content
         }
-        val root = try { mapper.readTree(decode(text)) } catch (e: ResponseStatusException) { throw e }
+        val root = try { configReader.readTree<JsonNode>(decode(text)) } catch (e: ResponseStatusException) { throw e }
             catch (_: Exception) { bad("Invalid subscription JSON") }
         if (root == null || !root.isObject) bad("Expected subscription object")
         if (root.has("msg")) bad(root.path("msg").asText("Subscription returned an error").take(200))
@@ -76,7 +84,10 @@ class Subscriptions(private val mapper: ObjectMapper, private val transport: Pro
         var data = raw.trim().removePrefix("\uFEFF")
         if (data.startsWith("{")) return data
         val marker = Regex("[A-Za-z0-9]{8}\\*\\*").find(data)
-        if (marker != null) data = try { String(Base64.getMimeDecoder().decode(data.substring(marker.range.last + 1)), Charsets.UTF_8) }
+        if (marker != null) data = try {
+            val payload = data.substring(marker.range.last + 1).replace(Regex("[\\t\\r\\n ]"), "")
+            Charsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(Base64.getDecoder().decode(payload))).toString()
+        }
             catch (_: Exception) { bad("Invalid subscription base64") }
         if (data.startsWith("2423")) data = try {
             val hex = data.replace(Regex("\\s+"), "")
@@ -110,9 +121,25 @@ class Subscriptions(private val mapper: ObjectMapper, private val transport: Pro
     companion object {
         internal fun httpUri(value: String): URI {
             val uri = runCatching { URI(value) }.getOrElse { bad("Invalid HTTP(S) address") }
-            if (value.length > 4096 || value.any { it.code <= 32 || it.code == 127 } || uri.scheme !in setOf("http", "https") ||
-                uri.host.isNullOrBlank() || uri.rawUserInfo != null || uri.rawFragment != null || uri.port !in -1..65535 || uri.port == 0) bad("Invalid HTTP(S) address")
-            return uri
+            val scheme = uri.scheme?.lowercase()
+            val authority = uri.rawAuthority ?: bad("Invalid HTTP(S) address")
+            if (value.toByteArray(Charsets.UTF_8).size > 4096 || value.any { it.code <= 32 || it.code == 127 || it == '\\' } ||
+                scheme !in setOf("http", "https") || uri.isOpaque || uri.rawFragment != null ||
+                authority.any { it == '@' || it == '%' }) bad("Invalid HTTP(S) address")
+            // URI.host is null for Unicode DNS names. Normalize the authority only;
+            // preserve the raw path/query (including signed query parameters).
+            val ascii = if (authority.startsWith("[")) authority else runCatching {
+                val parts = authority.split(':')
+                require(parts.size in 1..2 && parts[0].isNotEmpty())
+                IDN.toASCII(parts[0], IDN.USE_STD3_ASCII_RULES).lowercase() +
+                    if (parts.size == 2) ":" + parts[1].also { require(it.isNotEmpty()) } else ""
+            }.getOrElse { bad("Invalid HTTP(S) address") }
+            val normalized = runCatching {
+                URI("$scheme://$ascii${uri.rawPath.orEmpty()}${uri.rawQuery?.let { "?$it" }.orEmpty()}").parseServerAuthority()
+            }.getOrElse { bad("Invalid HTTP(S) address") }
+            if (normalized.host.isNullOrBlank() || normalized.rawUserInfo != null ||
+                normalized.port !in -1..65535 || normalized.port == 0) bad("Invalid HTTP(S) address")
+            return normalized
         }
         private fun bad(message: String): Nothing = throw ResponseStatusException(HttpStatus.BAD_REQUEST, message)
     }

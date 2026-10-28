@@ -31,8 +31,8 @@ open class ProviderTransport(@Value("\${TV_NEXT_LAN_ORIGINS:}") allowedPrivate: 
     }
     open fun get(uri: URI, headers: Map<String, String> = emptyMap(), form: String? = null): String = perform(uri, headers, form, "application/x-www-form-urlencoded").content
     open fun postJson(uri: URI, headers: Map<String,String>, json: String): String = perform(uri, headers, json, "application/json").content
-    fun getDocument(uri: URI, headers: Map<String,String> = emptyMap()): FetchedText = perform(uri,headers,null,"application/x-www-form-urlencoded")
-    private fun perform(initial: URI, initialHeaders: Map<String,String>, initialBody: String?, contentType: String): FetchedText {
+    open fun getDocument(uri: URI, headers: Map<String,String> = emptyMap()): FetchedText = perform(uri,headers,null,"application/x-www-form-urlencoded",true)
+    private fun perform(initial: URI, initialHeaders: Map<String,String>, initialBody: String?, contentType: String, binaryEnvelope: Boolean = false): FetchedText {
         Subscriptions.httpUri(initial.toString())
         validateHeaders(initialHeaders)
         if (!permits.tryAcquire()) throw ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Provider concurrency limit")
@@ -42,7 +42,7 @@ open class ProviderTransport(@Value("\${TV_NEXT_LAN_ORIGINS:}") allowedPrivate: 
             for (hop in 0..3) {
                 val address = resolveAddress(uri)
                 if (System.nanoTime()>=deadline) throw java.net.SocketTimeoutException()
-                try { return FetchedText(exchange(uri, address, headers, body, contentType, deadline),uri) }
+                try { return FetchedText(exchange(uri, address, headers, body, contentType, deadline, binaryEnvelope),uri) }
                 catch (redirect: ProviderRedirect) {
                     if (hop==3) throw java.io.IOException("Redirect limit")
                     val next=Subscriptions.httpUri(uri.resolve(redirect.location).toString())
@@ -60,7 +60,7 @@ open class ProviderTransport(@Value("\${TV_NEXT_LAN_ORIGINS:}") allowedPrivate: 
         catch (_: Exception) { throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "Provider transport failed") }
         finally { permits.release() }
     }
-    internal fun exchange(uri: URI, address: InetAddress, headers: Map<String, String> = emptyMap(), form: String? = null, contentType: String = "application/x-www-form-urlencoded", deadline: Long = System.nanoTime()+8_000_000_000L): String {
+    internal fun exchange(uri: URI, address: InetAddress, headers: Map<String, String> = emptyMap(), form: String? = null, contentType: String = "application/x-www-form-urlencoded", deadline: Long = System.nanoTime()+8_000_000_000L, binaryEnvelope: Boolean = false): String {
         val port = if (uri.port != -1) uri.port else if (uri.scheme == "https") 443 else 80
         val plain = Socket()
         try {
@@ -96,7 +96,7 @@ open class ProviderTransport(@Value("\${TV_NEXT_LAN_ORIGINS:}") allowedPrivate: 
                     socket.soTimeout = minOf(remaining, 3000).toInt().coerceAtLeast(1)
                     return input.read()
                 }
-                return parseResponse(object : InputStream() { override fun read() = readByte() })
+                return parseResponse(object : InputStream() { override fun read() = readByte() }, binaryEnvelope)
             }
         } finally { plain.close() }
     }
@@ -121,7 +121,7 @@ open class ProviderTransport(@Value("\${TV_NEXT_LAN_ORIGINS:}") allowedPrivate: 
             return b.size == 16 && b[0] in 0x20..0x3f &&
                 !(b[0] == 0x20 && b[1] == 0x01 && (b[2] < 2 || b[2] == 0x0d && b[3] == 0xb8)) && !(b[0] == 0x20 && b[1] == 0x02)
         }
-        internal fun parseResponse(input: InputStream): String {
+        internal fun parseResponse(input: InputStream, binaryEnvelope: Boolean = false): String {
             var headerBytes = 0
             fun line(limit: Int = 8192): String {
                 val out = ByteArrayOutputStream()
@@ -183,7 +183,18 @@ open class ProviderTransport(@Value("\${TV_NEXT_LAN_ORIGINS:}") allowedPrivate: 
                     decoded
                 }
             } else body.toByteArray()
-            return StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(bytes)).toString()
+            try { return StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(bytes)).toString() }
+            catch (e: java.nio.charset.CharacterCodingException) {
+                // Decoder.getJson accepts image-prefixed Base64 configurations.
+                // Extract only an ASCII envelope; never silently replace invalid
+                // UTF-8 in ordinary provider/EPG responses or decoded JSON.
+                if (!binaryEnvelope) throw e
+                val ascii = String(bytes, StandardCharsets.ISO_8859_1)
+                val marker = Regex("[A-Za-z0-9]{8}\\*\\*").find(ascii) ?: throw e
+                val suffix = ascii.substring(marker.range.last + 1)
+                if (suffix.isBlank() || !suffix.matches(Regex("[A-Za-z0-9+/=\\t\\r\\n ]+"))) throw e
+                return ascii.substring(marker.range.first)
+            }
         }
     }
 }

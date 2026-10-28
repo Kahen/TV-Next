@@ -40,6 +40,48 @@ class SubscriptionCompatibilityTest {
         assertFailsWith<ResponseStatusException> { subscriptions.load(SubscriptionRequest("2423nothex")) }
         assertFailsWith<ResponseStatusException> { subscriptions.load(SubscriptionRequest("😀".repeat(300_000))) }
     }
+    @Test fun imageEnvelopeAndCommentedConfigLoadLikeOriginalDecoder() {
+        val commented = """{
+            // Subscription comments accepted by upstream Gson
+            "spider":"./worker.jpg;md5;0123456789abcdef0123456789abcdef",
+            "sites":[/* keep https:// inside strings */{"key":"fixture","type":3,"api":"csp_Fixture","ext":{"url":"https://example.org/x//y"}}]
+        }"""
+        val body = byteArrayOf(0xff.toByte(), 0xd8.toByte(), 0xff.toByte(), 0xe0.toByte()) +
+            ("abcdefgh**" + Base64.getEncoder().encodeToString(commented.toByteArray())).toByteArray()
+        val wire = "HTTP/1.1 200 OK\r\nContent-Type: image/x-ms-bmp\r\nContent-Length: ${body.size}\r\n\r\n".toByteArray() + body
+        val fetched = object : ProviderTransport() {
+            override fun getDocument(uri: URI, headers: Map<String,String>): FetchedText {
+                assertEquals("www.xn--sss604efuw.net", uri.host)
+                return FetchedText(ProviderTransport.parseResponse(wire.inputStream(), true), URI("https://cdn.example/path/config"))
+            }
+        }
+        val document = Subscriptions(mapper,fetched).load(SubscriptionRequest(url="http://www.饭太硬.net/tv"))
+        assertEquals(1, document.sites.size)
+        assertEquals("https://cdn.example/path/worker.jpg;md5;0123456789abcdef0123456789abcdef", document.sites.single().jar)
+        assertEquals("https://example.org/x//y", mapper.readTree(document.content).path("sites")[0].path("ext").path("url").asText())
+        assertEquals("requires-spider-runtime", document.sites.single().support)
+        assertFails { ProviderTransport.parseResponse(wire.inputStream()) }
+        assertFailsWith<ResponseStatusException> { subscriptions.load(SubscriptionRequest(commented + " {}")) }
+        // The compatibility reader must not relax the shared JSON mapper.
+        assertFails { mapper.readTree(commented) }
+    }
+    @Test fun unicodeDomainsNormalizeWithoutChangingSignedPathsOrWeakeningAuthorityValidation() {
+        assertEquals("http://www.xn--sss604efuw.net/tv?x=%2F&x=+", Subscriptions.httpUri("http://www.饭太硬.net/tv?x=%2F&x=+").toString())
+        assertEquals("https://xn--fsqu00a.xn--0zwm56d:8443/a%2Fb?q=%E4%B8%AD", Subscriptions.httpUri("HTTPS://例子.测试:8443/a%2Fb?q=%E4%B8%AD").toString())
+        assertEquals("http://[2001:4860:4860::8888]:8080/a", Subscriptions.httpUri("http://[2001:4860:4860::8888]:8080/a").toString())
+        listOf("http://用户:密码@饭太硬.net/tv", "http://饭太硬.net@127.0.0.1/", "http://%31%32%37.0.0.1/",
+            "http://饭太硬.net:/", "http://饭太硬.net:0/", "http://饭太硬.net:65536/", "http://饭太硬.net:bad/",
+            "http://bad_host.example/", "http://饭太硬.net\\@127.0.0.1/", "http://饭太硬.net/#x", "http://[fe80::1%25eth0]/").forEach {
+            assertFailsWith<ResponseStatusException>(it) { Subscriptions.httpUri(it) }
+        }
+    }
+    @Test fun envelopesDoNotMaskInvalidUtf8OrArbitrarySuffixBytes() {
+        fun wire(body: ByteArray) = "HTTP/1.1 200 OK\r\nContent-Length: ${body.size}\r\n\r\n".toByteArray() + body
+        assertFails { ProviderTransport.parseResponse(wire(byteArrayOf(0xff.toByte()) + "abcdefgh**e30=!".toByteArray()).inputStream(), true) }
+        assertFails { ProviderTransport.parseResponse(wire(byteArrayOf(0xff.toByte()) + "not an envelope".toByteArray()).inputStream(), true) }
+        assertFailsWith<ResponseStatusException> { subscriptions.load(SubscriptionRequest("abcdefgh**e30=!")) }
+        assertFailsWith<ResponseStatusException> { subscriptions.load(SubscriptionRequest("abcdefgh**" + Base64.getEncoder().encodeToString(byteArrayOf(0xff.toByte())))) }
+    }
     @Test fun originalAesEnvelopeAndLongCloudFolderIdRoundTrip() {
         val key = "testkey".padEnd(16,'0').toByteArray()
         val ivText = "1234567890123"

@@ -162,6 +162,8 @@ def inspect_jar(path: str | os.PathLike[str]) -> JarReport:
                     raise JarInspectionError("archive-uncompressed-limit")
                 if name.lower().endswith(NATIVE_EXTENSIONS):
                     blockers.add("native-library")
+                if name.lower().endswith(".dex"):
+                    blockers.add("android-dex-bytecode")
                 if name.lower().endswith((".jar", ".zip")):
                     blockers.add("nested-archive-not-inspected")
                 if name.upper() == "META-INF/MANIFEST.MF":
