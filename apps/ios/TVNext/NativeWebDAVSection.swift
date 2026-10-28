@@ -3,6 +3,7 @@ import SwiftUI
 /// Native read-only WebDAV browser. Credentials are intentionally not persisted.
 struct NativeWebDAVSection: View {
     let onPlay: (TVChannel) -> Void
+    let onDisconnect: (URL) -> Void
     @State private var address = ""
     @State private var username = ""
     @State private var password = ""
@@ -59,6 +60,8 @@ struct NativeWebDAVSection: View {
     }
 
     private func connect() {
+        // Changing servers also revokes any credentials retained by the player.
+        if let root { onDisconnect(root) }
         task?.cancel()
         requestID = UUID()
         root = nil
@@ -113,6 +116,7 @@ struct NativeWebDAVSection: View {
     }
 
     private func disconnect() {
+        if let root { onDisconnect(root) }
         task?.cancel()
         task = nil
         requestID = UUID()
