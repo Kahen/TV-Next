@@ -93,5 +93,10 @@ cross-process host quarantine and is still not a production runtime service.
 removal-in-progress, daemon failures, cleanup deadlines, lifecycle ordering,
 missing CLI, preserved timeout context and refusing success after failed teardown.
 The Docker integration suite still verifies live cgroups, all worker methods,
-timeout cleanup and the final empty-container inventory. A second deadline is
-not an extension of the untrusted worker's execution budget.
+timeout cleanup and the final empty-container inventory. The execution deadline initiates termination; a stalled Docker daemon can still
+prevent timely termination. Unconfirmed teardown is therefore a host failure,
+not a sandbox guarantee or permission to continue serving requests.
+
+Initial Docker integration evidence for the new lifecycle:
+https://github.com/Kahen/TV-Next/actions/runs/40683953519 (same implementation;
+subsequent documentation-only changes still require the final PR gates).
