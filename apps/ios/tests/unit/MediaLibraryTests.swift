@@ -242,6 +242,13 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertEqual(MediaLibraryStore.persistableAudioDisplayName(prefix), prefix)
         XCTAssertNil(MediaLibraryStore.persistableAudioDisplayName(""))
         XCTAssertNil(MediaLibraryStore.persistableAudioDisplayName(String(repeating: "x", count: 81)))
+        // V1 could have stored a truncated 80-character prefix; drop it
+        // during migration. V2 may safely store an exact 80-character name.
+        XCTAssertTrue(MediaLibraryStore.isValidStoredAudioDisplayName("English", version: 1))
+        XCTAssertFalse(MediaLibraryStore.isValidStoredAudioDisplayName(prefix, version: 1))
+        XCTAssertTrue(MediaLibraryStore.isValidStoredAudioDisplayName(prefix, version: 2))
+        XCTAssertFalse(MediaLibraryStore.isValidStoredAudioDisplayName(first, version: 2))
+        XCTAssertFalse(MediaLibraryStore.isValidStoredAudioDisplayName("English", version: 99))
 
         let longOptions: [(name: String, languageTag: String?)] = [
             (name: first, languageTag: "en"),
