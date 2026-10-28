@@ -60,6 +60,15 @@ jobs:
         run: |
           swiftc -warnings-as-errors TVNext/NativeWebDAV.swift tests/WebDAVSmoke.swift -o /tmp/tvnext-webdav-tests
           /tmp/tvnext-webdav-tests
+          python3 ../../scripts/webdav_fixture_server.py > /tmp/tvnext-webdav-fixture.log 2>&1 &
+          fixture_pid=$!
+          trap 'kill "$fixture_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..20}; do
+            if curl --silent http://127.0.0.1:8767/dav/ -o /dev/null; then break; fi
+            sleep 1
+          done
+          swiftc -warnings-as-errors TVNext/NativeWebDAV.swift tests/WebDAVNetworkSmoke.swift -o /tmp/tvnext-webdav-network-tests
+          /tmp/tvnext-webdav-network-tests
       - name: Validate original filter contract with shared JVM fixture
         working-directory: apps/ios
         run: |
