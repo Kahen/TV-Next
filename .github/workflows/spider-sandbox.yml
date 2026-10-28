@@ -27,6 +27,9 @@ jobs:
           python-version: "3.12"
       - name: Verify shared Android init binding fingerprints
         run: python3 -m unittest discover -s scripts -p test_spider_binding.py -v
+      - name: Verify delayed create, removal and cleanup failure handling
+        working-directory: services/spider-runtime
+        run: python3 -m unittest -v test_cleanup
       - name: Build immutable demonstration runtimes
         run: |
           docker build -f services/spider-runtime/node/Dockerfile -t tvnext/spider-node-fixture:ci services/spider-runtime
