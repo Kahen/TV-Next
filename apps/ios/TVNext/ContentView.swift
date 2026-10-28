@@ -77,7 +77,7 @@ struct ContentView: View {
                     localMediaSection.id("local-media")
                     importSection.id("import")
                     HomeServerSection(serverURL:$serverURL,library:library,onSessionChange:{ homeSession=$0;remote.configure($0,server:$1);library.configureRelay(server:$1,session:$0) },remoteState:remote.state).id("home-server")
-                    EpgSection(serverURL:serverURL,session:homeSession,channels:library.channels) { library.play($0) }
+                    EpgSection(serverURL:serverURL,session:homeSession,channels:library.channels,playbackGeneration:library.playbackGeneration) { library.play($0) }
                         .id(serverURL+"|"+(homeSession?.token ?? ""))
                     ConfigPreviewSection().id("config")
                     CloudSection(serverURL: serverURL) { library.play($0) }.id("cloud")
@@ -361,7 +361,7 @@ struct ContentView: View {
                         .accessibilityIdentifier("retry-playback")
                 }
                 if let channel = library.current {
-                    NativeLiveReplayControls(channel:channel,serverURL:serverURL,session:homeSession,onPlay:{ library.play($0) })
+                    NativeLiveReplayControls(channel:channel,serverURL:serverURL,session:homeSession,onPlay:{ library.play($0) },playbackGeneration:library.playbackGeneration)
                 }
                 Picker("播放速度", selection: $playbackSpeed) {
                     Text("0.75×").tag(Float(0.75))

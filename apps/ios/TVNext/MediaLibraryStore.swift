@@ -13,6 +13,7 @@ private struct SavedLibrary: Codable {
 
 @MainActor
 final class MediaLibraryStore: ObservableObject {
+    @Published private(set) var playbackGeneration=0
     @Published private(set) var channels: [TVChannel] = []
     @Published private(set) var favorites: [String] = []
     @Published private(set) var recent: [TVChannel] = []
@@ -144,6 +145,7 @@ final class MediaLibraryStore: ObservableObject {
     func play(_ channel: TVChannel) {
         playbackError = nil
         guard MediaAddress.valid(channel.url), let url = URL(string: channel.url) else { return }
+        playbackGeneration += 1
         if let replay = channel.replay {
             guard let api=relayAPI else { playbackError="请先登录家庭服务器以播放回放。";return }
             do {
@@ -192,7 +194,8 @@ final class MediaLibraryStore: ObservableObject {
         statusObservation?.invalidate()
         current = channel
         recent.removeAll { $0.url == channel.url }
-        recent.insert(channel, at: 0)
+        var history=channel;history.replay=nil
+        recent.insert(history, at: 0)
         recent = Array(recent.prefix(100))
         recentTimes[channel.url] = Date().timeIntervalSince1970 * 1000
         recentTimes = recentTimes.filter { key,_ in recent.contains(where: { $0.url == key }) }
@@ -206,6 +209,7 @@ final class MediaLibraryStore: ObservableObject {
     }
 
     func playLocalFile(_ file: URL, name: String) {
+        playbackGeneration += 1
         requestedChannel = nil
         savePosition()
         cancelRelay()
@@ -335,6 +339,7 @@ final class MediaLibraryStore: ObservableObject {
     }
 
     func clear() {
+        playbackGeneration += 1
         cancelRelay()
         player.pause()
         player.replaceCurrentItem(with: nil)

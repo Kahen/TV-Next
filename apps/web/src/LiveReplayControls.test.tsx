@@ -4,7 +4,11 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import LiveReplayControls, { timeshiftRange } from "./LiveReplayControls";
 import type { Channel } from "./api";
 import { addRecent, emptyLibrary, normalizeLibrary } from "./library";
-import golden from "../../../fixtures/fongmi-live-replay-golden.json";
+import { readFileSync } from "node:fs";
+import type { LiveTimeshift, LiveCatchup } from "./api";
+const golden = JSON.parse(readFileSync("../../fixtures/fongmi-live-replay-golden.json", "utf8")) as {
+  now:number;time:number;stop:number;timeshift:LiveTimeshift;catchup:LiveCatchup;liveUrl:string;
+};
 
 const session = { token:"owner-token",user:{id:"u",username:"Owner"},device:{id:"d",name:"Web",createdAt:0,expiresAt:9e12,current:true} };
 const channel: Channel = { name:"News",group:"Live",url:golden.liveUrl,timeshift:golden.timeshift,catchup:golden.catchup,headers:{Cookie:"private-live"} };
@@ -69,4 +73,17 @@ it("rejects server capabilities outside the configured relay path", async () => 
   vi.spyOn(Date,"now").mockReturnValue(golden.now);vi.stubGlobal("fetch",vi.fn(async()=>({ok:true,json:async()=>({...replay,path:"https://attacker.invalid/"})})));
   const play=vi.fn();render(<LiveReplayControls channel={channel} session={session} onPlay={play}/>);
   fireEvent.click(screen.getByRole("button",{name:"回到直播"}));await screen.findByRole("alert");expect(play).not.toHaveBeenCalled();
+});
+
+it("invalidates a pending programme replay when another source is selected elsewhere", async () => {
+  vi.spyOn(Date,"now").mockReturnValue(golden.now);
+  let finish!:(value:unknown)=>void;
+  const fetcher=vi.fn((path:string)=>path.endsWith("/replay")?new Promise(resolve=>{finish=resolve;}):Promise.resolve({ok:true,json:async()=>({closed:true})}));
+  vi.stubGlobal("fetch",fetcher);const play=vi.fn();
+  const programme={start:new Date(golden.time).toISOString(),stop:new Date(golden.stop).toISOString(),title:"Earlier news"};
+  const view=render(<LiveReplayControls channel={channel} session={session} programme={programme} cancellationKey={0} onPlay={play}/>);
+  fireEvent.click(screen.getByRole("button",{name:"回看 · Earlier news"}));
+  view.rerender(<LiveReplayControls channel={channel} session={session} programme={programme} cancellationKey={1} onPlay={play}/>);
+  await act(async()=>{finish({ok:true,json:async()=>replay});});
+  expect(play).not.toHaveBeenCalled();expect(fetcher.mock.calls.some(([url])=>url.endsWith("/close"))).toBe(true);
 });

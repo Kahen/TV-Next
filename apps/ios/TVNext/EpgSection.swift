@@ -5,6 +5,7 @@ struct EpgSection: View {
     let serverURL: String
     let session: NativeHomeSession?
     let channels: [TVChannel]
+    var playbackGeneration=0
     let onPlay: (TVChannel)->Void
     @State private var xml=""
     @State private var name=""
@@ -93,7 +94,7 @@ struct EpgSection: View {
                         VStack(alignment:.leading) {
                             Text(program.start+" · "+program.title).font(.caption)
                             if snapshot.indices.contains(index) {
-                                NativeLiveReplayControls(channel:snapshot[index],serverURL:serverURL,session:session,onPlay:onPlay,programme:program)
+                                NativeLiveReplayControls(channel:snapshot[index],serverURL:serverURL,session:session,onPlay:onPlay,programme:program,playbackGeneration:playbackGeneration)
                             }
                         }
                     }

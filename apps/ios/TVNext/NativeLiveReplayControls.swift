@@ -6,6 +6,7 @@ struct NativeLiveReplayControls: View {
     let session: NativeHomeSession?
     let onPlay: (TVChannel)->Void
     var programme: NativeEpgProgram? = nil
+    var playbackGeneration=0
     @State private var selectedTime = Date().addingTimeInterval(-60)
     @State private var task: Task<Void,Never>?
     @State private var generation=UUID()
@@ -44,6 +45,7 @@ struct NativeLiveReplayControls: View {
                 }.buttonStyle(.bordered)
             }
         }
+        .onChange(of:playbackGeneration) { _,_ in cancel() }
         .onChange(of:channel.id) { _,_ in cancel();error=nil }
         .onChange(of:session?.token) { _,_ in cancel();error=nil }
         .onChange(of:serverURL) { _,_ in cancel();error=nil }

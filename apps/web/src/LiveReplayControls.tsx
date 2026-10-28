@@ -17,8 +17,9 @@ function localDateValue(time: number): string {
   return new Date(time - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 19);
 }
 
-export default function LiveReplayControls({ channel, session, onPlay, programme }: {
+export default function LiveReplayControls({ channel, session, onPlay, programme, cancellationKey = 0 }: {
   channel: Channel; session: HomeSession | null; onPlay: (channel: Channel) => void;
+  cancellationKey?: number;
   programme?: { start: string; stop: string; title: string };
 }) {
   const [now, setNow] = useState(Date.now);
@@ -35,7 +36,7 @@ export default function LiveReplayControls({ channel, session, onPlay, programme
   useEffect(() => {
     generation.current++; pending.current?.abort(); setError(""); setBusy(false); setTime("");
     return () => { generation.current++; pending.current?.abort(); };
-  }, [channel.url, session?.token, programme?.start, programme?.stop]);
+  }, [channel.url, session?.token, programme?.start, programme?.stop, cancellationKey]);
   const range = timeshiftRange(channel, now);
   const catchup = !!programme && !!channel.catchup;
   if (!range && !catchup && !channel.replay) return null;
