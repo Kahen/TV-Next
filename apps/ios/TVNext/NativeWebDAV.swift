@@ -51,6 +51,7 @@ enum NativeWebDAV {
     static func authorization(username: String, password: String, root: URL) throws -> String? {
         guard !username.isEmpty || !password.isEmpty else { return nil }
         guard root.scheme?.lowercased() == "https", !username.isEmpty,
+              username.count <= 256, password.count <= 1024,
               !username.contains(":"), !username.contains("\r"), !username.contains("\n"),
               !password.contains("\r"), !password.contains("\n") else {
             throw NativeWebDAVError.insecureCredentials
@@ -114,7 +115,9 @@ enum NativeWebDAV {
                   let path = segments(candidate, root: root),
                   path.count == folderSegments.count + 1, path.starts(with: folderSegments),
                   let name = path.last, name.count <= 180 else { continue }
-            let item = NativeWebDAVItem(url: candidate, name: name, isDirectory: record.directory)
+            let normalized = record.directory && !candidate.path.hasSuffix("/")
+                ? candidate.appendingPathComponent("", isDirectory: true) : candidate
+            let item = NativeWebDAVItem(url: normalized, name: name, isDirectory: record.directory)
             unique[item.id] = item
         }
         return Array(unique.values).sorted {
