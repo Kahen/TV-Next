@@ -41,7 +41,7 @@ class LiveReplayTest {
     @Test fun rejectsFailedWebviewDrmAndMalformedTimeshiftResults() {
         listOf("null", "[]", "{}", "{", """{"url":"file:///secret"}""", """{"url":"https://example.org/a","parse":1}""",
             """{"url":"https://example.org/a","jx":1}""", """{"url":"https://example.org/a","msg":"provider secret"}""",
-            """{"url":"https://example.org/a","drm":{}}""", """{"url":"https://example.org/a","header":[]}""")
+            """{"url":"https://example.org/a","drm":{}}""", """{"url":"https://example.org/a","header":[]}""", """{"url":"https://example.org/a","header":{"Cookie":{}}}""")
             .forEach { body -> assertFailsWith<ResponseStatusException> { LiveReplay(mapper,Transport(body)).resolve(LiveReplayRequest(Channel("Live",live,"Live",timeshift=shift),time),now) } }
     }
     @Test fun catchupUsesOriginalAppendReplacementAndExplicitTimezone() {

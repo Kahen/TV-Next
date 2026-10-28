@@ -93,7 +93,7 @@ struct EpgSection: View {
                     ForEach(Array((channel.previous ?? []).enumerated()),id:\.offset) { _,program in
                         VStack(alignment:.leading) {
                             Text(program.start+" · "+program.title).font(.caption)
-                            if snapshot.indices.contains(index) {
+                            if snapshot.indices.contains(index),snapshot[index].catchup != nil {
                                 NativeLiveReplayControls(channel:snapshot[index],serverURL:serverURL,session:session,onPlay:onPlay,programme:program,playbackGeneration:playbackGeneration)
                             }
                         }

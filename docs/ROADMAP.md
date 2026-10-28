@@ -37,12 +37,12 @@ Per explicit user instruction on 2026-10-25, close the implementation issue once
 
 Tracking: https://github.com/Kahen/TV-Next/issues/3
 
-- [ ] Initial FongMi site/live/group/channel metadata normalization + Web browsing + optional direct HTTP(S) live playback; headers/flags, nested references and full config compatibility still pending
-- [ ] Static FongMi Result adapter provides home/category/search/detail/lines/episodes on Web/API and now native iOS offline data browsing, with shared synthetic fixture tests; genuine network providers, cross-site queries and permitted real fixture validation remain
-- [ ] FongMi nested live JSON metadata preview and offline XMLTV import/EPG channel matching implemented on Web/API. Full M3U/TXT/JSON live imports, auto EPG updates, iOS EPG, replay and timeshift remain
-- [ ] Subtitle tracks (WebVTT/SRT) and per-title audio preferences
-- [ ] Cross-provider search with cancellation, timeout, pagination and deduplication
-- [ ] Structured golden fixtures from sources with permission to test
+- [x] Source-derived type 0/1/2/4 config decoding, sites/headers/ext/flags, depot selection and Web/iOS browsing.
+- [x] Home/category/filter/search/detail/episodes/lines, native/Web bounded cross-provider search with cancellation and partial failure, and the documented HTTP action web workflow.
+- [x] M3U/TXT/nested JSON live imports, offline and subscribed XMLTV/XMLTV.gz, persistent guide scheduling/cache and Web/iOS guide UI.
+- [x] Explicit timeshift Result RPC, bounded programme catchup subset, historical XMLTV and Web/iOS replay controls; see LIVE_REPLAY.md.
+- [ ] Embedded subtitle/audio selection and per-title preferences.
+- [ ] Broader permitted real-provider corpus, interactive QR/login workflows, parser chains and long-tail replay formats; device validation remains separate.
 
 Acceptance: comparison snapshots for home/category/detail/search/player APIs against a documented compatibility subset.
 
@@ -64,13 +64,13 @@ Acceptance: declared supported plugin fixtures pass on server; never execute rem
 
 Tracking: https://github.com/Kahen/TV-Next/issues/5
 
-- [ ] External SRT/WebVTT subtitle offset implemented on Web/iOS with bounds and tests; ASS/SSA styling, multiple embedded subtitles, Danmaku overlay and device verification remain
-- [ ] Audio track/channel selection, decoder capability diagnostics, speed, skip intro/outro
-- [ ] Native iOS: AVPlayer/PiP/background media, AirPlay; evaluate alternate player SDK licensing
-- [ ] Optional transcoding sidecar for media not supported natively; measure CPU/bandwidth
-- [ ] DLNA discovery/control in a LAN-capable service; iOS local-network permissions
-- [ ] Media ingestion from authorized WebDAV/SMB/DLNA/local files
-- [ ] Offline cache/download lifecycle for downloadable content where authorized
+- [x] External SRT/WebVTT timing offset, bounded ASS/SSA Dialogue text, Web/native danmaku parsers and timeline overlays.
+- [x] Basic native system PiP and AirPlay route picker; playback speed controls and AList/OpenList browsing.
+- [ ] Styled ASS positioning/karaoke/fonts, embedded subtitle/audio preferences, decoder diagnostics and intro/outro skip.
+- [ ] Background/lock-screen media controls and remaining device PiP/AirPlay quality/codec/energy matrix.
+- [ ] Optional transcoding sidecar with measured resource limits.
+- [ ] Authorized LAN DLNA discovery/control and WebDAV/SMB inputs with secure credentials.
+- [ ] Offline cache/download lifecycle and direct cloud login/QR/OAuth.
 
 Acceptance: device matrix includes iPhone/iPad models, Safari/Chrome/Firefox, and H.264/H.265/AAC compatibility tests.
 
@@ -78,13 +78,12 @@ Acceptance: device matrix includes iPhone/iPad models, Safari/Chrome/Firefox, an
 
 Tracking: https://github.com/Kahen/TV-Next/issues/6
 
-- [ ] Account, device pairing, API keys, per-user ACL and opt-in sync
-- [ ] WebSocket remote control with device authorization and expiring pairing codes
-- [ ] NAS Docker Compose deployment; PostgreSQL migrations; optional Redis caching
-- [ ] Metrics, structured logs, tracing and failure dashboards
-- [ ] Safe SSRF-resistant proxy limited to approved destinations; byte/rate/connection caps
-- [ ] Secure remote access/TLS guidance; backups/import-export, conflict resolution
-- [ ] EPG scheduling, provider health reporting and search caching
+- [x] Accounts, one-use device pairing, hashed per-device bearer tokens/revocation, per-user ACL and opt-in revision-CAS sync.
+- [x] Authenticated WebSocket remote control, expiring handshake tickets and acknowledgements.
+- [x] NAS Compose, H2/PostgreSQL migrations, restart/backup restore integration, diagnostics and request correlation.
+- [x] Address-bound HTTP/HLS capability relay with pinned DNS/TLS, redirect/header policy, byte/rate/connection/session quotas and revocation.
+- [x] EPG scheduling/cache and device-private provider health/search cache.
+- [ ] Remote-access deployment hardening, actual remote-NAS operational/security assessment and acceptance.
 
 Acceptance: least-privilege self-hosted service, audited access to user data and consistent playback history on devices.
 

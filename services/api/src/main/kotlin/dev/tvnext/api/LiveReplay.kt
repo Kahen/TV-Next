@@ -41,6 +41,7 @@ class LiveReplay(private val mapper: ObjectMapper, private val transport: Provid
             if (header.isTextual) header = try { mapper.readTree(header.asText()) ?: fail("Invalid timeshift headers", HttpStatus.BAD_GATEWAY) }
                 catch (_: Exception) { fail("Invalid timeshift headers", HttpStatus.BAD_GATEWAY) }
             if (!header.isMissingNode && !header.isNull && !header.isObject) fail("Invalid timeshift headers", HttpStatus.BAD_GATEWAY)
+            if (header.isObject && header.fields().asSequence().any { !it.value.isTextual }) fail("Invalid timeshift headers", HttpStatus.BAD_GATEWAY)
             val headers = if (header.isObject) header.fields().asSequence().associate { it.key to it.value.asText() } else emptyMap()
             ProviderTransport.validateHeaders(headers)
             return MediaRelayRequest(url, headers)
