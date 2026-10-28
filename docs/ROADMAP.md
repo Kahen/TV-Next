@@ -70,7 +70,8 @@ Tracking: https://github.com/Kahen/TV-Next/issues/5
 - [x] Basic native system PiP and AirPlay route picker; playback speed controls and AList/OpenList browsing.
 - [x] Native AVPlayer audio/embedded subtitle selection and bounded per-title audio preferences; per-title subtitle preferences (#60, PR gates passed).
 - [ ] Styled ASS positioning/karaoke/fonts, decoder diagnostics, intro/outro skip and broader format support remain.
-- [ ] Background/lock-screen media controls and remaining device PiP/AirPlay quality/codec/energy matrix.
+- [x] Opt-in native background audio and system play/pause/finite-VOD seek/skip metadata controls; see NATIVE_BACKGROUND_PLAYBACK.md for final-head test gates and limits.
+- [ ] Physical background/lock-screen/PiP/AirPlay delivery, quality/codec/energy matrix.
 - [ ] Optional transcoding sidecar with measured resource limits.
 - [ ] Authorized LAN DLNA discovery/control and WebDAV/SMB inputs with secure credentials.
 - [ ] Offline cache/download lifecycle and direct cloud login/QR/OAuth.

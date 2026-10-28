@@ -2,6 +2,7 @@ import XCTest
 import AVFoundation
 import AVKit
 import CryptoKit
+import MediaPlayer
 @testable import TVNext
 
 @MainActor
@@ -51,6 +52,80 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertFalse(try site("requires-spider-runtime").supported)
         XCTAssertFalse(try site("unknown-runtime").supported)
         XCTAssertNotNil(NativeSubscriptionURLStore.validated("http://www.饭太硬.net/tv"))
+    }
+
+    func testOptInBackgroundAudioPersistsAndInterruptionStillPauses() async throws {
+        XCTAssertFalse(store.backgroundPlaybackEnabled)
+        store.playLocalFile(try fixture(), name:"Owned fixture.mp4")
+        try await waitUntil { self.store.player.currentItem?.status == .readyToPlay && self.store.player.rate > 0 }
+        store.setApplicationBackground(true)
+        XCTAssertEqual(store.player.rate,0,"Backgrounding remains opt-in")
+        XCTAssertFalse(store.handleSystemPlaybackCommand(.play))
+        store.setBackgroundPlaybackEnabled(true)
+        XCTAssertTrue(store.handleSystemPlaybackCommand(.play))
+        XCTAssertEqual(store.player.audiovisualBackgroundPlaybackPolicy,.continuesIfPossible)
+        let restored=MediaLibraryStore(defaults:defaults)
+        XCTAssertTrue(restored.backgroundPlaybackEnabled)
+        store.setApplicationBackground(true)
+        XCTAssertGreaterThan(store.player.rate,0)
+        NotificationCenter.default.post(name:AVAudioSession.interruptionNotification,object:nil,
+            userInfo:[AVAudioSessionInterruptionTypeKey:AVAudioSession.InterruptionType.began.rawValue])
+        try await waitUntil { self.store.player.rate == 0 }
+        XCTAssertTrue(store.handleSystemPlaybackCommand(.play))
+        store.setBackgroundPlaybackEnabled(false)
+        XCTAssertEqual(store.player.rate,0)
+        XCTAssertFalse(store.handleSystemPlaybackCommand(.play))
+        store.clear()
+        XCTAssertNil(defaults.object(forKey:"tv-next-background-audio-v1"))
+    }
+
+    func testRemoteTransportCommandsValidateSeekAndPublishOnlyMetadata() async throws {
+        XCTAssertFalse(store.handleSystemPlaybackCommand(.play))
+        XCTAssertFalse(store.handleSystemPlaybackCommand(.seek(1)))
+        store.playLocalFile(try fixture(),name:"Owned fixture.mp4")
+        try await waitUntil { self.store.player.currentItem?.status == .readyToPlay }
+        XCTAssertTrue(store.handleSystemPlaybackCommand(.pause))
+        XCTAssertEqual(store.player.rate,0)
+        let duration=try XCTUnwrap(store.player.currentItem).duration.seconds
+        for invalid in [-1,Double.nan,Double.infinity,duration+1] {
+            XCTAssertFalse(store.handleSystemPlaybackCommand(.seek(invalid)))
+        }
+        XCTAssertFalse(store.handleSystemPlaybackCommand(.skip(.nan)))
+        XCTAssertFalse(store.handleSystemPlaybackCommand(.skip(61)))
+        XCTAssertTrue(store.handleSystemPlaybackCommand(.seek(1)))
+        try await waitUntil { abs(self.store.player.currentTime().seconds-1) < 0.1 }
+        store.setPlaybackSpeed(1.5)
+        XCTAssertTrue(store.handleSystemPlaybackCommand(.play))
+        XCTAssertEqual(store.player.rate,1.5)
+        try await waitUntil { (MPNowPlayingInfoCenter.default().nowPlayingInfo?[MPMediaItemPropertyTitle] as? String) == "Owned fixture.mp4" }
+        let info=try XCTUnwrap(MPNowPlayingInfoCenter.default().nowPlayingInfo)
+        XCTAssertNil(info[MPMediaItemPropertyAssetURL])
+        XCTAssertFalse(String(describing:info).contains("file://"))
+        XCTAssertTrue(MPRemoteCommandCenter.shared().changePlaybackPositionCommand.isEnabled)
+        XCTAssertTrue(store.handleSystemPlaybackCommand(.toggle))
+        XCTAssertEqual(store.player.rate,0)
+        store.clear()
+        XCTAssertNil(MPNowPlayingInfoCenter.default().nowPlayingInfo)
+        XCTAssertFalse(MPRemoteCommandCenter.shared().playCommand.isEnabled)
+    }
+
+    func testNowPlayingSnapshotBoundsAndOldStoreCannotOverwriteNewOwner() async throws {
+        let live=NativeNowPlayingSnapshot(title:"https://example.invalid/private?token=secret",elapsed:.nan,duration:.infinity,rate:.infinity,defaultRate:.nan)
+        XCTAssertFalse(live.seekable)
+        XCTAssertEqual(live.info[MPMediaItemPropertyTitle] as? String,"TV-Next 媒体")
+        XCTAssertNil(live.info[MPMediaItemPropertyPlaybackDuration])
+        XCTAssertNil(live.info[MPNowPlayingInfoPropertyElapsedPlaybackTime])
+        XCTAssertEqual(live.info[MPNowPlayingInfoPropertyPlaybackRate] as? Float,0)
+        store.playLocalFile(try fixture(),name:"Old title")
+        let next=MediaLibraryStore(defaults:defaults)
+        defer { next.clear() }
+        next.playLocalFile(try fixture(),name:"New title")
+        try await waitUntil { (MPNowPlayingInfoCenter.default().nowPlayingInfo?[MPMediaItemPropertyTitle] as? String) == "New title" }
+        store.setPlaybackSpeed(2)
+        store.clear()
+        XCTAssertEqual(MPNowPlayingInfoCenter.default().nowPlayingInfo?[MPMediaItemPropertyTitle] as? String,"New title")
+        next.clear()
+        XCTAssertNil(MPNowPlayingInfoCenter.default().nowPlayingInfo)
     }
 
     func testSubscriptionKeychainOnlyStoresValidExplicitURLsAndCanClear() {
@@ -379,7 +454,8 @@ final class MediaLibraryTests: XCTestCase {
         target.headers = ["Referer": "https://example.invalid/"]
         relayStore.play(target)
         try await waitUntil { pending != nil }
-        relayStore.suspendPlayback()
+        relayStore.setBackgroundPlaybackEnabled(true)
+        relayStore.setApplicationBackground(true)
         // Deliberately emulate a transport that finishes despite cancellation.
         pending?.resume(returning: NativeRelayResponse(path: "/api/v1/home/media/" + String(repeating: "a", count: 43) + "/0", expiresAt: Int64.max))
         pending = nil
