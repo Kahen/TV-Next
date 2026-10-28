@@ -43,6 +43,16 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertTrue(store.player.allowsExternalPlayback)
     }
 
+    func testOnlyServerApprovedAndroidSpiderSitesAreEnabled() throws {
+        func site(_ support: String) throws -> NativeSubscription.Site {
+            try JSONDecoder().decode(NativeSubscription.Site.self, from: Data("{\"key\":\"fixture\",\"name\":\"Fixture\",\"type\":3,\"searchable\":true,\"hidden\":false,\"support\":\"\(support)\"}".utf8))
+        }
+        XCTAssertTrue(try site("android-spider").supported)
+        XCTAssertFalse(try site("requires-spider-runtime").supported)
+        XCTAssertFalse(try site("unknown-runtime").supported)
+        XCTAssertNotNil(NativeSubscriptionURLStore.validated("http://www.饭太硬.net/tv"))
+    }
+
     func testSubscriptionKeychainOnlyStoresValidExplicitURLsAndCanClear() {
         let store = NativeSubscriptionURLStore(account: "xcuitest-" + UUID().uuidString)
         defer { _ = store.clear() }

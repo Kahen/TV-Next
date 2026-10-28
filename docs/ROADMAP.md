@@ -42,7 +42,7 @@ Tracking: https://github.com/Kahen/TV-Next/issues/3
 - [x] M3U/TXT/nested JSON live imports, offline and subscribed XMLTV/XMLTV.gz, persistent guide scheduling/cache and Web/iOS guide UI.
 - [x] Explicit timeshift Result RPC, bounded programme catchup subset, historical XMLTV and Web/iOS replay controls; see LIVE_REPLAY.md.
 - [x] Native AVPlayer embedded/HLS audio and subtitle selection menus with optional subtitle-off.
-- [x] Device-local per-title native audio preferences (#57); per-title embedded/HLS subtitle and explicit-off preferences (#59, pending final-head CI).
+- [x] Device-local per-title native audio preferences (#57); per-title embedded/HLS subtitle and explicit-off preferences (#60, PR gates passed).
 - [ ] Broader audio/subtitle container and codec compatibility, including track identity changes across providers; device validation remains separate.
 - [ ] Broader permitted real-provider corpus, interactive QR/login workflows, parser chains and long-tail replay formats; device validation remains separate.
 
@@ -68,7 +68,7 @@ Tracking: https://github.com/Kahen/TV-Next/issues/5
 
 - [x] External SRT/WebVTT timing offset, bounded ASS/SSA Dialogue text, Web/native danmaku parsers and timeline overlays.
 - [x] Basic native system PiP and AirPlay route picker; playback speed controls and AList/OpenList browsing.
-- [x] Native AVPlayer audio/embedded subtitle selection and bounded per-title audio preferences; per-title subtitle preferences (#59, pending final-head CI).
+- [x] Native AVPlayer audio/embedded subtitle selection and bounded per-title audio preferences; per-title subtitle preferences (#60, PR gates passed).
 - [ ] Styled ASS positioning/karaoke/fonts, decoder diagnostics, intro/outro skip and broader format support remain.
 - [ ] Background/lock-screen media controls and remaining device PiP/AirPlay quality/codec/energy matrix.
 - [ ] Optional transcoding sidecar with measured resource limits.

@@ -22,6 +22,18 @@ class HomeServerIntegrationTest @Autowired constructor(private val accounts: Hom
     private fun user()=accounts.register(Credentials("user-"+UUID.randomUUID().toString(),"long-test-password","Test device"))
     private fun principal(session: HomeSession)=accounts.principal("Bearer "+session.token)
     private fun snapshot(name: String="Own")=mapper.readTree("""{"version":1,"channels":[{"name":"$name","url":"https://example.org/movie.mp4","group":"Own","headers":{"Cookie":"private-cookie","User-Agent":"TV-Next"}}],"favorites":["https://example.org/movie.mp4"],"recent":[{"channel":{"name":"Own","url":"https://example.org/movie.mp4","group":"Own"},"openedAt":1}],"positions":{"https://example.org/movie.mp4":45}}""")
+    @Test fun spiderRoutesRequireDeviceAuthenticationEvenWhenTheRuntimeIsDisabled() {
+        val session=user()
+        val request=mapper.writeValueAsString(SiteRequest(content="""{"sites":[{"key":"spider","type":3,"api":"csp_Fixture"}]}""",siteKey="spider",vodId="v1",categoryId="1",query="test"))
+        for(op in listOf("home","category","search","detail","play","action")) {
+            mvc.perform(post("/api/v1/subscriptions/$op").contentType(MediaType.APPLICATION_JSON).content(request)).andExpect(status().isUnauthorized)
+        }
+        mvc.perform(post("/api/v1/subscriptions/home").header("Authorization","Bearer "+session.token).contentType(MediaType.APPLICATION_JSON).content(request))
+            .andExpect(status().isUnprocessableEntity)
+        accounts.revoke(principal(session),session.device.id)
+        mvc.perform(post("/api/v1/subscriptions/home").header("Authorization","Bearer "+session.token).contentType(MediaType.APPLICATION_JSON).content(request))
+            .andExpect(status().isUnauthorized)
+    }
     @Test fun storesOnlyPasswordAndTokenHashesAndScopesAllLibrariesToUser() {
         val one=user();val two=user();val a=principal(one);val b=principal(two)
         assertNotEquals(one.token,db.queryForObject("SELECT token_hash FROM devices WHERE id=?",String::class.java,one.device.id))

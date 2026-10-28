@@ -25,7 +25,7 @@ class ProviderGateway(private val accounts: HomeAccounts,private val provider: S
     internal var now: ()->Long = System::currentTimeMillis
 
     fun page(op: String,r: SiteRequest,auth: String?): ProviderPage {
-        val p=principal(auth) ?: return provider.page(op,r)
+        val p=principal(auth,r) ?: return provider.page(op,r)
         val key=sourceKey(p,r)
         val generation=generation(key)
         if(op!="search")return observed(key,generation) { provider.page(op,r) }
@@ -59,11 +59,15 @@ class ProviderGateway(private val accounts: HomeAccounts,private val provider: S
     fun play(r: SiteRequest,auth: String?)=execute(r,auth) { provider.play(r) }
     fun action(r: SiteRequest,auth: String?)=execute(r,auth) { provider.action(r) }
     private fun <T> execute(r: SiteRequest,auth: String?,work: ()->T): T {
-        val p=principal(auth) ?: return work()
+        val p=principal(auth,r) ?: return work()
         val key=sourceKey(p,r)
         return observed(key,generation(key),work)
     }
-    private fun principal(auth: String?)=if(auth==null)null else accounts.principal(auth)
+    private fun principal(auth: String?,r: SiteRequest): HomePrincipal? {
+        if(auth!=null)return accounts.principal(auth)
+        if(provider.requiresAuthentication(r))throw ResponseStatusException(HttpStatus.UNAUTHORIZED,"Spider execution requires a signed-in device")
+        return null
+    }
     private fun sourceKey(p: HomePrincipal,r: SiteRequest): HealthKey {
         if(r.siteKey.isBlank() || r.siteKey.length>200 || r.url.length>4096 || r.content.toByteArray(Charsets.UTF_8).size>1_048_576)
             throw ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid source request")

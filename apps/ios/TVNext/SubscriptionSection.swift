@@ -155,11 +155,11 @@ struct SubscriptionSection: View {
         guard let document else { return }
         let keyword = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !keyword.isEmpty else { return }
-        let sources = document.sites.filter { $0.searchable && !$0.hidden && $0.supported }
+        let sources = document.sites.filter { $0.searchable && !$0.hidden && $0.supported && ($0.type != 3 || session != nil) }
             .map { NativeSearchSource(key: $0.key, name: $0.name) }
         clearCrossSiteSearch(); page = nil; detail = nil
         run { api, id in
-            let result = try await NativeCrossSiteSearch.search(sources: sources, fetch: { source, number in
+            let result = try await NativeCrossSiteSearch.search(sources: sources, concurrency: document.sites.contains { $0.type == 3 && $0.supported } ? 2 : 4, fetch: { source, number in
                 var r = NativeSiteRequest()
                 r.content = document.content; r.url = document.url
                 r.siteKey = source.key; r.query = keyword; r.page = number
@@ -236,8 +236,8 @@ struct SubscriptionSection: View {
         ForEach(doc.depots) { depot in Button(depot.name) { load(depot.url) }.disabled(busy) }
         ScrollView(.horizontal) {
             HStack { ForEach(doc.sites.filter { !$0.hidden }) { site in
-                Button(site.name + (site.supported ? "" : " · 需 Spider 适配")) { browse(site.key) }
-                    .buttonStyle(.bordered).disabled(busy || !site.supported)
+                Button(site.name + (site.supported ? (site.type == 3 && session == nil ? " · 请先登录" : "") : " · 需 Spider 适配")) { browse(site.key) }
+                    .buttonStyle(.bordered).disabled(busy || !site.supported || (site.type == 3 && session == nil))
             } }
         }
         HStack {

@@ -101,6 +101,9 @@ export async function postMedia<T>(path: string, body: MediaQuery): Promise<T> {
 
 export interface PlaybackResource { name: string; url: string; lang?: string | null }
 export interface SubscriptionSite { key: string; name: string; type: number; searchable: boolean; hidden: boolean; support: string }
+export function supportedSubscriptionSite(site: SubscriptionSite): boolean {
+  return [0,1,2,4].includes(site.type) || site.type === 3 && site.support === "android-spider";
+}
 export interface SubscriptionDocument { content: string; url: string; sites: SubscriptionSite[]; depots: {name: string; url: string}[]; liveCount: number; warnings: string[] }
 export async function requestJson<T>(path: string, body: unknown, signal?: AbortSignal, token?: string): Promise<T> {
   const response = await fetch(base + path, { method: "POST", headers: { "Content-Type": "application/json",...(token?{Authorization:"Bearer "+token}:{}) },

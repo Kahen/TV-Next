@@ -84,6 +84,15 @@ class JavaCompatibilityTests(unittest.TestCase):
         with self.assertRaises(JarInspectionError):
             inspect_jar(str(file) + ".not-a-jar")
 
+    def test_dex_and_arm_native_guard_are_reported_even_in_mixed_jvm_archives(self):
+        file = self.with_jar([("classes.dex", b"dex\n035\x00"),
+                              ("assets/guard_v8.so", b"\x7fELF"),
+                              ("Fixture.class", fake_class())])
+        report = inspect_jar(file)
+        self.assertEqual(report.status, "unsupported")
+        self.assertIn("android-dex-bytecode", report.reasons)
+        self.assertIn("native-library", report.reasons)
+
     def test_flags_nested_code_or_manifest_classpath_for_review(self):
         filename = self.with_jar([
             ("Fixture.class", fake_class()),

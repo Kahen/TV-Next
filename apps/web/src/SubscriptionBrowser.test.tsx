@@ -4,10 +4,22 @@ import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/re
 import SubscriptionBrowser from "./SubscriptionBrowser";
 import CloudBrowser from "./CloudBrowser";
 import { requestJson } from "./api";
-vi.mock("./api",()=>({requestJson:vi.fn()}));
+vi.mock("./api",async importOriginal=>({...await importOriginal<typeof import("./api")>(),requestJson:vi.fn()}));
 const request=vi.mocked(requestJson);
 const doc={content:'{"sites":[]}',url:"https://example.org/config.json",sites:[{key:"cloud",name:"Cloud",type:4,searchable:true,hidden:false,support:"http-spider"},{key:"android",name:"Android",type:3,searchable:true,hidden:false,support:"requires-spider-runtime"}],warnings:[],depots:[],liveCount:0};
 afterEach(cleanup);beforeEach(()=>{request.mockReset();});
+it("requires login before browsing a server-approved Android site",async()=>{
+  request.mockResolvedValueOnce({...doc,sites:[{...doc.sites[1],support:"android-spider"}]});
+  const onPlay=vi.fn();const view=render(<SubscriptionBrowser onPlay={onPlay}/>);
+  fireEvent.change(screen.getByLabelText("订阅配置"),{target:{value:'{"sites":[]}'}});
+  fireEvent.click(screen.getByText("加载订阅"));
+  expect((await screen.findByRole("button",{name:/Android.*请先登录/}) as HTMLButtonElement).disabled).toBe(true);
+  const session={token:"a".repeat(43),user:{id:"u",username:"own"},device:{id:"d",name:"Web",createdAt:1,expiresAt:9999999999999,current:true}};
+  view.rerender(<SubscriptionBrowser onPlay={onPlay} session={session}/>);
+  request.mockResolvedValueOnce({categories:[],items:[],total:0,page:1,hasMore:false});
+  fireEvent.click(await screen.findByRole("button",{name:"Android"}));
+  await waitFor(()=>expect(request.mock.calls[1]?.[3]).toBe(session.token));
+});
 it("loads original subscription and resolves cloud episode with playback metadata",async()=>{
   const onPlay=vi.fn();
   request.mockResolvedValueOnce(doc)

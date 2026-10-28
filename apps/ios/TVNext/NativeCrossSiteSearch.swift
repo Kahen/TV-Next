@@ -1,7 +1,7 @@
 import Foundation
 
 /// A bounded native counterpart of the Web type 0/1/2/4 subscription search.
-/// The caller must filter out hidden, non-searchable and Spider-only sites.
+/// The caller filters hidden/unsearchable sites and checks server-approved Spider capability and device login.
 struct NativeSearchSource: Hashable {
     let key: String
     let name: String
@@ -39,6 +39,7 @@ enum NativeCrossSiteSearch {
 
     static func search<Item>(
         sources: [NativeSearchSource],
+        concurrency: Int = maxConcurrent,
         fetch: @escaping (NativeSearchSource, Int) async throws -> NativeSearchPage<Item>,
         identity: @escaping (Item) -> String?
     ) async throws -> NativeSearchResult<Item> {
@@ -50,10 +51,11 @@ enum NativeCrossSiteSearch {
         var failures = Set<Int>()
         var truncated = Set<Int>()
 
-        // Four simultaneous sites at most; each site's two pages are requested in order.
-        for offset in stride(from: 0, to: selected.count, by: maxConcurrent) {
+        let parallel = min(maxConcurrent, max(1, concurrency))
+        // Bound Android-host fan-out separately; each site's pages stay ordered.
+        for offset in stride(from: 0, to: selected.count, by: parallel) {
             try Task.checkCancellation()
-            let batch = Array(selected.enumerated())[offset..<min(offset + maxConcurrent, selected.count)]
+            let batch = Array(selected.enumerated())[offset..<min(offset + parallel, selected.count)]
             await withTaskGroup(of: NativeSearchOutcome<Item>.self) { group in
                 for (index, source) in batch {
                     group.addTask {

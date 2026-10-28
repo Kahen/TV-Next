@@ -1,6 +1,7 @@
 import type { MediaItem, MediaPage, SubscriptionSite } from "./api";
+import { supportedSubscriptionSite } from "./api";
 
-/** A bounded, deterministic subset of FongMi HTTP source search; never executes Spider. */
+/** Bounded source search; approved Android providers execute only on the separate server-selected host. */
 export interface CrossSiteHit { siteKey: string; item: MediaItem }
 export interface CrossSiteSearchResult {
   items: CrossSiteHit[];
@@ -24,7 +25,7 @@ export async function searchAcrossSites(
   if (signal.aborted) throw canceled();
   const seenSites = new Set<string>();
   const eligible = sites.filter(site => {
-    if (!site.searchable || site.hidden || ![0, 1, 2, 4].includes(site.type) || seenSites.has(site.key)) return false;
+    if (!site.searchable || site.hidden || !supportedSubscriptionSite(site) || seenSites.has(site.key)) return false;
     seenSites.add(site.key);
     return true;
   });
@@ -34,7 +35,7 @@ export async function searchAcrossSites(
   const truncated = new Set<number>();
   let cursor = 0;
 
-  await Promise.all(Array.from({ length: Math.min(MAX_CONCURRENT, selected.length) }, async () => {
+  await Promise.all(Array.from({ length: Math.min(selected.some(site => site.type === 3) ? 2 : MAX_CONCURRENT, selected.length) }, async () => {
     while (cursor < selected.length) {
       if (signal.aborted) throw canceled();
       const index = cursor++;
