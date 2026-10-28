@@ -55,8 +55,11 @@ remote controls: a seek is bounded to 0…duration, rejected for unknown/live
 duration or failed/unready items, and does not replace the current player item.
 Buttons are disabled when no player item exists; when a loaded item cannot
 seek, the UI shows a non-sensitive explanatory message. New playback clears
-that message. This is manual seeking, **not** automatic intro/outro detection
-or chapter-marker support.
+that message. The finite-VOD target calculation is tested independently,
+including end-of-media clamping: AVPlayer may report a reset clock at EOF
+for short synthetic MP4s, so simulator tests do not require its clock to
+remain at exactly the duration after seeking to the end. This is manual
+seeking, **not** automatic intro/outro detection or chapter-marker support.
 
 ## Verification boundaries
 
