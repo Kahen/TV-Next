@@ -99,6 +99,15 @@ jobs:
             sleep 1
           done
           test -s tests/unit/Fixtures/fixture.mp4
+          # Generate two synthetic AAC tracks, without downloading external media.
+          ffmpeg -nostdin -hide_banner -loglevel error -y \
+            -f lavfi -i 'color=c=black:s=320x180:r=15:d=4' \
+            -f lavfi -i 'sine=frequency=440:duration=4' \
+            -f lavfi -i 'sine=frequency=880:duration=4' \
+            -map 0:v -map 1:a -map 2:a -t 4 -c:v libx264 -pix_fmt yuv420p -c:a aac \
+            -metadata:s:a:0 language=eng -metadata:s:a:1 language=jpn \
+            -movflags +faststart tests/unit/Fixtures/audio-tracks.mp4
+          test -s tests/unit/Fixtures/audio-tracks.mp4
           # Regenerate now that the owned synthetic resource exists.
           xcodegen generate
           xcrun simctl list devices available --json > /tmp/tvnext-simulators.json

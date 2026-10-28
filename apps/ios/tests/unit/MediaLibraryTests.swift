@@ -97,6 +97,24 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertNil(restored.player.currentItem)
     }
 
+    func testAudioTrackSelectionIsItemScopedAndRejectsInvalidIndices() async throws {
+        XCTAssertFalse(store.selectAudioTrack(0), "No player item must never accept a track")
+        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "audio-tracks", withExtension: "mp4"))
+        store.playLocalFile(url, name: "audio-tracks.mp4")
+        try await waitUntil({ self.store.audioTracks.count == 2 }, timeout: 15)
+        XCTAssertFalse(store.selectAudioTrack(-1))
+        XCTAssertFalse(store.selectAudioTrack(2))
+        XCTAssertTrue(store.selectAudioTrack(1))
+        XCTAssertEqual(store.selectedAudioTrack, 1)
+        XCTAssertEqual(store.audioTracks.map(\.id), [0, 1])
+        store.playLocalFile(try fixture(), name: "fixture.mp4")
+        XCTAssertTrue(store.audioTracks.isEmpty, "Old item tracks must disappear immediately")
+        XCTAssertNil(store.selectedAudioTrack)
+        XCTAssertFalse(store.selectAudioTrack(1), "Do not select a track from a replaced item")
+        store.clear()
+        XCTAssertTrue(store.audioTracks.isEmpty)
+    }
+
     func testPlaybackSpeedBoundsAndInvalidNumbers() {
         store.setPlaybackSpeed(1.5)
         store.setPlaybackSpeed(.nan)

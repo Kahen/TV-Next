@@ -375,6 +375,26 @@ struct ContentView: View {
                 .onChange(of: playbackSpeed) { _, speed in
                     library.setPlaybackSpeed(speed)
                 }
+                if !library.audioTracks.isEmpty {
+                    Menu {
+                        ForEach(library.audioTracks) { track in
+                            Button {
+                                _ = library.selectAudioTrack(track.id)
+                            } label: {
+                                if library.selectedAudioTrack == track.id {
+                                    Label(track.title, systemImage: "checkmark")
+                                } else {
+                                    Text(track.title)
+                                }
+                            }
+                        }
+                    } label: {
+                        Label("音轨：" + (library.audioTracks.first(where: {
+                            $0.id == library.selectedAudioTrack
+                        })?.title ?? "系统默认"), systemImage: "waveform")
+                    }
+                    .accessibilityIdentifier("audio-track-menu")
+                }
 
                 if let channel = library.current,
                    let seconds = library.positions[channel.url] {
