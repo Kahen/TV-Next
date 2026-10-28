@@ -96,8 +96,9 @@ final class MediaLibraryTests: XCTestCase {
         try await waitUntil { abs(self.store.player.currentTime().seconds-1) < 0.1 }
         XCTAssertTrue(store.handleSystemPlaybackCommand(.skip(-15)), "Back skip clamps to zero")
         try await waitUntil { self.store.player.currentTime().seconds < 0.1 }
-        XCTAssertTrue(store.handleSystemPlaybackCommand(.skip(15)), "Forward skip clamps to duration")
-        try await waitUntil { self.store.player.currentTime().seconds >= duration - 0.2 }
+        // An exact-end AVPlayer seek can report 0 after EOF on short MP4 fixtures.
+        // Verify clamping deterministically below; do not assert its unstable EOF clock.
+        XCTAssertTrue(store.handleSystemPlaybackCommand(.skip(15)), "Forward skip accepts a bounded EOF target")
         XCTAssertTrue(store.handleSystemPlaybackCommand(.seek(1)))
         try await waitUntil { abs(self.store.player.currentTime().seconds-1) < 0.1 }
         XCTAssertFalse(store.handleSystemPlaybackCommand(.rate(.nan)))
@@ -115,6 +116,17 @@ final class MediaLibraryTests: XCTestCase {
         store.clear()
         XCTAssertNil(MPNowPlayingInfoCenter.default().nowPlayingInfo)
         XCTAssertFalse(MPRemoteCommandCenter.shared().playCommand.isEnabled)
+    }
+
+    func testBoundedSkipTargetRejectsInvalidAndClampsBothDirections() {
+        XCTAssertEqual(NativePlaybackCommand.boundedSkipTarget(current: 1, interval: -15, duration: 3), 0)
+        XCTAssertEqual(NativePlaybackCommand.boundedSkipTarget(current: 1, interval: 15, duration: 3), 3)
+        XCTAssertEqual(NativePlaybackCommand.boundedSkipTarget(current: 1, interval: 0.5, duration: 3), 1.5)
+        XCTAssertNil(NativePlaybackCommand.boundedSkipTarget(current: 1, interval: .nan, duration: 3))
+        XCTAssertNil(NativePlaybackCommand.boundedSkipTarget(current: 1, interval: 61, duration: 3))
+        XCTAssertNil(NativePlaybackCommand.boundedSkipTarget(current: -1, interval: 1, duration: 3))
+        XCTAssertNil(NativePlaybackCommand.boundedSkipTarget(current: 1, interval: 1, duration: .infinity))
+        XCTAssertNil(NativePlaybackCommand.boundedSkipTarget(current: 1, interval: 1, duration: 604_800))
     }
 
     func testNowPlayingSnapshotBoundsAndOldStoreCannotOverwriteNewOwner() async throws {
