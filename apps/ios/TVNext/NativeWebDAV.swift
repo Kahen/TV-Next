@@ -144,8 +144,6 @@ enum NativeWebDAV {
         request.httpBody = Data("<?xml version=\"1.0\" encoding=\"utf-8\"?><d:propfind xmlns:d=\"DAV:\"><d:prop><d:resourcetype/></d:prop></d:propfind>".utf8)
         if let auth { request.setValue(auth, forHTTPHeaderField: "Authorization") }
         request.timeoutInterval = 15
-        let session = URLSession(configuration: .ephemeral, delegate: WebDAVNoRedirect(), delegateQueue: nil)
-        defer { session.invalidateAndCancel() }
         // The URLSession data delegate enforces the cap per received chunk,
         // before a server-controlled body can accumulate in application memory.
         let data = try await WebDAVBoundedTransport.load(request, maxBytes: 1_048_576)
