@@ -179,6 +179,9 @@ final class LibraryUITests: XCTestCase {
         app.buttons["play-url"].tap()
         jump("播放器")
         XCTAssertFalse(error.exists)
+        let forward = app.buttons["seek-forward-15"]
+        reveal(forward)
+        XCTAssertTrue(forward.isEnabled, "A selected player item exposes manual seek controls")
         let fullscreen = app.buttons["enter-fullscreen"]
         reveal(fullscreen)
         fullscreen.tap()
