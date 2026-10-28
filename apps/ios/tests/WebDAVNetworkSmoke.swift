@@ -16,6 +16,9 @@ import Foundation
             _ = try await NativeWebDAV.list(root: root, folder: root, username: "alice", password: "pw")
             fatalError("Sent credentials over HTTP")
         } catch NativeWebDAVError.insecureCredentials { }
+        let noLength = root.appendingPathComponent("no-length", isDirectory: true)
+        let unannounced = try await NativeWebDAV.list(root: root, folder: noLength, username: "", password: "")
+        precondition(unannounced == entries, "Unknown-length valid XML should be accepted")
         for path in ["large-declared", "large-streamed"] {
             let oversized = root.appendingPathComponent(path, isDirectory: true)
             do {
