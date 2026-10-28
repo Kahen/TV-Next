@@ -360,7 +360,7 @@ final class MediaLibraryStore: ObservableObject {
             Task { @MainActor [weak self] in self?.updateSystemMetadata() }
         }
         mediaTimeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 1, preferredTimescale: 600), queue: .main) { [weak self] _ in
-            self?.updateSystemMetadata()
+            Task { @MainActor [weak self] in self?.updateSystemMetadata() }
         }
         let center = NotificationCenter.default
         audioObservers.append(center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] note in
@@ -377,13 +377,13 @@ final class MediaLibraryStore: ObservableObject {
             forInterval: CMTime(seconds: 8, preferredTimescale: 600),
             queue: .main
         ) { [weak self] _ in
-            self?.savePosition()
+            Task { @MainActor [weak self] in self?.savePosition() }
         }
         captionObserver = player.addPeriodicTimeObserver(
             forInterval: CMTime(seconds: 0.2, preferredTimescale: 600),
             queue: .main
         ) { [weak self] _ in
-            self?.refreshCaptions()
+            Task { @MainActor [weak self] in self?.refreshCaptions() }
         }
     }
 
