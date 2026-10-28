@@ -1,5 +1,28 @@
 import Foundation
 
+struct NativeTimeshift: Codable, Equatable {
+    let url: String; let start: Int64; let window: Int64
+    func range(now: Int64) -> ClosedRange<Int64>? {
+        guard start > 0, start < now, window > 0,
+              url.range(of: #"\{time\}|%7Btime%7D"#, options: [.regularExpression, .caseInsensitive]) != nil else { return nil }
+        return max(start, now - window)...now
+    }
+}
+struct NativeCatchup: Codable, Equatable {
+    var type = "append"; var days = "7"; var source: String; var regex = ""; var replace = ""
+}
+struct NativeReplaySession: Codable, Equatable {
+    let path: String; let expiresAt: Int64; let hls: Bool; let time: Int64
+}
+struct NativeReplaySelection: Equatable {
+    let time: Int64
+    let stop: Int64?
+    let timezone: String
+}
+struct NativeReplayRequest: Encodable {
+    let channel: TVChannel; let time: Int64; let stop: Int64?; let timezone: String
+}
+
 struct TVChannel: Codable, Identifiable, Equatable {
     let name: String
     let url: String
@@ -8,6 +31,13 @@ struct TVChannel: Codable, Identifiable, Equatable {
     let tvgId: String?
     var headers: [String:String]? = nil
     var headersRequired: Bool? = nil
+    var timeshift: NativeTimeshift? = nil
+    var catchup: NativeCatchup? = nil
+    // A relay capability belongs to the active player only and is never encoded.
+    var replay: NativeReplaySession? = nil
+    // Ephemeral selection for retry. Never encoded or written to UserDefaults.
+    var replaySelection: NativeReplaySelection? = nil
+    private enum CodingKeys: String, CodingKey { case name, url, group, logo, tvgId, headers, headersRequired, timeshift, catchup }
 
     var id: String { group + "|" + name + "|" + url }
 }

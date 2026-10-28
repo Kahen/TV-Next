@@ -13,6 +13,7 @@ export interface EpgChannel {
   matchType: "id" | "name" | "none";
   current: EpgProgram | null;
   upcoming: EpgProgram[];
+  previous?: EpgProgram[];
 }
 export interface EpgGuideResponse {
   generatedAt: string;

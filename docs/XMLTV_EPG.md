@@ -55,4 +55,4 @@ The Web view rejects stale responses on channel changes/logout and binds play bu
 
 ## Remaining compatibility
 
-Time-shift/catch-up playback, FongMi EPG placeholder URL substitution, credential-header feeds, country-specific synonyms, large regional guide support and real licensed IPTV/Apple-device playback verification remain open. Code integration is separate from final device acceptance.
+The explicit timeshift Result and bounded programme catchup subset now has Web/iOS controls and historical guide entries; see [LIVE_REPLAY.md](LIVE_REPLAY.md). Long-tail replay protocols, FongMi EPG placeholder URL substitution, credential-header feeds, country-specific synonyms, large regional guide support and real licensed IPTV/Apple-device playback verification remain open. Code integration is separate from final device acceptance.

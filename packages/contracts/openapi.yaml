@@ -4,7 +4,8 @@ info:
   version: 0.3.0-preview
   description: Bounded offline imports plus DNS-pinned TVBox/FongMi type 0/1/2/4 subscription
     and AList/OpenList metadata operations. Type 3 remote code activation and media
-    streaming proxy are not implemented. Network destinations are public by default;
+    arbitrary media forwarding are not implemented. Authenticated bounded HTTP/HLS relay
+    and original live timeshift/programme catchup subsets are available. Network destinations are public by default;
     explicit LAN origins are configured by the administrator. POST envelopes are limited
     to 3 MiB and peers to 300 requests/minute. Home accounts, device pairing, revision-based
     library synchronization and one-use WebSocket ticket endpoints are opt-in; registration
@@ -395,6 +396,35 @@ paths:
         '502':
           description: Provider transport, denied destination or invalid upstream
             response
+  /api/v1/subscriptions/replay:
+    post:
+      summary: Resolve original FongMi timeshift Result or programme Catchup into a private media capability
+      security:
+      - deviceBearer: []
+      description: Times are Unix milliseconds. time=0 and omitted stop returns to live; timeshift RPCs return Result JSON, not media. stop selects the separate programme catchup path. Replay capabilities and templates must not enter persisted libraries.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LiveReplayRequest'
+      responses:
+        '200':
+          description: Registered media capability; Cache-Control no-store, private
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LiveReplaySession'
+        '400':
+          description: Invalid declaration, timezone or timestamp outside explicit provider range
+        '401':
+          description: Missing, expired or revoked device token
+        '422':
+          description: Unsupported catchup mode, template, origin, parser or DRM
+        '429':
+          description: Request, provider or media-session quota exceeded
+        '502':
+          description: Denied provider destination or invalid timeshift Result
   /api/v1/subscriptions/live:
     post:
       summary: Import inline or referenced M3U/TXT/group-JSON live channels
@@ -1161,6 +1191,14 @@ components:
           additionalProperties:
             type: string
             maxLength: 8192
+        timeshift:
+          anyOf:
+          - $ref: '#/components/schemas/LiveTimeshift'
+          - type: 'null'
+        catchup:
+          anyOf:
+          - $ref: '#/components/schemas/LiveCatchup'
+          - type: 'null'
     PlaylistResponse:
       type: object
       required:
@@ -1500,6 +1538,10 @@ components:
           maxItems: 30
           items:
             $ref: '#/components/schemas/PlaybackResource'
+        timeshift:
+          anyOf:
+          - $ref: '#/components/schemas/LiveTimeshift'
+          - type: 'null'
     EpgGuideRequest:
       type: object
       required:
@@ -1534,6 +1576,11 @@ components:
           minimum: 1
           maximum: 72
           default: 12
+        pastHours:
+          type: integer
+          minimum: 0
+          maximum: 168
+          default: 0
     EpgProgram:
       type: object
       required:
@@ -1582,6 +1629,12 @@ components:
           - type: 'null'
         upcoming:
           type: array
+          items:
+            $ref: '#/components/schemas/EpgProgram'
+        previous:
+          type: array
+          maxItems: 40
+          description: Completed programmes within pastHours, newest first; independent of upcoming/current
           items:
             $ref: '#/components/schemas/EpgProgram'
     EpgGuideResponse:
@@ -2101,6 +2154,87 @@ components:
           minimum: 1
           maximum: 72
           default: 12
+        pastHours:
+          type: integer
+          minimum: 0
+          maximum: 168
+          default: 0
+    LiveTimeshift:
+      type: object
+      required: [url, start, window]
+      properties:
+        url:
+          type: string
+          maxLength: 2048
+          description: HTTP(S) Result endpoint with literal {time} or case-insensitive %7Btime%7D
+        start:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Earliest provider timestamp in Unix milliseconds
+        window:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Sliding window length in milliseconds; effective minimum is max(start, now-window)
+    LiveCatchup:
+      type: object
+      required: [source]
+      properties:
+        type:
+          type: string
+          enum: [append, default]
+          default: append
+        days:
+          type: string
+          default: '7'
+          description: Decimal integer 1..30
+        source:
+          type: string
+          maxLength: 2048
+        regex:
+          type: string
+          maxLength: 200
+          description: Supported subset is a literal URL substring; provider regular expressions are rejected
+        replace:
+          type: string
+          maxLength: 400
+          description: Optional comma-separated literal from,to; no regular expressions
+    LiveReplayRequest:
+      type: object
+      required: [channel]
+      properties:
+        channel:
+          $ref: '#/components/schemas/Channel'
+        time:
+          type: integer
+          format: int64
+          minimum: 0
+          default: 0
+        stop:
+          type: [integer, 'null']
+          format: int64
+          description: Programme end; must be greater than time and no later than server now
+        timezone:
+          type: string
+          maxLength: 80
+          default: UTC
+          description: Explicit IANA zone for catchup date formats; |UTC always overrides it
+    LiveReplaySession:
+      type: object
+      required: [path, expiresAt, hls, time]
+      properties:
+        path:
+          type: string
+          pattern: '^/api/v1/home/media/[A-Za-z0-9_-]{43}/0$'
+        expiresAt:
+          type: integer
+          format: int64
+        hls:
+          type: boolean
+        time:
+          type: integer
+          format: int64
   securitySchemes:
     deviceBearer:
       type: http

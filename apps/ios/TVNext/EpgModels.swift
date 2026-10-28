@@ -12,6 +12,7 @@ struct NativeEpgProgram: Decodable {
 struct NativeEpgChannel: Decodable {
     let id: String?;let name: String;let matchedChannelId: String?;let matchType: String
     let current: NativeEpgProgram?;let upcoming: [NativeEpgProgram]
+    let previous: [NativeEpgProgram]?
 }
 struct NativeEpgGuide: Decodable {
     let generatedAt: String;let until: String;let totalChannels: Int;let matchedChannels: Int
@@ -26,5 +27,6 @@ struct NativeEpgRequest: Encodable {
     var xml: String? = nil
     let channels: [NativeEpgChannelRequest]
     var hours=12
+    var pastHours=168
 }
 struct NativeEpgFeedWrite: Encodable { let name: String;let url: String;let intervalMinutes: Int;var enabled=true }

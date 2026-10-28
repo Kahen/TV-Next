@@ -77,12 +77,12 @@ struct ContentView: View {
                     localMediaSection.id("local-media")
                     importSection.id("import")
                     HomeServerSection(serverURL:$serverURL,library:library,onSessionChange:{ homeSession=$0;remote.configure($0,server:$1);library.configureRelay(server:$1,session:$0) },remoteState:remote.state).id("home-server")
-                    EpgSection(serverURL:serverURL,session:homeSession,channels:library.channels) { library.play($0) }
+                    EpgSection(serverURL:serverURL,session:homeSession,channels:library.channels,playbackGeneration:library.playbackGeneration) { library.play($0) }
                         .id(serverURL+"|"+(homeSession?.token ?? ""))
                     ConfigPreviewSection().id("config")
                     CloudSection(serverURL: serverURL) { library.play($0) }.id("cloud")
                     SubscriptionSection(serverURL: serverURL, session:homeSession, onPlay: { playback, title in
-                        library.play(TVChannel(name: title + " · " + playback.name, url: playback.url, group: playback.lineName, logo: nil, tvgId: nil, headers:playback.headers))
+                        library.play(TVChannel(name: title + " · " + playback.name, url: playback.url, group: playback.lineName, logo: nil, tvgId: nil, headers:playback.headers, timeshift:playback.timeshift))
                         remoteResourceKey = playback.url
                         remoteDanmaku = playback.danmaku
                     }, onImport: { library.importChannels($0) }).id("subscription")
@@ -359,6 +359,9 @@ struct ContentView: View {
                         .accessibilityIdentifier("playback-error")
                     Button("重试播放") { library.retryPlayback() }
                         .accessibilityIdentifier("retry-playback")
+                }
+                if let channel = library.current {
+                    NativeLiveReplayControls(channel:channel,serverURL:serverURL,session:homeSession,onPlay:{ library.play($0) },playbackGeneration:library.playbackGeneration)
                 }
                 Picker("播放速度", selection: $playbackSpeed) {
                     Text("0.75×").tag(Float(0.75))

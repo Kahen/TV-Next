@@ -3,13 +3,15 @@ import { epgChannelsFromPlaylist, formatProgrammeRange } from "./epg";
 import type { EpgGuideResponse } from "./epg";
 import type { Channel } from "./api";
 import EpgFeeds from "./EpgFeeds";
+import LiveReplayControls, { createReplayRequestCoordinator } from "./LiveReplayControls";
 import type { HomeSession } from "./homeApi";
 import { validMediaUrl } from "./library";
 
 const MAX_XML_BYTES = 2_097_152;
 
-export default function EpgGuide({ channels, onPlay, session = null }: {
+export default function EpgGuide({ channels, onPlay, session = null, cancellationKey = 0 }: {
   session?: HomeSession | null;
+  cancellationKey?: number;
   channels: Channel[];
   onPlay: (channel: Channel) => void;
 }) {
@@ -24,7 +26,9 @@ export default function EpgGuide({ channels, onPlay, session = null }: {
   const [guideChannels,setGuideChannels] = useState<Channel[]>([]);
   const pending=useRef<AbortController|null>(null);
   const generation=useRef(0);
-  function invalidate(feeds=true) { if(feeds)setFeedReset(value=>value+1);generation.current++;pending.current?.abort();setGuide(null);setGuideChannels([]);setBusy(false); }
+  const replayCoordinator=useRef(createReplayRequestCoordinator());
+  useEffect(() => { replayCoordinator.current.invalidate(); }, [cancellationKey]);
+  function invalidate(feeds=true) { replayCoordinator.current.invalidate(); if(feeds)setFeedReset(value=>value+1);generation.current++;pending.current?.abort();setGuide(null);setGuideChannels([]);setBusy(false); }
   useEffect(()=>{invalidate();return ()=>{generation.current++;pending.current?.abort();};},[channels,session?.token]);
   const shown = guide?.channels.map((item, index) => ({ item, channel: guideChannels[index] }))
     .filter(({ item }) => item.name.toLowerCase().includes(filter.toLowerCase()));
@@ -67,7 +71,7 @@ export default function EpgGuide({ channels, onPlay, session = null }: {
         body: JSON.stringify({
           xml,
           channels: epgChannelsFromPlaylist(snapshot),
-          hours
+          hours, pastHours: 168
         })
       });
       const payload: unknown = await res.json().catch(() => null);
@@ -131,7 +135,7 @@ export default function EpgGuide({ channels, onPlay, session = null }: {
                 <small>{item.matchType === "id" ? "tvg-id 匹配" :
                   item.matchType === "name" ? "名称匹配" : "未匹配节目表"}</small>
               </div>
-              {channel && validMediaUrl(channel.url) && <button className="secondary" onClick={() => onPlay(channel)}>
+              {channel && validMediaUrl(channel.url) && <button className="secondary" onClick={() => { replayCoordinator.current.invalidate(); onPlay(channel); }}>
                 播放频道
               </button>}
             </div>
@@ -142,6 +146,7 @@ export default function EpgGuide({ channels, onPlay, session = null }: {
                   {item.current.description && <p className="epg-description">{item.current.description}</p>}
                 </div>
               : <p className="hint">当前时间没有节目数据。</p>}
+            {channel && item.previous?.map((programme, i) => <div key={i}><time>{new Date(programme.start).toLocaleString()}</time><span> · {programme.title}</span><LiveReplayControls channel={channel} session={session} onPlay={onPlay} programme={programme} cancellationKey={cancellationKey} coordinator={replayCoordinator.current}/></div>)}
             {item.upcoming.length > 0 && <div className="epg-upcoming">
               {item.upcoming.map((next, i) => <div key={i}>
                 <time>{formatProgrammeRange(next.start, next.stop)}</time><span>{next.title}</span>

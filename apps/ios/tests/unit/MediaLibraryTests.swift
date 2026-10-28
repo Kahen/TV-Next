@@ -281,4 +281,79 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertNotNil(relayStore.playbackError)
     }
 
+    func testReplayCapabilityAndProviderTemplatesNeverPersist() throws {
+        var original=channel("Replay")
+        original.timeshift=NativeTimeshift(url:"https://example.invalid/seek?time={time}",start:1,window:1000)
+        original.catchup=NativeCatchup(source:"?begin=${(b)timestamp}")
+        original.replay=NativeReplaySession(path:"/api/v1/home/media/"+String(repeating:"a",count:43)+"/0",expiresAt:Int64.max,hls:true,time:1)
+        XCTAssertTrue(store.importChannels([original]))
+        let snapshot=store.syncedSnapshot().channels[0]
+        XCTAssertNil(snapshot.timeshift);XCTAssertNil(snapshot.catchup);XCTAssertNil(snapshot.replay)
+        let restored=MediaLibraryStore(defaults:defaults)
+        defer { restored.clear() }
+        XCTAssertNil(restored.channels[0].timeshift);XCTAssertNil(restored.channels[0].catchup)
+        let encoded=String(data:try JSONEncoder().encode(original),encoding:.utf8)!
+        XCTAssertFalse(encoded.contains("/api/v1/home/media/"))
+    }
+
+    func testReplayRetryRenewsTicketAndPreservesOriginalSelection() async throws {
+        var calls: [NativeReplaySelection] = []
+        let freshPath="/api/v1/home/media/"+String(repeating:"c",count:43)+"/0"
+        let relayStore=MediaLibraryStore(defaults:defaults,resolveReplay:{ _,request in
+            calls.append(NativeReplaySelection(time:request.time,stop:request.stop,timezone:request.timezone))
+            return NativeReplaySession(path:freshPath,expiresAt:Int64.max,hls:false,time:request.time)
+        })
+        defer { relayStore.clear() }
+        let session=NativeHomeSession(token:"unit-fixture",user:NativeHomeUser(id:"u",username:"fixture"),
+            device:NativeHomeDevice(id:"d",name:"fixture",createdAt:0,expiresAt:Int64.max,current:true))
+        relayStore.configureRelay(server:"http://127.0.0.1:8765",session:session)
+        var target=channel("Replay")
+        let selection=NativeReplaySelection(time:123456,stop:234567,timezone:"Asia/Hong_Kong")
+        target.replaySelection=selection
+        target.replay=NativeReplaySession(path:"/api/v1/home/media/"+String(repeating:"a",count:43)+"/0",
+            expiresAt:Int64.max,hls:false,time:selection.time)
+        relayStore.play(target)
+        relayStore.retryPlayback()
+        try await waitUntil { relayStore.current?.replay?.path == freshPath }
+        XCTAssertEqual(calls,[selection])
+        XCTAssertEqual(relayStore.current?.url,target.url)
+        XCTAssertEqual(relayStore.recent.first?.url,target.url)
+        XCTAssertNil(relayStore.syncedSnapshot().channels.first?.replay)
+    }
+
+    func testNativeProgrammeReplayOwnershipInvalidatesOlderSelections() {
+        let coordinator=NativeReplayRequestCoordinator()
+        let first=coordinator.begin()
+        let second=coordinator.begin()
+        XCTAssertFalse(coordinator.isCurrent(first))
+        XCTAssertTrue(coordinator.isCurrent(second))
+        coordinator.invalidate()
+        XCTAssertFalse(coordinator.isCurrent(second))
+    }
+
+    func testReplayWithoutSelectionCannotReuseClosedTicket() {
+        let session=NativeHomeSession(token:"unit-fixture",user:NativeHomeUser(id:"u",username:"fixture"),
+            device:NativeHomeDevice(id:"d",name:"fixture",createdAt:0,expiresAt:Int64.max,current:true))
+        store.configureRelay(server:"http://127.0.0.1:8765",session:session)
+        var target=channel("Replay")
+        target.replay=NativeReplaySession(path:"/api/v1/home/media/"+String(repeating:"a",count:43)+"/0",
+            expiresAt:Int64.max,hls:false,time:1)
+        store.play(target)
+        store.retryPlayback()
+        XCTAssertEqual(store.playbackError,"回放会话不可直接重试，请重新选择回放时间。")
+    }
+
+    func testInvalidReplayKeepsExistingPlayerAndHistory() throws {
+        let original=channel("Live")
+        store.play(original)
+        let item=store.player.currentItem
+        var replay=original
+        replay.replay=NativeReplaySession(path:"https://attacker.invalid/",expiresAt:Int64.max,hls:false,time:1)
+        store.play(replay)
+        XCTAssertTrue(store.player.currentItem === item)
+        XCTAssertEqual(store.current,original)
+        XCTAssertEqual(store.recent.count,1)
+        XCTAssertNotNil(store.playbackError)
+    }
+
 }

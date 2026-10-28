@@ -47,3 +47,7 @@ a per-subsystem GitHub Actions summary. Only `contents:read` permissions are req
 browser media/PWA interactions, XCUI physical-device testing, NAS authentication/TLS,
 security audit/SBOM, signed/TestFlight distribution. Those P1–P6 launch checks
 remain blockers, not implicitly passing because the gate turns green.
+
+## Live replay source-parity increment
+
+`fixtures/fongmi-live-replay-golden.json` anchors Kotlin/Vitest/Swift window and metadata checks. `LiveReplayTest` covers Result RPC vs programme catchup, credentials, UTC/Hong Kong/DST, invalid windows/templates and historical XMLTV bounds; `LiveReplayIntegrationTest` verifies authorize-before-I/O, private capability output and revocation. Native XCTest covers persistence stripping and rejection preserving the player; Web component/browser regressions cover explicit controls, cancellation and original-URL identity. The iOS reusable workflow runs the new shared Swift smoke on both simulator jobs. Final-head aggregate success is required before acceptance; physical/device/provider corpus remains separate.

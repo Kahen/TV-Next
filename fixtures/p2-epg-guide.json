@@ -1,1 +1,32 @@
-{"generatedAt":"2026-10-23T04:30:00Z","until":"2026-10-23T16:30:00Z","totalChannels":2,"matchedChannels":1,"channels":[{"id":"news","name":"News","matchedChannelId":"news","matchType":"id","current":{"start":"2026-10-23T04:00:00Z","stop":"2026-10-23T05:00:00Z","title":"今日新闻","description":null},"upcoming":[]},{"id":"unknown","name":"Unknown","matchedChannelId":null,"matchType":"none","current":null,"upcoming":[]}],"warnings":[]}
+{
+  "generatedAt": "2026-10-23T04:30:00Z",
+  "until": "2026-10-23T16:30:00Z",
+  "totalChannels": 2,
+  "matchedChannels": 1,
+  "channels": [
+    {
+      "id": "news",
+      "name": "News",
+      "matchedChannelId": "news",
+      "matchType": "id",
+      "current": {
+        "start": "2026-10-23T04:00:00Z",
+        "stop": "2026-10-23T05:00:00Z",
+        "title": "今日新闻",
+        "description": null
+      },
+      "upcoming": [],
+      "previous": []
+    },
+    {
+      "id": "unknown",
+      "name": "Unknown",
+      "matchedChannelId": null,
+      "matchType": "none",
+      "current": null,
+      "upcoming": [],
+      "previous": []
+    }
+  ],
+  "warnings": []
+}

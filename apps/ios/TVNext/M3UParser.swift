@@ -47,13 +47,18 @@ enum M3UParser {
         var logo: String?
         var tvgId: String?
         var lineCount = 0
+        var defaultCatchup: NativeCatchup?
+        var catchup: NativeCatchup?
 
         for raw in text.components(separatedBy: .newlines) {
             lineCount += 1
             if lineCount > 20_000 { throw PlaylistError.tooManyLines }
             let line = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-            if line.lowercased().hasPrefix("#extinf") {
+            if line.lowercased().hasPrefix("#extm3u") {
+                defaultCatchup = parseCatchup(attributes(in:line))
+            } else if line.lowercased().hasPrefix("#extinf") {
                 let attrs = attributes(in: line)
+                catchup = parseCatchup(attrs) ?? defaultCatchup
                 nextName = title(in: line).flatMap { $0.isEmpty ? nil : $0 }
                     ?? attrs["tvg-name"].flatMap { $0.isEmpty ? nil : $0 }
                     ?? "Unnamed"
@@ -71,16 +76,22 @@ enum M3UParser {
                         url: line,
                         group: String(group.prefix(100)),
                         logo: logo.flatMap { MediaAddress.valid($0) ? $0 : nil },
-                        tvgId: tvgId.map { String($0.prefix(150)) }
+                        tvgId: tvgId.map { String($0.prefix(150)) }, catchup:catchup
                     ))
                 }
                 nextName = nil
                 group = "Uncategorized"
                 logo = nil
                 tvgId = nil
+                catchup = nil
             }
         }
         return result
+    }
+
+    private static func parseCatchup(_ attrs: [String:String]) -> NativeCatchup? {
+        guard let source=attrs["catchup-source"],!source.isEmpty else { return nil }
+        return NativeCatchup(type:attrs["catchup"] ?? "append",days:attrs["catchup-days"] ?? "7",source:source,replace:attrs["catchup-replace"] ?? "")
     }
 
     /// EXTINF metadata ends at the first comma outside quoted attributes.

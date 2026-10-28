@@ -15,7 +15,7 @@ import org.springframework.web.server.ResponseStatusException
 data class EpgFeedWrite(val name: String = "", val url: String = "", val intervalMinutes: Int = 360, val enabled: Boolean = true)
 data class EpgFeedStatus(val id: String, val name: String, val url: String, val intervalMinutes: Int, val enabled: Boolean,
     val updatedAt: Long, val nextRefresh: Long, val lastError: String?, val available: Boolean)
-data class EpgFeedGuideRequest(val channels: List<EpgChannelRequest> = emptyList(), val at: String? = null, val hours: Int = 12)
+data class EpgFeedGuideRequest(val channels: List<EpgChannelRequest> = emptyList(), val at: String? = null, val hours: Int = 12, val pastHours: Int = 0)
 
 @Configuration
 @EnableScheduling
@@ -50,7 +50,7 @@ class EpgFeeds(private val db: JdbcTemplate, private val transport: ProviderTran
     fun guide(user: String,id: String,r: EpgFeedGuideRequest): EpgGuideResponse {
         val xml=db.query("SELECT content FROM epg_feeds WHERE user_id=? AND id=?",{rs,_->rs.getString(1)},user,id).firstOrNull()
             ?: fail(HttpStatus.NOT_FOUND,"EPG feed has no downloaded guide; refresh it first")
-        return xmltv.guide(EpgGuideRequest(xml,r.channels,r.at,r.hours))
+        return xmltv.guide(EpgGuideRequest(xml,r.channels,r.at,r.hours,r.pastHours))
     }
     fun refresh(user: String,id: String): EpgFeedStatus {
         val feed=list(user).firstOrNull { it.id==id } ?: fail(HttpStatus.NOT_FOUND,"Unknown EPG feed")

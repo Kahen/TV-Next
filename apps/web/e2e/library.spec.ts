@@ -17,6 +17,43 @@ async function select(page:Page,name:string){
 }
 test.beforeEach(async({page})=>{await page.goto("/");});
 
+test.describe("live replay controls",()=>{
+  // Keep synthetic route fixtures independent of service-worker request ownership in WebKit.
+  // The separate production PWA test below still exercises real service workers.
+  test.use({serviceWorkers:"block"});
+test("explicit live replay uses a capability while keeping original library identity and preserves playback on resolution errors",async({page})=>{
+  const token="r".repeat(43),ticket="c".repeat(43),path="/api/v1/home/media/"+ticket+"/0";
+  const now=Date.now();let fail=false;const requested:number[]=[];
+  await page.evaluate(({token})=>sessionStorage.setItem("tv-next-home-session-v1",JSON.stringify({token,user:{id:"replay-owner",username:"Replay"},device:{id:"d",name:"Web",createdAt:0,expiresAt:Date.now()+3600000,current:true}})),{token});
+  await page.reload();
+  await page.route("**/api/v1/playlists/parse",async route=>{
+    const response=await route.fetch();const value=await response.json();
+    value.channels=value.channels.map((c:Record<string,unknown>)=>({...c,timeshift:{url:"https://example.org/seek?time={time}",start:now-3600000,window:3600000}}));
+    await route.fulfill({response,json:value});
+  });
+  await page.route("**/api/v1/subscriptions/replay",async route=>{
+    expect(route.request().headers()["authorization"]).toBe("Bearer "+token);
+    requested.push(route.request().postDataJSON().time);
+    await route.fulfill({status:fail?422:200,json:fail?{error:"Fixture replay unavailable"}:{path,expiresAt:Date.now()+3600000,hls:false,time:requested.at(-1)}});
+  });
+  await page.route("**"+path,async route=>{const response=await route.fetch({url:media});await route.fulfill({response});});
+  await page.route("**/api/v1/home/media/*/close",route=>route.fulfill({json:{closed:true}}));
+  await importPlaylist(page);await select(page,"Fixture MP4");
+  await page.getByRole("button",{name:"回到直播",exact:true}).click();
+  await expect.poll(()=>page.locator("video").evaluate(v=>(v as HTMLVideoElement).currentSrc)).toContain(path);
+  await expect.poll(()=>page.locator("video").evaluate(v=>(v as HTMLVideoElement).readyState)).toBeGreaterThanOrEqual(2);
+  expect(requested[0]).toBe(0);
+  const value=await page.evaluate(key=>localStorage.getItem(key)||"",key);
+  expect(value).not.toContain(ticket);expect(value).not.toContain("seek?time");
+  expect(JSON.parse(value).recent[0].channel.url).toBe(media);
+  const before=await page.locator("video").evaluate(v=>(v as HTMLVideoElement).currentSrc);
+  fail=true;await page.getByRole("button",{name:"回到直播",exact:true}).click();
+  await expect(page.getByRole("alert").filter({hasText:"Fixture replay unavailable"})).toBeVisible();
+  expect(await page.locator("video").evaluate(v=>(v as HTMLVideoElement).currentSrc)).toBe(before);
+});
+
+});
+
 test("real REST import, decoded MP4, favorites and original-URL resume survive reload",async({page})=>{
   await importPlaylist(page);await select(page,"Fixture MP4");
   await page.locator("video").evaluate(async node=>{const v=node as HTMLVideoElement;v.muted=true;await v.play();});

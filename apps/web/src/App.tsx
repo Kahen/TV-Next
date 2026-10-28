@@ -21,6 +21,7 @@ import { parseDanmaku } from "./danmaku";
 import type { DanmakuComment } from "./danmaku";
 import "./media-style.css";
 import EpgGuide from "./EpgGuide";
+import LiveReplayControls from "./LiveReplayControls";
 import "./epg-style.css";
 
 type Tab = "playlist" | "config" | "media" | "epg" | "home";
@@ -38,6 +39,7 @@ export default function App() {
   const [library, setLibrary] = useState<LibraryState>(loadLibrary);
   const [preview, setPreview] = useState<ConfigPreview | null>(null);
   const [catalog, setCatalog] = useState<CatalogPreview | null>(null);
+  const [playbackGeneration, setPlaybackGeneration] = useState(0);
   const [selected, setSelected] = useState<Channel | null>(null);
   const [manualUrl, setManualUrl] = useState("");
   const [filter, setFilter] = useState("");
@@ -111,6 +113,7 @@ export default function App() {
     if (channel.headersRequired) { setError("此频道的私密请求头未保存在媒体库，请重新加载订阅后播放。"); return; }
     setError("");
     setLocalVideo(null);
+    setPlaybackGeneration(value=>value+1);
     setSelected(channel);
     setDanmaku([]); setSubtitleOriginal(""); setSubtitleName("");
     setLibrary((state) => addRecent(state, channel));
@@ -134,14 +137,14 @@ export default function App() {
     let lastSavedAt = 0;
 
     const remember = (force: boolean) => {
-      if (isLocal || !Number.isFinite(video.duration) || !Number.isFinite(video.currentTime)) return;
+      if (selected?.replay || isLocal || !Number.isFinite(video.duration) || !Number.isFinite(video.currentTime)) return;
       const now = Date.now();
       if (!force && now - lastSavedAt < 8000) return;
       lastSavedAt = now;
       setLibrary((state) => setPosition(state, positionKey, video.currentTime, video.duration));
     };
     const resume = () => {
-      if (isLocal) return;
+      if (isLocal || selected?.replay) return;
       const position = libraryRef.current.positions[positionKey];
       if (position && Number.isFinite(video.duration) && video.duration - position > 15) {
         try { video.currentTime = position; } catch { /* non-seekable stream */ }
@@ -152,7 +155,7 @@ export default function App() {
     const onPause = () => remember(true);
     // React effects may not flush during pagehide. Persist the latest clock synchronously.
     const onPageHide = () => {
-      if (isLocal) return;
+      if (isLocal || selected?.replay) return;
       const next = setPosition(libraryRef.current, positionKey, video.currentTime, video.duration);
       libraryRef.current = next;
       saveLibrary(next);
@@ -162,7 +165,7 @@ export default function App() {
       if (document.visibilityState === "hidden") onPageHide();
     };
     const onEnded = () => {
-      if (!isLocal && Number.isFinite(video.duration)) {
+      if (!isLocal && !selected?.replay && Number.isFinite(video.duration)) {
         setLibrary((state) => setPosition(state, positionKey, video.duration, video.duration));
       }
     };
@@ -216,6 +219,7 @@ export default function App() {
       return;
     }
     setError("");
+    setPlaybackGeneration(value=>value+1);
     setSelected(null);
     setDanmaku([]); setSubtitleOriginal(""); setSubtitleName("");
     setLocalVideo({ url: URL.createObjectURL(file), name: file.name });
@@ -415,6 +419,7 @@ export default function App() {
             <label>屏蔽词（逗号分隔）<input maxLength={1000} value={danmakuSettings.blocked} onChange={e=>setDanmakuSettings(s=>({...s,blocked:e.target.value}))}/></label>
             <button onClick={()=>setDanmaku([])}>清空弹幕</button>
           </details>}
+          {selected && <LiveReplayControls channel={selected} session={homeSession} onPlay={playChannel} cancellationKey={playbackGeneration} />}
           {selected && <div className="player-actions">
             <button className="secondary" onClick={() => setLibrary((state) => toggleFavorite(state, selected.url))}>
               {library.favorites.includes(selected.url) ? "★ 取消收藏" : "☆ 收藏此频道"}
@@ -433,7 +438,7 @@ export default function App() {
             <span className="hint">本地文件不会上传，也不会保存到播放历史；能否播放取决于浏览器编解码能力。</span>
           </div>
         </div>
-        {tab === "home" ? <HomeServerPanel library={library} onRestore={setLibrary} session={homeSession} onSessionChange={setHomeSession} remoteState={remoteState}/> : tab === "media" ? <><SubscriptionBrowser session={homeSession} onPlay={playChannel} onImport={channels=>setLibrary(state=>({...state,channels:channels.slice(0,1500)}))}/><CloudBrowser onPlay={playChannel}/><MediaBrowser onPlay={playChannel} /></> : tab === "epg" ? <EpgGuide channels={channels} onPlay={playChannel} session={homeSession} /> : tab === "config" ? <>
+        {tab === "home" ? <HomeServerPanel library={library} onRestore={setLibrary} session={homeSession} onSessionChange={setHomeSession} remoteState={remoteState}/> : tab === "media" ? <><SubscriptionBrowser session={homeSession} onPlay={playChannel} onImport={channels=>setLibrary(state=>({...state,channels:channels.slice(0,1500)}))}/><CloudBrowser onPlay={playChannel}/><MediaBrowser onPlay={playChannel} /></> : tab === "epg" ? <EpgGuide channels={channels} onPlay={playChannel} session={homeSession} cancellationKey={playbackGeneration} /> : tab === "config" ? <>
           <div className="section-heading"><h2>检查 FongMi JSON 配置</h2><span>STATIC INSPECTION ONLY</span></div>
           <section className="panel">
             <p className="hint">只展示站点、直播分组及 Spider 声明，不会运行 Java/JS/Python 插件或获取远程内容。</p>
