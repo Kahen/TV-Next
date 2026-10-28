@@ -38,8 +38,8 @@ import Foundation
         let minimalXML = Data("<d:multistatus xmlns:d=\"DAV:\"></d:multistatus>".utf8)
         var exactlyAtLimit = minimalXML
         exactlyAtLimit.append(Data(repeating: 32, count: 1_048_576 - minimalXML.count))
-        precondition(try NativeWebDAV.parse(exactlyAtLimit, root: root, folder: folder).isEmpty,
-                     "A valid 1 MiB response must remain supported")
+        let exactBoundaryItems = try NativeWebDAV.parse(exactlyAtLimit, root: root, folder: folder)
+        precondition(exactBoundaryItems.isEmpty, "A valid 1 MiB response must remain supported")
         do { _ = try NativeWebDAV.parse(Data(repeating: 65, count: 1_048_577), root: root, folder: folder); fatalError("Accepted oversized XML") }
         catch NativeWebDAVError.responseTooLarge { }
         print("Native WebDAV bounded listing smoke passed")
