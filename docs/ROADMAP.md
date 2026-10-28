@@ -73,7 +73,8 @@ Tracking: https://github.com/Kahen/TV-Next/issues/5
 - [x] Opt-in native background audio and system play/pause/finite-VOD seek/skip metadata controls; see NATIVE_BACKGROUND_PLAYBACK.md for final-head test gates and limits.
 - [ ] Physical background/lock-screen/PiP/AirPlay delivery, quality/codec/energy matrix.
 - [ ] Optional transcoding sidecar with measured resource limits.
-- [ ] Authorized LAN DLNA discovery/control and WebDAV/SMB inputs with secure credentials (native read-only WebDAV subset in PR for #66; SMB and physical/provider acceptance remain).
+- [x] Native iOS read-only WebDAV Depth:1 browsing with optional HTTPS Basic credentials and authenticated relay playback (PR #67); physical/provider verification remains open.
+- [ ] Authorized LAN DLNA discovery/control and SMB inputs with secure credentials; broader WebDAV auth/provider support remains.
 - [ ] Offline cache/download lifecycle and direct cloud login/QR/OAuth.
 
 Acceptance: device matrix includes iPhone/iPad models, Safari/Chrome/Firefox, and H.264/H.265/AAC compatibility tests.
