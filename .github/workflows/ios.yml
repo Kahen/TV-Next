@@ -113,6 +113,22 @@ jobs:
             -hls_segment_filename '/tmp/tvnext-audio-hls/stream_%v_%03d.m4s' \
             '/tmp/tvnext-audio-hls/stream_%v.m3u8'
           grep -q 'EXT-X-MEDIA:TYPE=AUDIO' /tmp/tvnext-audio-hls/master.m3u8
+          # Append a local WebVTT HLS rendition to the synthetic master.
+          # This tests AVFoundation's native legible media-selection group, not
+          # FongMi Android subtitle renderers or external ASS/SSA styling.
+          python3 - <<'PYTHON'
+          from pathlib import Path
+          root = Path('/tmp/tvnext-audio-hls')
+          master = root / 'master.m3u8'
+          lines = master.read_text().splitlines()
+          assert any(line.startswith('#EXT-X-STREAM-INF:') for line in lines)
+          lines = [line + ',SUBTITLES="subs"' if line.startswith('#EXT-X-STREAM-INF:') else line for line in lines]
+          lines.insert(1, '#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="Synthetic English",LANGUAGE="en",DEFAULT=NO,AUTOSELECT=YES,FORCED=NO,URI="subs.m3u8"')
+          master.write_text('\n'.join(lines) + '\n')
+          (root / 'subs.m3u8').write_text('#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:4\n#EXT-X-PLAYLIST-TYPE:VOD\n#EXT-X-MEDIA-SEQUENCE:0\n#EXTINF:4.000,\ncaptions.vtt\n#EXT-X-ENDLIST\n')
+          (root / 'captions.vtt').write_text('WEBVTT\nX-TIMESTAMP-MAP=LOCAL:00:00:00.000,MPEGTS:0\n\n00:00:00.000 --> 00:00:03.500\nSynthetic subtitles\n')
+          PYTHON
+          grep -q 'EXT-X-MEDIA:TYPE=SUBTITLES' /tmp/tvnext-audio-hls/master.m3u8
           python3 -m http.server 8766 --bind 127.0.0.1 --directory /tmp/tvnext-audio-hls > /tmp/tvnext-audio-server.log 2>&1 &
           audio_pid=$!
           trap 'kill "$fixture_pid" "$audio_pid" 2>/dev/null || true' EXIT
