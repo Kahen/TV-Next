@@ -23,6 +23,18 @@ private struct NativeAudioPreferenceSnapshot: Codable {
     let entries: [NativeAudioPreference]
 }
 
+private struct NativeSubtitlePreference: Codable {
+    let urlDigest: String
+    let displayName: String?
+    let languageTag: String?
+    let isOff: Bool
+}
+
+private struct NativeSubtitlePreferenceSnapshot: Codable {
+    let version: Int
+    let entries: [NativeSubtitlePreference]
+}
+
 struct NativeAudioTrack: Identifiable, Equatable {
     let id: Int
     let title: String
@@ -62,7 +74,7 @@ final class MediaLibraryStore: ObservableObject {
     private let audioPreferenceStorageKey = "tv-next-native-audio-preferences-v1"
     private var audioPreferences: [NativeAudioPreference] = []
 
-    private func audioPreferenceKey() -> String? {
+    private func mediaPreferenceKey() -> String? {
         guard let channel = current, channel.replay == nil, currentLocalFile == nil,
               MediaAddress.valid(channel.url) else { return nil }
         return SHA256.hash(data: Data(channel.url.utf8))
@@ -83,7 +95,7 @@ final class MediaLibraryStore: ObservableObject {
     }
 
     private func rememberAudioPreference(_ option: AVMediaSelectionOption) {
-        guard let key = audioPreferenceKey() else { return }
+        guard let key = mediaPreferenceKey() else { return }
         let name = String(option.displayName.prefix(80))
         guard !name.isEmpty, (option.extendedLanguageTag?.count ?? 0) <= 64 else { return }
         audioPreferences.removeAll { $0.urlDigest == key }
@@ -100,6 +112,45 @@ final class MediaLibraryStore: ObservableObject {
     private var subtitleTrackTask: Task<Void, Never>?
     private var subtitleTrackItem: AVPlayerItem?
     private var subtitleTrackGroup: AVMediaSelectionGroup?
+    private let subtitlePreferenceStorageKey = "tv-next-native-subtitle-preferences-v1"
+    private var subtitlePreferences: [NativeSubtitlePreference] = []
+
+    private func restoreSubtitlePreferences() {
+        guard let data = defaults.data(forKey: subtitlePreferenceStorageKey),
+              data.count <= 64_000,
+              let snapshot = try? JSONDecoder().decode(NativeSubtitlePreferenceSnapshot.self, from: data),
+              snapshot.version == 1 else { return }
+        var seen = Set<String>()
+        subtitlePreferences = Array(snapshot.entries.reversed().filter { entry in
+            let validChoice = entry.isOff
+                ? entry.displayName == nil && entry.languageTag == nil
+                : (entry.displayName.map { !$0.isEmpty && $0.count <= 80 } ?? false)
+                    && (entry.languageTag?.count ?? 0) <= 64
+            return entry.urlDigest.count == 64 && entry.urlDigest.allSatisfy(\.isHexDigit)
+                && validChoice && seen.insert(entry.urlDigest).inserted
+        }.prefix(100).reversed())
+    }
+
+    /// Display labels may be shortened for the menu, but a persisted identity
+    /// must never be shortened: two provider renditions can share the same prefix.
+    static func persistableSubtitleDisplayName(_ name: String) -> String? {
+        guard !name.isEmpty, name.count <= 80 else { return nil }
+        return name
+    }
+
+    private func rememberSubtitlePreference(_ option: AVMediaSelectionOption?) {
+        guard let key = mediaPreferenceKey() else { return }
+        let name = option.flatMap { Self.persistableSubtitleDisplayName($0.displayName) }
+        guard option == nil || (name != nil
+              && (option?.extendedLanguageTag?.count ?? 0) <= 64) else { return }
+        let preference = NativeSubtitlePreference(urlDigest: key,
+            displayName: name, languageTag: option?.extendedLanguageTag, isOff: option == nil)
+        let updated = Array((subtitlePreferences.filter { $0.urlDigest != key } + [preference]).suffix(100))
+        let snapshot = NativeSubtitlePreferenceSnapshot(version: 1, entries: updated)
+        guard let data = try? JSONEncoder().encode(snapshot), data.count <= 64_000 else { return }
+        defaults.set(data, forKey: subtitlePreferenceStorageKey)
+        subtitlePreferences = updated
+    }
 
     /// Only the installed item may receive a legible-track selection.
     /// nil explicitly disables subtitles when the media group permits it.
@@ -112,11 +163,13 @@ final class MediaLibraryStore: ObservableObject {
             player.appliesMediaSelectionCriteriaAutomatically = false
             item.select(group.options[index], in: group)
             selectedSubtitleTrack = index
+            rememberSubtitlePreference(group.options[index])
         } else {
             guard group.allowsEmptySelection else { return false }
             player.appliesMediaSelectionCriteriaAutomatically = false
             item.select(nil, in: group)
             selectedSubtitleTrack = nil
+            rememberSubtitlePreference(nil)
         }
         return true
     }
@@ -142,6 +195,27 @@ final class MediaLibraryStore: ObservableObject {
                     })?.id
                 } else {
                     self.selectedSubtitleTrack = nil
+                }
+                // Restore only an exact, unique identity on the currently installed item.
+                if let key = self.mediaPreferenceKey(),
+                   let preference = self.subtitlePreferences.first(where: { $0.urlDigest == key }) {
+                    if preference.isOff {
+                        if group.allowsEmptySelection {
+                            self.player.appliesMediaSelectionCriteriaAutomatically = false
+                            item.select(nil, in: group)
+                            self.selectedSubtitleTrack = nil
+                        }
+                    } else {
+                        let matches = Array(group.options.prefix(16).enumerated()).filter {
+                            $0.element.displayName == preference.displayName &&
+                            $0.element.extendedLanguageTag == preference.languageTag
+                        }
+                        if matches.count == 1, let match = matches.first {
+                            self.player.appliesMediaSelectionCriteriaAutomatically = false
+                            item.select(match.element, in: group)
+                            self.selectedSubtitleTrack = match.offset
+                        }
+                    }
                 }
             } catch {
                 // No selectable legible group: retain native playback and external caption support.
@@ -199,7 +273,7 @@ final class MediaLibraryStore: ObservableObject {
                     self.selectedAudioTrack = nil
                 }
                 // Reapply only a unique, exact match. Never use a stale numeric index.
-                if let key = self.audioPreferenceKey(),
+                if let key = self.mediaPreferenceKey(),
                    let preference = self.audioPreferences.first(where: { $0.urlDigest == key }) {
                     let matches = Array(group.options.prefix(16).enumerated()).filter {
                         String($0.element.displayName.prefix(80)) == preference.displayName &&
@@ -273,6 +347,7 @@ final class MediaLibraryStore: ObservableObject {
         player.allowsExternalPlayback = true
         restore()
         restoreAudioPreferences()
+        restoreSubtitlePreferences()
         let center = NotificationCenter.default
         audioObservers.append(center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] note in
             guard let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
@@ -595,6 +670,8 @@ final class MediaLibraryStore: ObservableObject {
         defaults.removeObject(forKey: storageKey)
         audioPreferences = []
         defaults.removeObject(forKey: audioPreferenceStorageKey)
+        subtitlePreferences = []
+        defaults.removeObject(forKey: subtitlePreferenceStorageKey)
     }
 
     private func restore() {
