@@ -66,7 +66,7 @@ Tracking: https://github.com/Kahen/TV-Next/issues/5
 
 - [x] External SRT/WebVTT timing offset, bounded ASS/SSA Dialogue text, Web/native danmaku parsers and timeline overlays.
 - [x] Basic native system PiP and AirPlay route picker; playback speed controls and AList/OpenList browsing.
-- [ ] Styled ASS positioning/karaoke/fonts, embedded subtitle/audio preferences, decoder diagnostics and intro/outro skip.
+- [ ] Native AVPlayer audio-track menu (implementation pending CI); styled ASS positioning/karaoke/fonts, embedded subtitle selection, persistent audio preferences, decoder diagnostics and intro/outro skip remain.
 - [ ] Background/lock-screen media controls and remaining device PiP/AirPlay quality/codec/energy matrix.
 - [ ] Optional transcoding sidecar with measured resource limits.
 - [ ] Authorized LAN DLNA discovery/control and WebDAV/SMB inputs with secure credentials.

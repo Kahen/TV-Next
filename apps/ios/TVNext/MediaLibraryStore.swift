@@ -11,6 +11,11 @@ private struct SavedLibrary: Codable {
     let recentTimes: [String:Double]?
 }
 
+struct NativeAudioTrack: Identifiable, Equatable {
+    let id: Int
+    let title: String
+}
+
 @MainActor
 final class MediaLibraryStore: ObservableObject {
     @Published private(set) var playbackGeneration=0
@@ -32,6 +37,60 @@ final class MediaLibraryStore: ObservableObject {
     private var captionObserver: Any?
 
     let player = AVPlayer()
+    @Published private(set) var audioTracks: [NativeAudioTrack] = []
+    @Published private(set) var selectedAudioTrack: Int?
+    private var audioTrackTask: Task<Void, Never>?
+    private var audioTrackItem: AVPlayerItem?
+    private var audioTrackGroup: AVMediaSelectionGroup?
+
+    /// Media selection is ephemeral and scoped to the installed AVPlayerItem.
+    func selectAudioTrack(_ index: Int) -> Bool {
+        guard let item = audioTrackItem, player.currentItem === item,
+              let group = audioTrackGroup,
+              index >= 0, index < audioTracks.count, index < group.options.count else { return false }
+        player.appliesMediaSelectionCriteriaAutomatically = false
+        item.select(group.options[index], in: group)
+        selectedAudioTrack = index
+        return true
+    }
+
+    private func resetAudioTracks() {
+        player.appliesMediaSelectionCriteriaAutomatically = true
+        audioTrackTask?.cancel()
+        audioTrackTask = nil
+        audioTrackItem = nil
+        audioTrackGroup = nil
+        audioTracks = []
+        selectedAudioTrack = nil
+    }
+
+    private func discoverAudioTracks(for item: AVPlayerItem) {
+        audioTrackTask?.cancel()
+        audioTrackTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                guard let group = try await item.asset.loadMediaSelectionGroup(for: .audible),
+                      !Task.isCancelled, self.player.currentItem === item else { return }
+                self.audioTrackItem = item
+                self.audioTrackGroup = group
+                self.audioTracks = Array(group.options.prefix(16).enumerated().map { index, option in
+                    let label = String(option.displayName.prefix(80))
+                    return NativeAudioTrack(id: index, title: "音轨 \(index + 1) · " + (label.isEmpty ? "未命名" : label))
+                })
+                if let selected = item.currentMediaSelection.selectedMediaOption(in: group) {
+                    self.selectedAudioTrack = self.audioTracks.first(where: {
+                        group.options[$0.id] === selected
+                    })?.id
+                } else {
+                    self.selectedAudioTrack = nil
+                }
+            } catch {
+                // Some codecs/containers expose no AVFoundation media-selection group.
+                // Keep system playback working rather than presenting an unusable menu.
+            }
+        }
+    }
+
     @Published private(set) var playbackSpeed: Float = 1.0
 
     func setPlaybackSpeed(_ speed: Float) {
@@ -69,7 +128,9 @@ final class MediaLibraryStore: ObservableObject {
     }
     private func cancelRelay() {
         relayGeneration=UUID();relayTask?.cancel();relayTask=nil
-        if let (api,ticket)=activeRelay { player.pause();player.replaceCurrentItem(with:nil);release(api,ticket) }
+        if let (api,ticket)=activeRelay {
+            player.pause();player.replaceCurrentItem(with:nil);resetAudioTracks();release(api,ticket)
+        }
         activeRelay=nil
     }
 
@@ -115,6 +176,7 @@ final class MediaLibraryStore: ObservableObject {
         if let captionObserver { player.removeTimeObserver(captionObserver) }
         statusObservation?.invalidate()
         relayTask?.cancel()
+        audioTrackTask?.cancel()
         LocalMediaStager.discard(currentLocalFile)
     }
 
@@ -167,6 +229,7 @@ final class MediaLibraryStore: ObservableObject {
         statusObservation?.invalidate()
         player.pause()
         player.replaceCurrentItem(with: nil)
+        resetAudioTracks()
         requestedChannel = channel
         if channel.headersRequired == true {
             playbackError = "媒体库未保存此来源的私密请求头，请重新加载订阅后播放。"
@@ -238,6 +301,7 @@ final class MediaLibraryStore: ObservableObject {
     /// Status callbacks may arrive after another selection, clear or relay cancellation.
     /// Only the currently installed item may change UI state or seek the player.
     private func observe(_ item: AVPlayerItem, resume: Double?) {
+        resetAudioTracks()
         statusObservation?.invalidate()
         statusObservation = item.observe(\.status, options: [.initial, .new]) { [weak self] observed, _ in
             Task { @MainActor [weak self] in
@@ -246,6 +310,7 @@ final class MediaLibraryStore: ObservableObject {
                     self.playbackError = "播放失败：媒体不可访问或编解码不受支持。可重试或选择其他媒体。"
                 } else if observed.status == .readyToPlay {
                     self.playbackError = nil
+                    self.discoverAudioTracks(for: observed)
                     if let resume, resume.isFinite, resume >= 5 {
                         let duration = observed.duration.seconds
                         guard duration.isFinite, duration >= 60, duration - resume >= 15 else { return }
@@ -382,6 +447,7 @@ final class MediaLibraryStore: ObservableObject {
         cancelRelay()
         player.pause()
         player.replaceCurrentItem(with: nil)
+        resetAudioTracks()
         LocalMediaStager.discard(currentLocalFile)
         currentLocalFile = nil
         localFileName = nil

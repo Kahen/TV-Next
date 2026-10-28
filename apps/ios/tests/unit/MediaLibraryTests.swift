@@ -97,6 +97,27 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertNil(restored.player.currentItem)
     }
 
+    func testAudioTrackSelectionIsItemScopedAndRejectsInvalidIndices() async throws {
+        XCTAssertFalse(store.selectAudioTrack(0), "No player item must never accept a track")
+        // An HLS master explicitly declares two alternative audio renditions.
+        // A multi-audio MP4 does not consistently expose AVMediaSelectionGroup on iOS.
+        store.play(channel("Two audio renditions", url: "http://127.0.0.1:8766/master.m3u8"))
+        try await waitUntil({ self.store.audioTracks.count == 2 }, timeout: 15)
+        XCTAssertFalse(store.selectAudioTrack(-1))
+        XCTAssertFalse(store.selectAudioTrack(2))
+        XCTAssertTrue(store.selectAudioTrack(1))
+        XCTAssertFalse(store.player.appliesMediaSelectionCriteriaAutomatically)
+        XCTAssertEqual(store.selectedAudioTrack, 1)
+        XCTAssertEqual(store.audioTracks.map(\.id), [0, 1])
+        store.playLocalFile(try fixture(), name: "fixture.mp4")
+        XCTAssertTrue(store.audioTracks.isEmpty, "Old item tracks must disappear immediately")
+        XCTAssertTrue(store.player.appliesMediaSelectionCriteriaAutomatically)
+        XCTAssertNil(store.selectedAudioTrack)
+        XCTAssertFalse(store.selectAudioTrack(1), "Do not select a track from a replaced item")
+        store.clear()
+        XCTAssertTrue(store.audioTracks.isEmpty)
+    }
+
     func testPlaybackSpeedBoundsAndInvalidNumbers() {
         store.setPlaybackSpeed(1.5)
         store.setPlaybackSpeed(.nan)
