@@ -344,6 +344,8 @@ final class MediaLibraryStore: ObservableObject {
     }
     private let storageKey = "tv-next-library-v1"
     private let defaults: UserDefaults
+    private let introOutroStore: NativeIntroOutroMarkerStore
+    @Published private(set) var introOutroMarkers: NativeIntroOutroMarkers?
     private var timeObserver: Any?
     private var statusObservation: NSKeyValueObservation?
     private var requestedChannel: TVChannel?
@@ -383,6 +385,7 @@ final class MediaLibraryStore: ObservableObject {
              try await api.request("subscriptions/replay", body: request)
          }) {
         self.defaults = defaults
+        self.introOutroStore = NativeIntroOutroMarkerStore(defaults: defaults)
         self.createRelay = createRelay
         self.resolveReplay = resolveReplay
         player.allowsExternalPlayback = true
@@ -515,6 +518,7 @@ final class MediaLibraryStore: ObservableObject {
         clearCaptions()
         statusObservation?.invalidate()
         current = channel
+        introOutroMarkers = nil
         recent.removeAll { $0.url == channel.url }
         var history=channel;history.replay=nil
         recent.insert(history, at: 0)
@@ -555,6 +559,7 @@ final class MediaLibraryStore: ObservableObject {
             statusObservation = nil
             current = nil
             requestedChannel = nil
+            introOutroMarkers = nil
             localFileName = nil
             clearCaptions()
             mediaControls?.invalidate()
@@ -580,6 +585,7 @@ final class MediaLibraryStore: ObservableObject {
         currentLocalFile = file
         localFileName = name
         current = nil
+        introOutroMarkers = nil
         clearCaptions()
         statusObservation?.invalidate()
         playbackError = nil
@@ -606,6 +612,7 @@ final class MediaLibraryStore: ObservableObject {
                 } else if observed.status == .readyToPlay {
                     self.playbackError = nil
                     self.updateSystemMetadata()
+                    self.refreshIntroOutroMarkers(duration: observed.duration.seconds)
                     self.discoverAudioTracks(for: observed)
                     self.discoverEmbeddedSubtitles(for: observed)
                     if let resume, resume.isFinite, resume >= 5 {
@@ -616,6 +623,64 @@ final class MediaLibraryStore: ObservableObject {
                 }
             }
         }
+    }
+
+    private func refreshIntroOutroMarkers(duration: Double) {
+        guard let digest = mediaPreferenceKey() else { introOutroMarkers = nil; return }
+        introOutroMarkers = introOutroStore.markers(for: digest, duration: duration)
+    }
+
+    /// Markers are only available for a ready, finite remote VOD. They never
+    /// run automatically or attach to local files, live or replay sessions.
+    private func introOutroContext() -> (digest: String, duration: Double, time: Double)? {
+        guard let digest = mediaPreferenceKey(),
+              let item = player.currentItem, item.status == .readyToPlay,
+              let channel = current, channel.replay == nil else { return nil }
+        let duration = item.duration.seconds
+        let time = player.currentTime().seconds
+        guard duration.isFinite, duration >= 120, duration < 604_800,
+              time.isFinite, time >= 0, time <= duration else { return nil }
+        return (digest, duration, time)
+    }
+
+    @discardableResult
+    func markIntroEnd() -> Bool {
+        guard let context = introOutroContext(),
+              let markers = (introOutroMarkers ?? NativeIntroOutroMarkers())
+                .settingIntro(context.time, duration: context.duration),
+              introOutroStore.save(markers, digest: context.digest, duration: context.duration) else { return false }
+        introOutroMarkers = markers
+        return true
+    }
+
+    @discardableResult
+    func markOutroStart() -> Bool {
+        guard let context = introOutroContext(),
+              let markers = (introOutroMarkers ?? NativeIntroOutroMarkers())
+                .settingOutro(context.time, duration: context.duration),
+              introOutroStore.save(markers, digest: context.digest, duration: context.duration) else { return false }
+        introOutroMarkers = markers
+        return true
+    }
+
+    @discardableResult
+    func skipMarkedIntro() -> Bool {
+        guard let context = introOutroContext(),
+              let target = introOutroMarkers?.introTarget(current: context.time, duration: context.duration) else { return false }
+        return handleSystemPlaybackCommand(.seek(target))
+    }
+
+    @discardableResult
+    func skipMarkedOutro() -> Bool {
+        guard let context = introOutroContext(),
+              let target = introOutroMarkers?.outroTarget(current: context.time, duration: context.duration) else { return false }
+        return handleSystemPlaybackCommand(.seek(target))
+    }
+
+    func clearIntroOutroMarkers() {
+        guard let digest = mediaPreferenceKey() else { return }
+        introOutroStore.remove(digest: digest)
+        introOutroMarkers = nil
     }
 
     func retryPlayback() {
@@ -817,6 +882,8 @@ final class MediaLibraryStore: ObservableObject {
         statusObservation?.invalidate()
         current = nil
         requestedChannel = nil
+        introOutroMarkers = nil
+        introOutroStore.clear()
         pictureInPictureActive = false
         mediaControls?.invalidate()
         backgroundPlaybackEnabled = false
