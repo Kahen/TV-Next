@@ -196,7 +196,9 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertTrue(restored.canDisableEmbeddedSubtitles)
         XCTAssertTrue(restored.selectSubtitleTrack(nil))
         let off = try XCTUnwrap(defaults.data(forKey: key))
-        XCTAssertTrue(String(decoding: off, as: UTF8.self).contains("\\"isOff\\":true"))
+        let offObject = try XCTUnwrap(JSONSerialization.jsonObject(with: off) as? [String: Any])
+        let offEntries = try XCTUnwrap(offObject["entries"] as? [[String: Any]])
+        XCTAssertEqual(offEntries.last?["isOff"] as? Bool, true)
         let offRestored = MediaLibraryStore(defaults: defaults)
         offRestored.play(channel("Synthetic subtitles", url: mediaURL))
         try await waitUntil({ offRestored.subtitleTracks.count == 1 &&

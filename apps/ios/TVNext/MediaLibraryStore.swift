@@ -134,7 +134,7 @@ final class MediaLibraryStore: ObservableObject {
     private func rememberSubtitlePreference(_ option: AVMediaSelectionOption?) {
         guard let key = mediaPreferenceKey() else { return }
         let name = option.map { String($0.displayName.prefix(80)) }
-        guard option == nil || (name != nil && !name!.isEmpty
+        guard option == nil || (name?.isEmpty == false
               && (option?.extendedLanguageTag?.count ?? 0) <= 64) else { return }
         let preference = NativeSubtitlePreference(urlDigest: key,
             displayName: name, languageTag: option?.extendedLanguageTag, isOff: option == nil)
