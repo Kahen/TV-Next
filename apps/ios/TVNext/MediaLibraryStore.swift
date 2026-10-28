@@ -90,11 +90,11 @@ final class MediaLibraryStore: ObservableObject {
     private func restoreAudioPreferences() {
         guard let data = defaults.data(forKey: audioPreferenceStorageKey), data.count <= 64_000,
               let snapshot = try? JSONDecoder().decode(NativeAudioPreferenceSnapshot.self, from: data),
-              snapshot.version == 1 else { return }
+              snapshot.version == 1 || snapshot.version == 2 else { return }
         var seen = Set<String>()
         audioPreferences = Array(snapshot.entries.reversed().filter { entry in
             entry.urlDigest.count == 64 && entry.urlDigest.allSatisfy(\.isHexDigit) &&
-            !entry.displayName.isEmpty && entry.displayName.count <= 80 &&
+            Self.isValidStoredAudioDisplayName(entry.displayName, version: snapshot.version) &&
             (entry.languageTag?.count ?? 0) <= 64 &&
             seen.insert(entry.urlDigest).inserted
         }.prefix(100).reversed())
@@ -105,6 +105,14 @@ final class MediaLibraryStore: ObservableObject {
     static func persistableAudioDisplayName(_ name: String) -> String? {
         guard !name.isEmpty, name.count <= 80 else { return nil }
         return name
+    }
+
+    /// V1 stored a truncated 80-character prefix. Such entries cannot be
+    /// distinguished from a legitimate 80-character name, so drop them when
+    /// migrating; V2 stores only complete identities.
+    static func isValidStoredAudioDisplayName(_ name: String, version: Int) -> Bool {
+        guard persistableAudioDisplayName(name) != nil else { return false }
+        return version == 2 || (version == 1 && name.count < 80)
     }
 
     /// Match full AVFoundation identities, never menu labels or stale indices.
@@ -133,7 +141,7 @@ final class MediaLibraryStore: ObservableObject {
             saved = []
         }
         let updated = Array((audioPreferences.filter { $0.urlDigest != key } + saved).suffix(100))
-        let snapshot = NativeAudioPreferenceSnapshot(version: 1, entries: updated)
+        let snapshot = NativeAudioPreferenceSnapshot(version: 2, entries: updated)
         guard let data = try? JSONEncoder().encode(snapshot), data.count <= 64_000 else { return }
         defaults.set(data, forKey: audioPreferenceStorageKey)
         audioPreferences = updated
