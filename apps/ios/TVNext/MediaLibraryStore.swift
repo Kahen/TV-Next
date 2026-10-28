@@ -539,6 +539,10 @@ final class MediaLibraryStore: ObservableObject {
             guard channel.group == "WebDAV", let url = URL(string: channel.url) else { return false }
             return NativeWebDAV.contains(url, root: root)
         }
+        let revokedURLs = Set(
+            ([current, requestedChannel].compactMap { $0 } + recent + channels)
+                .filter(belongs).map(\.url)
+        )
         let ownsPlayback = current.map(belongs) == true || requestedChannel.map(belongs) == true
         if ownsPlayback {
             playbackGeneration += 1
@@ -560,12 +564,8 @@ final class MediaLibraryStore: ObservableObject {
         recent.removeAll(where: belongs)
         channels.removeAll(where: belongs)
         recentTimes = recentTimes.filter { key, _ in recent.contains(where: { $0.url == key }) }
-        let removedURLs = Set(positions.keys.filter {
-            guard let url = URL(string: $0) else { return false }
-            return NativeWebDAV.contains(url, root: root)
-        })
-        positions = positions.filter { !removedURLs.contains($0.key) }
-        favorites.removeAll(where: { removedURLs.contains($0) })
+        positions = positions.filter { !revokedURLs.contains($0.key) }
+        favorites.removeAll(where: { revokedURLs.contains($0) })
         persist()
     }
 
