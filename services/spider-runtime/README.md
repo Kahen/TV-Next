@@ -12,7 +12,7 @@ plugins executable in a JVM. Real ARM-host verification remains pending.
 - Host-only `runner.py` accepts one of three **hardcoded Docker image tags** and five allowed read-only methods: `home`, `category`, `search`, `detail`, `player`.
 - Single JSON RPC v1 request on stdin: `{"version":1,"method":"home","args":{}}`. Single JSON result on stdout: `{"version":1,"status":"ok","runtime":"node","data":{...}}`. Errors return bounded `{"version":1,"status":"error","code":"..." }` without stack traces, secrets, or raw plugin output.
 - All workers read the same committed `fixtures/catalog.json` and must provide **identical business results**, independent of language. URL strings are placeholder fixture metadata; no runtime fetch occurs.
-- Host launch is a one-shot Docker process **per invocation**. The launch policy disallows networking, Docker socket mounts, host mounts, Linux capabilities, writable root filesystems and root UID.
+- Host launch is a one-shot Docker container **per invocation**, registered with `docker create` before `docker start --attach --interactive`. The launch policy disallows networking, Docker socket mounts, host mounts, Linux capabilities, writable root filesystems and root UID. Fixture images must exist locally (`--pull never`).
 - JS, Python and Java have diagnostic test hooks for controlled network, filesystem and timeout probes, enabled only by a host-side explicit `diagnostic=True` test invocation; the normal caller rejects their methods. The hooks are **not** plugin APIs.
 
 ### Hardening controls (enforced by Docker CLI)
@@ -26,7 +26,7 @@ plugins executable in a JVM. Real ARM-host verification remains pending.
 | CPU | `--cpus 0.5` |
 | Process / descriptors | `--pids-limit 32 --ulimit nofile=64:64` |
 | Request / output | 16 KiB JSON request and response; 64 KiB host stdout/stderr file limits |
-| Time budget | Configurable 0.1–20 s, 7 s default; Docker container force-removed on timeout |
+| Time budget | Configurable 0.1–20 s, 7 s default, shared by create/start/execution; separate bounded 20 s teardown confirmation |
 | Images | Fixed in source; no user-provided image, source path or shell command |
 
 Docker's host daemon is a **privileged trust boundary**. Do not mount a Docker socket inside the API, expose the host Python runner through REST, rely on JS `vm` or Python `eval` as a security boundary, or connect a live plugin loader until a security review validates Docker daemon access, UID namespaces, seccomp/LSM policy, OS updates, cgroup limits, network egress controls, log/secret isolation, and allowed fixture provenance. `--network none` proves egress deny in CI, but also means *real Spider plugins requiring Internet cannot function yet*.
@@ -69,3 +69,29 @@ python3 services/spider-runtime/jar_inspect.py /path/to/authorized.jar
 The local, read-only scanner checks archive size/ZIP path traversal/compression limits, class file structure, JVM constant pool/descriptors referencing `android/`, `dalvik/` and `androidx/`, JNI `native` method flags and bundled native libraries (`.so`, `.dll`, etc.). It produces machine-readable `pure-jvm-candidate`, `unsupported` or `rejected` statuses. Candidate means **not obviously Android-dependent by these heuristics**, NOT verified safe, functional or compatible. Reflection, JNI wrappers, classfile tricks, late-loaded dependencies and obfuscation may evade static identification. Both external provider activation and network access remain prohibited.
 
 CI runs unit tests built from synthetic classfile bytes and scans the actual bundled JAR extracted without execution from the freshly built Docker image. P3 still requires an approved source corpus, dynamic plugin policy, full bytecode/security review, Android API test fixtures and an independent sandbox assessment before executing other JARs.
+
+
+## Confirmed teardown and delayed Docker transactions
+
+A CI run exposed a Docker start timeout followed by a container stuck in
+`Created`/removal-in-progress. Killing a `docker run` client and issuing one
+`docker rm -f` did not prove resource teardown. The runner now registers and
+validates a container identity before starting it, shares the original execution
+deadline across both phases, and retries removal/polls exact-name absence within
+an additional 20-second cleanup budget. CPU, memory, PID and execution limits
+are unchanged; automatic image pulling is disabled.
+
+A timed-out create is treated as an outstanding daemon transaction. Absence is
+accepted only after that unique container was observed or removed. Unreachable
+daemons and unconfirmed removal raise `RuntimeCleanupFailure`, including after
+an otherwise successful worker response; the original failure remains in the
+exception context. A caller must stop using that Docker host until an operator
+or host controller confirms cleanup. This module does not implement persistent
+cross-process host quarantine and is still not a production runtime service.
+
+`test_cleanup.py` uses a deterministic fake clock/CLI to cover delayed creation,
+removal-in-progress, daemon failures, cleanup deadlines, lifecycle ordering,
+missing CLI, preserved timeout context and refusing success after failed teardown.
+The Docker integration suite still verifies live cgroups, all worker methods,
+timeout cleanup and the final empty-container inventory. A second deadline is
+not an extension of the untrusted worker's execution budget.

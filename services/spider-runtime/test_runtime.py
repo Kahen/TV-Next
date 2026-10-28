@@ -8,17 +8,25 @@ import unittest
 import uuid
 from runner import (
     IMAGES, RuntimeFailure, RuntimeTimeout,
-    docker_command, run_fixture,
+    docker_command, docker_create_command, run_fixture,
 )
 
 
 class FixtureIsolationTests(unittest.TestCase):
     def test_policy_has_no_network_mounts_or_host_privileges(self):
         for runtime in IMAGES:
+            create = " ".join(docker_create_command(runtime,"tvnext-fixture-test"))
+            for token in ("--pull never","--network none","--read-only","--cap-drop ALL",
+                          "--security-opt no-new-privileges","--user 65534:65534",
+                          "--memory 128m","--pids-limit 32","--cpus 0.5","--log-driver none"):
+                self.assertIn(token,create)
+            self.assertNotIn("--attach",create)
+            self.assertNotIn("--rm",create)
+        for runtime in IMAGES:
             cmd = docker_command(runtime, "tvnext-fixture-test")
             parts = " ".join(cmd)
             for token in (
-                "--network none", "--cap-drop ALL", "--security-opt no-new-privileges",
+                "--pull never", "--network none", "--cap-drop ALL", "--security-opt no-new-privileges",
                 "--read-only", "--pids-limit 32", "--memory 128m",
                 "--memory-swap 128m", "--cpus 0.5", "--user 65534:65534",
                 "--tmpfs /tmp:rw,nosuid,noexec,size=8m",
