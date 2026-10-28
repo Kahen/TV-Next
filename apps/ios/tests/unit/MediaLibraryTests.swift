@@ -1,6 +1,7 @@
 import XCTest
 import AVFoundation
 import AVKit
+import CryptoKit
 @testable import TVNext
 
 @MainActor
@@ -173,6 +174,64 @@ final class MediaLibraryTests: XCTestCase {
         store.clear()
         XCTAssertTrue(store.subtitleTracks.isEmpty)
         XCTAssertTrue(store.player.appliesMediaSelectionCriteriaAutomatically)
+    }
+
+    func testPerTitleSubtitleSelectionAndOffRestoreWithoutPersistingURL() async throws {
+        let mediaURL = "http://127.0.0.1:8766/master.m3u8"
+        let key = "tv-next-native-subtitle-preferences-v1"
+        XCTAssertFalse(store.selectSubtitleTrack(0))
+        store.play(channel("Synthetic subtitles", url: mediaURL))
+        try await waitUntil({ self.store.subtitleTracks.count == 1 }, timeout: 15)
+        XCTAssertFalse(store.selectSubtitleTrack(-1))
+        XCTAssertFalse(store.selectSubtitleTrack(16))
+        XCTAssertNil(defaults.data(forKey: key))
+        XCTAssertTrue(store.selectSubtitleTrack(0))
+        let data = try XCTUnwrap(defaults.data(forKey: key))
+        XCTAssertLessThanOrEqual(data.count, 64_000)
+        XCTAssertFalse(String(decoding: data, as: UTF8.self).contains(mediaURL))
+        let restored = MediaLibraryStore(defaults: defaults)
+        restored.play(channel("Synthetic subtitles", url: mediaURL))
+        try await waitUntil({ restored.subtitleTracks.count == 1 && restored.selectedSubtitleTrack == 0 }, timeout: 15)
+        XCTAssertFalse(restored.player.appliesMediaSelectionCriteriaAutomatically)
+        XCTAssertTrue(restored.canDisableEmbeddedSubtitles)
+        XCTAssertTrue(restored.selectSubtitleTrack(nil))
+        let off = try XCTUnwrap(defaults.data(forKey: key))
+        XCTAssertTrue(String(decoding: off, as: UTF8.self).contains("\\"isOff\\":true"))
+        let offRestored = MediaLibraryStore(defaults: defaults)
+        offRestored.play(channel("Synthetic subtitles", url: mediaURL))
+        try await waitUntil({ offRestored.subtitleTracks.count == 1 &&
+                              !offRestored.player.appliesMediaSelectionCriteriaAutomatically }, timeout: 15)
+        XCTAssertNil(offRestored.selectedSubtitleTrack)
+        offRestored.playLocalFile(try fixture(), name: "fixture.mp4")
+        XCTAssertTrue(offRestored.player.appliesMediaSelectionCriteriaAutomatically)
+        XCTAssertFalse(offRestored.selectSubtitleTrack(nil))
+        offRestored.clear()
+        XCTAssertNil(defaults.data(forKey: key))
+    }
+
+    func testCorruptedOrUnmatchedSubtitlePreferencesDoNotOverrideSystemSelection() async throws {
+        let key = "tv-next-native-subtitle-preferences-v1"
+        let mediaURL = "http://127.0.0.1:8766/master.m3u8"
+        defaults.set(Data("not-json".utf8), forKey: key)
+        let corrupted = MediaLibraryStore(defaults: defaults)
+        corrupted.play(channel("Synthetic subtitles", url: mediaURL))
+        try await waitUntil({ corrupted.subtitleTracks.count == 1 }, timeout: 15)
+        XCTAssertTrue(corrupted.player.appliesMediaSelectionCriteriaAutomatically)
+        XCTAssertFalse(corrupted.selectSubtitleTrack(100))
+        XCTAssertEqual(defaults.data(forKey: key), Data("not-json".utf8))
+
+        let digest = SHA256.hash(data: Data(mediaURL.utf8)).map { String(format: "%02x", $0) }.joined()
+        let missing = """
+        {"version":1,"entries":[{"urlDigest":"\(digest)","displayName":"Absent subtitle",
+        "languageTag":"zz","isOff":false}]}
+        """
+        defaults.set(Data(missing.utf8), forKey: key)
+        let unmatched = MediaLibraryStore(defaults: defaults)
+        unmatched.play(channel("Synthetic subtitles", url: mediaURL))
+        try await waitUntil({ unmatched.subtitleTracks.count == 1 }, timeout: 15)
+        XCTAssertTrue(unmatched.player.appliesMediaSelectionCriteriaAutomatically)
+        unmatched.clear()
+        XCTAssertNil(defaults.data(forKey: key))
     }
 
     func testPlaybackSpeedBoundsAndInvalidNumbers() {
