@@ -3,7 +3,9 @@ import Foundation
 @main struct WebDAVNetworkSmoke {
     static func main() async throws {
         let root = try NativeWebDAV.rootURL("http://127.0.0.1:8767/dav")
-        let entries = try await NativeWebDAV.list(root: root, folder: root, username: "", password: "")
+        let entries: [NativeWebDAVItem]
+        do { entries = try await NativeWebDAV.list(root: root, folder: root, username: "", password: "") }
+        catch { fatalError("Initial WebDAV listing failed: \(error)") }
         precondition(entries.map(\.name) == ["Folder", "Owned.mp4"])
         let redirect = root.appendingPathComponent("redirect", isDirectory: true)
         do {
@@ -17,7 +19,9 @@ import Foundation
             fatalError("Sent credentials over HTTP")
         } catch NativeWebDAVError.insecureCredentials { }
         let noLength = root.appendingPathComponent("no-length", isDirectory: true)
-        let unannounced = try await NativeWebDAV.list(root: root, folder: noLength, username: "", password: "")
+        let unannounced: [NativeWebDAVItem]
+        do { unannounced = try await NativeWebDAV.list(root: root, folder: noLength, username: "", password: "") }
+        catch { fatalError("Unknown-length WebDAV listing failed: \(error)") }
         precondition(unannounced.map(\.name) == entries.map(\.name), "Unknown-length valid XML should be accepted")
         for path in ["large-declared", "large-streamed"] {
             let oversized = root.appendingPathComponent(path, isDirectory: true)
@@ -30,7 +34,9 @@ import Foundation
             }
         }
         // A rejected oversized transfer must not poison the next connection.
-        let again = try await NativeWebDAV.list(root: root, folder: root, username: "", password: "")
+        let again: [NativeWebDAVItem]
+        do { again = try await NativeWebDAV.list(root: root, folder: root, username: "", password: "") }
+        catch { fatalError("WebDAV listing after rejected oversized transfer failed: \(error)") }
         precondition(again == entries)
         print("Native WebDAV localhost HTTP integration and streaming cap passed")
     }
