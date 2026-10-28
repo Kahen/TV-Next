@@ -25,6 +25,12 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(302)
             self.send_header('Location', 'https://foreign.example/dav/')
             self.end_headers()
+        elif self.path == '/dav/no-length/':
+            # A valid multistatus without a declared length must still parse.
+            self.send_response(207)
+            self.send_header('Content-Type', 'application/xml')
+            self.end_headers()
+            self.wfile.write(XML)
         elif self.path == '/dav/large-declared/':
             # The client must reject this declared size before reading the body.
             self.send_response(207)
