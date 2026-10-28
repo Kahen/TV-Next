@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Owned, localhost-only RFC 4918 fixture for native WebDAV CI."""
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 XML = b'''<?xml version="1.0" encoding="utf-8"?>
 <d:multistatus xmlns:d="DAV:">
@@ -57,4 +57,4 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
 if __name__ == '__main__':
-    HTTPServer(('127.0.0.1', 8767), Handler).serve_forever()
+    ThreadingHTTPServer(('127.0.0.1', 8767), Handler).serve_forever()
