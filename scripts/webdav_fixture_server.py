@@ -30,7 +30,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(207)
             self.send_header('Content-Type', 'application/xml')
             self.end_headers()
-            self.wfile.write(XML)
+            self.wfile.write(XML.replace(b'/dav/', b'/dav/no-length/'))
         elif self.path == '/dav/large-declared/':
             # The client must reject this declared size before reading the body.
             self.send_response(207)
