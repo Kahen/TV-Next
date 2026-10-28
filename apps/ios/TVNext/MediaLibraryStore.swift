@@ -531,6 +531,44 @@ final class MediaLibraryStore: ObservableObject {
         persist()
     }
 
+    /// Disconnecting WebDAV must revoke credentials already handed to the player,
+    /// including a pending relay request and any reusable in-memory history.
+    /// Only channels originating from this WebDAV root are affected.
+    func revokeWebDAV(root: URL) {
+        func belongs(_ channel: TVChannel) -> Bool {
+            guard channel.group == "WebDAV", let url = URL(string: channel.url) else { return false }
+            return NativeWebDAV.contains(url, root: root)
+        }
+        let ownsPlayback = current.map(belongs) == true || requestedChannel.map(belongs) == true
+        if ownsPlayback {
+            playbackGeneration += 1
+            savePosition()
+            cancelRelay() // Cancels pending creation and closes an active capability.
+            player.pause()
+            player.replaceCurrentItem(with: nil)
+            resetMediaSelections()
+            statusObservation?.invalidate()
+            statusObservation = nil
+            current = nil
+            requestedChannel = nil
+            localFileName = nil
+            clearCaptions()
+            mediaControls?.invalidate()
+            playbackError = nil
+        }
+        // A retry or recent-item selection must not reuse the Basic header.
+        recent.removeAll(where: belongs)
+        channels.removeAll(where: belongs)
+        recentTimes = recentTimes.filter { key, _ in recent.contains(where: { $0.url == key }) }
+        let removedURLs = Set(positions.keys.filter {
+            guard let url = URL(string: $0) else { return false }
+            return NativeWebDAV.contains(url, root: root)
+        })
+        positions = positions.filter { !removedURLs.contains($0.key) }
+        favorites.removeAll(where: { removedURLs.contains($0) })
+        persist()
+    }
+
     func playLocalFile(_ file: URL, name: String) {
         playbackGeneration += 1
         requestedChannel = nil
