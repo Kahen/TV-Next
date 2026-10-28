@@ -211,6 +211,18 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertNil(defaults.data(forKey: key))
     }
 
+    func testSubtitlePreferenceIdentityNeverTruncatesAmbiguousLongNames() {
+        let sharedPrefix = String(repeating: "A", count: 80)
+        let first = sharedPrefix + " - English"
+        let second = sharedPrefix + " - Commentary"
+        XCTAssertNotEqual(first, second)
+        XCTAssertNil(MediaLibraryStore.persistableSubtitleDisplayName(first))
+        XCTAssertNil(MediaLibraryStore.persistableSubtitleDisplayName(second))
+        XCTAssertEqual(MediaLibraryStore.persistableSubtitleDisplayName(sharedPrefix), sharedPrefix)
+        XCTAssertNil(MediaLibraryStore.persistableSubtitleDisplayName(""))
+        XCTAssertNil(MediaLibraryStore.persistableSubtitleDisplayName(String(repeating: "x", count: 81)))
+    }
+
     func testCorruptedOrUnmatchedSubtitlePreferencesDoNotOverrideSystemSelection() async throws {
         let key = "tv-next-native-subtitle-preferences-v1"
         let mediaURL = "http://127.0.0.1:8766/master.m3u8"

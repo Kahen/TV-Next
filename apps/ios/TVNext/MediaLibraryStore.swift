@@ -131,10 +131,17 @@ final class MediaLibraryStore: ObservableObject {
         }.prefix(100).reversed())
     }
 
+    /// Display labels may be shortened for the menu, but a persisted identity
+    /// must never be shortened: two provider renditions can share the same prefix.
+    static func persistableSubtitleDisplayName(_ name: String) -> String? {
+        guard !name.isEmpty, name.count <= 80 else { return nil }
+        return name
+    }
+
     private func rememberSubtitlePreference(_ option: AVMediaSelectionOption?) {
         guard let key = mediaPreferenceKey() else { return }
-        let name = option.map { String($0.displayName.prefix(80)) }
-        guard option == nil || (name?.isEmpty == false
+        let name = option.flatMap { Self.persistableSubtitleDisplayName($0.displayName) }
+        guard option == nil || (name != nil
               && (option?.extendedLanguageTag?.count ?? 0) <= 64) else { return }
         let preference = NativeSubtitlePreference(urlDigest: key,
             displayName: name, languageTag: option?.extendedLanguageTag, isOff: option == nil)
@@ -200,7 +207,7 @@ final class MediaLibraryStore: ObservableObject {
                         }
                     } else {
                         let matches = Array(group.options.prefix(16).enumerated()).filter {
-                            String($0.element.displayName.prefix(80)) == preference.displayName &&
+                            $0.element.displayName == preference.displayName &&
                             $0.element.extendedLanguageTag == preference.languageTag
                         }
                         if matches.count == 1, let match = matches.first {
