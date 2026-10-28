@@ -70,7 +70,7 @@ struct NativeWebDAVSection: View {
             let url = try NativeWebDAV.rootURL(address, username: username, password: password)
             root = url
             open(url)
-        } catch { error = error.localizedDescription }
+        } catch { self.error = error.localizedDescription }
     }
 
     private func open(_ next: URL) {
@@ -109,7 +109,7 @@ struct NativeWebDAVSection: View {
             let headers = auth.map { ["Authorization": $0] }
             onPlay(TVChannel(name: entry.name, url: entry.url.absoluteString,
                              group: "WebDAV", logo: nil, tvgId: nil, headers: headers))
-        } catch { error = error.localizedDescription }
+        } catch { self.error = error.localizedDescription }
     }
 
     private func disconnect() {
