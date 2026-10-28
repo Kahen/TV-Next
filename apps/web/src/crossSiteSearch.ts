@@ -1,7 +1,7 @@
 import type { MediaItem, MediaPage, SubscriptionSite } from "./api";
 import { supportedSubscriptionSite } from "./api";
 
-/** A bounded, deterministic subset of FongMi HTTP source search; never executes Spider. */
+/** Bounded source search; approved Android providers execute only on the separate server-selected host. */
 export interface CrossSiteHit { siteKey: string; item: MediaItem }
 export interface CrossSiteSearchResult {
   items: CrossSiteHit[];

@@ -1,7 +1,7 @@
 import Foundation
 
 /// A bounded native counterpart of the Web type 0/1/2/4 subscription search.
-/// The caller must filter out hidden, non-searchable and Spider-only sites.
+/// The caller filters hidden/unsearchable sites and checks server-approved Spider capability and device login.
 struct NativeSearchSource: Hashable {
     let key: String
     let name: String

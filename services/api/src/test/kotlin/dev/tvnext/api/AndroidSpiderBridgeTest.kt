@@ -3,6 +3,9 @@ package dev.tvnext.api
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import java.net.URI
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.test.*
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
@@ -110,6 +113,29 @@ class AndroidSpiderBridgeTest {
         val host=Host().apply { badSession=true }
         assertFailsWith<ResponseStatusException> { bridge(host).invoke(spec,"home",SiteRequest()) }
         assertEquals(1,host.calls.size)
+    }
+    @Test fun concurrentHostRequestsAreRejectedInsteadOfQueueingUnboundedWork() {
+        val entered=CountDownLatch(2);val release=CountDownLatch(1)
+        val host=object:ProviderTransport() {
+            override fun bridgeRequest(uri: URI,headers: Map<String,String>,body: String?,method: String,deadline: Long): String {
+                entered.countDown()
+                check(release.await(5,TimeUnit.SECONDS))
+                throw java.io.IOException("private host failure")
+            }
+        }
+        val bridge=AndroidSpiderBridge(mapper,host,policy())
+        Executors.newFixedThreadPool(2).use { pool ->
+            val tasks=(0..1).map { pool.submit<Int> {
+                assertFailsWith<ResponseStatusException> { bridge.invoke(spec,"home",SiteRequest()) }.statusCode.value()
+            } }
+            try {
+                assertTrue(entered.await(3,TimeUnit.SECONDS))
+                assertEquals(429,assertFailsWith<ResponseStatusException> { bridge.invoke(spec,"home",SiteRequest()) }.statusCode.value())
+            } finally { release.countDown() }
+            assertEquals(listOf(502,502),tasks.map { it.get(5,TimeUnit.SECONDS) })
+        }
+        // Failed transports release permits as well as successful invocations.
+        assertEquals(502,assertFailsWith<ResponseStatusException> { bridge.invoke(spec,"home",SiteRequest()) }.statusCode.value())
     }
     @Test fun subscribedProviderRoutesApprovedOpaqueEpisodesThroughAndroidInsteadOfHttpApis() {
         val host=Host();val policy=policy()

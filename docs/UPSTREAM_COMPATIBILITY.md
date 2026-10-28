@@ -28,7 +28,7 @@ Aliyun/Alipan, Quark, UC, 115 and other original TVBox cloud providers commonly 
 
 ## Explicit pending compatibility
 
-- Android type 3 JAR/QuickJS/Python activation and actual provider corpus; current isolation harness is bundled-fixture only.
+- Full Android type 3 JAR/QuickJS/Python compatibility and actual provider corpus. The Docker isolation harness remains fixture-only; a separate, default-off [Android Spider bridge](ANDROID_SPIDER_BRIDGE.md) now maps approved stateless `csp_*` media methods to the original Android test-session API, with real ARM-host acceptance pending.
 - WebView/sniffing parser chains (`parse`/`jx`/`playUrl`) and non-HTTP protocols; these fail explicitly rather than playing a webpage as video.
 - Authenticated Web/iOS media relay supports header-dependent HTTP byte ranges and HLS child playlists/segments/AES-128 identity keys. See [MEDIA_RELAY.md](MEDIA_RELAY.md) for limits, including redirects, opaque resource IDs and credential scope. Cross-origin headers are intentionally stripped. DASH, DRM, continuous raw live transport and oversized non-range responses remain unsupported.
 - Long-tail live replay templates and interactive login/QR action workflows. The authenticated timeshift Result and bounded programme catchup subset is implemented; see [LIVE_REPLAY.md](LIVE_REPLAY.md). Client category filters retain original key/name/init/value(n,v) semantics; single-object/list maps are normalized, defaults apply at category changes and selected values survive pagination. Live TXT/M3U/nested JSON and external references, per-channel headers and type 4 folder navigation are implemented; HTTP actions return data without executing arbitrary UI instructions.
