@@ -1,6 +1,6 @@
 # Implementation status — 2026-10-28
 
-Verified repository baseline: `main` at `25ec82e` (PR #60), plus the current PR's explicitly described changes. This table reconciles code with older open issue checklists; it does not treat an unchecked historical issue item as proof that current code is missing. Final-head automated evidence belongs to the associated PR.
+Verified repository baseline at the start of this slice: `main` at `a9797ef` (PR #63), plus the current PR's explicitly described changes. This table reconciles code with older open issue checklists; it does not treat an unchecked historical issue item as proof that current code is missing. Final-head automated evidence belongs to the associated PR.
 
 | Phase | Implemented code | Still unfinished |
 | --- | --- | --- |
@@ -10,6 +10,10 @@ Verified repository baseline: `main` at `25ec82e` (PR #60), plus the current PR'
 | P4 | SRT/VTT offset, bounded ASS/SSA dialogue text, danmaku parsers/overlays, AList/OpenList browsing, basic native PiP and system AirPlay route picker; native AVPlayer audio and embedded/HLS subtitle selection, device-local per-title audio and subtitle/off preferences (#58/#60); this increment adds opt-in background audio and system media controls | ASS styling/position/karaoke/fonts and broader audio matching, physical background/lock-screen control acceptance, intro/outro skipping, DLNA, WebDAV/SMB, offline download lifecycle, optional transcoding, direct cloud login/QR/OAuth and device codec/energy verification (#5) |
 | P5 | Accounts, hashed device tokens, pairing/revocation, per-user CAS sync, authenticated WS remote, H2/PostgreSQL/NAS persistence and restore, diagnostics, EPG scheduling, device-private provider health/search cache, bounded HTTP/HLS capability media relay | Remote-access deployment hardening, security/operational assessment and actual NAS/remote-network acceptance (#6) |
 | P6 | Committed npm lockfile, npm audit/CycloneDX SBOM, aggregate Web/API/PostgreSQL/browser/iOS/Compose/NAS/sandbox CI | JVM/container dependency and licence/provenance audit, immutable image/action pins, performance/reliability benchmarks, reproducible versioned artifacts/rollback, native signing/TestFlight/distribution (#7) |
+
+## Native audio identity collision regression (P4)
+
+The original per-title audio preference code shortened track names to 80 characters before persistence and compared shortened names on restoration. This could restore the wrong rendition when a provider changed tracks or shared a long prefix. The current PR uses full AVFoundation name/language identity, refuses to persist names longer than 80 characters, removes a stale preference after an unpersistable explicit choice, and requires a unique exact match. XCTest covers matching and collision/failure cases; the existing synthetic HLS playback tests continue to exercise the real player selection path. This is not real-device or third-party provider verification. Final-head CI evidence belongs to the PR.
 
 ## Live replay increment
 
