@@ -1,0 +1,35 @@
+#!/usr/bin/env python3
+"""Owned, localhost-only RFC 4918 fixture for native WebDAV CI."""
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+XML = b'''<?xml version="1.0" encoding="utf-8"?>
+<d:multistatus xmlns:d="DAV:">
+  <d:response><d:href>/dav/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop></d:propstat></d:response>
+  <d:response><d:href>/dav/Owned.mp4</d:href><d:propstat><d:prop><d:resourcetype/></d:prop></d:propstat></d:response>
+  <d:response><d:href>/dav/Folder/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop></d:propstat></d:response>
+  <d:response><d:href>https://foreign.example/evil.mp4</d:href></d:response>
+</d:multistatus>'''
+
+class Handler(BaseHTTPRequestHandler):
+    def do_PROPFIND(self):
+        if self.path == '/dav/':
+            if self.headers.get('Depth') != '1':
+                self.send_error(400)
+                return
+            self.send_response(207)
+            self.send_header('Content-Type', 'application/xml; charset=utf-8')
+            self.send_header('Content-Length', str(len(XML)))
+            self.end_headers()
+            self.wfile.write(XML)
+        elif self.path == '/dav/redirect/':
+            self.send_response(302)
+            self.send_header('Location', 'https://foreign.example/dav/')
+            self.end_headers()
+        else:
+            self.send_error(404)
+
+    def log_message(self, *_args):
+        pass
+
+if __name__ == '__main__':
+    HTTPServer(('127.0.0.1', 8767), Handler).serve_forever()

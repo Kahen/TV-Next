@@ -80,6 +80,22 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["TVBox / FongMi 原版订阅"].waitForExistence(timeout: 5))
     }
 
+    func testNativeWebDAVFormRejectsUnsafeURLWithoutNetworking() {
+        jump("WebDAV 文件")
+        let connect = app.buttons["webdav-connect"]
+        reveal(connect)
+        XCTAssertTrue(connect.exists)
+        XCTAssertFalse(connect.isEnabled)
+        enter(app.textFields["webdav-url"], "javascript:alert(1)")
+        reveal(connect)
+        connect.tap()
+        XCTAssertTrue(app.staticTexts["webdav-error"].waitForExistence(timeout: 5))
+        let disconnect = app.buttons["webdav-disconnect"]
+        reveal(disconnect)
+        disconnect.tap()
+        XCTAssertFalse(app.staticTexts["webdav-error"].exists)
+    }
+
     func testInlineSeekControlsArePresentAndDisabledWithoutMedia() {
         jump("播放器")
         let back = app.buttons["seek-back-15"]
