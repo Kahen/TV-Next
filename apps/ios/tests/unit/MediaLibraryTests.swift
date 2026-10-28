@@ -165,6 +165,41 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertFalse(MPRemoteCommandCenter.shared().playCommand.isEnabled)
     }
 
+    func testManualIntroOutroMarkersPersistOnlySafeBoundariesAndRejectChangedMedia() throws {
+        let digest = String(repeating: "a", count: 64)
+        let storage = NativeIntroOutroMarkerStore(defaults: defaults)
+        let empty = NativeIntroOutroMarkers()
+        let intro = try XCTUnwrap(empty.settingIntro(85, duration: 1800))
+        let both = try XCTUnwrap(intro.settingOutro(1680, duration: 1800))
+        XCTAssertNil(intro.settingOutro(40, duration: 1800))
+        XCTAssertNil(empty.settingIntro(.nan, duration: 1800))
+        XCTAssertNil(empty.settingOutro(1800, duration: 1800))
+        XCTAssertEqual(both.introTarget(current: 0, duration: 1800), 85)
+        XCTAssertNil(both.introTarget(current: 100, duration: 1800))
+        XCTAssertEqual(both.outroTarget(current: 1700, duration: 1800), 1799)
+        XCTAssertNil(both.outroTarget(current: 1600, duration: 1800))
+        XCTAssertTrue(storage.save(both, digest: digest, duration: 1800))
+        XCTAssertEqual(NativeIntroOutroMarkerStore(defaults: defaults).markers(for: digest, duration: 1800), both)
+        XCTAssertNil(storage.markers(for: digest, duration: 2000), "A changed video duration must not reuse old boundaries")
+        XCTAssertFalse(storage.save(both, digest: "https://private.invalid/video", duration: 1800))
+        let data = try XCTUnwrap(defaults.data(forKey: NativeIntroOutroMarkerStore.storageKey))
+        XCTAssertFalse(String(decoding: data, as: UTF8.self).contains("private.invalid"))
+        storage.clear()
+        XCTAssertNil(defaults.object(forKey: NativeIntroOutroMarkerStore.storageKey))
+    }
+
+    func testManualIntroOutroCannotMarkShortLocalFixture() async throws {
+        XCTAssertFalse(store.markIntroEnd())
+        XCTAssertFalse(store.markOutroStart())
+        XCTAssertFalse(store.skipMarkedIntro())
+        XCTAssertFalse(store.skipMarkedOutro())
+        store.playLocalFile(try fixture(), name: "Owned short fixture.mp4")
+        try await waitUntil { self.store.player.currentItem?.status == .readyToPlay }
+        XCTAssertFalse(store.markIntroEnd(), "Local files are excluded from per-URL preferences")
+        XCTAssertFalse(store.markOutroStart())
+        XCTAssertNil(store.introOutroMarkers)
+    }
+
     func testBoundedSkipTargetRejectsInvalidAndClampsBothDirections() {
         XCTAssertEqual(NativePlaybackCommand.boundedSkipTarget(current: 1, interval: -15, duration: 3), 0)
         XCTAssertEqual(NativePlaybackCommand.boundedSkipTarget(current: 1, interval: 15, duration: 3), 3)
