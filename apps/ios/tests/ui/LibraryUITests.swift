@@ -107,6 +107,19 @@ final class LibraryUITests: XCTestCase {
         XCTAssertFalse(forward.isEnabled)
     }
 
+    func testManualIntroOutroControlsDoNotMarkWithoutMedia() {
+        jump("播放器")
+        let intro = app.buttons["mark-intro-end"]
+        let outro = app.buttons["mark-outro-start"]
+        reveal(intro)
+        XCTAssertTrue(intro.exists)
+        XCTAssertTrue(outro.exists)
+        XCTAssertFalse(intro.isEnabled)
+        XCTAssertFalse(outro.isEnabled)
+        XCTAssertFalse(app.buttons["skip-marked-intro"].exists)
+        XCTAssertFalse(app.buttons["skip-marked-outro"].exists)
+    }
+
     func testBackgroundAudioTogglePersistsAcrossRelaunch() {
         jump("播放器")
         let toggle=app.switches["background-playback-toggle"]

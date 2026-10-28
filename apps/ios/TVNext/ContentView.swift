@@ -383,6 +383,7 @@ struct ContentView: View {
                 .pickerStyle(.menu)
                 .accessibilityIdentifier("playback-speed")
                 NativeSeekControls(library: library)
+                NativeIntroOutroControls(library: library)
                 if !library.audioTracks.isEmpty {
                     Menu {
                         ForEach(library.audioTracks) { track in
