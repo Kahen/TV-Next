@@ -10,12 +10,12 @@ The app uses the same AVPlayer seek validation as system remote controls. Unknow
 
 ## Persistence and privacy
 
-Only an SHA-256 digest of the remote media URL, two numeric marker times and a numeric duration are stored in a versioned device-local UserDefaults snapshot. No raw URL, media request headers, Basic credentials, capability tickets or file paths are written. Storage is limited to 100 distinct titles and 64 KiB. Corrupt/unsupported snapshots are ignored. On reopening, a marker is used only when the duration still matches within max(2 seconds, 1%); a changed provider rendition therefore does not reuse an obviously stale boundary. Clearing the media library deletes the marker snapshot. This preference is never synchronized to the home server.
+Only an SHA-256 digest of the remote media URL, two numeric marker times and a numeric duration are stored in a versioned device-local UserDefaults snapshot. No raw URL, media request headers, Basic credentials, capability tickets or file paths are written. Storage is limited to 100 distinct titles and 64 KiB. Corrupt/unsupported snapshots are ignored. On reopening, a marker is used only when the duration still matches within max(2 seconds, 1%); a changed provider rendition therefore does not reuse an obviously stale boundary. AVPlayerItem can report an indefinite duration when its status first becomes ready. The native player observes later duration updates and retries restoration only for the still-installed, ready item; invalid durations do not erase the saved preference. Stale callbacks from replaced items cannot restore markers on a different title. Clearing the media library deletes the marker snapshot. This preference is never synchronized to the home server.
 
 ## Verification
 
 - Linux Swift smoke (NativeIntroOutroMarkers.swift + IntroOutroSmoke.swift): local compile with warnings-as-errors passed for success, invalid times, wrong duration, unsafe key and deletion.
-- XCTest: marker storage/reload, finite-boundary validation, duration mismatch and local-file exclusion.
+- XCTest: marker storage/reload, indefinite-to-finite duration retry, finite-boundary validation, duration mismatch and local-file exclusion. The delayed-duration regression has a deterministic storage test; actual KVO timing across external providers remains a physical-device acceptance item.
 - XCUI: the production SwiftUI controls are present and disabled without media on iPhone/iPad simulators.
 - **Merge gate:** final-HEAD full integration and native iPhone/iPad simulator checks must succeed. A local Swift smoke is not a simulator test.
 
