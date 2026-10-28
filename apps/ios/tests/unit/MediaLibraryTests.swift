@@ -180,6 +180,13 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertNil(both.outroTarget(current: 1600, duration: 1800))
         XCTAssertTrue(storage.save(both, digest: digest, duration: 1800))
         XCTAssertEqual(NativeIntroOutroMarkerStore(defaults: defaults).markers(for: digest, duration: 1800), both)
+        // A ready AVPlayerItem may initially report indefinite duration. The
+        // duration KVO callback must be able to retry this same stored pair
+        // when the item's finite duration arrives, without deleting it.
+        XCTAssertNil(storage.markers(for: digest, duration: .nan))
+        XCTAssertNil(storage.markers(for: digest, duration: .infinity))
+        XCTAssertNil(storage.markers(for: digest, duration: 0))
+        XCTAssertEqual(storage.markers(for: digest, duration: 1800), both)
         XCTAssertNil(storage.markers(for: digest, duration: 2000), "A changed video duration must not reuse old boundaries")
         XCTAssertFalse(storage.save(both, digest: "https://private.invalid/video", duration: 1800))
         let data = try XCTUnwrap(defaults.data(forKey: NativeIntroOutroMarkerStore.storageKey))
