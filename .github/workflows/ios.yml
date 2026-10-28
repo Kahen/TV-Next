@@ -107,10 +107,10 @@ jobs:
             -f lavfi -i 'sine=frequency=440:duration=4' \
             -f lavfi -i 'sine=frequency=880:duration=4' \
             -map 0:v -map 1:a -map 2:a -c:v libx264 -pix_fmt yuv420p -c:a aac -t 4 \
-            -f hls -hls_time 2 -hls_playlist_type vod \
+            -f hls -hls_segment_type fmp4 -hls_time 2 -hls_playlist_type vod \
             -var_stream_map 'a:0,agroup:aud,default:yes,language:eng a:1,agroup:aud,default:no,language:jpn v:0,agroup:aud' \
             -master_pl_name master.m3u8 \
-            -hls_segment_filename '/tmp/tvnext-audio-hls/stream_%v_%03d.ts' \
+            -hls_segment_filename '/tmp/tvnext-audio-hls/stream_%v_%03d.m4s' \
             '/tmp/tvnext-audio-hls/stream_%v.m3u8'
           grep -q 'EXT-X-MEDIA:TYPE=AUDIO' /tmp/tvnext-audio-hls/master.m3u8
           python3 -m http.server 8766 --bind 127.0.0.1 --directory /tmp/tvnext-audio-hls > /tmp/tvnext-audio-server.log 2>&1 &
