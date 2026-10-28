@@ -1,0 +1,21 @@
+import Foundation
+
+@main struct WebDAVNetworkSmoke {
+    static func main() async throws {
+        let root = try NativeWebDAV.rootURL("http://127.0.0.1:8767/dav")
+        let entries = try await NativeWebDAV.list(root: root, folder: root, username: "", password: "")
+        precondition(entries.map(\.name) == ["Folder", "Owned.mp4"])
+        let redirect = root.appendingPathComponent("redirect", isDirectory: true)
+        do {
+            _ = try await NativeWebDAV.list(root: root, folder: redirect, username: "", password: "")
+            fatalError("Followed a cross-origin redirect")
+        } catch NativeWebDAVError.httpStatus(302) {
+            // The client rejects redirects and reports the original response.
+        }
+        do {
+            _ = try await NativeWebDAV.list(root: root, folder: root, username: "alice", password: "pw")
+            fatalError("Sent credentials over HTTP")
+        } catch NativeWebDAVError.insecureCredentials { }
+        print("Native WebDAV localhost HTTP integration passed")
+    }
+}
