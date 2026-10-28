@@ -41,6 +41,26 @@ Apple's MPNowPlayingSession is deliberately not combined with this app's
 AVPlayerViewController. The app owns its Now Playing info and the AVKit
 controller's automatic metadata publishing remains disabled.
 
+## Native inline 15-second seek controls
+
+Original [FongMi PlayerManager.canSeek / seekTo](https://github.com/FongMi/TV/blob/123cc086159b0f13bf54bdf64bacbc259ca47c88/app/src/main/java/com/fongmi/android/tv/player/PlayerManager.java)
+checks seek capability and delegates to the player (or timeshift).
+TV-Next implements the same user-facing seek intent through AVPlayer for finite
+media; its live timeshift controls remain a separate explicit P2 workflow.
+
+The SwiftUI player now offers explicit **后退 15 秒** and **前进 15 秒**
+buttons alongside its playback speed menu. These actions call the same
+`MediaLibraryStore.handleSystemPlaybackCommand(.skip)` path as the system
+remote controls: a seek is bounded to 0…duration, rejected for unknown/live
+duration or failed/unready items, and does not replace the current player item.
+Buttons are disabled when no player item exists; when a loaded item cannot
+seek, the UI shows a non-sensitive explanatory message. New playback clears
+that message. The finite-VOD target calculation is tested independently,
+including end-of-media clamping: AVPlayer may report a reset clock at EOF
+for short synthetic MP4s, so simulator tests do not require its clock to
+remain at exactly the duration after seeking to the end. This is manual
+seeking, **not** automatic intro/outro detection or chapter-marker support.
+
 ## Verification boundaries
 
 XCTest uses the owned local media fixture to exercise default-off pause, opt-in

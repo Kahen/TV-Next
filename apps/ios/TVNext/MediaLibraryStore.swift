@@ -707,9 +707,10 @@ final class MediaLibraryStore: ObservableObject {
                 }
             }
         case .skip(let interval):
-            let current=player.currentTime().seconds,duration=item.duration.seconds
-            guard interval.isFinite,abs(interval)<=60,current.isFinite,duration.isFinite,duration>0 else { return false }
-            return handleSystemPlaybackCommand(.seek(min(duration,max(0,current+interval))))
+            guard let target = NativePlaybackCommand.boundedSkipTarget(
+                current: player.currentTime().seconds, interval: interval, duration: item.duration.seconds
+            ) else { return false }
+            return handleSystemPlaybackCommand(.seek(target))
         case .rate(let rate):
             let duration=item.duration.seconds
             guard rate.isFinite,(0.75...2).contains(rate),duration.isFinite,duration>0,duration<604_800 else { return false }

@@ -11,6 +11,17 @@ Verified repository baseline at the start of this slice: `main` at `a9797ef` (PR
 | P5 | Accounts, hashed device tokens, pairing/revocation, per-user CAS sync, authenticated WS remote, H2/PostgreSQL/NAS persistence and restore, diagnostics, EPG scheduling, device-private provider health/search cache, bounded HTTP/HLS capability media relay | Remote-access deployment hardening, security/operational assessment and actual NAS/remote-network acceptance (#6) |
 | P6 | Committed npm lockfile, npm audit/CycloneDX SBOM, aggregate Web/API/PostgreSQL/browser/iOS/Compose/NAS/sandbox CI | JVM/container dependency and licence/provenance audit, immutable image/action pins, performance/reliability benchmarks, reproducible versioned artifacts/rollback, native signing/TestFlight/distribution (#7) |
 
+## Native inline seeking increment (P4)
+
+The SwiftUI iPhone/iPad player now exposes explicit 15-second backward and
+forward actions using the already validated finite-VOD remote-command seek
+path. This adds no new network transport or persisted state. XCTest covers
+successful forward/backward seeks clamped to media bounds and existing
+negative inputs; XCUI checks both production controls are disabled with no
+media. This does **not** implement automatic intro/outro detection or claim
+physical-device playback. Final-head simulator and full integration CI are
+required before merging this slice.
+
 ## Native audio identity collision regression (P4)
 
 The original per-title audio preference code shortened track names to 80 characters before persistence and compared shortened names on restoration. This could restore the wrong rendition when a provider changed tracks or shared a long prefix. The current PR uses full AVFoundation name/language identity, refuses to persist names longer than 80 characters, migrates v1 snapshots conservatively (dropping ambiguous 80-character entries), removes a stale preference after an unpersistable explicit choice, and requires a unique exact match. XCTest covers matching and collision/failure cases; the existing synthetic HLS playback tests continue to exercise the real player selection path. This is not real-device or third-party provider verification. Final-head CI evidence belongs to the PR.
