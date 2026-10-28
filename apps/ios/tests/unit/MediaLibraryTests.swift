@@ -117,7 +117,8 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertEqual(live.info[MPMediaItemPropertyTitle] as? String,"TV-Next 媒体")
         XCTAssertNil(live.info[MPMediaItemPropertyPlaybackDuration])
         XCTAssertNil(live.info[MPNowPlayingInfoPropertyElapsedPlaybackTime])
-        XCTAssertEqual(live.info[MPNowPlayingInfoPropertyPlaybackRate] as? Float,0)
+        XCTAssertEqual((live.info[MPNowPlayingInfoPropertyPlaybackRate] as? NSNumber)?.floatValue,0)
+        XCTAssertEqual((live.info[MPNowPlayingInfoPropertyDefaultPlaybackRate] as? NSNumber)?.floatValue,1)
         store.playLocalFile(try fixture(),name:"Old title")
         let next=MediaLibraryStore(defaults:defaults)
         defer { next.clear() }

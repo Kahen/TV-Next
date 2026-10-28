@@ -335,8 +335,12 @@ struct ContentView: View {
                      : "此设备不支持系统画中画。")
                     .font(.caption).foregroundStyle(.secondary)
                     .accessibilityIdentifier("picture-in-picture-status")
-                Toggle("后台继续播放音频",isOn:Binding(get:{library.backgroundPlaybackEnabled},set:{library.setBackgroundPlaybackEnabled($0)}))
-                    .accessibilityIdentifier("background-playback-toggle")
+                HStack {
+                    Text("后台继续播放音频").frame(maxWidth:.infinity,alignment:.leading)
+                    Toggle("后台继续播放音频",isOn:Binding(get:{library.backgroundPlaybackEnabled},set:{library.setBackgroundPlaybackEnabled($0)}))
+                        .labelsHidden().fixedSize().frame(minHeight:44)
+                        .accessibilityIdentifier("background-playback-toggle")
+                }
                 Text("开启后，已开始播放的媒体可在锁屏或切换应用时继续输出音频；系统中断和耳机断开仍会暂停。")
                     .font(.caption).foregroundStyle(.secondary)
 

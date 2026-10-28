@@ -18,8 +18,8 @@ struct NativeNowPlayingSnapshot {
         let safeTitle = bounded.isEmpty || bounded.contains("://") ? "TV-Next 媒体" : bounded
         var value: [String: Any] = [MPMediaItemPropertyTitle: safeTitle,
             MPNowPlayingInfoPropertyIsLiveStream: !seekable,
-            MPNowPlayingInfoPropertyPlaybackRate: rate.isFinite ? rate : 0,
-            MPNowPlayingInfoPropertyDefaultPlaybackRate: defaultRate.isFinite ? defaultRate : 1]
+            MPNowPlayingInfoPropertyPlaybackRate: NSNumber(value: rate.isFinite ? rate : Float(0)),
+            MPNowPlayingInfoPropertyDefaultPlaybackRate: NSNumber(value: defaultRate.isFinite ? defaultRate : Float(1))]
         if elapsed.isFinite && elapsed >= 0 {
             value[MPNowPlayingInfoPropertyElapsedPlaybackTime] = seekable ? min(elapsed,duration) : elapsed
         }
