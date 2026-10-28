@@ -19,6 +19,7 @@ struct EpgSection: View {
     @State private var error: String?
     @State private var task: Task<Void,Never>?
     @State private var generation=UUID()
+    @State private var replayCoordinator=NativeReplayRequestCoordinator()
     var body: some View {
         GroupBox("直播节目表 · XMLTV") {
             VStack(alignment:.leading,spacing:12) {
@@ -50,7 +51,7 @@ struct EpgSection: View {
         .onChange(of:serverURL) { _,_ in invalidate() }
         .onChange(of:session?.token) { _,_ in invalidate();feeds=[] }
         .onChange(of:xml) { _,_ in invalidate() }
-        .onDisappear { task?.cancel();generation=UUID() }
+        .onDisappear { task?.cancel();generation=UUID();replayCoordinator.invalidate() }
     }
     private var subscriptionControls: some View {
         VStack(alignment:.leading,spacing:10) {
@@ -87,14 +88,14 @@ struct EpgSection: View {
                 VStack(alignment:.leading,spacing:6) {
                     HStack {
                         Text(channel.name).font(.headline)
-                        if snapshot.indices.contains(index) { Button("播放频道") { onPlay(snapshot[index]) } }
+                        if snapshot.indices.contains(index) { Button("播放频道") { replayCoordinator.invalidate();onPlay(snapshot[index]) } }
                     }
                     if let current=channel.current { Text("正在播："+current.title+" · "+current.range) }
                     ForEach(Array((channel.previous ?? []).enumerated()),id:\.offset) { _,program in
                         VStack(alignment:.leading) {
                             Text(program.start+" · "+program.title).font(.caption)
                             if snapshot.indices.contains(index),snapshot[index].catchup != nil {
-                                NativeLiveReplayControls(channel:snapshot[index],serverURL:serverURL,session:session,onPlay:onPlay,programme:program,playbackGeneration:playbackGeneration)
+                                NativeLiveReplayControls(channel:snapshot[index],serverURL:serverURL,session:session,onPlay:onPlay,programme:program,playbackGeneration:playbackGeneration,coordinator:replayCoordinator)
                             }
                         }
                     }
@@ -106,7 +107,7 @@ struct EpgSection: View {
             ForEach(Array(guide.warnings.enumerated()),id:\.offset) { _,warning in Text(warning).font(.caption) }
         }
     }
-    private func invalidate() { task?.cancel();generation=UUID();busy=false;guide=nil;snapshot=[] }
+    private func invalidate() { replayCoordinator.invalidate();task?.cancel();generation=UUID();busy=false;guide=nil;snapshot=[] }
     private func reload() {
         run { api in try await api.get("home/epg/feeds") } receive: { (value:[NativeEpgFeed]) in feeds=value }
     }

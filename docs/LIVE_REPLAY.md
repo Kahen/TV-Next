@@ -57,3 +57,5 @@ Only synthetic fixtures are used. This increment does not establish real-provide
 
 - Native iOS replay retry requests a **new** server capability for the same ephemeral selected time, stop and timezone. The previous capability is closed; a replay without original selection metadata requires the user to choose a time again. The selection and capability are excluded from local snapshots.
 - Web XMLTV programme buttons share a guide-scoped request owner. When a newer programme is selected, a slower previous response is discarded and its returned relay ticket is closed. Switching guides/channels or leaving the view invalidates pending selections. This does not assert real-provider or physical-device playback.
+
+- Native iOS XMLTV programme buttons also share a guide-scoped selection owner; a later programme selection or guide change invalidates older in-flight responses, which close any returned capability instead of replacing playback.

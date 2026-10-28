@@ -1,5 +1,13 @@
 import SwiftUI
 
+@MainActor
+final class NativeReplayRequestCoordinator {
+    private var generation=UUID()
+    func begin() -> UUID { generation=UUID();return generation }
+    func isCurrent(_ id: UUID) -> Bool { generation==id }
+    func invalidate() { generation=UUID() }
+}
+
 struct NativeLiveReplayControls: View {
     let channel: TVChannel
     let serverURL: String
@@ -7,6 +15,7 @@ struct NativeLiveReplayControls: View {
     let onPlay: (TVChannel)->Void
     var programme: NativeEpgProgram? = nil
     var playbackGeneration=0
+    var coordinator: NativeReplayRequestCoordinator? = nil
     @State private var selectedTime = Date().addingTimeInterval(-60)
     @State private var task: Task<Void,Never>?
     @State private var generation=UUID()
@@ -59,7 +68,7 @@ struct NativeLiveReplayControls: View {
             let now=Int64(Date().timeIntervalSince1970*1000)
             guard channel.timeshift?.range(now:now)?.contains(time) == true else { error="请选择提供方允许的回放时间。";return }
         }
-        cancel();let id=UUID();generation=id;busy=true;error=nil
+        cancel();let id=UUID();generation=id;let owner=coordinator?.begin();busy=true;error=nil
         task=Task { @MainActor in
             defer { if generation==id { busy=false } }
             let api=TVNextAPI(server:server,token:session.token)
@@ -67,7 +76,7 @@ struct NativeLiveReplayControls: View {
                 let result: NativeReplaySession=try await api.request("subscriptions/replay",
                     body:NativeReplayRequest(channel:channel,time:time,stop:stop,timezone:TimeZone.current.identifier))
                 let address=try MediaRelayAddress.resolve(result.path,server:server)
-                guard !Task.isCancelled,generation==id else {
+                guard !Task.isCancelled,generation==id,(owner == nil || coordinator?.isCurrent(owner!) == true) else {
                     let _: [String:Bool]? = try? await api.request("home/media/"+address.ticket+"/close",body:EmptyHomeRequest())
                     return
                 }

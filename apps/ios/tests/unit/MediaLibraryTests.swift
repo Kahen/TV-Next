@@ -321,6 +321,16 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertNil(relayStore.syncedSnapshot().channels.first?.replay)
     }
 
+    func testNativeProgrammeReplayOwnershipInvalidatesOlderSelections() {
+        let coordinator=NativeReplayRequestCoordinator()
+        let first=coordinator.begin()
+        let second=coordinator.begin()
+        XCTAssertFalse(coordinator.isCurrent(first))
+        XCTAssertTrue(coordinator.isCurrent(second))
+        coordinator.invalidate()
+        XCTAssertFalse(coordinator.isCurrent(second))
+    }
+
     func testReplayWithoutSelectionCannotReuseClosedTicket() {
         let session=NativeHomeSession(token:"unit-fixture",user:NativeHomeUser(id:"u",username:"fixture"),
             device:NativeHomeDevice(id:"d",name:"fixture",createdAt:0,expiresAt:Int64.max,current:true))
