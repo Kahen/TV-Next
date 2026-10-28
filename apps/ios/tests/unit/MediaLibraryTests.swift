@@ -96,9 +96,10 @@ final class MediaLibraryTests: XCTestCase {
         try await waitUntil { abs(self.store.player.currentTime().seconds-1) < 0.1 }
         XCTAssertTrue(store.handleSystemPlaybackCommand(.skip(-15)), "Back skip clamps to zero")
         try await waitUntil { self.store.player.currentTime().seconds < 0.1 }
-        // An exact-end AVPlayer seek can report 0 after EOF on short MP4 fixtures.
-        // Verify clamping deterministically below; do not assert its unstable EOF clock.
-        XCTAssertTrue(store.handleSystemPlaybackCommand(.skip(15)), "Forward skip accepts a bounded EOF target")
+        // Exercise a finite forward seek and its observable player clock before
+        // checking the exact-EOF command separately (where AVPlayer may reset).
+        XCTAssertTrue(store.handleSystemPlaybackCommand(.skip(0.5)))
+        try await waitUntil { abs(self.store.player.currentTime().seconds-0.5) < 0.1 }
         XCTAssertTrue(store.handleSystemPlaybackCommand(.seek(1)))
         try await waitUntil { abs(self.store.player.currentTime().seconds-1) < 0.1 }
         XCTAssertFalse(store.handleSystemPlaybackCommand(.rate(.nan)))
@@ -113,6 +114,9 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertTrue(MPRemoteCommandCenter.shared().changePlaybackPositionCommand.isEnabled)
         XCTAssertTrue(store.handleSystemPlaybackCommand(.toggle))
         XCTAssertEqual(store.player.rate,0)
+        // Last command: an exact-EOF seek can reset AVPlayer's clock or finish
+        // asynchronously. The pure boundary test checks the target precisely.
+        XCTAssertTrue(store.handleSystemPlaybackCommand(.skip(15)), "Forward skip accepts a bounded EOF target")
         store.clear()
         XCTAssertNil(MPNowPlayingInfoCenter.default().nowPlayingInfo)
         XCTAssertFalse(MPRemoteCommandCenter.shared().playCommand.isEnabled)
