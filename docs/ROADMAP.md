@@ -69,7 +69,7 @@ Tracking: https://github.com/Kahen/TV-Next/issues/5
 - [x] External SRT/WebVTT timing offset, bounded ASS/SSA Dialogue text, Web/native danmaku parsers and timeline overlays.
 - [x] Basic native system PiP and AirPlay route picker; playback speed controls and AList/OpenList browsing.
 - [x] Native AVPlayer audio/embedded subtitle selection and bounded per-title audio preferences; per-title subtitle preferences (#60, PR gates passed).
-- [ ] Styled ASS positioning/karaoke/fonts, decoder diagnostics, intro/outro skip and broader format support remain.
+- [ ] Styled ASS positioning/karaoke/fonts, decoder diagnostics, **automatic** intro/outro skip and broader format support remain. Native iOS manual per-title skip markers are implemented in PR #69 (subject to final CI); see [IOS_INTRO_OUTRO.md](IOS_INTRO_OUTRO.md).
 - [x] Opt-in native background audio and system play/pause/finite-VOD seek/skip metadata controls; see NATIVE_BACKGROUND_PLAYBACK.md for final-head test gates and limits.
 - [ ] Physical background/lock-screen/PiP/AirPlay delivery, quality/codec/energy matrix.
 - [ ] Optional transcoding sidecar with measured resource limits.
