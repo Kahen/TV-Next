@@ -147,7 +147,8 @@ def main():
     for endpoint, payload, status in [
         ("/resources/text", {"url":"http://169.254.169.254/latest/meta-data/"}, 502),
         ("/cloud/list", {"server":"https://example.org", "path":"/../secret"}, 400),
-        ("/subscriptions/detail", {"content":config,"siteKey":"fixture-site","vodId":"1"}, 422)
+        # Type-3 execution now authenticates before the disabled-runtime check.
+        ("/subscriptions/detail", {"content":config,"siteKey":"fixture-site","vodId":"1"}, 401)
     ]:
         try:
             request(WEB + "/api/v1" + endpoint, payload)
