@@ -94,7 +94,9 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertFalse(store.handleSystemPlaybackCommand(.skip(61)))
         XCTAssertTrue(store.handleSystemPlaybackCommand(.seek(1)))
         try await waitUntil { abs(self.store.player.currentTime().seconds-1) < 0.1 }
-        store.setPlaybackSpeed(1.5)
+        XCTAssertFalse(store.handleSystemPlaybackCommand(.rate(.nan)))
+        XCTAssertFalse(store.handleSystemPlaybackCommand(.rate(3)))
+        XCTAssertTrue(store.handleSystemPlaybackCommand(.rate(1.5)))
         XCTAssertTrue(store.handleSystemPlaybackCommand(.play))
         XCTAssertEqual(store.player.rate,1.5)
         try await waitUntil { (MPNowPlayingInfoCenter.default().nowPlayingInfo?[MPMediaItemPropertyTitle] as? String) == "Owned fixture.mp4" }

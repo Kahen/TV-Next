@@ -38,7 +38,6 @@ struct ContentView: View {
     @State private var captionOffsetSeconds: Double = 0
     @State private var isShowingExporter = false
     @State private var exportDocument: M3UExportDocument?
-    @State private var playbackSpeed: Float = 1.0
     @State private var isShowingClearConfirmation = false
     @State private var errorMessage: String?
     @State private var isLoading = false
@@ -368,7 +367,7 @@ struct ContentView: View {
                 if let channel = library.current {
                     NativeLiveReplayControls(channel:channel,serverURL:serverURL,session:homeSession,onPlay:{ library.play($0) },playbackGeneration:library.playbackGeneration)
                 }
-                Picker("播放速度", selection: $playbackSpeed) {
+                Picker("播放速度", selection: Binding(get:{library.playbackSpeed},set:{library.setPlaybackSpeed($0)})) {
                     Text("0.75×").tag(Float(0.75))
                     Text("1×").tag(Float(1))
                     Text("1.25×").tag(Float(1.25))
@@ -377,9 +376,6 @@ struct ContentView: View {
                 }
                 .pickerStyle(.menu)
                 .accessibilityIdentifier("playback-speed")
-                .onChange(of: playbackSpeed) { _, speed in
-                    library.setPlaybackSpeed(speed)
-                }
                 if !library.audioTracks.isEmpty {
                     Menu {
                         ForEach(library.audioTracks) { track in

@@ -2,7 +2,7 @@ import Foundation
 import MediaPlayer
 
 enum NativePlaybackCommand {
-    case play, pause, toggle, seek(TimeInterval), skip(TimeInterval)
+    case play, pause, toggle, seek(TimeInterval), skip(TimeInterval), rate(Float)
 }
 
 struct NativeNowPlayingSnapshot {
@@ -55,6 +55,10 @@ final class NativeMediaControls {
         center.skipBackwardCommand.preferredIntervals = [15]
         register(center.skipForwardCommand) { _ in .skip(15) }
         register(center.skipBackwardCommand) { _ in .skip(-15) }
+        center.changePlaybackRateCommand.supportedPlaybackRates = [0.75,1,1.25,1.5,2]
+        register(center.changePlaybackRateCommand) { event in
+            (event as? MPChangePlaybackRateCommandEvent).map { .rate($0.playbackRate) }
+        }
     }
 
     private func register(_ command: MPRemoteCommand, map: @escaping (MPRemoteCommandEvent) -> NativePlaybackCommand?) {
@@ -84,6 +88,7 @@ final class NativeMediaControls {
         center.changePlaybackPositionCommand.isEnabled = snapshot?.seekable == true
         center.skipForwardCommand.isEnabled = snapshot?.seekable == true
         center.skipBackwardCommand.isEnabled = snapshot?.seekable == true
+        center.changePlaybackRateCommand.isEnabled = snapshot?.seekable == true
     }
 
     func invalidate() {

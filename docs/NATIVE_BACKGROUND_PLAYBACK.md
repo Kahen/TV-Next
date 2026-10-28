@@ -23,10 +23,10 @@ after them. Returning to the foreground also does not automatically resume.
 ## System transport and metadata
 
 `MPRemoteCommandCenter` handles play, pause, toggle, stop-as-pause, finite-VOD
-seek and 15-second backward/forward skip. Missing/failed items, unavailable
+seek, 15-second backward/forward skip and bounded 0.75–2x VOD speed. Missing/failed items, unavailable
 playback, NaN/infinite/out-of-range seeks and invalid skip intervals fail without
 changing the selected media. Live/unknown-duration media do not advertise seek.
-Existing playback speed is retained when resuming. Command validation runs on
+Playback speed is retained when resuming, and system rate changes update the production picker. Command validation runs on
 the main actor even if the system invokes the handler on another thread.
 
 `MPNowPlayingInfoCenter` publishes bounded title/local filename, elapsed time,
