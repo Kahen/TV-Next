@@ -80,6 +80,7 @@ struct ContentView: View {
                         .id(serverURL+"|"+(homeSession?.token ?? ""))
                     ConfigPreviewSection().id("config")
                     CloudSection(serverURL: serverURL) { library.play($0) }.id("cloud")
+                    NativeWebDAVSection { library.play($0) }.id("webdav")
                     SubscriptionSection(serverURL: serverURL, session:homeSession, onPlay: { playback, title in
                         library.play(TVChannel(name: title + " · " + playback.name, url: playback.url, group: playback.lineName, logo: nil, tvgId: nil, headers:playback.headers, timeshift:playback.timeshift))
                         remoteResourceKey = playback.url
@@ -120,6 +121,7 @@ struct ContentView: View {
                         Button("JSON 配置") { navigate(to: "config") }
                         Button("TVBox 订阅") { navigate(to: "subscription") }
                         Button("网盘文件") { navigate(to: "cloud") }
+                        Button("WebDAV 文件") { navigate(to: "webdav") }
                         Button("直播节目表") { navigate(to: serverURL+"|"+(homeSession?.token ?? "")) }
                         Button("家庭服务器") { navigate(to: "home-server") }
                         Button("弹幕设置") { navigate(to: "danmaku") }
