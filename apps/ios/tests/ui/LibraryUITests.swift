@@ -80,6 +80,17 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["TVBox / FongMi 原版订阅"].waitForExistence(timeout: 5))
     }
 
+    func testInlineSeekControlsArePresentAndDisabledWithoutMedia() {
+        jump("播放器")
+        let back = app.buttons["seek-back-15"]
+        let forward = app.buttons["seek-forward-15"]
+        reveal(back)
+        XCTAssertTrue(back.exists)
+        XCTAssertTrue(forward.exists)
+        XCTAssertFalse(back.isEnabled)
+        XCTAssertFalse(forward.isEnabled)
+    }
+
     func testBackgroundAudioTogglePersistsAcrossRelaunch() {
         jump("播放器")
         let toggle=app.switches["background-playback-toggle"]
