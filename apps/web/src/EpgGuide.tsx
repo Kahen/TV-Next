@@ -3,6 +3,7 @@ import { epgChannelsFromPlaylist, formatProgrammeRange } from "./epg";
 import type { EpgGuideResponse } from "./epg";
 import type { Channel } from "./api";
 import EpgFeeds from "./EpgFeeds";
+import LiveReplayControls from "./LiveReplayControls";
 import type { HomeSession } from "./homeApi";
 import { validMediaUrl } from "./library";
 
@@ -67,7 +68,7 @@ export default function EpgGuide({ channels, onPlay, session = null }: {
         body: JSON.stringify({
           xml,
           channels: epgChannelsFromPlaylist(snapshot),
-          hours
+          hours, pastHours: 168
         })
       });
       const payload: unknown = await res.json().catch(() => null);
@@ -142,6 +143,7 @@ export default function EpgGuide({ channels, onPlay, session = null }: {
                   {item.current.description && <p className="epg-description">{item.current.description}</p>}
                 </div>
               : <p className="hint">当前时间没有节目数据。</p>}
+            {channel && item.previous?.map((programme, i) => <div key={i}><time>{new Date(programme.start).toLocaleString()}</time><span> · {programme.title}</span><LiveReplayControls channel={channel} session={session} onPlay={onPlay} programme={programme}/></div>)}
             {item.upcoming.length > 0 && <div className="epg-upcoming">
               {item.upcoming.map((next, i) => <div key={i}>
                 <time>{formatProgrammeRange(next.start, next.stop)}</time><span>{next.title}</span>

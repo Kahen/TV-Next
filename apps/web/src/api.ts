@@ -1,3 +1,6 @@
+export interface LiveTimeshift { url: string; start: number; window: number }
+export interface LiveCatchup { type: string; days: string; source: string; regex?: string; replace?: string }
+export interface LiveReplaySession { path: string; expiresAt: number; hls: boolean; time: number }
 export interface Channel {
   name: string;
   url: string;
@@ -6,6 +9,9 @@ export interface Channel {
   tvgId?: string | null;
   headers?: Record<string, string>;
   headersRequired?: boolean;
+  timeshift?: LiveTimeshift | null;
+  catchup?: LiveCatchup | null;
+  replay?: LiveReplaySession;
   subtitles?: PlaybackResource[];
   danmaku?: PlaybackResource[];
 }
@@ -71,7 +77,7 @@ export interface MediaDetail {
   item: MediaItem; description: string | null; director: string | null;
   actors: string | null; lines: MediaLine[]; provider: string;
 }
-export interface MediaPlayback { url: string; name: string; lineName: string; provider: string; headers?: Record<string, string>; subtitles?: PlaybackResource[]; danmaku?: PlaybackResource[] }
+export interface MediaPlayback { timeshift?: LiveTimeshift | null; url: string; name: string; lineName: string; provider: string; headers?: Record<string, string>; subtitles?: PlaybackResource[]; danmaku?: PlaybackResource[] }
 export interface MediaQuery {
   content: string; categoryId?: string; query?: string; vodId?: string;
   page?: number; pageSize?: number; lineIndex?: number; episodeIndex?: number;

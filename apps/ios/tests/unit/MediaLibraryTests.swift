@@ -281,4 +281,32 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertNotNil(relayStore.playbackError)
     }
 
+    func testReplayCapabilityAndProviderTemplatesNeverPersist() throws {
+        var original=channel("Replay")
+        original.timeshift=NativeTimeshift(url:"https://example.invalid/seek?time={time}",start:1,window:1000)
+        original.catchup=NativeCatchup(source:"?begin=${(b)timestamp}")
+        original.replay=NativeReplaySession(path:"/api/v1/home/media/"+String(repeating:"a",count:43)+"/0",expiresAt:Int64.max,hls:true,time:1)
+        XCTAssertTrue(store.importChannels([original]))
+        let snapshot=store.syncedSnapshot().channels[0]
+        XCTAssertNil(snapshot.timeshift);XCTAssertNil(snapshot.catchup);XCTAssertNil(snapshot.replay)
+        let restored=MediaLibraryStore(defaults:defaults)
+        defer { restored.clear() }
+        XCTAssertNil(restored.channels[0].timeshift);XCTAssertNil(restored.channels[0].catchup)
+        let encoded=String(data:try JSONEncoder().encode(original),encoding:.utf8)!
+        XCTAssertFalse(encoded.contains("/api/v1/home/media/"))
+    }
+
+    func testInvalidReplayKeepsExistingPlayerAndHistory() throws {
+        let original=channel("Live")
+        store.play(original)
+        let item=store.player.currentItem
+        var replay=original
+        replay.replay=NativeReplaySession(path:"https://attacker.invalid/",expiresAt:Int64.max,hls:false,time:1)
+        store.play(replay)
+        XCTAssertTrue(store.player.currentItem === item)
+        XCTAssertEqual(store.current,original)
+        XCTAssertEqual(store.recent.count,1)
+        XCTAssertNotNil(store.playbackError)
+    }
+
 }

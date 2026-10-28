@@ -27,7 +27,8 @@ data class EpgGuideRequest(
     val xml: String = "",
     val channels: List<EpgChannelRequest> = emptyList(),
     val at: String? = null,
-    val hours: Int = 12
+    val hours: Int = 12,
+    val pastHours: Int = 0
 )
 data class EpgProgram(
     val start: String,
@@ -41,7 +42,8 @@ data class EpgChannelGuide(
     val matchedChannelId: String?,
     val matchType: String,
     val current: EpgProgram?,
-    val upcoming: List<EpgProgram>
+    val upcoming: List<EpgProgram>,
+    val previous: List<EpgProgram> = emptyList()
 )
 data class EpgGuideResponse(
     val generatedAt: String,
@@ -74,6 +76,7 @@ class XmltvGuideService {
         if (request.channels.isEmpty() || request.channels.size > MAX_REQUEST_CHANNELS) {
             fail("Provide 1..300 channels for EPG matching")
         }
+        if (request.pastHours !in 0..168) fail("pastHours must be between 0 and 168")
         if (request.hours !in 1..72) fail("hours must be between 1 and 72")
         val now = request.at?.let { timestamp ->
             runCatching { OffsetDateTime.parse(timestamp).toInstant() }
@@ -108,7 +111,9 @@ class XmltvGuideService {
             }.sortedBy { it.start }.take(20).map { toProgram(it) }.toList()
             EpgChannelGuide(explicitId, name.ifBlank { explicitId.orEmpty() }, found,
                 if (matched != null) "id" else if (viaName != null) "name" else "none",
-                current?.let { toProgram(it) }, upcoming)
+                current?.let { toProgram(it) }, upcoming,
+                events.asSequence().filter { !it.stop.isAfter(now) && !it.start.isBefore(now.minusSeconds(request.pastHours.toLong()*3600)) }
+                    .sortedByDescending { it.start }.take(40).map { toProgram(it) }.toList())
         }
         return EpgGuideResponse(now.toString(), until.toString(), guides.size,
             guides.count { it.matchedChannelId != null }, guides, feed.warnings)

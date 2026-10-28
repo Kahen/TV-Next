@@ -20,11 +20,13 @@ class LiveSubscriptions(private val mapper: ObjectMapper, private val subscripti
         var base = r.url
         var headers = emptyMap<String,String>()
         val warnings = mutableListOf<String>()
+        var inheritedCatchup: LiveCatchup? = null
         if (content.trimStart().startsWith("{") || content.contains("**") || content.trimStart().startsWith("2423")) {
             val doc = subscriptions.load(SubscriptionRequest(content,base))
             val root = mapper.readTree(doc.content)
             val live = root.path("lives").get(r.liveIndex) ?: bad("Unknown live source")
             if (live.path("api").asText("").isNotBlank()) bad("This live source requires a Spider runtime")
+            inheritedCatchup = LiveReplay.catchup(live.path("catchup"),mapper)
             val rawHeaders = live.path("header")
             val node = if (rawHeaders.isTextual) runCatching { mapper.readTree(rawHeaders.asText()) }.getOrNull() else rawHeaders
             headers = (node?.takeIf { it.isObject }?.fields()?.asSequence()?.associate { it.key to it.value.asText() }).orEmpty().toMutableMap().apply {
@@ -49,7 +51,7 @@ class LiveSubscriptions(private val mapper: ObjectMapper, private val subscripti
             }
             else -> txt(content,warnings)
         }
-        return LiveImportResponse(channels.map { it.copy(headers = headers + it.headers) },channels.size,warnings.distinct())
+        return LiveImportResponse(channels.map { it.copy(headers = headers + it.headers, catchup = it.catchup ?: inheritedCatchup) },channels.size,warnings.distinct())
     }
     private fun groups(content: String, warnings: MutableList<String>): List<Channel> {
         val root = try { mapper.readTree(content) } catch (_: Exception) { bad("Invalid live group JSON") }
@@ -62,7 +64,10 @@ class LiveSubscriptions(private val mapper: ObjectMapper, private val subscripti
                 if (accepted.size < urls.size) warnings += "Some live protocols need a server adapter."
                 val channelHeaders = channel.path("header").takeIf { it.isObject }?.fields()?.asSequence()?.associate { it.key to it.value.asText() }.orEmpty()
                 ProviderTransport.validateHeaders(channelHeaders)
-                accepted.forEach { url -> add(result,Channel(channel.path("name").asText("Unnamed").take(200),url,group.path("name").asText("Uncategorized").take(100),headers=channelHeaders)) }
+                accepted.forEach { url -> add(result,Channel(channel.path("name").asText("Unnamed").take(200),url,group.path("name").asText("Uncategorized").take(100),logo=channel.path("logo").asText("").takeIf { valid(it) },
+                    tvgId=channel.path("tvgId").asText(channel.path("tvgName").asText("")).take(150).ifBlank { null },
+                    headers=channelHeaders, timeshift=LiveReplay.timeshift(channel.path("timeshift"),mapper),
+                    catchup=LiveReplay.catchup(channel.path("catchup"),mapper))) }
             }
         }
         return result

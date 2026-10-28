@@ -144,6 +144,17 @@ final class MediaLibraryStore: ObservableObject {
     func play(_ channel: TVChannel) {
         playbackError = nil
         guard MediaAddress.valid(channel.url), let url = URL(string: channel.url) else { return }
+        if let replay = channel.replay {
+            guard let api=relayAPI else { playbackError="请先登录家庭服务器以播放回放。";return }
+            do {
+                let address=try MediaRelayAddress.resolve(replay.path,server:api.server)
+                guard replay.expiresAt > Int64(Date().timeIntervalSince1970*1000) else { throw NativeRequestError.message("回放会话已过期，请重新选择时间。") }
+                savePosition();cancelRelay()
+                activeRelay=(api,address.ticket);requestedChannel=channel
+                playResolved(channel,address.url)
+            } catch { playbackError=error.localizedDescription }
+            return
+        }
         savePosition()
         cancelRelay()
         statusObservation?.invalidate()
@@ -188,7 +199,7 @@ final class MediaLibraryStore: ObservableObject {
 
         guard prepareAudioSession() else { return }
         let item = AVPlayerItem(url: url)
-        observe(item, resume: positions[channel.url])
+        observe(item, resume: channel.replay == nil ? positions[channel.url] : nil)
         player.replaceCurrentItem(with: item)
         player.playImmediately(atRate: playbackSpeed)
         persist()
@@ -306,7 +317,7 @@ final class MediaLibraryStore: ObservableObject {
     }
 
     func savePosition() {
-        guard let channel = current,
+        guard let channel = current, channel.replay == nil,
               let duration = player.currentItem?.duration.seconds, duration.isFinite, duration >= 60 else { return }
         let seconds = player.currentTime().seconds
         guard seconds.isFinite, seconds >= 0 else { return }
@@ -379,6 +390,9 @@ final class MediaLibraryStore: ObservableObject {
         var result = channel
         result.headersRequired = channel.headersRequired == true || !(channel.headers ?? [:]).isEmpty
         result.headers = nil
+        result.replay = nil
+        result.timeshift = nil
+        result.catchup = nil
         return result
     }
     private func persist() {

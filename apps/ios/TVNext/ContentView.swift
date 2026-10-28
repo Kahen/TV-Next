@@ -82,7 +82,7 @@ struct ContentView: View {
                     ConfigPreviewSection().id("config")
                     CloudSection(serverURL: serverURL) { library.play($0) }.id("cloud")
                     SubscriptionSection(serverURL: serverURL, session:homeSession, onPlay: { playback, title in
-                        library.play(TVChannel(name: title + " · " + playback.name, url: playback.url, group: playback.lineName, logo: nil, tvgId: nil, headers:playback.headers))
+                        library.play(TVChannel(name: title + " · " + playback.name, url: playback.url, group: playback.lineName, logo: nil, tvgId: nil, headers:playback.headers, timeshift:playback.timeshift))
                         remoteResourceKey = playback.url
                         remoteDanmaku = playback.danmaku
                     }, onImport: { library.importChannels($0) }).id("subscription")
@@ -359,6 +359,9 @@ struct ContentView: View {
                         .accessibilityIdentifier("playback-error")
                     Button("重试播放") { library.retryPlayback() }
                         .accessibilityIdentifier("retry-playback")
+                }
+                if let channel = library.current {
+                    NativeLiveReplayControls(channel:channel,serverURL:serverURL,session:homeSession,onPlay:{ library.play($0) })
                 }
                 Picker("播放速度", selection: $playbackSpeed) {
                     Text("0.75×").tag(Float(0.75))

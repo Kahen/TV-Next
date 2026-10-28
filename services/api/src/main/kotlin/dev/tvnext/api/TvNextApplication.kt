@@ -21,7 +21,7 @@ fun main(args: Array<String>) {
 }
 
 data class TextImportRequest(val content: String = "")
-data class Channel(val name: String, val url: String, val group: String, val logo: String? = null, val tvgId: String? = null, val headers: Map<String,String> = emptyMap())
+data class Channel(val name: String, val url: String, val group: String, val logo: String? = null, val tvgId: String? = null, val headers: Map<String,String> = emptyMap(), val timeshift: LiveTimeshift? = null, val catchup: LiveCatchup? = null)
 data class PlaylistResponse(val channels: List<Channel>, val total: Int = channels.size)
 data class SitePreview(val key: String, val name: String, val type: Int?)
 data class ConfigPreviewResponse(val spiderDeclared: Boolean, val sites: List<SitePreview>, val liveGroupCount: Int)
@@ -56,6 +56,10 @@ class PlaylistParser {
         }
     }
 
+    private fun m3uCatchup(attrs: Map<String,String>): LiveCatchup? = attrs["catchup-source"]?.takeIf { it.isNotBlank() }?.let {
+        LiveCatchup(attrs["catchup"] ?: "append", attrs["catchup-days"] ?: "7", it, replace = attrs["catchup-replace"].orEmpty())
+    }
+
     fun parse(content: String): PlaylistResponse {
         validateSize(content)
         val channels = mutableListOf<Channel>()
@@ -64,14 +68,20 @@ class PlaylistParser {
         var logo: String? = null
         var tvgId: String? = null
         var mediaHeaders = emptyMap<String,String>()
+        var globalCatchup: LiveCatchup? = null
+        var catchup: LiveCatchup? = null
         var lines = 0
         content.lineSequence().forEach { raw ->
             lines++
             if (lines > MAX_LINES) fail("Too many lines")
             val line = raw.trim()
             when {
+                line.startsWith("#EXTM3U", ignoreCase = true) -> {
+                    globalCatchup = m3uCatchup(attribute.findAll(line).associate { it.groupValues[1].lowercase() to it.groupValues[2] })
+                }
                 line.startsWith("#EXTINF", ignoreCase = true) -> {
                     val attrs = attribute.findAll(line).associate { it.groupValues[1].lowercase() to it.groupValues[2] }
+                    catchup = m3uCatchup(attrs) ?: globalCatchup
                     name = metadataTitle(line)?.takeIf { it.isNotEmpty() }
                         ?: attrs["tvg-name"]?.takeIf { it.isNotBlank() } ?: "Unnamed"
                     group = attrs["group-title"]?.takeIf { it.isNotBlank() } ?: "Uncategorized"
@@ -99,13 +109,14 @@ class PlaylistParser {
                     if (uri != null) {
                         if (channels.size >= MAX_CHANNELS) fail("Too many channels")
                         channels += Channel(name?.take(200) ?: (uri.host ?: "Stream"),
-                            stream, group.take(100), logo, tvgId?.take(150), (mediaHeaders + extra).also { ProviderTransport.validateHeaders(it) })
+                            stream, group.take(100), logo, tvgId?.take(150), (mediaHeaders + extra).also { ProviderTransport.validateHeaders(it) }, catchup = catchup)
                     }
                     name = null
                     group = "Uncategorized"
                     logo = null
                     tvgId = null
                     mediaHeaders = emptyMap()
+                    catchup = null
                 }
             }
         }

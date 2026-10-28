@@ -76,7 +76,7 @@ export default function SubscriptionBrowser({onPlay, onImport,session}: {session
     const {controller, id} = start();
     try {
       const p = await sourceRequest<MediaPlayback>("/api/v1/subscriptions/play", {...body(), vodId: detail.item.id, lineIndex: line, episodeIndex: index}, controller.signal);
-      if (id === requestId.current) onPlay({name: detail.item.name + " · " + p.name, url: p.url, group: p.lineName, headers: p.headers, subtitles: p.subtitles, danmaku: p.danmaku});
+      if (id === requestId.current) onPlay({name: detail.item.name + " · " + p.name, url: p.url, group: p.lineName, headers: p.headers, subtitles: p.subtitles, danmaku: p.danmaku, timeshift: p.timeshift});
     } catch (e) { if (id === requestId.current && !controller.signal.aborted) setError(e instanceof Error ? e.message : "播放解析失败"); }
     finally { if (id === requestId.current) setBusy(false); }
   }

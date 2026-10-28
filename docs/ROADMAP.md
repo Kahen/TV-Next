@@ -1,6 +1,6 @@
 # TV-Next roadmap
 
-Updated: 2026-10-23. Current code backlog: [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md). This is a delivery plan, not a claim that every feature exists.
+Updated: 2026-10-28. Current code backlog: [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md). This is a delivery plan, not a claim that every feature exists.
 
 ## Goals and non-goals
 
@@ -131,3 +131,7 @@ Accounts, per-device tokens, expiring one-use pairing, user-scoped library CAS, 
 ### Web dependency security increment
 
 Known-advisory build/test packages are upgraded with a regenerated npm lockfile. Web CI now rejects moderate-or-higher advisories and retains a CycloneDX SBOM and JSON audit report. See [DEPENDENCY_SECURITY.md](DEPENDENCY_SECURITY.md); JVM/container/license/signing/provenance and remaining P6 gates stay open.
+
+## 2026-10-28 live replay increment
+
+Original FongMi timeshift Result resolution and the bounded programme catchup subset now have Web/iOS controls, authenticated capability relay and historical XMLTV views. See [LIVE_REPLAY.md](LIVE_REPLAY.md) for the pinned source mapping, supported date/time tokens, explicit exclusions and regression coverage. [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) reconciles previously merged action/search/AirPlay/Keychain work with the remaining code backlog. P2–P6 are still incomplete.

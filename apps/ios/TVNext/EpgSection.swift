@@ -46,6 +46,8 @@ struct EpgSection: View {
             } catch { self.error=error.localizedDescription }
         }
         .onChange(of:channels) { _,_ in invalidate() }
+        .onChange(of:serverURL) { _,_ in invalidate() }
+        .onChange(of:session?.token) { _,_ in invalidate();feeds=[] }
         .onChange(of:xml) { _,_ in invalidate() }
         .onDisappear { task?.cancel();generation=UUID() }
     }
@@ -87,6 +89,14 @@ struct EpgSection: View {
                         if snapshot.indices.contains(index) { Button("播放频道") { onPlay(snapshot[index]) } }
                     }
                     if let current=channel.current { Text("正在播："+current.title+" · "+current.range) }
+                    ForEach(Array((channel.previous ?? []).enumerated()),id:\.offset) { _,program in
+                        VStack(alignment:.leading) {
+                            Text(program.start+" · "+program.title).font(.caption)
+                            if snapshot.indices.contains(index) {
+                                NativeLiveReplayControls(channel:snapshot[index],serverURL:serverURL,session:session,onPlay:onPlay,programme:program)
+                            }
+                        }
+                    }
                     ForEach(Array(channel.upcoming.enumerated()),id:\.offset) { _,program in
                         Text(program.range+" · "+program.title).font(.caption)
                     }

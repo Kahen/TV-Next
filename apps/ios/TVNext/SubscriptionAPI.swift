@@ -24,6 +24,7 @@ struct NativeMediaDetail: Decodable {
 }
 struct NativePlaybackResource: Decodable, Identifiable { let name: String; let url: String; var id: String { url } }
 struct NativeMediaPlayback: Decodable {
+    let timeshift: NativeTimeshift?
     let url: String; let name: String; let lineName: String; let headers: [String:String]
     let danmaku: [NativePlaybackResource]; let subtitles: [NativePlaybackResource]
 }
