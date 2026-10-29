@@ -101,6 +101,23 @@ final class LibraryUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["webdav-error"].exists)
     }
 
+    func testWebDAVFilterAndRefreshAreConnectionScoped() {
+        jump("WebDAV 文件")
+        let connect = app.buttons["webdav-connect"]
+        reveal(connect)
+        XCTAssertFalse(connect.isEnabled)
+        XCTAssertFalse(app.buttons["webdav-refresh"].exists)
+        XCTAssertFalse(app.textFields["webdav-filter"].exists)
+        enter(app.textFields["webdav-url"], "javascript:alert(1)")
+        reveal(connect)
+        connect.tap()
+        XCTAssertTrue(app.staticTexts["webdav-error"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["webdav-refresh"].exists)
+        reveal(app.buttons["webdav-disconnect"])
+        app.buttons["webdav-disconnect"].tap()
+        XCTAssertFalse(app.staticTexts["webdav-error"].exists)
+    }
+
     func testInlineSeekControlsArePresentAndDisabledWithoutMedia() {
         jump("播放器")
         let back = app.buttons["seek-back-15"]
