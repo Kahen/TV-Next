@@ -31,9 +31,12 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header('Location', '/dav/')
             self.end_headers()
         elif self.path == '/dav/no-length/':
-            # A valid multistatus without a declared length must still parse.
+            # Explicit EOF is required for a body with no Content-Length.
+            # Do not rely on platform-specific keep-alive/HTTP version defaults.
             self.send_response(207)
             self.send_header('Content-Type', 'application/xml')
+            self.send_header('Connection', 'close')
+            self.close_connection = True
             self.end_headers()
             self.wfile.write(XML.replace(b'/dav/', b'/dav/no-length/'))
         elif self.path == '/dav/large-declared/':
@@ -50,11 +53,23 @@ class Handler(BaseHTTPRequestHandler):
             # No Content-Length: exercise the actual incremental byte limit.
             self.send_response(207)
             self.send_header('Content-Type', 'application/xml')
+            self.send_header('Connection', 'close')
+            self.close_connection = True
             self.end_headers()
             try:
                 self.wfile.write(b'x' * 1_048_577)
             except (BrokenPipeError, ConnectionResetError):
                 pass  # Expected when the bounded client cancels its transfer.
+        elif self.path in ('/dav/unauthorized/', '/dav/forbidden/', '/dav/ok-not-multistatus/', '/dav/empty-multistatus/'):
+            status = {
+                '/dav/unauthorized/': 401,
+                '/dav/forbidden/': 403,
+                '/dav/ok-not-multistatus/': 200,
+                '/dav/empty-multistatus/': 207,
+            }[self.path]
+            self.send_response(status)
+            self.send_header('Content-Length', '0')
+            self.end_headers()
         else:
             self.send_error(404)
 
