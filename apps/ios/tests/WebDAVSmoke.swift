@@ -8,9 +8,9 @@ import Foundation
         let xml = """
         <?xml version="1.0" encoding="utf-8"?>
         <d:multistatus xmlns:d="DAV:">
-          <d:response><d:href>/dav/Movies/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop></d:propstat></d:response>
-          <d:response><d:href>/dav/Movies/Sub/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop></d:propstat></d:response>
-          <d:response><d:href>/dav/Movies/Owned%20Film.mp4</d:href><d:propstat><d:prop><d:resourcetype/></d:prop></d:propstat></d:response>
+          <d:response><d:href>/dav/Movies/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+          <d:response><d:href>/dav/Movies/Sub/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+          <d:response><d:href>/dav/Movies/Owned%20Film.mp4</d:href><d:propstat><d:prop><d:resourcetype/></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
           <d:response><d:href>https://evil.example/dav/Movies/attack.mp4</d:href></d:response>
           <d:response><d:href>/dav/MoviesExtra/skip.mp4</d:href></d:response>
           <d:response><d:href>/dav/Movies/%2e%2e/escape.mp4</d:href></d:response>
@@ -42,6 +42,46 @@ import Foundation
         precondition(exactBoundaryItems.isEmpty, "A valid 1 MiB response must remain supported")
         do { _ = try NativeWebDAV.parse(Data(repeating: 65, count: 1_048_577), root: root, folder: folder); fatalError("Accepted oversized XML") }
         catch NativeWebDAVError.responseTooLarge { }
-        print("Native WebDAV bounded listing smoke passed")
+
+        let mixed = """
+        <d:multistatus xmlns:d="DAV:" xmlns:x="urn:foreign">
+          <d:response>
+            <d:href>/dav/Movies/Good.mp4</d:href>
+            <d:propstat><d:prop><d:resourcetype/></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+          </d:response>
+          <d:response>
+            <d:href>/dav/Movies/Folder/</d:href>
+            <d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat>
+            <d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+          </d:response>
+          <d:response>
+            <d:href>/dav/Movies/NotFound.mp4</d:href>
+            <d:propstat><d:prop><d:resourcetype/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat>
+          </d:response>
+          <d:response>
+            <d:href>/dav/Movies/Spoofed.mp4</d:href>
+            <d:propstat><d:prop><d:resourcetype><x:collection/></d:resourcetype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+            <x:href>/dav/Movies/Wrong.mp4</x:href>
+            <d:propstat><d:prop><x:resourcetype><d:collection/></x:resourcetype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+          </d:response>
+          <d:response>
+            <d:href>/dav/Movies/Nested.mp4</d:href>
+            <d:propstat><d:prop><d:href>/dav/Movies/Injected.mp4</d:href><d:resourcetype/></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+          </d:response>
+          <d:response>
+            <d:href>/dav/Movies/Failed.mp4</d:href>
+            <d:status>HTTP/1.1 404 Not Found</d:status>
+            <d:propstat><d:prop><d:resourcetype/></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+          </d:response>
+          <d:response>
+            <d:href>/dav/Movies/BadStatus.mp4</d:href>
+            <d:propstat><d:prop><d:resourcetype/></d:prop><d:status>garbage</d:status></d:propstat>
+          </d:response>
+        </d:multistatus>
+        """
+        let verified = try NativeWebDAV.parse(Data(mixed.utf8), root: root, folder: folder)
+        precondition(verified.map(\.name) == ["Folder", "Good.mp4", "Nested.mp4", "Spoofed.mp4"], "Incorrect propstat/href scope: \(verified)")
+        precondition(verified[0].isDirectory && verified.dropFirst().allSatisfy { !$0.isDirectory })
+        print("Native WebDAV bounded listing and RFC 4918 status smoke passed")
     }
 }

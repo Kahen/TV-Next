@@ -11,6 +11,10 @@ Verified repository baseline at the start of this slice: `main` at `a9797ef` (PR
 | P5 | Accounts, hashed device tokens, pairing/revocation, per-user CAS sync, authenticated WS remote, H2/PostgreSQL/NAS persistence and restore, diagnostics, EPG scheduling, device-private provider health/search cache, bounded HTTP/HLS capability media relay | Remote-access deployment hardening, security/operational assessment and actual NAS/remote-network acceptance (#6) |
 | P6 | Committed npm lockfile, npm audit/CycloneDX SBOM, aggregate Web/API/PostgreSQL/browser/iOS/Compose/NAS/sandbox CI | JVM/container dependency and licence/provenance audit, immutable image/action pins, performance/reliability benchmarks, reproducible versioned artifacts/rollback, native signing/TestFlight/distribution (#7) |
 
+## Native WebDAV RFC 4918 propstat/href parsing (P4, #72)
+
+The native Depth:1 parser now treats only direct DAV:response/DAV:href as resource identity and requires a 2xx DAV:propstat/DAV:resourcetype to list a file or folder. Collection flags from failed properties, nested/foreign XML and failed response statuses cannot misclassify or inject listings. Synthetic positive/negative Swift smoke, XCTest and localhost PROPFIND fixtures exercise the contract; final-head aggregate CI and physical/provider verification remain separate. This is not a new network transport, SMB/DLNA implementation or security audit.
+
 ## Native WebDAV incremental response cap (P4)
 
 The native WebDAV `PROPFIND` transport now rejects oversized declared responses and reads unknown-length XML bodies incrementally, aborting after 1 MiB instead of allocating the entire body through `URLSession.data(for:)`. A localhost fixture tests both size cases, a successful listing after rejection, existing redirect/auth policy and bounded parser behavior. See [IOS_WEBDAV.md](IOS_WEBDAV.md) and issue #70. This is not a full network resource quota, physical-device acceptance, or independent security audit. Final-head CI evidence belongs to the associated PR.

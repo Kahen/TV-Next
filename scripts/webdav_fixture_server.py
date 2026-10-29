@@ -4,9 +4,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 XML = b'''<?xml version="1.0" encoding="utf-8"?>
 <d:multistatus xmlns:d="DAV:">
-  <d:response><d:href>/dav/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop></d:propstat></d:response>
-  <d:response><d:href>/dav/Owned.mp4</d:href><d:propstat><d:prop><d:resourcetype/></d:prop></d:propstat></d:response>
-  <d:response><d:href>/dav/Folder/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop></d:propstat></d:response>
+  <d:response><d:href>/dav/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+  <d:response><d:href>/dav/Owned.mp4</d:href><d:propstat><d:prop><d:resourcetype/></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+  <d:response><d:href>/dav/Folder/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
   <d:response><d:href>https://foreign.example/evil.mp4</d:href></d:response>
 </d:multistatus>'''
 
@@ -24,6 +24,11 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == '/dav/redirect/':
             self.send_response(302)
             self.send_header('Location', 'https://foreign.example/dav/')
+            self.end_headers()
+        elif self.path == '/dav/redirect-local/':
+            # Redirects must be denied even when they stay on the same origin.
+            self.send_response(302)
+            self.send_header('Location', '/dav/')
             self.end_headers()
         elif self.path == '/dav/no-length/':
             # A valid multistatus without a declared length must still parse.

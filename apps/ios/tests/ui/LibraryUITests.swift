@@ -17,7 +17,12 @@ final class LibraryUITests: XCTestCase {
 
     override func tearDown() async throws {
         XCUIDevice.shared.orientation = .portrait
-        app.terminate()
+        // Do not synchronously terminate here: on slower iPad simulators
+        // XCTest can fail an otherwise passing case if SpringBoard refuses
+        // termination while the app is backgrounding. The next setUp()
+        // calls launch(), which relaunches the target; explicit
+        // terminate/relaunch assertions inside persistence tests remain.
+        app = nil
     }
 
     private func jump(_ name: String) {
