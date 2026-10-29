@@ -229,7 +229,7 @@ final class LibraryUITests: XCTestCase {
         confirmation.buttons["删除离线文件"].tap()
         XCTAssertFalse(play.exists, "Confirmed deletion must remove the offline catalog entry")
         jump("播放器")
-        XCTAssertFalse(app.staticTexts["current-media"].exists, "Confirmed deletion must release the active local player item")
+        XCTAssertTrue(app.staticTexts["current-media"].label.contains("尚未选择媒体"), "Confirmed deletion must release the active local player item")
     }
 
     func testManualIntroOutroControlsDoNotMarkWithoutMedia() {
