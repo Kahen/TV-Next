@@ -10,7 +10,7 @@ final class NativeWebDAVTests: XCTestCase {
         <d:multistatus xmlns:d="DAV:">
           <d:response><d:href>/dav/Media/</d:href></d:response>
           <d:response><d:href>/dav/Media/Season%201</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
-          <d:response><d:href>/dav/Media/Owned.mp4</d:href></d:response>
+          <d:response><d:href>/dav/Media/Owned.mp4</d:href><d:propstat><d:prop><d:resourcetype/></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
           <d:response><d:href>https://foreign.test/dav/Media/evil.mp4</d:href></d:response>
           <d:response><d:href>/dav/Media/%2e%2e/escape.mp4</d:href></d:response>
           <d:response><d:href>/dav/Media/bad%2Fpath.mp4</d:href></d:response>
