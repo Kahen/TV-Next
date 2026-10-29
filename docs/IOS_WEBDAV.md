@@ -30,4 +30,4 @@ The localhost fixture explicitly closes responses without `Content-Length`. The 
 
 ## Local WebDAV browse controls (P4, #76)
 
-Native Swift smoke and XCTest verify trimmed case-insensitive matching, folder retention, supported/unsupported suffixes, and empty results. Production XCUI checks that refresh/filter controls are not exposed before a validated connection and remain absent after invalid URL rejection; existing simulator networking tests verify bounded Depth:1 transport. No real WebDAV provider, large-directory server-side search or physical-device behavior is claimed.
+Native Swift smoke and XCTest verify trimmed case-insensitive matching, folder retention, supported/unsupported suffixes, and empty results. Production iPhone/iPad XCUI checks invalid URL rejection and, against the owned localhost RFC 4918 fixture, a successful folder listing, media-only folder retention, case-insensitive search, same-folder refresh, and disconnect cleanup. Existing Swift network smoke verifies bounded Depth:1 transport. No real WebDAV provider, large-directory server-side search or physical-device behavior is claimed.
