@@ -64,3 +64,7 @@ The optional bridge delegates approved init bindings to an existing separate
 FongMi Android host; authentication, polling, deadlines, cleanup and opaque-ID
 contracts have automated tests. No ARM host is available here, so this does not
 claim actual Spider execution, complete P3 compatibility or release acceptance.
+
+## Native WebDAV completion-status CI regression (#74)
+
+The 2026-10-29 main push full gate [40809764313](https://github.com/Kahen/TV-Next/actions/runs/40809764313) failed in the iPad-only localhost WebDAV network smoke with `invalidResponse`, despite the iPhone and other jobs succeeding. This follow-up adds a final-task-response HTTP status/length fallback, explicit EOF for unknown-length localhost fixtures, and positive/negative/size-boundary transport regressions. It does not weaken redirect rejection, byte caps or credential handling, and it is not evidence of real-device/provider acceptance. Final-head iPhone/iPad and aggregate CI must succeed before merging this slice.
