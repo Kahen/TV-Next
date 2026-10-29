@@ -76,3 +76,14 @@ The SwiftUI WebDAV view adds explicit current-folder refresh and device-local fi
 ## Native WebDAV bounded breadcrumb navigation (P4, #78)
 
 Native SwiftUI adds direct root/ancestor shortcuts for nested WebDAV folders. A pure Swift helper derives at most 32 canonical directory ancestors from already root-validated URLs, rejecting foreign origins, sibling roots, non-directory inputs and over-depth paths. The UI invokes the existing bounded/cancelable directory fetch, not a new transport. Swift smoke, XCTest and iPhone/iPad XCUI against the owned localhost nested-folder fixture provide positive/negative regression coverage. Final-head aggregate CI and physical-provider validation remain distinct.
+
+## Native offline deletion confirmation (P4, #83)
+
+Offline copies now require an explicit destructive confirmation before deletion.
+Cancel preserves the file, catalog entry and any active AVPlayer item; confirm
+releases only the matching local player item and removes the copy. The native
+section displays the current count and byte usage against the existing quota.
+Production iPhone/iPad XCUI covers owned-fixture download, relaunch, playback,
+cancel and confirm. See [IOS_OFFLINE_DELETE.md](IOS_OFFLINE_DELETE.md).
+Final-head simulator/integration gates and physical-device acceptance are distinct;
+this does not implement resumable/HLS/DRM downloads, SMB/DLNA or signed releases.
