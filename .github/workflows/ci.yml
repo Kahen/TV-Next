@@ -58,7 +58,12 @@ jobs:
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
         with:
           gradle-version: "8.14.3"
-      - run: gradle test bootJar --no-daemon
+      - name: Verify committed JVM dependency evidence
+        working-directory: .
+        run: |
+          python3 scripts/verify_gradle_dependencies.py
+          python3 -m unittest discover -s scripts -p test_verify_gradle_dependencies.py
+      - run: gradle test bootJar --dependency-verification strict --no-daemon
       - name: Publish exact API test counts
         if: always()
         run: python ../../scripts/summarize_junit.py build/test-results/test
@@ -102,7 +107,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
         with:
           gradle-version: "8.14.3"
-      - run: gradle test --tests '*HomeServerIntegrationTest' --tests '*RemoteControlIntegrationTest' --tests '*EpgFeedIntegrationTest' --no-daemon
+      - run: gradle test --dependency-verification strict --tests '*HomeServerIntegrationTest' --tests '*RemoteControlIntegrationTest' --tests '*EpgFeedIntegrationTest' --no-daemon
       - name: Publish PostgreSQL test evidence
         if: always()
         run: python ../../scripts/summarize_junit.py build/test-results/test
