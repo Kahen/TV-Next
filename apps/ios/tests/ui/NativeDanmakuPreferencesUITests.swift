@@ -32,28 +32,34 @@ final class NativeDanmakuPreferencesUITests: XCTestCase {
             return toggle
         }
 
-        func expectValue(_ expected: String) {
-            let toggle = visibleToggle()
-            let predicate = NSPredicate(format: "value == %@", expected)
+        // Assert the actual SwiftUI model state via visible feedback, not the
+        // platform/locale-dependent XCUIElement.value representation of a switch.
+        func expectEnabled(_ enabled: Bool) {
+            let status = app.staticTexts["danmaku-enabled-status"]
+            XCTAssertTrue(status.waitForExistence(timeout: 10))
+            let expected = enabled ? "弹幕已开启" : "弹幕已关闭"
+            let predicate = NSPredicate(format: "label == %@", expected)
             XCTAssertEqual(
-                XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: predicate, object: toggle)], timeout: 10),
+                XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: predicate, object: status)], timeout: 10),
                 .completed,
-                "Native danmaku toggle did not reach expected value \(expected)"
+                "Native danmaku UI state did not become \\(expected); observed \\(status.label)"
             )
         }
 
         openDanmakuSettings()
         let toggle = visibleToggle()
-        if toggle.value as? String != "0" { toggle.tap() }
-        expectValue("0")
+        let status = app.staticTexts["danmaku-enabled-status"]
+        XCTAssertTrue(status.waitForExistence(timeout: 10))
+        if status.label != "弹幕已关闭" { toggle.tap() }
+        expectEnabled(false)
 
         app.terminate()
         app.launch()
         openDanmakuSettings()
-        expectValue("0")
+        expectEnabled(false)
 
         // Restore the default for other production UI tests in the same simulator.
         visibleToggle().tap()
-        expectValue("1")
+        expectEnabled(true)
     }
 }
