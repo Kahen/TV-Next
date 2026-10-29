@@ -69,7 +69,10 @@ final class LibraryUITests: XCTestCase {
             let viewport = visibleViewport()
             return !frame.isEmpty && !frame.isInfinite && viewport.contains(frame)
         }
-        let reachable = NSPredicate { _, _ in visible() && element.isHittable }
+        // A SwiftUI TextField may report an AX activation-point exception when
+        // isHittable is queried during a scroll transition. Geometry checks
+        // do not request an activation point; actual taps still exercise UI.
+        let reachable = NSPredicate { _, _ in visible() }
         if XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: reachable, object: element)], timeout: 3) == .completed { return }
         var resetToSection = false
         for _ in 0..<12 {
@@ -81,7 +84,7 @@ final class LibraryUITests: XCTestCase {
             let frame = element.frame
             let viewport = visibleViewport()
             guard !viewport.isEmpty else { app.activate(); continue }
-            if visible() && element.isHittable { return }
+            if visible() { return }
             print("Reveal frame=\(frame), viewport=\(viewport)")
             // Short controlled drags avoid oscillating past a control when its
             // layout moves after keyboard dismissal or a validation message.
