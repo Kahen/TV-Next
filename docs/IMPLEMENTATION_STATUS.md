@@ -2,7 +2,7 @@
 
 This is the current code/acceptance inventory. Historical issue comments and older
 milestone ledgers describe their own commits; an unchecked old checkbox is not
-proof that current code is missing. PRs #79–#86 contain the latest implementation increments;
+proof that current code is missing. PRs #79–#91 contain the latest implementation increments;
 only merged changes with passing final-head CI count as delivered on main.
 
 | Phase | Implemented code | Remaining implementation | External acceptance |
@@ -10,9 +10,9 @@ only merged changes with passing final-head CI count as delivered on main.
 | P1 | Web/iOS persistent libraries, imports/export/local files, favorites/history/resume, player controls, PWA shell, real-browser and iPhone/iPad simulator acceptance; #2 closed | No reopened P1 implementation task | Physical Apple devices and installed PWA, #38 |
 | P2 | Source-derived type 0/1/2/4 subscriptions, categories/filters/search/details/lines, bounded cross-site search, HTTP action web subset, live imports/XMLTV.gz scheduling, bounded timeshift/catchup; native AVPlayer audio/subtitle preferences; native subscription external captions in #80 | Interactive login/QR actions, parser/WebView chains, wider replay/provider variants, broader Web track/preference parity | Permitted representative provider corpus and real playback, #3 |
 | P3 | Bundled Java/Node/Python fixture workers and OS-isolation tests; bounded nonexecuting JAR/DEX preflight; administrator-bound Android SpiderTest bridge, five media operations, device auth and Web/iOS capability UI; #85 adds a preflighted/hash-checked owned-JAR loader using original Spider media signatures inside the OS sandbox | External pure-JVM artifact/dependency approval and representative corpus (#45), authorized dispatcher/API activation, real JS/QuickJS/Python adapters, controlled egress and stateful Android sessions/actions/proxy callbacks | Actual ARM Android DEX/native execution, permitted plugin corpus and independent isolation/security review, #4 |
-| P4 | External SRT/VTT/text ASS/SSA, offsets/danmaku; native PiP/AirPlay/audio/subtitle preferences/background controls; AList/OpenList and read-only WebDAV; native manual markers; #79 fixes exact collection hrefs/breadcrumbs; #80 adds opt-in marker auto-skip, offline media files, native subscription captions and stale-resource cancellation; #84 adds offline deletion confirmation/storage usage; #86 adds private read-only codec/buffer/error diagnostics | Styled ASS/fonts/karaoke, broader subtitle matching/headers, SMB/DLNA, HLS/background/resumable downloads, optional transcoding, direct cloud login/QR/OAuth and automatic skip detection/provider metadata | Physical codec/seek/PiP/AirPlay/background/WebDAV/storage/energy matrix, #5 and #38 |
+| P4 | External SRT/VTT/text ASS/SSA, offsets/danmaku; native PiP/AirPlay/audio/subtitle preferences/background controls; AList/OpenList and read-only WebDAV; native manual markers; #79 fixes exact collection hrefs/breadcrumbs; #80 adds opt-in marker auto-skip, offline media files, native subscription captions and stale-resource cancellation; #84 adds offline deletion confirmation/storage usage; #86 adds private read-only codec/buffer/error diagnostics; #89 binds WebDAV requests/playback to immutable connection credentials | Styled ASS/fonts/karaoke, broader subtitle matching/headers, SMB/DLNA, HLS/background/resumable downloads, optional transcoding, direct cloud login/QR/OAuth and automatic skip detection/provider metadata | Physical codec/seek/PiP/AirPlay/background/WebDAV/storage/energy matrix, #5 and #38 |
 | P5 | Accounts, hashed device tokens, one-use pairing/revocation, CAS library sync, authenticated WS remote, H2/PostgreSQL/NAS restart/restore, diagnostics, EPG scheduling, private provider health/cache and bounded DNS-pinned HTTP/HLS relay | Remaining remote-access deployment controls and operational hardening | Actual NAS/remote-network restore/load/ACL/egress assessment, #6 |
-| P6 | npm lock/audit/CycloneDX SBOM; all-or-nothing Web/API/PostgreSQL/browser/native/Compose/NAS/isolation gate; #81 pins Actions and Docker inputs with official metadata provenance and CI drift rejection; #82 builds gated unsigned Web/API/Linux amd64 candidates with matching source, Web SBOM/audit and checksums | Gradle/Maven verification/locking, JVM/container/license/SBOM/provenance audit, measured performance budgets, signed/ARM/native artifacts, reproducible outputs and actual rollback/distribution acceptance | Independent security/license review, Apple signing/TestFlight/distribution decision, #7 |
+| P6 | npm lock/audit/CycloneDX SBOM; all-or-nothing Web/API/PostgreSQL/browser/native/Compose/NAS/isolation gate; #81 pins Actions and Docker inputs with official metadata provenance and CI drift rejection; #82 builds gated unsigned Web/API/Linux amd64 candidates with matching source, Web SBOM/audit and checksums; #88 requires host/Docker API JAR byte equality; #90 locks API/tooling versions and verifies artifact/metadata SHA-256; #91 inventories exact shipped JVM library bytes | Independent JVM/container/license review, runtime/container SBOM/provenance beyond API libraries, measured performance budgets, signed/ARM/native artifacts, broader reproducibility and actual rollback/distribution acceptance | Independent security/license review, Apple signing/TestFlight/distribution decision, #7 |
 
 ## This iteration
 
@@ -58,11 +58,31 @@ only merged changes with passing final-head CI count as delivered on main.
   loads an actual owned, pinned and statically preflighted JAR through original
   FongMi init/home/category/detail/search/player/destroy signatures. Container
   isolation and bounded teardown remain the boundary; there is no external JAR
-  upload or new live API activation. See [PURE_JVM_SPIDER.md](PURE_JVM_SPIDER.md).
+  upload or new live API activation. Final-head [full gate](https://github.com/Kahen/TV-Next/actions/runs/40882224143) passed. See [PURE_JVM_SPIDER.md](PURE_JVM_SPIDER.md).
 - [#86](https://github.com/Kahen/TV-Next/pull/86): native AVPlayer diagnostics show
   encoded codec/dimensions/audio parameters, timeline/buffer state and sanitized
   errors. No raw URL, headers or error logs are shown or persisted. This does not
-  identify a hardware decoder. See [NATIVE_PLAYBACK_DIAGNOSTICS.md](NATIVE_PLAYBACK_DIAGNOSTICS.md).
+  identify a hardware decoder. Final-head [full gate](https://github.com/Kahen/TV-Next/actions/runs/40889089374) passed: each iPhone/iPad ran 52 unit and 13 UI tests. See [NATIVE_PLAYBACK_DIAGNOSTICS.md](NATIVE_PLAYBACK_DIAGNOSTICS.md).
+
+- [#88](https://github.com/Kahen/TV-Next/pull/88): the independently compiled host
+  and Docker API JARs must match byte for byte before candidate packaging. The
+  [candidate gate](https://github.com/Kahen/TV-Next/actions/runs/40887628529) passed.
+  This is scoped API binary equality, not universal container reproducibility.
+- [#89](https://github.com/Kahen/TV-Next/pull/89): editing an unconnected WebDAV
+  form cannot change the active root/credentials used by browsing or playback.
+  Authorization is root/origin/scheme/port scoped and credential bounds count
+  UTF-8 bytes. Native UI refreshes the active owned fixture after draft edits.
+- [#90](https://github.com/Kahen/TV-Next/pull/90): 132 exact API/tooling module
+  versions and 519 artifact/metadata SHA-256 values are committed. CI never
+  regenerates the baseline. Real Gradle negative probes reject wrong checksums
+  and missing lock state, including warm-cache behavior. See
+  [JVM_DEPENDENCY_INTEGRITY.md](JVM_DEPENDENCY_INTEGRITY.md).
+- [#91](https://github.com/Kahen/TV-Next/pull/91): API CI and candidates inventory
+  the actual embedded library bytes in CycloneDX JSON, with exact Maven identities,
+  hashes and archive paths. Unknown/changed libraries fail generation. The unused
+  Spring Boot jarmode extraction tool is excluded from the directly launched API.
+  This is a flat library inventory; dependency edges, license/vulnerability clearance
+  and JDK/OS coverage are not inferred. See [JVM_RUNTIME_SBOM.md](JVM_RUNTIME_SBOM.md).
 
 ## Remaining code, in priority order
 
@@ -80,10 +100,12 @@ only merged changes with passing final-head CI count as delivered on main.
    failure behavior for each tested variant.
 4. **Server operations:** remaining remote-access deployment hardening and measured
    ACL/egress/sync/restore reliability on the intended NAS/network topology.
-5. **Distribution:** JVM/container/dependency/license evidence, full release-level
-   SBOM/provenance, measured budgets, ARM/native/signature support, reproducible
-   output verification, rollback drills and Apple signing/TestFlight. The unsigned
-   candidate workflow is implemented in #82; it does not complete these gates.
+5. **Distribution:** independent JVM/container/dependency/license evidence, full
+   runtime/container SBOM and release provenance, measured budgets, ARM/native/signature
+   support, broader reproducibility, rollback drills and Apple signing/TestFlight.
+   Unsigned candidate packaging, API binary equality, JVM version/checksum baselines
+   and the shipped-library SBOM are implemented in #82/#88/#90/#91; these increments
+   do not complete the remaining distribution gates.
 
 ## Evidence and resource gates
 

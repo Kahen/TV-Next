@@ -18,10 +18,10 @@
 | --- | --- | --- |
 | P1 | Code, browser E2E and native simulator acceptance | Implementation #2 closed; physical Apple/installed-PWA matrix remains #38 |
 | P2 | Source/protocol parity across both clients and a permitted representative corpus | HTTP type 0/1/2/4, filters/search/live replay/EPG and native track preferences implemented; interactive/parser/long-tail/Web gaps and real corpus remain #3 |
-| P3 | Real supported Spider adapters, isolated runtime/egress and approved corpus | Fixture workers and optional Android bridge are implemented; actual Android/JVM/JS/Python plugin compatibility and independent review remain #4/#45 |
-| P4 | Advanced native media, network inputs/download/transcoding and device matrix | Native captions/tracks/PiP/background/AirPlay/WebDAV/markers/file downloads implemented; remaining styled ASS, SMB/DLNA, HLS/offline/cloud/transcoding and physical acceptance remain #5/#38 |
+| P3 | Real supported Spider adapters, isolated runtime/egress and approved corpus | Fixture workers, the owned original-signature JVM loader and optional Android bridge are implemented; external JVM/JS/Python corpus/activation, actual ARM Android execution and independent review remain #4/#45 |
+| P4 | Advanced native media, network inputs/download/transcoding and device matrix | Native captions/tracks/PiP/background/AirPlay/WebDAV/markers/file downloads and private playback diagnostics implemented; remaining styled ASS, SMB/DLNA, HLS/offline/cloud/transcoding and physical acceptance remain #5/#38 |
 | P5 | ACL/egress/sync/restore plus actual NAS and remote-network assessment | Account/relay/cache/sync/remote/NAS automated paths implemented; remote operational/security acceptance remains #6 |
-| P6 | Audited reproducible signed artifacts, rollback, compatibility and Apple distribution | Web audit/SBOM, immutable inputs and unsigned candidate packaging implemented; JVM/container/license/provenance/performance/rollback/signing and resource gates remain #7 |
+| P6 | Audited reproducible signed artifacts, rollback, compatibility and Apple distribution | Web audit/SBOM, immutable inputs, unsigned candidates, API host/Docker byte equality, JVM locks/checksums and shipped-library SBOM implemented; independent JVM/container/license/provenance/performance/rollback/signing and resource gates remain #7 |
 
 See [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) for the complete current
 inventory and PR evidence. Dated ledger entries below describe their own historical
