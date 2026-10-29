@@ -1,6 +1,6 @@
 # JVM dependency integrity
 
-The API uses Gradle 8.14.3 and JDK 21. The committed `services/api/gradle.lockfile` records 132 exact compile/runtime/test/tooling module versions. `gradle/verification-metadata.xml` records 519 SHA-256 checksums across 280 resolved components, including build plugins, POM/module metadata, parent BOMs and artifacts. BOM metadata is not an assertion that every managed library ships at runtime.
+The API uses Gradle 8.14.3 and JDK 21. The committed `services/api/gradle.lockfile` records 131 exact compile/runtime/test/tooling module versions. `gradle/verification-metadata.xml` records 515 SHA-256 checksums across 279 resolved components, including build plugins, POM/module metadata, parent BOMs and artifacts. BOM metadata is not an assertion that every managed library ships at runtime.
 
 All resolvable project configurations use Gradle strict dependency locking. API CI, PostgreSQL tests, Docker compilation and unsigned candidate compilation explicitly use strict dependency verification. There are no blanket trusted-artifact rules, ignored checksum exceptions or fallback to lenient/off verification. CI validates coverage and policy and never regenerates the approved files. Missing lock state, changed resolution, unlisted artifacts and wrong artifact/metadata bytes must fail.
 
@@ -9,6 +9,8 @@ All resolvable project configurations use Gradle strict dependency locking. API 
 Initial checksums were calculated by the Gradle 8.14.3 hosted JDK 21 build in [bootstrap run 40891396261](https://github.com/Kahen/TV-Next/actions/runs/40891396261), from the project repositories (Maven Central and the Gradle plugin portal). That draft ran dependencies, tests and bootJar before collecting the exact generated files. This is a recorded bootstrap trust point, not independent publisher provenance, PGP identity verification, vulnerability or license clearance. Verification prevents silently accepting different bytes after this baseline; a malicious original artifact or compromised baseline review remains outside that guarantee.
 
 The JVM Dependency Integrity workflow performs a real build with the committed files, then uses disposable project copies and the populated Gradle cache. An unchanged offline copy must succeed. Replacing every expected SHA-256 with zeros must produce Gradle's dependency-verification failure; restoring checksums and removing the lock must produce strict-lock failure during actual runtime resolution. Failure for an unrelated reason does not pass these probes. Parser regressions also reject mutable versions, incomplete configurations, missing module evidence, weak/alternate checksums, duplicate evidence, disabled metadata verification and blanket trust.
+
+The initial #90 baseline (132 modules / 519 hashes) was refreshed by the maintenance security update. See [JVM_MAINTENANCE_SECURITY.md](JVM_MAINTENANCE_SECURITY.md) for the current vendor versions, collector evidence, unchanged-byte comparison and family floors. This historical bootstrap link is retained as provenance of the first baseline.
 
 ## Intentional updates
 
