@@ -21,6 +21,16 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header('Content-Length', str(len(XML)))
             self.end_headers()
             self.wfile.write(XML)
+        elif self.path == '/dav/Folder/':
+            body = b'''<?xml version="1.0" encoding="utf-8"?>
+<d:multistatus xmlns:d="DAV:">
+  <d:response><d:href>/dav/Folder/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+</d:multistatus>'''
+            self.send_response(207)
+            self.send_header('Content-Type', 'application/xml; charset=utf-8')
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
         elif self.path == '/dav/redirect/':
             self.send_response(302)
             self.send_header('Location', 'https://foreign.example/dav/')
