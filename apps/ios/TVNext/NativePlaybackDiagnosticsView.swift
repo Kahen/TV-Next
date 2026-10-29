@@ -17,7 +17,21 @@ struct NativePlaybackDiagnosticsView: View {
     }
 
     var body: some View {
-        DisclosureGroup("播放诊断", isExpanded: $expanded) {
+        VStack(alignment: .leading, spacing: 8) {
+            // Keep the identifier on the actual full-width action, rather than
+            // the container: SwiftUI can propagate container identifiers to
+            // descendants and hide their independent accessibility identities.
+            Button {
+                expanded.toggle()
+                if expanded { timeline = NativePlaybackTimeline.capture(library.player) }
+            } label: {
+                Label("播放诊断", systemImage: expanded ? "chevron.down" : "chevron.right")
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            }
+            .buttonStyle(.bordered)
+            .accessibilityIdentifier("playback-diagnostics")
+            .accessibilityValue(expanded ? "已展开" : "已收起")
+            if expanded {
             VStack(alignment: .leading, spacing: 6) {
                 Text("引擎：AVPlayer").font(.caption)
                 if let timeline {
@@ -38,8 +52,8 @@ struct NativePlaybackDiagnosticsView: View {
                 Text("编码来自媒体格式描述；系统未公开实际硬件解码器选择。诊断不保存或显示媒体 URL、请求头及原始错误日志。")
                     .font(.caption2).foregroundStyle(.secondary)
             }.font(.caption).padding(.top, 8)
+            }
         }
-        .accessibilityIdentifier("playback-diagnostics")
         .task(id: Selection(item: library.player.currentItem.map(ObjectIdentifier.init), expanded: expanded)) {
             if expanded { await refresh() }
             else { request = UUID(); loading = false; metadata = nil; timeline = nil }
