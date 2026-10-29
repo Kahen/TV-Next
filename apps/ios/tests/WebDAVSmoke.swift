@@ -80,7 +80,7 @@ import Foundation
         </d:multistatus>
         """
         let verified = try NativeWebDAV.parse(Data(mixed.utf8), root: root, folder: folder)
-        precondition(verified.map(\\.name) == ["Folder", "Good.mp4", "Nested.mp4", "Spoofed.mp4"], "Incorrect propstat/href scope: \\(verified)")
+        precondition(verified.map(\.name) == ["Folder", "Good.mp4", "Nested.mp4", "Spoofed.mp4"], "Incorrect propstat/href scope: \(verified)")
         precondition(verified[0].isDirectory && verified.dropFirst().allSatisfy { !$0.isDirectory })
         print("Native WebDAV bounded listing and RFC 4918 status smoke passed")
     }
