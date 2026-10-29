@@ -139,7 +139,12 @@ enum CaptionParser {
                            offset: TimeInterval = 0) -> String {
         guard time.isFinite, offset.isFinite, offset >= -10, offset <= 10 else { return "" }
         let subtitleTime = time - offset
-        return cues.first(where: { subtitleTime >= $0.start && subtitleTime < $0.end })?.text ?? ""
+        // Multiple cues may be active at once (for example bilingual dialogue).
+        // Keep the parsed timeline order and bound the shared inline/fullscreen
+        // overlay even when a file contains thousands of simultaneous cues.
+        let active = cues.lazy.filter { subtitleTime >= $0.start && subtitleTime < $0.end }
+            .prefix(4).map(\.text).joined(separator: "\n")
+        return String(active.prefix(2_000))
     }
 
     private static func seconds(_ value: String) -> TimeInterval? {
