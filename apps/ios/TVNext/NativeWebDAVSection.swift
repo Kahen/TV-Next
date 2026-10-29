@@ -41,6 +41,22 @@ struct NativeWebDAVSection: View {
                 if let error { Text(error).font(.caption).foregroundStyle(.red).accessibilityIdentifier("webdav-error") }
                 if let root, let folder {
                     Text("当前目录：" + folder.path).font(.caption).textSelection(.enabled)
+                    // Each shortcut is a validated ancestor URL, not a path
+                    // reconstructed from a potentially untrusted filename.
+                    let ancestors = NativeWebDAV.navigationPath(root: root, folder: folder)
+                    if ancestors.count > 1 {
+                        ScrollView(.horizontal) {
+                            HStack(spacing: 8) {
+                                ForEach(ancestors, id: \.absoluteString) { ancestor in
+                                    Button(ancestor == root ? "根目录" : ancestor.lastPathComponent) {
+                                        open(ancestor)
+                                    }
+                                    .disabled(busy || ancestor == folder)
+                                    .accessibilityIdentifier(ancestor == root ? "webdav-root" : "webdav-ancestor")
+                                }
+                            }
+                        }
+                    }
                     HStack {
                         Button("上级目录") { open(folder.deletingLastPathComponent()) }
                             .disabled(busy || folder == root)
