@@ -8,7 +8,11 @@ This is an experimental compatibility subset, not completion of P1–P6. No IPA,
 TestFlight, App Store, real-device or real Spider execution result is included.
 
 PR packaging checks exercise directory/version boundaries, real Web/API/image
-builds, archive load and checksum verification without creating a release. Manual
+builds, archive load and checksum verification without creating a release. The API
+JAR built on the hosted runner must also be byte-identical to `/app/api.jar`
+extracted from the independently compiled pinned Docker build; mismatch fails
+candidate generation. This checks the two actual distributed API binaries, not
+the reproducibility of every toolchain/container layer. Manual
 dispatch first requires the entire cross-platform integration gate for the same
 revision. Set a unique version (`v0.2.0-rc.1`, for example). By default only a
 14-day workflow artifact is produced. Explicitly selecting **create_draft** on
