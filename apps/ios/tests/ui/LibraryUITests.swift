@@ -184,6 +184,20 @@ final class LibraryUITests: XCTestCase {
         XCTAssertFalse(forward.isEnabled)
     }
 
+    func testPlaybackDiagnosticsCanExpandAndRefreshWithoutMedia() {
+        jump("播放器")
+        let diagnostics = app.buttons["playback-diagnostics"]
+        reveal(diagnostics)
+        diagnostics.tap()
+        let state = app.staticTexts["diagnostics-state"]
+        XCTAssertTrue(state.waitForExistence(timeout: 5))
+        XCTAssertTrue(state.label.contains("尚未选择媒体"))
+        let refresh = app.buttons["diagnostics-refresh"]
+        reveal(refresh)
+        refresh.tap()
+        XCTAssertTrue(state.label.contains("尚未选择媒体"))
+    }
+
     func testOfflineDownloadSurvivesRelaunchAndCanBePlayedAndDeleted() {
         jump("离线媒体")
         let previous = app.buttons["offline-delete-Owned Offline"]

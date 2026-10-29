@@ -425,6 +425,7 @@ struct ContentView: View {
                 .accessibilityIdentifier("playback-speed")
                 NativeSeekControls(library: library)
                 NativeIntroOutroControls(library: library)
+                NativePlaybackDiagnosticsView(library: library)
                 ForEach(remoteSubtitles) { source in
                     Button("加载订阅字幕：" + source.name) { loadRemoteCaption(source) }
                         .disabled(library.current?.url != remoteResourceKey)
