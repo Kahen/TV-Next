@@ -113,6 +113,11 @@ import Foundation
         let episode = season.appendingPathComponent("Episode 1", isDirectory: true)
         precondition(NativeWebDAV.navigationPath(root: root, folder: episode) == [root, season, episode])
         precondition(NativeWebDAV.navigationPath(root: root, folder: root) == [root])
+        let aliasRoot = URL(string: "https://MEDIA.EXAMPLE:443/dav/")!
+        let aliasEpisode = URL(string: "https://MEDIA.EXAMPLE:443/dav/Season/Episode%201/")!
+        precondition(NativeWebDAV.navigationPath(root: root, folder: aliasRoot) == [root])
+        let normalized = NativeWebDAV.navigationPath(root: root, folder: aliasEpisode)
+        precondition(normalized.count == 3 && normalized.first == root)
         precondition(NativeWebDAV.navigationPath(root: root, folder: URL(string: "https://foreign.example/dav/")!).isEmpty)
         precondition(NativeWebDAV.navigationPath(root: root, folder: URL(string: "https://media.example/dav2/")!).isEmpty)
         var deep = root
