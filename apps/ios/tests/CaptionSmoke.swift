@@ -64,6 +64,27 @@ struct CaptionSmoke {
         precondition(CaptionParser.activeText(srtCues, at: .infinity) == "")
         precondition(CaptionParser.activeText(srtCues, at: 1.5, offset: 11) == "")
 
+        let overlapping = """
+        WEBVTT
+
+        00:00:01.000 --> 00:00:04.000
+        First language
+
+        00:00:02.000 --> 00:00:03.000
+        Second language
+        """
+        let overlapCues = try CaptionParser.parse(Data(overlapping.utf8))
+        precondition(CaptionParser.activeText(overlapCues, at: 2.5) == "First language\nSecond language")
+        precondition(CaptionParser.activeText(overlapCues, at: 3) == "First language")
+        precondition(CaptionParser.activeText(overlapCues, at: 4).isEmpty)
+        precondition(CaptionParser.activeText(overlapCues, at: 3.5, offset: 1) == "First language\nSecond language")
+        precondition(CaptionParser.activeText(overlapCues, at: 1.5, offset: -1) == "First language\nSecond language")
+        let crowded = (1...6).map { CaptionCue(start: 1, end: 4, text: "Line \($0)") }
+        precondition(CaptionParser.activeText(crowded, at: 2) == "Line 1\nLine 2\nLine 3\nLine 4")
+        let long = [CaptionCue(start: 1, end: 4, text: String(repeating: "甲", count: 1_500)),
+                    CaptionCue(start: 1, end: 4, text: String(repeating: "乙", count: 1_500))]
+        precondition(CaptionParser.activeText(long, at: 2).count == 2_000)
+
         print("TV-Next caption parser smoke tests passed")
     }
 }
