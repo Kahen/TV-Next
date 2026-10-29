@@ -30,7 +30,10 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(menu.waitForExistence(timeout: 5))
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: menu)], timeout: 5), .completed)
         menu.tap()
-        app.buttons[name].tap()
+        let destination = app.buttons[name]
+        destination.tap()
+        let dismissed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: destination)
+        XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 5), .completed, "Navigation menu did not dismiss")
     }
 
     private func reveal(_ element: XCUIElement) {
@@ -38,16 +41,20 @@ final class LibraryUITests: XCTestCase {
         let reachable = NSPredicate(format: "hittable == true")
         if XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: reachable, object: element)], timeout: 3) == .completed { return }
         for _ in 0..<8 {
+            // Offscreen children may be absent from a SwiftUI accessibility
+            // snapshot. Reading frame/identifier first throws before scrolling.
+            guard element.exists else { app.swipeUp(); continue }
             if element.isHittable { return }
             print("Reveal target \(element.identifier): exists=\(element.exists) frame=\(element.frame)")
             let frame = element.frame
-            if element.exists && frame.maxY < app.windows.firstMatch.frame.minY + 100 {
+            if frame.maxY < app.windows.firstMatch.frame.minY + 100 {
                 app.swipeDown()
             } else {
                 app.swipeUp()
             }
         }
         if XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: reachable, object: element)], timeout: 2) == .completed { return }
+        guard element.exists else { XCTFail("Target absent after bounded scrolling: \(app.debugDescription)"); return }
         if !element.isHittable { print("Unreachable element: \(element.debugDescription)\n\(app.debugDescription)") }
         XCTAssertTrue(element.isHittable)
     }
