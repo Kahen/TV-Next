@@ -51,6 +51,16 @@ class ShippedJvmSbomTests(unittest.TestCase):
                 self.write_jar(entries)
                 build_sbom(self.jar, self.metadata, "0.1.0")
 
+    def test_unreviewed_boot_injected_jarmode_fails_closed(self):
+        # Spring Boot 3.5 adds this tool unless bootJar.includeTools is false.
+        # A reviewed runtime library must not make the unreviewed tool pass.
+        self.write_jar([
+            ("BOOT-INF/lib/" + self.library, self.owned),
+            ("BOOT-INF/lib/spring-boot-jarmode-tools-3.5.6.jar", b"unreviewed boot tooling"),
+        ])
+        with self.assertRaisesRegex(ValueError, "spring-boot-jarmode-tools-3.5.6.jar"):
+            build_sbom(self.jar, self.metadata, "0.1.0")
+
     def test_mismatching_reviewed_hash_is_rejected(self):
         self.write_metadata(checksum="0" * 64)
         with self.assertRaises(ValueError):
