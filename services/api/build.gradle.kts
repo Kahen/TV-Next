@@ -8,6 +8,11 @@ group = "dev.tvnext"
 version = providers.gradleProperty("releaseVersion").getOrElse("0.1.0-SNAPSHOT")
 java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
 repositories { mavenCentral() }
+// Changes to direct or transitive dependency versions require a reviewed lock update.
+dependencyLocking {
+    lockAllConfigurations()
+    lockMode.set(org.gradle.api.artifacts.dsl.LockMode.STRICT)
+}
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
