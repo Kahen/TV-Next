@@ -26,21 +26,21 @@ import Foundation
         for (path, status) in [("ok-not-multistatus", 200), ("missing", 404)] {
             do {
                 _ = try await NativeWebDAV.list(root: root, folder: root.appendingPathComponent(path, isDirectory: true), username: "", password: "")
-                fatalError("Accepted non-207 WebDAV status \\(status)")
+                fatalError("Accepted non-207 WebDAV status \(status)")
             } catch NativeWebDAVError.httpStatus(let code) where code == status {
                 // Expected.
             } catch {
-                fatalError("Unexpected WebDAV status result for \\(path): \\(error)")
+                fatalError("Unexpected WebDAV status result for \(path): \(error)")
             }
         }
         for path in ["unauthorized", "forbidden"] {
             do {
                 _ = try await NativeWebDAV.list(root: root, folder: root.appendingPathComponent(path, isDirectory: true), username: "", password: "")
-                fatalError("Accepted unauthorized WebDAV response: \\(path)")
+                fatalError("Accepted unauthorized WebDAV response: \(path)")
             } catch NativeWebDAVError.unauthorized {
                 // Expected.
             } catch {
-                fatalError("Unexpected WebDAV auth result for \\(path): \\(error)")
+                fatalError("Unexpected WebDAV auth result for \(path): \(error)")
             }
         }
         do {
@@ -67,7 +67,7 @@ import Foundation
                 // The declared and the unknown-length transfer must both stop
                 // at the same bound, without parsing or returning partial items.
             } catch {
-                fatalError("Unexpected oversized WebDAV response for \\(path): \\(error)")
+                fatalError("Unexpected oversized WebDAV response for \(path): \(error)")
             }
         }
         // A rejected oversized transfer must not poison the next connection.
