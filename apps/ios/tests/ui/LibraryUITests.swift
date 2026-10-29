@@ -69,7 +69,10 @@ final class LibraryUITests: XCTestCase {
             let viewport = visibleViewport()
             return !frame.isEmpty && !frame.isInfinite && viewport.contains(frame)
         }
-        let reachable = NSPredicate { _, _ in visible() && element.isHittable }
+        // A SwiftUI TextField may report an AX activation-point exception when
+        // isHittable is queried during a scroll transition. Geometry checks
+        // do not request an activation point; actual taps still exercise UI.
+        let reachable = NSPredicate { _, _ in visible() }
         if XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: reachable, object: element)], timeout: 3) == .completed { return }
         var resetToSection = false
         for _ in 0..<12 {
@@ -81,7 +84,7 @@ final class LibraryUITests: XCTestCase {
             let frame = element.frame
             let viewport = visibleViewport()
             guard !viewport.isEmpty else { app.activate(); continue }
-            if visible() && element.isHittable { return }
+            if visible() { return }
             print("Reveal frame=\(frame), viewport=\(viewport)")
             // Short controlled drags avoid oscillating past a control when its
             // layout moves after keyboard dismissal or a validation message.
@@ -182,9 +185,19 @@ final class LibraryUITests: XCTestCase {
         enter(app.textFields["webdav-filter"], "owned")
         XCTAssertTrue(owned.exists, "Case-insensitive local search lost the matching file")
         XCTAssertFalse(folder.exists, "Search should narrow the visible listing")
+        // Draft credentials for another server must not affect this connection.
+        // The original anonymous HTTP fixture would reject newly applied Basic auth.
+        enter(app.textFields["webdav-url"], "https://unconnected.example/dav/")
+        enter(app.textFields["webdav-user"], "unconnected-account")
         let refresh = app.buttons["webdav-refresh"]
         reveal(refresh)
         refresh.tap()
+        let finished = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            refresh.exists && refresh.isEnabled
+        }, object: refresh)
+        XCTAssertEqual(XCTWaiter.wait(for: [finished], timeout: 15), .completed)
+        XCTAssertFalse(app.staticTexts["webdav-error"].waitForExistence(timeout: 2),
+                       "Editing an unconnected form applied credentials to the active server")
         XCTAssertTrue(owned.waitForExistence(timeout: 15))
         XCTAssertFalse(folder.exists, "Refreshing the same folder must preserve its local search")
         let disconnect = app.buttons["webdav-disconnect"]
