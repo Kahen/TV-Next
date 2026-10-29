@@ -20,7 +20,12 @@ final class NativeDanmakuPreferencesUITests: XCTestCase {
             let toggle = app.switches["danmaku-enabled-toggle"]
             XCTAssertTrue(toggle.waitForExistence(timeout: 10))
             for _ in 0..<12 {
-                if toggle.isHittable { return toggle }
+                // Avoid querying offscreen SwiftUI hittability directly: XCTest
+                // may throw while resolving an accessibility frame outside the viewport.
+                let frame = toggle.frame
+                let viewport = app.frame.insetBy(dx: 8, dy: 60)
+                if !frame.isEmpty && !viewport.isEmpty &&
+                    viewport.contains(frame) && toggle.isHittable { return toggle }
                 app.swipeUp()
             }
             XCTFail("Native danmaku control was not reachable after bounded scrolling")
