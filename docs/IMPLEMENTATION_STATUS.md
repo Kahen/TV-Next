@@ -68,3 +68,7 @@ claim actual Spider execution, complete P3 compatibility or release acceptance.
 ## Native WebDAV completion-status CI regression (#74)
 
 The 2026-10-29 main push full gate [40809764313](https://github.com/Kahen/TV-Next/actions/runs/40809764313) failed in the iPad-only localhost WebDAV network smoke with `invalidResponse`, despite the iPhone and other jobs succeeding. This follow-up adds a final-task-response HTTP status/length fallback, explicit EOF for unknown-length localhost fixtures, and positive/negative/size-boundary transport regressions. It does not weaken redirect rejection, byte caps or credential handling, and it is not evidence of real-device/provider acceptance. Final-head iPhone/iPad and aggregate CI must succeed before merging this slice.
+
+## Native WebDAV local browse controls (P4, #76)
+
+The SwiftUI WebDAV view adds explicit current-folder refresh and device-local filename/media-only filtering over the previously bounded Depth:1 listing. The filter never changes server requests, URL paths, headers or credentials; folders remain navigable in media-only mode, and the first-200-entry cap still applies. Refresh preserves the last successful listing on failure and rejects stale asynchronous responses through the existing request generation guard. Swift smoke, XCTest and production XCUI cover positive/negative UI and filtering behavior; final-head full CI and physical/provider acceptance remain separate.
