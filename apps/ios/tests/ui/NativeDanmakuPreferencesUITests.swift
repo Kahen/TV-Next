@@ -16,9 +16,19 @@ final class NativeDanmakuPreferencesUITests: XCTestCase {
             destination.tap()
         }
 
-        func expectValue(_ expected: String) {
+        func visibleToggle() -> XCUIElement {
             let toggle = app.switches["danmaku-enabled-toggle"]
             XCTAssertTrue(toggle.waitForExistence(timeout: 10))
+            for _ in 0..<12 {
+                if toggle.isHittable { return toggle }
+                app.swipeUp()
+            }
+            XCTFail("Native danmaku control was not reachable after bounded scrolling")
+            return toggle
+        }
+
+        func expectValue(_ expected: String) {
+            let toggle = visibleToggle()
             let predicate = NSPredicate(format: "value == %@", expected)
             XCTAssertEqual(
                 XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: predicate, object: toggle)], timeout: 10),
@@ -28,8 +38,7 @@ final class NativeDanmakuPreferencesUITests: XCTestCase {
         }
 
         openDanmakuSettings()
-        let toggle = app.switches["danmaku-enabled-toggle"]
-        XCTAssertTrue(toggle.waitForExistence(timeout: 10))
+        let toggle = visibleToggle()
         if toggle.value as? String != "0" { toggle.tap() }
         expectValue("0")
 
@@ -39,7 +48,7 @@ final class NativeDanmakuPreferencesUITests: XCTestCase {
         expectValue("0")
 
         // Restore the default for other production UI tests in the same simulator.
-        app.switches["danmaku-enabled-toggle"].tap()
+        visibleToggle().tap()
         expectValue("1")
     }
 }
