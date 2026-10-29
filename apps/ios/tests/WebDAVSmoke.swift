@@ -99,6 +99,16 @@ import Foundation
                 fatalError("Lost WebDAV non-207 status \(status)")
             }
         }
-        print("Native WebDAV bounded listing and RFC 4918 status smoke passed")
+        let mixedFiles = [
+            NativeWebDAVItem(url: root.appendingPathComponent("Season", isDirectory: true), name: "Season", isDirectory: true),
+            NativeWebDAVItem(url: root.appendingPathComponent("Owned.MP4"), name: "Owned.MP4", isDirectory: false),
+            NativeWebDAVItem(url: root.appendingPathComponent("readme.txt"), name: "readme.txt", isDirectory: false)
+        ]
+        precondition(NativeWebDAV.visibleEntries(mixedFiles, search: "", mediaOnly: true).map(\.name) == ["Season", "Owned.MP4"])
+        precondition(NativeWebDAV.visibleEntries(mixedFiles, search: "  owned  ", mediaOnly: true).map(\.name) == ["Owned.MP4"])
+        precondition(NativeWebDAV.visibleEntries(mixedFiles, search: "missing", mediaOnly: false).isEmpty)
+        precondition(NativeWebDAV.visibleEntries(mixedFiles, search: "readme", mediaOnly: true).isEmpty)
+        precondition(NativeWebDAV.visibleEntries(mixedFiles, search: "readme", mediaOnly: false).map(\.name) == ["readme.txt"])
+        print("Native WebDAV bounded listing, local filtering and RFC 4918 status smoke passed")
     }
 }
