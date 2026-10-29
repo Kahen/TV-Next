@@ -34,6 +34,13 @@ final class NativeDanmakuPreferencesUITests: XCTestCase {
 
         // Assert the actual SwiftUI model state via visible feedback, not the
         // platform/locale-dependent XCUIElement.value representation of a switch.
+        func tapToggle(_ toggle: XCUIElement) {
+            // SwiftUI may expose the entire label row as the Switch frame. A
+            // center tap can hit static label space without changing the value.
+            // Target the trailing switch thumb instead of the row midpoint.
+            toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+        }
+
         func expectEnabled(_ enabled: Bool) {
             let status = app.staticTexts["danmaku-enabled-status"]
             XCTAssertTrue(status.waitForExistence(timeout: 10))
@@ -42,7 +49,7 @@ final class NativeDanmakuPreferencesUITests: XCTestCase {
             XCTAssertEqual(
                 XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: predicate, object: status)], timeout: 10),
                 .completed,
-                "Native danmaku UI state did not become \\(expected); observed \\(status.label)"
+                "Native danmaku UI state did not become \(expected); observed \(status.label)"
             )
         }
 
@@ -50,7 +57,7 @@ final class NativeDanmakuPreferencesUITests: XCTestCase {
         let toggle = visibleToggle()
         let status = app.staticTexts["danmaku-enabled-status"]
         XCTAssertTrue(status.waitForExistence(timeout: 10))
-        if status.label != "弹幕已关闭" { toggle.tap() }
+        if status.label != "弹幕已关闭" { tapToggle(toggle) }
         expectEnabled(false)
 
         app.terminate()
@@ -59,7 +66,7 @@ final class NativeDanmakuPreferencesUITests: XCTestCase {
         expectEnabled(false)
 
         // Restore the default for other production UI tests in the same simulator.
-        visibleToggle().tap()
+        tapToggle(visibleToggle())
         expectEnabled(true)
     }
 }
