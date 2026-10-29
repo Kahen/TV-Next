@@ -35,3 +35,12 @@ unsupported URLs, format headers, owned localhost MP4 download and cancellation,
 plus production SwiftUI download/relaunch/local-play/delete on iPhone and iPad
 simulators. Final-head CI must pass before merging. Physical codec, disk-pressure
 and energy tests remain in #38/#5.
+
+The same native increment connects subscription `subtitles` resources to the
+existing SRT/VTT/text ASS parser and AVPlayer overlay. Loads use the bounded
+server text-resource transport; only the latest selection for the same playback
+generation can install cues. Switching media/server, importing/removing local
+captions and backgrounding cancel pending loads. Parse/network failure preserves
+the previous captions. These resources are fetched explicitly, not downloaded
+into the offline catalog. Additional provider-specific subtitle headers and
+styled ASS rendering remain outside this subset.

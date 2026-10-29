@@ -146,6 +146,8 @@ final class NativeOfflineTransfer: NSObject, URLSessionDownloadDelegate, @unchec
     private let progress: @Sendable (Double) -> Void
     private let fileExtension: String
     private var continuation: CheckedContinuation<Void, Error>?
+    private let completionLock = NSLock()
+    private var terminalResult: Result<Void, Error>?
     private var failure: Error?
     private var saved = false
 
@@ -176,7 +178,7 @@ final class NativeOfflineTransfer: NSObject, URLSessionDownloadDelegate, @unchec
         do {
             try await withTaskCancellationHandler {
                 try await withCheckedThrowingContinuation { (pending: CheckedContinuation<Void, Error>) in
-                    transfer.continuation = pending
+                    transfer.install(pending)
                     task.resume()
                 }
             } onCancel: { task.cancel() }
@@ -185,6 +187,27 @@ final class NativeOfflineTransfer: NSObject, URLSessionDownloadDelegate, @unchec
             try? FileManager.default.removeItem(at: destination)
             throw error
         }
+    }
+
+    // A pre-cancelled parent can cancel the suspended URLSessionTask before
+    // the continuation is installed. Retain its terminal result in either
+    // callback ordering instead of losing the completion and hanging forever.
+    private func install(_ pending: CheckedContinuation<Void, Error>) {
+        completionLock.lock()
+        let result = terminalResult
+        if result == nil { continuation = pending }
+        completionLock.unlock()
+        if let result { pending.resume(with: result) }
+    }
+
+    private func finish(_ result: Result<Void, Error>) {
+        completionLock.lock()
+        guard terminalResult == nil else { completionLock.unlock(); return }
+        terminalResult = result
+        let pending = continuation
+        continuation = nil
+        completionLock.unlock()
+        pending?.resume(with: result)
     }
 
     /// Reject text/playlist/error pages disguised as a downloadable media file.
@@ -251,8 +274,7 @@ final class NativeOfflineTransfer: NSObject, URLSessionDownloadDelegate, @unchec
         let problem = failure ?? error ?? (saved ? nil : NativeOfflineError.invalidResponse)
         if let problem {
             try? FileManager.default.removeItem(at: destination)
-            continuation?.resume(throwing: problem)
-        } else { continuation?.resume() }
-        continuation = nil
+            finish(.failure(problem))
+        } else { finish(.success(())) }
     }
 }

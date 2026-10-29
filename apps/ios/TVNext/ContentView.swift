@@ -17,6 +17,7 @@ struct ContentView: View {
     @State private var navigationRequest = UUID()
     @StateObject private var library = MediaLibraryStore()
     @StateObject private var offline = NativeOfflineDownloads()
+    @StateObject private var remoteCaptions = NativeRemoteCaptionLoader()
     @StateObject private var remote = NativeRemoteControl()
     @AppStorage("tv-next-api-url") private var serverURL = "http://localhost:8080"
     @State private var homeSession: NativeHomeSession?
@@ -24,6 +25,8 @@ struct ContentView: View {
     @State private var danmakuOptions = DanmakuOptions()
     @State private var remoteResourceKey: String?
     @State private var remoteDanmaku: [NativePlaybackResource] = []
+    @State private var remoteSubtitles: [NativePlaybackResource] = []
+    @State private var remoteResourceGeneration: Int?
     @State private var choosingDanmaku = false
     @State private var manualURL = ""
     @State private var quickPlayError: String?
@@ -87,6 +90,8 @@ struct ContentView: View {
                         library.play(TVChannel(name: title + " · " + playback.name, url: playback.url, group: playback.lineName, logo: nil, tvgId: nil, headers:playback.headers, timeshift:playback.timeshift))
                         remoteResourceKey = playback.url
                         remoteDanmaku = playback.danmaku
+                        remoteSubtitles = playback.subtitles
+                        remoteResourceGeneration = library.playbackGeneration
                     }, onImport: { library.importChannels($0) }).id("subscription")
                     MediaCatalogSection { channel in
                         errorMessage = nil
@@ -154,6 +159,7 @@ struct ContentView: View {
                 if phase == .inactive { library.savePosition() }
                 if phase == .background {
                     offline.cancel()
+                    remoteCaptions.cancel()
                     mediaGeneration = UUID()
                     isLoadingMedia = false
                     library.setApplicationBackground(true)
@@ -238,12 +244,23 @@ struct ContentView: View {
                     danmaku = try DanmakuParser.parse(text)
                 } catch { errorMessage = error.localizedDescription }
             }
-            .onChange(of: library.current?.url) { _, url in danmaku = []; if url != remoteResourceKey { remoteDanmaku = [] } }
+            .onChange(of: library.playbackGeneration) { _, generation in
+                remoteCaptions.cancel()
+                captionFileName = nil
+                captionOffsetSeconds = 0
+                danmaku = []
+                if generation != remoteResourceGeneration {
+                    remoteDanmaku = []
+                    remoteSubtitles = []
+                }
+            }
+            .onChange(of: serverURL) { _, _ in remoteCaptions.cancel(); remoteSubtitles = [] }
             .onDisappear {
                 // Presenting fullscreen keeps the same selected item and overlay state.
                 guard !showingFullscreen else { return }
                 remote.configure(nil,server:serverURL)
                 library.suspendPlayback()
+                remoteCaptions.cancel()
             }
             }
         }
@@ -388,6 +405,13 @@ struct ContentView: View {
                 .accessibilityIdentifier("playback-speed")
                 NativeSeekControls(library: library)
                 NativeIntroOutroControls(library: library)
+                ForEach(remoteSubtitles) { source in
+                    Button("加载订阅字幕：" + source.name) { loadRemoteCaption(source) }
+                        .disabled(library.current?.url != remoteResourceKey)
+                        .accessibilityIdentifier("subscription-subtitle-" + source.name)
+                }
+                if remoteCaptions.busy { ProgressView("加载订阅字幕…") }
+                if let error = remoteCaptions.error { Text(error).font(.caption).foregroundStyle(.red) }
                 if !library.audioTracks.isEmpty {
                     Menu {
                         ForEach(library.audioTracks) { track in
@@ -507,6 +531,7 @@ struct ContentView: View {
                     .buttonStyle(.bordered)
                     if captionFileName != nil {
                         Button("移除字幕") {
+                            remoteCaptions.cancel()
                             library.clearCaptions()
                             captionFileName = nil
                             captionOffsetSeconds = 0
@@ -527,6 +552,20 @@ struct ContentView: View {
                 }
             }
             .padding(.top, 8)
+        }
+    }
+
+    @MainActor
+    private func loadRemoteCaption(_ source: NativePlaybackResource) {
+        guard let server = URL(string: serverURL), library.current?.url == remoteResourceKey else { return }
+        let generation = library.playbackGeneration
+        let mediaURL = library.current?.url
+        remoteCaptions.load(source, api: TVNextAPI(server: server), isCurrent: {
+            library.playbackGeneration == generation && library.current?.url == mediaURL
+        }) { cues, name in
+            library.setCaptions(cues)
+            captionFileName = name
+            captionOffsetSeconds = 0
         }
     }
 
@@ -731,6 +770,7 @@ struct ContentView: View {
     }
 
     private func importCaption(_ result: Result<[URL], Error>) {
+        remoteCaptions.cancel()
         do {
             guard let url = try result.get().first else { return }
             guard ["srt", "vtt", "ass", "ssa"].contains(url.pathExtension.lowercased()) else {
