@@ -4,6 +4,20 @@ import Foundation
     static func main() throws {
         let root = try NativeWebDAV.rootURL("https://media.example/dav")
         precondition(root.absoluteString == "https://media.example/dav/")
+        var draftUser = "alice"
+        var draftPassword = "first-secret"
+        let active = try NativeWebDAVConnection(address: root.absoluteString, username: draftUser, password: draftPassword)
+        draftUser = "bob"
+        draftPassword = "second-secret"
+        let next = try NativeWebDAVConnection(address: "https://other.example/dav", username: draftUser, password: draftPassword)
+        let activeAuthorization = try active.authorization(for: root)
+        precondition(activeAuthorization == "Basic " + Data("alice:first-secret".utf8).base64EncodedString())
+        let nextAuthorization = try next.authorization(for: next.root)
+        precondition(nextAuthorization == "Basic " + Data("bob:second-secret".utf8).base64EncodedString())
+        do { _ = try active.authorization(for: next.root); fatalError("Credentials escaped the connected root") }
+        catch NativeWebDAVError.invalidFolder { }
+        do { _ = try NativeWebDAVConnection(address: root.absoluteString, username: "alice", password: String(repeating: "密", count: 400)); fatalError("Accepted oversized UTF-8 credentials") }
+        catch NativeWebDAVError.insecureCredentials { }
         let folder = root.appendingPathComponent("Movies", isDirectory: true)
         let xml = """
         <?xml version="1.0" encoding="utf-8"?>

@@ -13,6 +13,31 @@ struct NativeWebDAVItem: Identifiable, Equatable {
     var id: String { url.absoluteString }
 }
 
+/// Immutable active connection. Editing the form must never send another
+/// server's credentials to an existing listing or playback destination.
+struct NativeWebDAVConnection {
+    let root: URL
+    private let username: String
+    private let password: String
+
+    init(address: String, username: String, password: String) throws {
+        let root = try NativeWebDAV.rootURL(address, username: username, password: password)
+        _ = try NativeWebDAV.authorization(username: username, password: password, root: root)
+        self.root = root
+        self.username = username
+        self.password = password
+    }
+
+    func list(folder: URL) async throws -> [NativeWebDAVItem] {
+        try await NativeWebDAV.list(root: root, folder: folder, username: username, password: password)
+    }
+
+    func authorization(for resource: URL) throws -> String? {
+        guard NativeWebDAV.contains(resource, root: root) else { throw NativeWebDAVError.invalidFolder }
+        return try NativeWebDAV.authorization(username: username, password: password, root: root)
+    }
+}
+
 enum NativeWebDAVError: LocalizedError {
     case invalidAddress, insecureCredentials, invalidFolder, invalidResponse, responseTooLarge, unauthorized, httpStatus(Int)
 
@@ -53,7 +78,7 @@ enum NativeWebDAV {
     static func authorization(username: String, password: String, root: URL) throws -> String? {
         guard !username.isEmpty || !password.isEmpty else { return nil }
         guard root.scheme?.lowercased() == "https", !username.isEmpty,
-              username.count <= 256, password.count <= 1024,
+              username.utf8.count <= 256, password.utf8.count <= 1024,
               !username.contains(":"), !username.contains("\r"), !username.contains("\n"),
               !password.contains("\r"), !password.contains("\n") else {
             throw NativeWebDAVError.insecureCredentials
