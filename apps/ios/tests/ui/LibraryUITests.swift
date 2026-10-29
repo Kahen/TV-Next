@@ -42,7 +42,7 @@ final class LibraryUITests: XCTestCase {
         // XCTest can throw while evaluating hittability for a SwiftUI child
         // outside the viewport. Check existence and safe geometry first, also
         // inside waits; a hittable-only predicate bypasses that protection.
-        func viewport() -> CGRect {
+        func visibleViewport() -> CGRect {
             // AVKit may insert an empty auxiliary window ahead of the main
             // window. Using firstMatch made drag distances zero after playback.
             var bounds = app.frame
@@ -56,7 +56,7 @@ final class LibraryUITests: XCTestCase {
         func visible() -> Bool {
             guard element.exists else { return false }
             let frame = element.frame
-            let viewport = viewport()
+            let viewport = visibleViewport()
             return !frame.isEmpty && !frame.isInfinite && viewport.contains(frame)
         }
         let reachable = NSPredicate { _, _ in visible() && element.isHittable }
@@ -69,7 +69,7 @@ final class LibraryUITests: XCTestCase {
                 continue
             }
             let frame = element.frame
-            let viewport = viewport()
+            let viewport = visibleViewport()
             guard !viewport.isEmpty else { app.activate(); continue }
             if visible() && element.isHittable { return }
             print("Reveal frame=\(frame), viewport=\(viewport)")
