@@ -75,6 +75,19 @@ jobs:
           set -euo pipefail
           docker build --platform linux/amd64 --build-arg "TVNEXT_RELEASE_VERSION=${TVNEXT_CANDIDATE_VERSION#v}" --label "org.opencontainers.image.revision=$GITHUB_SHA" -t "tvnext/api:$TVNEXT_CANDIDATE_VERSION" services/api
           docker build --platform linux/amd64 --label "org.opencontainers.image.revision=$GITHUB_SHA" -t "tvnext/web:$TVNEXT_CANDIDATE_VERSION" apps/web
+          # The host and pinned container builder compile independently from
+          # different roots/JDK installations. A candidate must not silently
+          # ship a different API binary in its Docker image and JAR attachment.
+          jars=(services/api/build/libs/*.jar)
+          test "${#jars[@]}" -eq 1
+          candidate_container="tvnext-candidate-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          trap 'docker rm -f "$candidate_container" >/dev/null 2>&1 || true' EXIT
+          docker create --name "$candidate_container" "tvnext/api:$TVNEXT_CANDIDATE_VERSION" > /dev/null
+          docker cp "$candidate_container:/app/api.jar" /tmp/tvnext-container-api.jar
+          cmp "${jars[0]}" /tmp/tvnext-container-api.jar
+          sha256sum "${jars[0]}" /tmp/tvnext-container-api.jar
+          docker rm -f "$candidate_container" > /dev/null
+          trap - EXIT
           docker image inspect "tvnext/api:$TVNEXT_CANDIDATE_VERSION" "tvnext/web:$TVNEXT_CANDIDATE_VERSION" > /tmp/tvnext-image-inspection.json
           python3 - <<'PYTHON'
           import json
