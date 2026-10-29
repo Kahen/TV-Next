@@ -159,18 +159,25 @@ enum NativeWebDAV {
     /// a network destination from a displayed breadcrumb label.
     /// Limit the depth to avoid constructing unbounded navigation controls.
     static func navigationPath(root: URL, folder: URL) -> [URL] {
-        guard contains(folder, root: root),
+        guard let rootSegments = segments(root, root: root),
+              contains(folder, root: root),
               URLComponents(url: folder, resolvingAgainstBaseURL: false)?.percentEncodedPath.hasSuffix("/") == true else { return [] }
         var path = [folder]
         var current = folder
-        for _ in 0..<32 {
-            if current == root { return Array(path.reversed()) }
+        // Explicit default ports, host casing and equivalent encoded segments
+        // may differ in URL serialization while still identifying this root.
+        for _ in 0...32 {
+            if segments(current, root: root) == rootSegments {
+                path[path.count - 1] = root
+                return Array(path.reversed())
+            }
+            guard path.count <= 32 else { return [] }
             let parent = current.deletingLastPathComponent()
             guard parent != current, contains(parent, root: root) else { return [] }
             path.append(parent)
             current = parent
         }
-        return current == root ? Array(path.reversed()) : []
+        return []
     }
 
     static func list(root: URL, folder: URL, username: String, password: String) async throws -> [NativeWebDAVItem] {
