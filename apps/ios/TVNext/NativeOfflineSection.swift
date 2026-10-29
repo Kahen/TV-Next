@@ -5,6 +5,12 @@ struct NativeOfflineSection: View {
     @ObservedObject var library: MediaLibraryStore
     @State private var address = ""
     @State private var name = ""
+    @State private var pendingDeletion: NativeOfflineMediaEntry?
+
+    private var storageUsage: String {
+        let used = downloads.entries.reduce(Int64(0)) { $0 + $1.bytes }
+        return "已保存 \(downloads.entries.count) / 20 个文件 · \(ByteCountFormatter.string(fromByteCount: used, countStyle: .file)) / 2 GiB"
+    }
 
     var body: some View {
         GroupBox("离线媒体") {
@@ -30,6 +36,9 @@ struct NativeOfflineSection: View {
                     Button("取消下载") { downloads.cancel() }.accessibilityIdentifier("offline-cancel")
                 }
                 if let error = downloads.error { Text(error).font(.caption).foregroundStyle(.red).accessibilityIdentifier("offline-error") }
+                Text(storageUsage)
+                    .font(.caption).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("offline-storage-usage")
                 ForEach(downloads.entries) { entry in
                     VStack(alignment: .leading) {
                         Button("离线播放：" + entry.name) {
@@ -39,8 +48,7 @@ struct NativeOfflineSection: View {
                         HStack {
                             Text(ByteCountFormatter.string(fromByteCount: entry.bytes, countStyle: .file)).font(.caption)
                             Button("删除：" + entry.name, role: .destructive) {
-                                if let file = downloads.fileURL(entry) { library.stopLocalFile(file) }
-                                downloads.remove(entry)
+                                pendingDeletion = entry
                             }.accessibilityIdentifier("offline-delete-" + entry.name)
                         }
                     }
@@ -48,6 +56,21 @@ struct NativeOfflineSection: View {
                 Text("最多 20 个文件，总计 2 GiB，单文件 512 MiB。当前支持 MP4/M4V/MOV/MP3/M4A/AAC；不保存直播、HLS、DRM 或需要请求头的媒体。")
                     .font(.caption2).foregroundStyle(.secondary)
             }
+        }
+        .alert("删除离线媒体？", isPresented: Binding(
+            get: { pendingDeletion != nil },
+            set: { if !$0 { pendingDeletion = nil } }
+        )) {
+            Button("删除离线文件", role: .destructive) {
+                guard let entry = pendingDeletion else { return }
+                // Only a confirmed deletion may release the active AVPlayer item.
+                if let file = downloads.fileURL(entry) { library.stopLocalFile(file) }
+                downloads.remove(entry)
+                pendingDeletion = nil
+            }
+            Button("取消", role: .cancel) { pendingDeletion = nil }
+        } message: {
+            Text("删除后无法恢复。取消不会影响已下载文件或正在播放的媒体。")
         }
     }
 }

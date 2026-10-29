@@ -187,9 +187,16 @@ final class LibraryUITests: XCTestCase {
     func testOfflineDownloadSurvivesRelaunchAndCanBePlayedAndDeleted() {
         jump("离线媒体")
         let previous = app.buttons["offline-delete-Owned Offline"]
-        if previous.exists { reveal(previous); previous.tap() }
+        if previous.exists {
+            reveal(previous)
+            previous.tap()
+            XCTAssertTrue(app.alerts["删除离线媒体？"].waitForExistence(timeout: 5))
+            app.alerts.buttons["删除离线文件"].tap()
+            XCTAssertFalse(previous.exists)
+        }
         enter(app.textFields["offline-url"], "http://127.0.0.1:8765/fixture.mp4")
         enter(app.textFields["offline-name"], "Owned Offline")
+        XCTAssertTrue(app.staticTexts["offline-storage-usage"].exists)
         let download = app.buttons["offline-download"]
         reveal(download)
         download.tap()
@@ -208,7 +215,21 @@ final class LibraryUITests: XCTestCase {
         let remove = app.buttons["offline-delete-Owned Offline"]
         reveal(remove)
         remove.tap()
-        XCTAssertFalse(play.exists)
+        let confirmation = app.alerts["删除离线媒体？"]
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 5))
+        confirmation.buttons["取消"].tap()
+        XCTAssertTrue(play.exists, "Cancelling deletion must retain the offline file")
+        jump("播放器")
+        reveal(current)
+        XCTAssertTrue(current.label.contains("Owned Offline"), "Cancellation must not stop active playback")
+        jump("离线媒体")
+        reveal(remove)
+        remove.tap()
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 5))
+        confirmation.buttons["删除离线文件"].tap()
+        XCTAssertFalse(play.exists, "Confirmed deletion must remove the offline catalog entry")
+        jump("播放器")
+        XCTAssertTrue(app.staticTexts["current-media"].label.contains("尚未选择媒体"), "Confirmed deletion must release the active local player item")
     }
 
     func testManualIntroOutroControlsDoNotMarkWithoutMedia() {
