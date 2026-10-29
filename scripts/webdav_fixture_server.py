@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Owned, localhost-only RFC 4918 fixture for native WebDAV CI."""
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from time import sleep
 
 XML = b'''<?xml version="1.0" encoding="utf-8"?>
 <d:multistatus xmlns:d="DAV:">
@@ -74,22 +75,24 @@ class Handler(BaseHTTPRequestHandler):
             except (BrokenPipeError, ConnectionResetError):
                 pass
         elif self.path == '/dav/large-streamed/':
-            # Explicit HTTP/1.1 chunked framing exercises an unknown-length
-            # transfer without relying on platform-specific EOF behavior.
-            # Send 16 exact 64-KiB chunks plus one overflow byte.
+            # A valid keep-alive HTTP/1.1 chunked body with no Content-Length.
+            # Pace small chunks so CFNetwork delivers incremental data callbacks
+            # before the final chunk (an immediate close was reported as -1005
+            # instead of reaching the 1 MiB application-level size guard).
+            # Exactly 128 * 8192 + 1 decoded bytes cross the bound.
             self.protocol_version = 'HTTP/1.1'
             self.send_response(207)
             self.send_header('Content-Type', 'application/xml')
             self.send_header('Transfer-Encoding', 'chunked')
-            self.send_header('Connection', 'close')
-            self.close_connection = True
             self.end_headers()
             try:
-                for chunk in ([b'x' * 65_536] * 16 + [b'x']):
+                for chunk in ([b'x' * 8_192] * 128 + [b'x']):
                     self.wfile.write(f'{len(chunk):X}\r\n'.encode('ascii'))
                     self.wfile.write(chunk + b'\r\n')
                     self.wfile.flush()
+                    sleep(0.004)
                 self.wfile.write(b'0\r\n\r\n')
+                self.wfile.flush()
             except (BrokenPipeError, ConnectionResetError):
                 pass  # Expected when the bounded client cancels the transfer.
         elif self.path in ('/dav/unauthorized/', '/dav/forbidden/', '/dav/ok-not-multistatus/', '/dav/empty-multistatus/'):
