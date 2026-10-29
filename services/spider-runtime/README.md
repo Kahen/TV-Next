@@ -47,7 +47,7 @@ GitHub Actions `.github/workflows/spider-sandbox.yml` executes the same tests on
 
 The suite checks five method responses and Node/Python/Java parity; malformed action and oversized input handling; blocked outbound TCP; rejected attempts to write under `/worker`; live cgroup CPU/memory/PID quotas, non-root UID and host-environment-secret isolation; worker crash containment, oversized-output rejection, wall-clock timeout and leaked container cleanup; and checks explicit Docker hardening flags.
 
-**Not implemented / not proven:** dynamic Java/JAR provider loading, pure JVM FongMi Spider adapters, Android-dependent JARs, real Spider callback APIs, arbitrary JS/Python code execution, plugin dependency installation, QuickJS compatibility, network allowlist logic, end-user authorization, full control-plane/API integration, Linux container escape resistance, independent security audit, native iOS Spider parity, or real provider fixture corpus. Any future transition to dynamic plugins requires a new reviewed architecture and complete P3 acceptance tests.
+**Not implemented / not proven:** arbitrary/external Java/JAR activation, Android-dependent JARs, real Spider callback APIs, arbitrary JS/Python code execution, plugin dependency installation, QuickJS compatibility, network allowlist logic, end-user authorization, full control-plane/API integration, Linux container escape resistance, independent security audit, native iOS Spider parity, or representative real-provider corpus. The separate owned approved-JAR contract slice below does not enable external plugins.
 
 
 ## Bundled JVM/JAR reference (this PR)
@@ -100,3 +100,15 @@ not a sandbox guarantee or permission to continue serving requests.
 Initial Docker integration evidence for the new lifecycle:
 https://github.com/Kahen/TV-Next/actions/runs/40683953519 (same implementation;
 subsequent documentation-only changes still require the final PR gates).
+
+## Approved owned-JAR FongMi media contract
+
+A separate `jvm-spider` image now loads the compiled, preflighted and SHA-256
+checked **owned** provider JAR through the original Spider media signatures.
+The old three fixture workers remain RPC v1; this new restricted harness is v2.
+It inherits the same OS/container limits and confirmed teardown, never accepts a
+caller path/class/image/URL, and is not connected to a live API endpoint. See
+[PURE_JVM_SPIDER.md](../../docs/PURE_JVM_SPIDER.md) for exact signatures, the null
+Context/unsupported-host contract, provenance, negative tests and remaining gates.
+This is not Android/DEX portability, external plugin approval, real provider
+corpus acceptance, controlled egress or completion of #45/#4.

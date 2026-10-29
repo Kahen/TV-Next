@@ -21,6 +21,17 @@ IMAGES = {
     "python": "tvnext/spider-python-fixture:ci",
     "java": "tvnext/spider-java-fixture:ci",
 }
+APPROVED_IMAGES = {"java-spider": "tvnext/spider-jvm-approved:ci"}
+APPROVED_PROVIDER = "owned-reference"
+APPROVED_TEST_PROVIDERS = frozenset({
+    "owned-paged", "owned-fallback", "owned-throwing", "owned-invalid", "owned-cleanup",
+    "owned-timeout", "owned-output", "owned-oom", "owned-processes", "owned-policy",
+})
+APPROVED_ERRORS = frozenset({
+    "invalid-request", "provider-not-approved", "jar-integrity", "jar-preflight", "unsupported-api",
+    "unsupported-method", "unsupported-pagination", "provider-execution", "invalid-provider-response",
+    "provider-cleanup-failed", "provider-resource-limit", "request-too-large", "output-too-large", "nonzero-exit",
+})
 METHODS = frozenset({"home", "category", "search", "detail", "player"})
 DIAGNOSTICS = frozenset({"__probe_network", "__probe_write", "__probe_policy", "__probe_output", "__crash", "__sleep"})
 MAX_INPUT = 16_384
@@ -49,7 +60,8 @@ class RuntimeResponse:
 
 def docker_command(runtime: str, name: str, diagnostic: bool = False) -> list[str]:
     """No user-controlled image, mount, network, UID, cap or command in this list."""
-    if runtime not in IMAGES:
+    images = IMAGES | APPROVED_IMAGES
+    if runtime not in images:
         raise ValueError("unsupported runtime")
     cmd = [
         "docker", "run", "--rm", "--pull", "never", "--name", name,
@@ -70,7 +82,7 @@ def docker_command(runtime: str, name: str, diagnostic: bool = False) -> list[st
     ]
     if diagnostic:
         cmd += ["--env", "TVNEXT_TEST_HOOKS=1"]
-    return cmd + [IMAGES[runtime]]
+    return cmd + [images[runtime]]
 
 
 def _limit_host_output() -> None:
@@ -125,13 +137,16 @@ def _remove_container(name: str, *, pending_creation: bool = False, budget: floa
     return False
 
 
-def run_fixture(
+def _run_runtime(
     runtime: str, method: str, args: dict[str, Any] | None = None,
-    timeout: float = 7.0, *, diagnostic: bool = False
+    timeout: float = 7.0, *, diagnostic: bool = False, version: int = 1,
+    provider: str | None = None,
 ) -> RuntimeResponse:
-    if runtime not in IMAGES:
+    if version not in (1, 2):
+        raise ValueError("unsupported protocol version")
+    if runtime not in (IMAGES if version == 1 else APPROVED_IMAGES):
         raise ValueError("unsupported runtime")
-    if method not in (DIAGNOSTICS if diagnostic else METHODS):
+    if method not in (DIAGNOSTICS if diagnostic and version == 1 else METHODS):
         raise ValueError("method is not allowed for this mode")
     if args is None:
         args = {}
@@ -139,7 +154,10 @@ def run_fixture(
         raise ValueError("args must be a JSON object")
     if not 0.1 <= timeout <= 20:
         raise ValueError("timeout outside configured limits")
-    wire = json.dumps({"version": 1, "method": method, "args": args},
+    request = {"version": version, "method": method, "args": args}
+    if version == 2:
+        request["provider"] = provider
+    wire = json.dumps(request,
                       ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     if len(wire) > MAX_INPUT:
         raise ValueError("request too large")
@@ -187,13 +205,15 @@ def run_fixture(
                         code = "nonzero-exit"
                 except (ValueError, UnicodeDecodeError, AttributeError):
                     code = "nonzero-exit"
+                if version == 2 and code not in APPROVED_ERRORS:
+                    code = "provider-execution"
                 raise RuntimeFailure("runtime rejected request: " + code)
             try:
                 result = json.loads(payload.decode("utf-8"))
             except (ValueError, UnicodeDecodeError) as exc:
                 raise RuntimeFailure("invalid runtime response") from exc
             if (not isinstance(result, dict) or result.get("status") != "ok" or
-                    result.get("version") != 1 or result.get("runtime") != runtime or
+                    result.get("version") != version or result.get("runtime") != runtime or
                     not isinstance(result.get("data"), dict)):
                 raise RuntimeFailure("unexpected response schema")
             return RuntimeResponse(runtime=runtime, method=method, data=result["data"])
@@ -207,3 +227,23 @@ def run_fixture(
             # Preserve any original timeout/failure as __context__, but never report
             # an ordinary success or clean timeout when resource teardown is unknown.
             raise RuntimeCleanupFailure("runtime container removal could not be confirmed")
+
+
+def run_fixture(runtime: str, method: str, args: dict[str, Any] | None = None,
+                timeout: float = 7.0, *, diagnostic: bool = False) -> RuntimeResponse:
+    """Original static fixture v1 entry point; no JAR activation is inferred."""
+    return _run_runtime(runtime, method, args, timeout, diagnostic=diagnostic)
+
+
+def run_approved_spider(method: str, args: dict[str, Any] | None = None,
+                        timeout: float = 7.0, *, provider: str = APPROVED_PROVIDER,
+                        diagnostic: bool = False) -> RuntimeResponse:
+    """Owned/pinned JVM contract corpus only. No caller path, class, image or URL.
+
+    Remains a host-side CLI harness, not an API endpoint. Diagnostic provider
+    variants must be enabled explicitly at both host and worker boundaries.
+    """
+    if provider != APPROVED_PROVIDER and not (diagnostic and provider in APPROVED_TEST_PROVIDERS):
+        raise ValueError("provider is not approved")
+    return _run_runtime("java-spider", method, args, timeout, diagnostic=diagnostic,
+                        version=2, provider=provider)

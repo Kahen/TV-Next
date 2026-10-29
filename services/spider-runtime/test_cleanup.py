@@ -95,5 +95,17 @@ class CleanupTests(unittest.TestCase):
     def test_missing_cli_after_registration_cannot_silently_leave_container(self):
         with self.assertRaises(runner.RuntimeCleanupFailure): self.invoke(FileNotFoundError(),cleanup=False)
 
+    def test_approved_spider_protocol_error_cannot_include_provider_secrets(self):
+        def docker(command, **kwargs):
+            if command[1] == 'create':
+                kwargs['stdout'].write(b'a' * 64 + b'\n')
+                return self.result()
+            kwargs['stdout'].write(json.dumps({'version':2,'status':'error','code':'https://private/?token=secret'}).encode())
+            return self.result(2)
+        with patch.object(runner.subprocess, 'run', side_effect=docker), patch.object(runner, '_remove_container', return_value=True):
+            with self.assertRaises(runner.RuntimeFailure) as failure:
+                runner.run_approved_spider('home')
+            self.assertEqual(str(failure.exception), 'runtime rejected request: provider-execution')
+
 
 if __name__ == "__main__": unittest.main()
