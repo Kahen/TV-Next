@@ -311,6 +311,10 @@ struct ContentView: View {
                 }
                 Toggle("显示弹幕", isOn: $danmakuOptions.enabled)
                     .accessibilityIdentifier("danmaku-enabled-toggle")
+                // Stable, user-visible state feedback; XCUI switch.value differs by iOS locale.
+                Text(danmakuOptions.enabled ? "弹幕已开启" : "弹幕已关闭")
+                    .font(.caption2).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("danmaku-enabled-status")
                 HStack { Text("透明度"); Slider(value: $danmakuOptions.opacity, in: 0.1...1) }
                 HStack { Text("字号"); Slider(value: $danmakuOptions.fontSize, in: 12...40, step: 1) }
                 HStack { Text("显示区域"); Slider(value: $danmakuOptions.area, in: 0.25...1, step: 0.25) }
