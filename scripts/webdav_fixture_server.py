@@ -25,6 +25,11 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(302)
             self.send_header('Location', 'https://foreign.example/dav/')
             self.end_headers()
+        elif self.path == '/dav/redirect-local/':
+            # Redirects must be denied even when they stay on the same origin.
+            self.send_response(302)
+            self.send_header('Location', '/dav/')
+            self.end_headers()
         elif self.path == '/dav/no-length/':
             # A valid multistatus without a declared length must still parse.
             self.send_response(207)
