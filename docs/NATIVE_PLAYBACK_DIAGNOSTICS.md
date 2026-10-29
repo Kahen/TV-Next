@@ -14,7 +14,8 @@ Codec identifiers describe the encoded stream. AVFoundation does not expose the
 actual selected hardware decoder, and this UI makes no hardware-decoding claim.
 Unready/indefinite sources show unknown values; metadata errors preserve playback.
 
-XCTest reads the owned H.264 fixture's actual 160×90 format description and checks
+XCTest reads the owned H.264 fixture's actual 160×90 format description, a generated
+48 kHz stereo PCM audio file's format, and checks
 empty-player state, finite-time handling and secret-bearing error redaction.
 Production XCUI opens and refreshes the panel without media on both device families.
 Final-head iPhone/iPad simulator and full integration gates are required. Device

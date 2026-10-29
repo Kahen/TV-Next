@@ -25,6 +25,23 @@ final class NativePlaybackDiagnosticsTests: XCTestCase {
         XCTAssertEqual(NativeMediaMetadata.codec(0x00000000), "0x00000000")
     }
 
+    func testOwnedPCMAudioReportsSampleRateAndChannelCount() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".caf")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 2))
+        let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 4800))
+        buffer.frameLength = 4800
+        let channels = try XCTUnwrap(buffer.floatChannelData)
+        for index in 0..<2 { channels[index].initialize(repeating: 0, count: 4800) }
+        do {
+            let file = try AVAudioFile(forWriting: url, settings: format.settings)
+            try file.write(from: buffer)
+        }
+        let metadata = try await NativeMediaMetadata.collect(AVURLAsset(url: url))
+        XCTAssertTrue(metadata.video.isEmpty)
+        XCTAssertTrue(metadata.audio.contains { $0.contains("48000 Hz") && $0.contains("2 声道") })
+    }
+
     func testEmptyPlayerHasNoStaleTimelineOrError() {
         let value = NativePlaybackTimeline.capture(AVPlayer())
         XCTAssertEqual(value.state, "尚未选择媒体")
