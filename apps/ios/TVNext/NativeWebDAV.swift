@@ -128,6 +128,17 @@ enum NativeWebDAV {
         }.prefix(200).map { $0 }
     }
 
+    // Shared by URLSession's response callback and completion fallback. Some
+    // URLSession implementations complete without a separate didReceive(response:)
+    // callback. Never interpret that as a successful PROPFIND without validating
+    // the final HTTP status and advertised body length.
+    static func responseError(statusCode: Int, expectedLength: Int64, maxBytes: Int = 1_048_576) -> NativeWebDAVError? {
+        if statusCode == 401 || statusCode == 403 { return .unauthorized }
+        if statusCode != 207 { return .httpStatus(statusCode) }
+        if expectedLength > Int64(maxBytes) { return .responseTooLarge }
+        return nil
+    }
+
     static func playable(_ item: NativeWebDAVItem) -> Bool {
         guard !item.isDirectory else { return false }
         return ["mp4", "m4v", "mov", "m3u8", "mp3", "m4a", "aac", "ts"].contains(item.url.pathExtension.lowercased())
@@ -198,16 +209,11 @@ private final class WebDAVBoundedTransport: NSObject, URLSessionDataDelegate, @u
             finish(.failure(NativeWebDAVError.invalidResponse))
             return
         }
-        let failure: NativeWebDAVError?
-        if http.statusCode == 401 || http.statusCode == 403 {
-            failure = .unauthorized
-        } else if http.statusCode != 207 {
-            failure = .httpStatus(http.statusCode)
-        } else if response.expectedContentLength > Int64(maxBytes) {
-            failure = .responseTooLarge
-        } else {
-            failure = nil
-        }
+        let failure = NativeWebDAV.responseError(
+            statusCode: http.statusCode,
+            expectedLength: response.expectedContentLength,
+            maxBytes: maxBytes
+        )
         if let failure {
             completionHandler(.cancel)
             finish(.failure(failure))
@@ -229,6 +235,21 @@ private final class WebDAVBoundedTransport: NSObject, URLSessionDataDelegate, @u
 
     func urlSession(_ session: URLSession, task: URLSessionTask,
                     didCompleteWithError error: Error?) {
+        guard !finished else { return }
+        // macOS URLSession can report a final HTTPURLResponse on the task
+        // without invoking didReceive(response:). Apply the *same* rejection
+        // policy in that case; never return unchecked bytes to the XML parser.
+        if !acceptedResponse, let http = task.response as? HTTPURLResponse {
+            if let failure = NativeWebDAV.responseError(
+                statusCode: http.statusCode,
+                expectedLength: http.expectedContentLength,
+                maxBytes: maxBytes
+            ) {
+                finish(.failure(failure))
+                return
+            }
+            acceptedResponse = true
+        }
         if let error {
             finish(.failure(error))
         } else if acceptedResponse {
