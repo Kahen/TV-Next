@@ -45,6 +45,11 @@ jobs:
         run: |
           swiftc TVNext/DanmakuParser.swift tests/DanmakuSmoke.swift -o /tmp/tvnext-danmaku-tests
           /tmp/tvnext-danmaku-tests
+      - name: Verify bounded native danmaku settings persistence
+        working-directory: apps/ios
+        run: |
+          swiftc -warnings-as-errors TVNext/DanmakuOptions.swift tests/DanmakuOptionsSmoke.swift -o /tmp/tvnext-danmaku-options-tests
+          /tmp/tvnext-danmaku-options-tests
       - name: Run native XMLTV shared contract tests
         working-directory: apps/ios
         run: |
