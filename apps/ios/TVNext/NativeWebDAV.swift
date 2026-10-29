@@ -117,8 +117,14 @@ enum NativeWebDAV {
                   let path = segments(candidate, root: root),
                   path.count == folderSegments.count + 1, path.starts(with: folderSegments),
                   let name = path.last, name.count <= 180 else { continue }
-            let normalized = record.directory && !candidate.path.hasSuffix("/")
-                ? candidate.appendingPathComponent("", isDirectory: true) : candidate
+            // URL.path omits a directory's trailing slash on Darwin. Appending
+            // an empty component there changed an existing /Folder/ href into
+            // /Folder// and broke the next PROPFIND on strict WebDAV servers.
+            guard var components = URLComponents(url: candidate, resolvingAgainstBaseURL: false) else { continue }
+            if record.directory && !components.percentEncodedPath.hasSuffix("/") {
+                components.percentEncodedPath += "/"
+            }
+            guard let normalized = components.url else { continue }
             let item = NativeWebDAVItem(url: normalized, name: name, isDirectory: record.directory)
             unique[item.id] = item
         }

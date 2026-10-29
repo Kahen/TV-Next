@@ -7,6 +7,11 @@ import Foundation
         do { entries = try await NativeWebDAV.list(root: root, folder: root, username: "", password: "") }
         catch { fatalError("Initial WebDAV listing failed: \(error)") }
         precondition(entries.map(\.name) == ["Folder", "Owned.mp4"])
+        let nested = entries[0].url
+        precondition(nested.absoluteString == "http://127.0.0.1:8767/dav/Folder/", "Collection href acquired an extra slash")
+        let nestedEntries = try await NativeWebDAV.list(root: root, folder: nested, username: "", password: "")
+        precondition(nestedEntries.isEmpty)
+        precondition(NativeWebDAV.navigationPath(root: root, folder: nested) == [root, nested])
         // URLSession can complete a rejected redirect without a separate
         // didReceive(response:) callback. Both local and external Location
         // values must consistently surface the original 302, never follow it.

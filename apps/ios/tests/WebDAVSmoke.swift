@@ -20,6 +20,7 @@ import Foundation
         """
         let items = try NativeWebDAV.parse(Data(xml.utf8), root: root, folder: folder)
         precondition(items.map(\.name) == ["Sub", "Owned Film.mp4"], "Unexpected children: \(items)")
+        precondition(items[0].url.absoluteString == "https://media.example/dav/Movies/Sub/")
         precondition(!NativeWebDAV.playable(items[0]) && NativeWebDAV.playable(items[1]))
         precondition(NativeWebDAV.contains(folder, root: root))
         precondition(!NativeWebDAV.contains(URL(string: "https://media.example/dav2")!, root: root))

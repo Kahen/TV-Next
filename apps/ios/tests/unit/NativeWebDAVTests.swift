@@ -21,6 +21,7 @@ final class NativeWebDAVTests: XCTestCase {
         XCTAssertEqual(entries.map(\.name), ["Season 1", "Owned.mp4"])
         XCTAssertTrue(entries[0].isDirectory)
         XCTAssertTrue(entries[0].url.absoluteString.hasSuffix("/"), "Directory hrefs must be canonicalized for nested PROPFIND")
+        XCTAssertEqual(entries[0].url.absoluteString, "https://example.test/dav/Media/Season%201/")
         XCTAssertFalse(entries[1].isDirectory)
         XCTAssertTrue(NativeWebDAV.playable(entries[1]))
         XCTAssertFalse(NativeWebDAV.playable(entries[0]))
