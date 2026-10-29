@@ -68,6 +68,21 @@ jobs:
             if curl --silent http://127.0.0.1:8767/dav/ -o /dev/null; then break; fi
             sleep 1
           done
+          # Verify the owned oversized fixture is a *valid* HTTP/1.1
+          # unknown-length stream, not a premature EOF/connection reset.
+          python3 - <<'PYTHON'
+          import http.client
+          conn = http.client.HTTPConnection('127.0.0.1', 8767, timeout=15)
+          try:
+              conn.request('PROPFIND', '/dav/large-streamed/', headers={'Depth': '1'})
+              response = conn.getresponse()
+              assert response.version == 11 and response.status == 207
+              assert response.getheader('Transfer-Encoding') == 'chunked'
+              assert response.getheader('Content-Length') is None
+              assert len(response.read()) == 1_048_577
+          finally:
+              conn.close()
+          PYTHON
           swiftc -warnings-as-errors TVNext/NativeWebDAV.swift tests/WebDAVNetworkSmoke.swift -o /tmp/tvnext-webdav-network-tests
           /tmp/tvnext-webdav-network-tests
       - name: Verify manual intro/outro marker bounds and local persistence
