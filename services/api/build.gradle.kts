@@ -5,7 +5,7 @@ plugins {
     id("io.spring.dependency-management") version "1.1.7"
 }
 group = "dev.tvnext"
-version = "0.1.0-SNAPSHOT"
+version = providers.gradleProperty("releaseVersion").getOrElse("0.1.0-SNAPSHOT")
 java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
 repositories { mavenCentral() }
 dependencies {
@@ -26,4 +26,9 @@ dependencies {
 tasks.test {
     useJUnitPlatform()
     systemProperty("spring.datasource.url", System.getenv("TV_NEXT_TEST_DB_URL") ?: "jdbc:h2:mem:tvnext-tests;DB_CLOSE_DELAY=-1")
+}
+
+tasks.withType<org.gradle.api.tasks.bundling.AbstractArchiveTask>().configureEach {
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
 }
