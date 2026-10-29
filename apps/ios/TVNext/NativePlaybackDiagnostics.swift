@@ -8,11 +8,18 @@ struct NativeMediaMetadata: Equatable {
 
     static func codec(_ value: FourCharCode) -> String {
         let bytes = [UInt8((value >> 24) & 255), UInt8((value >> 16) & 255), UInt8((value >> 8) & 255), UInt8(value & 255)]
-        let raw = bytes.allSatisfy { (33...126).contains($0) } ? String(bytes: bytes, encoding: .ascii) : nil
+        let text = bytes.allSatisfy { (32...126).contains($0) }
+            ? String(bytes: bytes, encoding: .ascii)?.trimmingCharacters(in: .whitespaces) : nil
+        let raw = text?.isEmpty == false ? text : nil
         switch raw {
         case "avc1", "avc3": return "H.264 (\(raw!))"
         case "hvc1", "hev1": return "HEVC (\(raw!))"
-        case "mp4a": return "AAC / MPEG-4 audio (mp4a)"
+        case "aac": return "AAC"
+        case "aach": return "HE-AAC"
+        case "aacp": return "HE-AAC v2"
+        case "lpcm": return "PCM"
+        case "alac": return "Apple Lossless"
+        case "mp4a": return "MPEG-4 audio (mp4a)"
         case "ac-3": return "Dolby AC-3"
         case "ec-3": return "Dolby E-AC-3"
         default: return raw ?? String(format: "0x%08X", value)

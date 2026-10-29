@@ -22,6 +22,7 @@ final class NativePlaybackDiagnosticsTests: XCTestCase {
         XCTAssertFalse(NativePlaybackTimeline.seconds(.nan).contains("nan"))
         XCTAssertFalse(NativePlaybackTimeline.seconds(.infinity).contains("inf"))
         XCTAssertEqual(NativeMediaMetadata.codec(0x61766331), "H.264 (avc1)")
+        XCTAssertEqual(NativeMediaMetadata.codec(0x61616320), "AAC")
         XCTAssertEqual(NativeMediaMetadata.codec(0x00000000), "0x00000000")
     }
 
@@ -40,6 +41,25 @@ final class NativePlaybackDiagnosticsTests: XCTestCase {
         let metadata = try await NativeMediaMetadata.collect(AVURLAsset(url: url))
         XCTAssertTrue(metadata.video.isEmpty)
         XCTAssertTrue(metadata.audio.contains { $0.contains("48000 Hz") && $0.contains("2 声道") })
+    }
+
+    func testOwnedAACAudioReportsEncodedFormatInsteadOfContainerOrPCM() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".m4a")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 2))
+        let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 4800))
+        buffer.frameLength = 4800
+        let channels = try XCTUnwrap(buffer.floatChannelData)
+        for index in 0..<2 { channels[index].initialize(repeating: 0, count: 4800) }
+        do {
+            let file = try AVAudioFile(forWriting: url, settings: [
+                AVFormatIDKey: kAudioFormatMPEG4AAC, AVSampleRateKey: 48_000,
+                AVNumberOfChannelsKey: 2, AVEncoderBitRateKey: 128_000
+            ])
+            try file.write(from: buffer)
+        }
+        let metadata = try await NativeMediaMetadata.collect(AVURLAsset(url: url))
+        XCTAssertTrue(metadata.audio.contains { $0.hasPrefix("AAC") && $0.contains("48000 Hz") && $0.contains("2 声道") })
     }
 
     func testEmptyPlayerHasNoStaleTimelineOrError() {
