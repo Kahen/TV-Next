@@ -159,7 +159,8 @@ enum NativeWebDAV {
     /// a network destination from a displayed breadcrumb label.
     /// Limit the depth to avoid constructing unbounded navigation controls.
     static func navigationPath(root: URL, folder: URL) -> [URL] {
-        guard contains(folder, root: root), folder.path.hasSuffix("/") else { return [] }
+        guard contains(folder, root: root),
+              URLComponents(url: folder, resolvingAgainstBaseURL: false)?.percentEncodedPath.hasSuffix("/") == true else { return [] }
         var path = [folder]
         var current = folder
         for _ in 0..<32 {
