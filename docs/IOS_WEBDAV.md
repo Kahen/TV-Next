@@ -39,3 +39,5 @@ When browsing a nested WebDAV directory, the iPhone/iPad SwiftUI view displays h
 ### Localhost streaming fixture portability regression (PR #79)
 
 The initial PR gate [40844912548](https://github.com/Kahen/TV-Next/actions/runs/40844912548) reached the WebDAV network smoke on both Apple simulators but returned `invalidResponse` for the synthetic oversized unknown-length HTTP/1.0 EOF stream. This is a **failed** gate, not evidence of a client-side cap failure or a successful overflow rejection. The owned fixture now emits explicit HTTP/1.1 chunked framing with sixteen 64-KiB chunks followed by a one-byte overflow, so the transport's incremental byte cap is tested without ambiguous EOF framing. A fresh final-head gate is required before merging.
+
+The PR review also identified equivalent-origin URL serialization (explicit default HTTPS port, host casing) as a breadcrumb edge case. Ancestor termination now compares root-validated decoded path segments and always substitutes the configured canonical root URL. Swift smoke and XCTest include those aliases; an unverified PR check does not establish simulator success.
