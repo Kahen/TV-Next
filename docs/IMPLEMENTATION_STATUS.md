@@ -72,3 +72,7 @@ The 2026-10-29 main push full gate [40809764313](https://github.com/Kahen/TV-Nex
 ## Native WebDAV local browse controls (P4, #76)
 
 The SwiftUI WebDAV view adds explicit current-folder refresh and device-local filename/media-only filtering over the previously bounded Depth:1 listing. The filter never changes server requests, URL paths, headers or credentials; folders remain navigable in media-only mode, and the first-200-entry cap still applies. Refresh preserves the last successful listing on failure and rejects stale asynchronous responses through the existing request generation guard. Swift smoke, XCTest and production XCUI against the owned localhost PROPFIND fixture cover positive/negative UI, filtering, refresh and disconnect behavior; final-head full CI and physical/provider acceptance remain separate.
+
+## Native WebDAV bounded breadcrumb navigation (P4, #78)
+
+Native SwiftUI adds direct root/ancestor shortcuts for nested WebDAV folders. A pure Swift helper derives at most 32 canonical directory ancestors from already root-validated URLs, rejecting foreign origins, sibling roots, non-directory inputs and over-depth paths. The UI invokes the existing bounded/cancelable directory fetch, not a new transport. Swift smoke, XCTest and iPhone/iPad XCUI against the owned localhost nested-folder fixture provide positive/negative regression coverage. Final-head aggregate CI and physical-provider validation remain distinct.
