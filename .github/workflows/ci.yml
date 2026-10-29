@@ -58,7 +58,32 @@ jobs:
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
         with:
           gradle-version: "8.14.3"
-      - run: gradle test bootJar --no-daemon
+      - name: Verify committed JVM dependency evidence
+        working-directory: .
+        run: |
+          python3 scripts/verify_gradle_dependencies.py
+          python3 -m unittest discover -s scripts -p test_verify_gradle_dependencies.py
+          python3 -m unittest discover -s scripts -p test_generate_jvm_sbom.py
+      - run: gradle test bootJar --dependency-verification strict --no-daemon
+      - name: Inventory exact shipped JVM libraries
+        working-directory: .
+        run: |
+          jars=()
+          for candidate in services/api/build/libs/*.jar; do
+            if [[ "$candidate" != *-plain.jar ]]; then jars+=("$candidate"); fi
+          done
+          test "${#jars[@]}" -eq 1
+          python3 scripts/generate_jvm_sbom.py --jar "${jars[0]}" --version 0.1.0-SNAPSHOT --output services/api/build/reports/sbom-api.cdx.json
+      - name: Preserve JVM dependency evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: api-dependency-evidence
+          path: |
+            services/api/build/reports/sbom-api.cdx.json
+            services/api/gradle.lockfile
+            services/api/gradle/verification-metadata.xml
+          retention-days: 14
       - name: Publish exact API test counts
         if: always()
         run: python ../../scripts/summarize_junit.py build/test-results/test
@@ -102,7 +127,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
         with:
           gradle-version: "8.14.3"
-      - run: gradle test --tests '*HomeServerIntegrationTest' --tests '*RemoteControlIntegrationTest' --tests '*EpgFeedIntegrationTest' --no-daemon
+      - run: gradle test --dependency-verification strict --tests '*HomeServerIntegrationTest' --tests '*RemoteControlIntegrationTest' --tests '*EpgFeedIntegrationTest' --no-daemon
       - name: Publish PostgreSQL test evidence
         if: always()
         run: python ../../scripts/summarize_junit.py build/test-results/test

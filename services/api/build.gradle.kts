@@ -8,6 +8,11 @@ group = "dev.tvnext"
 version = providers.gradleProperty("releaseVersion").getOrElse("0.1.0-SNAPSHOT")
 java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
 repositories { mavenCentral() }
+// Changes to direct or transitive dependency versions require a reviewed lock update.
+dependencyLocking {
+    lockAllConfigurations()
+    lockMode.set(org.gradle.api.artifacts.dsl.LockMode.STRICT)
+}
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
@@ -31,4 +36,12 @@ tasks.test {
 tasks.withType<org.gradle.api.tasks.bundling.AbstractArchiveTask>().configureEach {
     isPreserveFileTimestamps = false
     isReproducibleFileOrder = true
+}
+
+// This service is launched with `java -jar`, not the jarmode extractor.
+// Spring Boot otherwise injects spring-boot-jarmode-tools into BOOT-INF/lib
+// outside the reviewed Gradle runtime resolution/checksum baseline.
+// Exclude that unused executable tool instead of silently whitelisting it.
+tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
+    includeTools.set(false)
 }

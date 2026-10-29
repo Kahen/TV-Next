@@ -6,6 +6,12 @@ on:
       - '.github/workflows/release-candidate.yml'
       - 'scripts/package_candidate.py'
       - 'scripts/test_package_candidate.py'
+      - 'scripts/generate_jvm_sbom.py'
+      - 'scripts/test_generate_jvm_sbom.py'
+      - 'services/api/build.gradle.kts'
+      - 'services/api/gradle.lockfile'
+      - 'services/api/gradle/verification-metadata.xml'
+      - 'services/api/Dockerfile'
   workflow_dispatch:
     inputs:
       version:
@@ -54,6 +60,7 @@ jobs:
           set -euo pipefail
           python3 scripts/verify_build_pins.py
           python3 -m unittest discover -s scripts -p test_package_candidate.py
+          python3 -m unittest discover -s scripts -p test_generate_jvm_sbom.py
           python3 - <<'PYTHON'
           import os, sys
           sys.path.insert(0, 'scripts')
@@ -69,7 +76,7 @@ jobs:
           npm --prefix apps/web audit --audit-level=moderate --json > apps/web/npm-audit.json
           npm --prefix apps/web sbom --sbom-format cyclonedx > apps/web/sbom-web.cdx.json
           npm --prefix apps/web run build
-          gradle -p services/api bootJar --no-daemon "-PreleaseVersion=${TVNEXT_CANDIDATE_VERSION#v}"
+          gradle -p services/api bootJar --dependency-verification strict --no-daemon "-PreleaseVersion=${TVNEXT_CANDIDATE_VERSION#v}"
       - name: Build and archive native Linux images
         run: |
           set -euo pipefail
