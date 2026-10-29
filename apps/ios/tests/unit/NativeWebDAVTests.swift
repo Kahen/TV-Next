@@ -94,6 +94,13 @@ final class NativeWebDAVTests: XCTestCase {
         let episode = folder.appendingPathComponent("Episode 2", isDirectory: true)
         XCTAssertEqual(NativeWebDAV.navigationPath(root: root, folder: root), [root])
         XCTAssertEqual(NativeWebDAV.navigationPath(root: root, folder: episode), [root, folder, episode])
+        let equivalentRoot = URL(string: "https://EXAMPLE.TEST:443/dav/")!
+        let equivalentEpisode = URL(string: "https://EXAMPLE.TEST:443/dav/Season%201/Episode%202/")!
+        XCTAssertEqual(NativeWebDAV.navigationPath(root: root, folder: equivalentRoot), [root])
+        let normalized = NativeWebDAV.navigationPath(root: root, folder: equivalentEpisode)
+        XCTAssertEqual(normalized.count, 3)
+        XCTAssertEqual(normalized.first, root, "Breadcrumb root must use configured canonical URL")
+        XCTAssertEqual(normalized.map(\.lastPathComponent), ["dav", "Season 1", "Episode 2"])
         XCTAssertTrue(NativeWebDAV.navigationPath(root: root, folder: URL(string: "https://evil.test/dav/")!).isEmpty)
         XCTAssertTrue(NativeWebDAV.navigationPath(root: root, folder: URL(string: "https://example.test/dav2/")!).isEmpty)
         XCTAssertTrue(NativeWebDAV.navigationPath(root: root, folder: root.appendingPathComponent("file.mp4")).isEmpty)
