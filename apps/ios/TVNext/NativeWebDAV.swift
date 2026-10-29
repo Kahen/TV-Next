@@ -246,31 +246,100 @@ private final class WebDAVBoundedTransport: NSObject, URLSessionDataDelegate, @u
     }
 }
 
+/// RFC 4918 multistatus collector. A response href is a direct child of
+/// DAV:response; collection is authoritative only in a successful DAV:propstat.
+/// Ignore similarly named foreign/nested elements and unsuccessful properties.
 private final class WebDAVXMLCollector: NSObject, XMLParserDelegate {
-    struct Record { var href = ""; var directory = false }
+    struct Record {
+        var href = ""
+        var directory = false
+        var hasResourceType = false
+        var invalidHref = false
+    }
+    private struct PropertyStatus {
+        var status = ""
+        var hasStatus = false
+        var invalidStatus = false
+        var hasResourceType = false
+        var directory = false
+    }
+
     var records: [Record] = []
     var sawMultistatus = false
+    private var path: [String] = []
     private var active: Record?
-    private var inHref = false
+    private var property: PropertyStatus?
+    private var responseStatus: String?
+    private var duplicateResponseStatus = false
+    private var seenHref = false
+
+    private static func successfulStatus(_ raw: String) -> Bool {
+        let parts = raw.split(whereSeparator: { $0.isWhitespace })
+        guard parts.count >= 2, parts[0].hasPrefix("HTTP/"),
+              parts[1].count == 3,
+              parts[1].allSatisfy({ $0.isASCII && $0.isNumber }),
+              let code = Int(parts[1]) else { return false }
+        return (200...299).contains(code)
+    }
+
     func parser(_ parser: XMLParser, didStartElement elementName: String, namespaceURI: String?,
                 qualifiedName qName: String?, attributes attributeDict: [String: String]) {
-        let name = elementName.split(separator: ":").last.map(String.init)?.lowercased() ?? ""
-        if name == "multistatus" && namespaceURI == "DAV:" { sawMultistatus = true }
-        guard namespaceURI == "DAV:" else { return }
-        if name == "response" { active = Record() }
-        if name == "href" && active != nil { inHref = true }
-        if name == "collection" && active != nil { active?.directory = true }
-    }
-    func parser(_ parser: XMLParser, foundCharacters string: String) {
-        if inHref { active?.href += string }
-    }
-    func parser(_ parser: XMLParser, didEndElement elementName: String, namespaceURI: String?, qualifiedName qName: String?) {
-        guard namespaceURI == "DAV:" else { return }
-        let name = elementName.split(separator: ":").last.map(String.init)?.lowercased() ?? ""
-        if name == "href" { inHref = false }
-        if name == "response", let record = active {
-            if records.count < 501 { records.append(record) }
-            active = nil
+        let name = namespaceURI == "DAV:"
+            ? (elementName.split(separator: ":").last.map(String.init)?.lowercased() ?? "")
+            : "#foreign"
+        path.append(name)
+        if path == ["multistatus"] { sawMultistatus = true }
+        if path == ["multistatus", "response"] {
+            active = Record()
+            seenHref = false
+            responseStatus = nil
+            duplicateResponseStatus = false
+        } else if path == ["multistatus", "response", "href"], active != nil {
+            if seenHref { active?.invalidHref = true }
+            seenHref = true
+        } else if path == ["multistatus", "response", "status"] {
+            if responseStatus != nil { duplicateResponseStatus = true }
+            else { responseStatus = "" }
+        } else if path == ["multistatus", "response", "propstat"] {
+            property = PropertyStatus()
+        } else if path == ["multistatus", "response", "propstat", "status"] {
+            if property?.hasStatus == true { property?.invalidStatus = true }
+            property?.hasStatus = true
+        } else if path == ["multistatus", "response", "propstat", "prop", "resourcetype"] {
+            property?.hasResourceType = true
+        } else if path == ["multistatus", "response", "propstat", "prop", "resourcetype", "collection"] {
+            property?.directory = true
         }
+    }
+
+    func parser(_ parser: XMLParser, foundCharacters string: String) {
+        if path == ["multistatus", "response", "href"] {
+            active?.href += string
+        } else if path == ["multistatus", "response", "status"] {
+            responseStatus? += string
+        } else if path == ["multistatus", "response", "propstat", "status"] {
+            property?.status += string
+        }
+    }
+
+    func parser(_ parser: XMLParser, didEndElement elementName: String, namespaceURI: String?,
+                qualifiedName qName: String?) {
+        if path == ["multistatus", "response", "propstat"] {
+            if let property, property.hasStatus, !property.invalidStatus,
+               property.hasResourceType, Self.successfulStatus(property.status) {
+                active?.hasResourceType = true
+                active?.directory = (active?.directory ?? false) || property.directory
+            }
+            property = nil
+        } else if path == ["multistatus", "response"] {
+            if let active, !active.invalidHref, active.hasResourceType,
+               !duplicateResponseStatus,
+               responseStatus.map(Self.successfulStatus) ?? true,
+               records.count < 501 {
+                records.append(active)
+            }
+            self.active = nil
+        }
+        if !path.isEmpty { path.removeLast() }
     }
 }
