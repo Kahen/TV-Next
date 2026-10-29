@@ -1,6 +1,6 @@
 # JVM dependency integrity
 
-The API uses Gradle 8.14.3 and JDK 21. The committed `services/api/gradle.lockfile` records 131 exact compile/runtime/test/tooling module versions. `gradle/verification-metadata.xml` records 515 SHA-256 checksums across 279 resolved components, including build plugins, POM/module metadata, parent BOMs and artifacts. BOM metadata is not an assertion that every managed library ships at runtime.
+The API uses Gradle 8.14.3 and JDK 21. The committed `services/api/gradle.lockfile` records 131 exact compile/runtime/test/tooling module versions. `gradle/verification-metadata.xml` records 518 SHA-256 checksums across 280 resolved components, including build plugins, POM/module metadata, parent BOMs and artifacts. BOM metadata is not an assertion that every managed library ships at runtime.
 
 All resolvable project configurations use Gradle strict dependency locking. API CI, PostgreSQL tests, Docker compilation and unsigned candidate compilation explicitly use strict dependency verification. There are no blanket trusted-artifact rules, ignored checksum exceptions or fallback to lenient/off verification. CI validates coverage and policy and never regenerates the approved files. Missing lock state, changed resolution, unlisted artifacts and wrong artifact/metadata bytes must fail.
 
@@ -22,6 +22,7 @@ The initial #90 baseline (132 modules / 519 hashes) was refreshed by the mainten
    ```
 
 3. Review coordinate/version changes and each new checksum against the intended upstream artifact/repository. Generating metadata is not approval. Do not add wildcard trust or switch verification off to clear a failure.
-4. Commit both generated files. Run the evidence validator, negative probes, API/PostgreSQL, real Docker build, unsigned candidate byte-equality packaging and the full integration gate. An unchanged library version with different bytes needs investigation.
+4. Verify a clean pinned Docker build as well as the host build: warm caches can omit metadata variants from checksum generation. Retain already accepted exact hashes only with provenance and actual strict cold-build verification; a missing or changed checksum must not be silently trusted.
+5. Commit both generated files. Run the evidence validator, negative probes, API/PostgreSQL, real Docker build, unsigned candidate byte-equality packaging and the full integration gate. An unchanged library version with different bytes needs investigation.
 
 Gradle user guidance: [locking](https://docs.gradle.org/current/userguide/dependency_locking.html) and [verification](https://docs.gradle.org/current/userguide/dependency_verification.html). Remaining P6 work includes independent dependency/license review, JVM/container vulnerability scanning and release-level SBOM/provenance/signatures. Physical Apple, ARM/native distribution and rollback acceptance remain separate.
