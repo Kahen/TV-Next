@@ -7,6 +7,11 @@ struct NativeOfflineSection: View {
     @State private var name = ""
     @State private var pendingDeletion: NativeOfflineMediaEntry?
 
+    private var storageUsage: String {
+        let used = downloads.entries.reduce(Int64(0)) { $0 + $1.bytes }
+        return "已保存 \(downloads.entries.count) / 20 个文件 · \(ByteCountFormatter.string(fromByteCount: used, countStyle: .file)) / 2 GiB"
+    }
+
     var body: some View {
         GroupBox("离线媒体") {
             VStack(alignment: .leading, spacing: 12) {
@@ -31,7 +36,7 @@ struct NativeOfflineSection: View {
                     Button("取消下载") { downloads.cancel() }.accessibilityIdentifier("offline-cancel")
                 }
                 if let error = downloads.error { Text(error).font(.caption).foregroundStyle(.red).accessibilityIdentifier("offline-error") }
-                Text("已保存 \(downloads.entries.count) / 20 个文件 · \(ByteCountFormatter.string(fromByteCount: downloads.entries.reduce(Int64(0)) { $0 + $1.bytes }, countStyle: .file)) / 2 GiB")
+                Text(storageUsage)
                     .font(.caption).foregroundStyle(.secondary)
                     .accessibilityIdentifier("offline-storage-usage")
                 ForEach(downloads.entries) { entry in
