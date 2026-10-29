@@ -59,6 +59,19 @@ final class NativeDanmakuOptionsTests: XCTestCase {
         XCTAssertEqual(DanmakuOptionsStore.load(from: defaults), DanmakuOptions())
     }
 
+    func testBlockedWordsAreTruncatedOnScalarBoundary() {
+        let long = String(repeating: "剧", count: 2_000)
+        let bounded = DanmakuOptionsStore.boundedBlocked(long)
+        XCTAssertEqual(bounded.utf8.count, 4_095)
+        XCTAssertFalse(bounded.contains("�"))
+        var options = DanmakuOptions()
+        options.blocked = bounded
+        let (defaults, name) = isolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: name) }
+        XCTAssertTrue(DanmakuOptionsStore.save(options, to: defaults))
+        XCTAssertEqual(DanmakuOptionsStore.load(from: defaults).blocked, bounded)
+    }
+
     func testClearAndSuiteIsolation() {
         let (first, firstName) = isolatedDefaults()
         let (second, secondName) = isolatedDefaults()
