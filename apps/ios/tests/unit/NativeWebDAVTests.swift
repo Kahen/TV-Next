@@ -88,6 +88,22 @@ final class NativeWebDAVTests: XCTestCase {
         XCTAssertTrue(NativeWebDAV.visibleEntries(entries, search: "not-found", mediaOnly: false).isEmpty)
     }
 
+    func testBreadcrumbsAreCanonicalRootBoundedAndDepthLimited() throws {
+        let root = try NativeWebDAV.rootURL("https://example.test/dav")
+        let folder = root.appendingPathComponent("Season 1", isDirectory: true)
+        let episode = folder.appendingPathComponent("Episode 2", isDirectory: true)
+        XCTAssertEqual(NativeWebDAV.navigationPath(root: root, folder: root), [root])
+        XCTAssertEqual(NativeWebDAV.navigationPath(root: root, folder: episode), [root, folder, episode])
+        XCTAssertTrue(NativeWebDAV.navigationPath(root: root, folder: URL(string: "https://evil.test/dav/")!).isEmpty)
+        XCTAssertTrue(NativeWebDAV.navigationPath(root: root, folder: URL(string: "https://example.test/dav2/")!).isEmpty)
+        XCTAssertTrue(NativeWebDAV.navigationPath(root: root, folder: root.appendingPathComponent("file.mp4")).isEmpty)
+        var deep = root
+        for index in 0..<32 { deep.appendPathComponent("d\(index)", isDirectory: true) }
+        XCTAssertEqual(NativeWebDAV.navigationPath(root: root, folder: deep).count, 33)
+        deep.appendPathComponent("too-deep", isDirectory: true)
+        XCTAssertTrue(NativeWebDAV.navigationPath(root: root, folder: deep).isEmpty)
+    }
+
     func testCredentialPolicyAndInvalidResponses() throws {
         let root = try NativeWebDAV.rootURL("https://example.test/dav")
         XCTAssertEqual(try NativeWebDAV.authorization(username: "alice", password: "pw", root: root), "Basic YWxpY2U6cHc=")
