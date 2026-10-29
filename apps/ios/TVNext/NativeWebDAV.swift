@@ -242,7 +242,11 @@ private final class WebDAVBoundedTransport: NSObject, URLSessionDataDelegate, @u
                     willPerformHTTPRedirection response: HTTPURLResponse,
                     newRequest request: URLRequest,
                     completionHandler: @escaping (URLRequest?) -> Void) {
+        // URLSession is allowed to finish a denied redirect without calling
+        // didReceive(response:). Preserve the original 3xx status in either
+        // callback ordering instead of surfacing a misleading invalidResponse.
         completionHandler(nil)
+        finish(.failure(NativeWebDAVError.httpStatus(response.statusCode)))
     }
 }
 
