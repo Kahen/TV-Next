@@ -6,6 +6,10 @@ on:
       - '.github/workflows/release-candidate.yml'
       - 'scripts/package_candidate.py'
       - 'scripts/test_package_candidate.py'
+      - 'services/api/build.gradle.kts'
+      - 'services/api/gradle.lockfile'
+      - 'services/api/gradle/verification-metadata.xml'
+      - 'services/api/Dockerfile'
   workflow_dispatch:
     inputs:
       version:
@@ -69,7 +73,7 @@ jobs:
           npm --prefix apps/web audit --audit-level=moderate --json > apps/web/npm-audit.json
           npm --prefix apps/web sbom --sbom-format cyclonedx > apps/web/sbom-web.cdx.json
           npm --prefix apps/web run build
-          gradle -p services/api bootJar --no-daemon "-PreleaseVersion=${TVNEXT_CANDIDATE_VERSION#v}"
+          gradle -p services/api bootJar --dependency-verification strict --no-daemon "-PreleaseVersion=${TVNEXT_CANDIDATE_VERSION#v}"
       - name: Build and archive native Linux images
         run: |
           set -euo pipefail
