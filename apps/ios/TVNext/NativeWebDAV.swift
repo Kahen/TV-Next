@@ -144,6 +144,17 @@ enum NativeWebDAV {
         return ["mp4", "m4v", "mov", "m3u8", "mp3", "m4a", "aac", "ts"].contains(item.url.pathExtension.lowercased())
     }
 
+    /// Filter only the already validated Depth:1 listing. Keep folders visible
+    /// in media-only mode so users can still navigate to playable files.
+    /// Search is local, never interpolated into URLs, headers or PROPFIND XML.
+    static func visibleEntries(_ entries: [NativeWebDAVItem], search: String, mediaOnly: Bool) -> [NativeWebDAVItem] {
+        let term = search.trimmingCharacters(in: .whitespacesAndNewlines)
+        return entries.filter { item in
+            (!mediaOnly || item.isDirectory || playable(item)) &&
+            (term.isEmpty || item.name.localizedCaseInsensitiveContains(term))
+        }
+    }
+
     static func list(root: URL, folder: URL, username: String, password: String) async throws -> [NativeWebDAVItem] {
         guard contains(folder, root: root) else { throw NativeWebDAVError.invalidFolder }
         let auth = try authorization(username: username, password: password, root: root)
