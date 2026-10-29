@@ -67,7 +67,7 @@ final class NativeWebDAVTests: XCTestCase {
         </d:multistatus>
         """
         let entries = try NativeWebDAV.parse(Data(mixed.utf8), root: root, folder: folder)
-        XCTAssertEqual(entries.map(\\.name), ["Folder", "Good.mp4", "Nested.mp4", "Spoofed.mp4"])
+        XCTAssertEqual(entries.map(\.name), ["Folder", "Good.mp4", "Nested.mp4", "Spoofed.mp4"])
         XCTAssertTrue(entries[0].isDirectory)
         XCTAssertTrue(entries.dropFirst().allSatisfy { !$0.isDirectory })
     }
