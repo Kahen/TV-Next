@@ -60,16 +60,24 @@ class Handler(BaseHTTPRequestHandler):
             except (BrokenPipeError, ConnectionResetError):
                 pass
         elif self.path == '/dav/large-streamed/':
-            # No Content-Length: exercise the actual incremental byte limit.
+            # Explicit HTTP/1.1 chunked framing exercises an unknown-length
+            # transfer without relying on platform-specific EOF behavior.
+            # Send 16 exact 64-KiB chunks plus one overflow byte.
+            self.protocol_version = 'HTTP/1.1'
             self.send_response(207)
             self.send_header('Content-Type', 'application/xml')
+            self.send_header('Transfer-Encoding', 'chunked')
             self.send_header('Connection', 'close')
             self.close_connection = True
             self.end_headers()
             try:
-                self.wfile.write(b'x' * 1_048_577)
+                for chunk in ([b'x' * 65_536] * 16 + [b'x']):
+                    self.wfile.write(f'{len(chunk):X}\r\n'.encode('ascii'))
+                    self.wfile.write(chunk + b'\r\n')
+                    self.wfile.flush()
+                self.wfile.write(b'0\r\n\r\n')
             except (BrokenPipeError, ConnectionResetError):
-                pass  # Expected when the bounded client cancels its transfer.
+                pass  # Expected when the bounded client cancels the transfer.
         elif self.path in ('/dav/unauthorized/', '/dav/forbidden/', '/dav/ok-not-multistatus/', '/dav/empty-multistatus/'):
             status = {
                 '/dav/unauthorized/': 401,
