@@ -39,7 +39,11 @@ final class NativeDanmakuPreferencesUITests: XCTestCase {
         openDanmakuSettings()
         let status = app.staticTexts["danmaku-enabled-status"]
         XCTAssertTrue(status.waitForExistence(timeout: 10))
-        if status.label != "弹幕已关闭" { tapEnabledAction() }
+        // Establish the known enabled baseline even if another test left a
+        // device-local preference behind, then prove a real write to disabled.
+        if status.label != "弹幕已开启" { tapEnabledAction() }
+        expectEnabled(true)
+        tapEnabledAction()
         expectEnabled(false)
 
         app.terminate()
