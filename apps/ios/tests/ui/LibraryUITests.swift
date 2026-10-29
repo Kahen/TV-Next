@@ -1,9 +1,11 @@
+import UIKit
 import XCTest
 
 /// Exercises production views, persistence and navigation; no seeded library or test-only app routes.
 @MainActor
 final class LibraryUITests: XCTestCase {
     private var app: XCUIApplication!
+    private var currentSection = "媒体库"
 
     override func setUp() async throws {
         continueAfterFailure = false
@@ -34,29 +36,66 @@ final class LibraryUITests: XCTestCase {
         destination.tap()
         let dismissed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: destination)
         XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 5), .completed, "Navigation menu did not dismiss")
+        currentSection = name
     }
 
     private func reveal(_ element: XCUIElement) {
-        // Menu dismissal and ScrollViewReader animation settle after the action returns.
-        let reachable = NSPredicate(format: "hittable == true")
-        if XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: reachable, object: element)], timeout: 3) == .completed { return }
-        for _ in 0..<8 {
-            // Offscreen children may be absent from a SwiftUI accessibility
-            // snapshot. Reading frame/identifier first throws before scrolling.
-            guard element.exists else { app.swipeUp(); continue }
-            if element.isHittable { return }
-            print("Reveal target \(element.identifier): exists=\(element.exists) frame=\(element.frame)")
-            let frame = element.frame
-            if frame.maxY < app.windows.firstMatch.frame.minY + 100 {
-                app.swipeDown()
-            } else {
-                app.swipeUp()
+        // XCTest can throw while evaluating hittability for a SwiftUI child
+        // outside the viewport. Check existence and safe geometry first, also
+        // inside waits; a hittable-only predicate bypasses that protection.
+        func visibleViewport() -> CGRect {
+            // AVKit may insert an empty auxiliary window ahead of the main
+            // window. Using firstMatch made drag distances zero after playback.
+            var bounds = app.frame
+            if bounds.isEmpty || bounds.isInfinite {
+                bounds = app.windows.allElementsBoundByIndex.map(\.frame)
+                    .filter { !$0.isEmpty && !$0.isInfinite }
+                    .max { $0.width * $0.height < $1.width * $1.height } ?? .zero
             }
+            if bounds.isEmpty || bounds.isInfinite {
+                // The test runner shares the simulator's UIKit screen. Keep a
+                // nonzero point-space fallback if AX publishes no window frame.
+                let screen = UIScreen.main.bounds
+                let landscape = XCUIDevice.shared.orientation == .landscapeLeft || XCUIDevice.shared.orientation == .landscapeRight
+                bounds = CGRect(x: 0, y: 0,
+                    width: landscape ? max(screen.width, screen.height) : min(screen.width, screen.height),
+                    height: landscape ? min(screen.width, screen.height) : max(screen.width, screen.height))
+            }
+            return bounds.insetBy(dx: 8, dy: 90)
         }
-        if XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: reachable, object: element)], timeout: 2) == .completed { return }
-        guard element.exists else { XCTFail("Target absent after bounded scrolling: \(app.debugDescription)"); return }
-        if !element.isHittable { print("Unreachable element: \(element.debugDescription)\n\(app.debugDescription)") }
-        XCTAssertTrue(element.isHittable)
+        func visible() -> Bool {
+            guard element.exists else { return false }
+            let frame = element.frame
+            let viewport = visibleViewport()
+            return !frame.isEmpty && !frame.isInfinite && viewport.contains(frame)
+        }
+        let reachable = NSPredicate { _, _ in visible() && element.isHittable }
+        if XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: reachable, object: element)], timeout: 3) == .completed { return }
+        var resetToSection = false
+        for _ in 0..<12 {
+            guard element.exists else {
+                if !resetToSection { jump(currentSection); resetToSection = true }
+                else { app.swipeUp() }
+                continue
+            }
+            let frame = element.frame
+            let viewport = visibleViewport()
+            guard !viewport.isEmpty else { app.activate(); continue }
+            if visible() && element.isHittable { return }
+            print("Reveal frame=\(frame), viewport=\(viewport)")
+            // Short controlled drags avoid oscillating past a control when its
+            // layout moves after keyboard dismissal or a validation message.
+            let amount: CGFloat
+            if !frame.isEmpty && frame.minY < viewport.minY {
+                amount = min(viewport.minY - frame.minY + 30, viewport.height * 0.25)
+            } else {
+                amount = -min(max(30, frame.maxY - viewport.maxY + 30), viewport.height * 0.25)
+            }
+            let origin = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            origin.press(forDuration: 0.05, thenDragTo: origin.withOffset(CGVector(dx: 0, dy: amount)))
+        }
+        let reached = XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: reachable, object: element)], timeout: 2) == .completed
+        XCTAssertTrue(reached, "Target was not visible and hittable after bounded scrolling")
     }
 
     private func enter(_ element: XCUIElement, _ text: String) {

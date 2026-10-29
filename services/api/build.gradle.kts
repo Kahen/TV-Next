@@ -1,13 +1,17 @@
 plugins {
     kotlin("jvm") version "2.2.20"
     kotlin("plugin.spring") version "2.2.20"
-    id("org.springframework.boot") version "3.5.6"
+    id("org.springframework.boot") version "3.5.16"
     id("io.spring.dependency-management") version "1.1.7"
 }
 group = "dev.tvnext"
 version = providers.gradleProperty("releaseVersion").getOrElse("0.1.0-SNAPSHOT")
 java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
 repositories { mavenCentral() }
+// Keep the Jakarta EE 10 / Logback 1.5 maintenance families while taking
+// vendor security fixes beyond the Spring Boot 3.5.16 managed baseline.
+extra["tomcat.version"] = "10.1.61"
+extra["logback.version"] = "1.5.38"
 // Changes to direct or transitive dependency versions require a reviewed lock update.
 dependencyLocking {
     lockAllConfigurations()
