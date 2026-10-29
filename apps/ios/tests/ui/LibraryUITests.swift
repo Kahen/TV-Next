@@ -143,9 +143,19 @@ final class LibraryUITests: XCTestCase {
         enter(app.textFields["webdav-filter"], "owned")
         XCTAssertTrue(owned.exists, "Case-insensitive local search lost the matching file")
         XCTAssertFalse(folder.exists, "Search should narrow the visible listing")
+        // Draft credentials for another server must not affect this connection.
+        // The original anonymous HTTP fixture would reject newly applied Basic auth.
+        enter(app.textFields["webdav-url"], "https://unconnected.example/dav/")
+        enter(app.textFields["webdav-user"], "unconnected-account")
         let refresh = app.buttons["webdav-refresh"]
         reveal(refresh)
         refresh.tap()
+        let finished = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            refresh.exists && refresh.isEnabled
+        }, object: refresh)
+        XCTAssertEqual(XCTWaiter.wait(for: [finished], timeout: 15), .completed)
+        XCTAssertFalse(app.staticTexts["webdav-error"].waitForExistence(timeout: 2),
+                       "Editing an unconnected form applied credentials to the active server")
         XCTAssertTrue(owned.waitForExistence(timeout: 15))
         XCTAssertFalse(folder.exists, "Refreshing the same folder must preserve its local search")
         let disconnect = app.buttons["webdav-disconnect"]
