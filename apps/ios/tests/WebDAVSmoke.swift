@@ -20,6 +20,7 @@ import Foundation
         """
         let items = try NativeWebDAV.parse(Data(xml.utf8), root: root, folder: folder)
         precondition(items.map(\.name) == ["Sub", "Owned Film.mp4"], "Unexpected children: \(items)")
+        precondition(items[0].url.absoluteString == "https://media.example/dav/Movies/Sub/")
         precondition(!NativeWebDAV.playable(items[0]) && NativeWebDAV.playable(items[1]))
         precondition(NativeWebDAV.contains(folder, root: root))
         precondition(!NativeWebDAV.contains(URL(string: "https://media.example/dav2")!, root: root))
@@ -109,6 +110,22 @@ import Foundation
         precondition(NativeWebDAV.visibleEntries(mixedFiles, search: "missing", mediaOnly: false).isEmpty)
         precondition(NativeWebDAV.visibleEntries(mixedFiles, search: "readme", mediaOnly: true).isEmpty)
         precondition(NativeWebDAV.visibleEntries(mixedFiles, search: "readme", mediaOnly: false).map(\.name) == ["readme.txt"])
-        print("Native WebDAV bounded listing, local filtering and RFC 4918 status smoke passed")
+        let season = root.appendingPathComponent("Season", isDirectory: true)
+        let episode = season.appendingPathComponent("Episode 1", isDirectory: true)
+        precondition(NativeWebDAV.navigationPath(root: root, folder: episode) == [root, season, episode])
+        precondition(NativeWebDAV.navigationPath(root: root, folder: root) == [root])
+        let aliasRoot = URL(string: "https://MEDIA.EXAMPLE:443/dav/")!
+        let aliasEpisode = URL(string: "https://MEDIA.EXAMPLE:443/dav/Season/Episode%201/")!
+        precondition(NativeWebDAV.navigationPath(root: root, folder: aliasRoot) == [root])
+        let normalized = NativeWebDAV.navigationPath(root: root, folder: aliasEpisode)
+        precondition(normalized.count == 3 && normalized.first == root)
+        precondition(NativeWebDAV.navigationPath(root: root, folder: URL(string: "https://foreign.example/dav/")!).isEmpty)
+        precondition(NativeWebDAV.navigationPath(root: root, folder: URL(string: "https://media.example/dav2/")!).isEmpty)
+        var deep = root
+        for index in 0..<32 { deep.appendPathComponent("d\(index)", isDirectory: true) }
+        precondition(NativeWebDAV.navigationPath(root: root, folder: deep).count == 33)
+        deep.appendPathComponent("overflow", isDirectory: true)
+        precondition(NativeWebDAV.navigationPath(root: root, folder: deep).isEmpty)
+        print("Native WebDAV bounded listing, local filtering, bounded breadcrumbs and RFC 4918 status smoke passed")
     }
 }

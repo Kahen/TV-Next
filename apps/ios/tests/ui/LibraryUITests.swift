@@ -148,6 +148,24 @@ final class LibraryUITests: XCTestCase {
         XCTAssertFalse(refresh.exists)
     }
 
+    func testWebDAVBreadcrumbReturnsToRootUsingOwnedFixture() {
+        jump("WebDAV 文件")
+        enter(app.textFields["webdav-url"], "http://127.0.0.1:8767/dav/")
+        let connect = app.buttons["webdav-connect"]
+        reveal(connect)
+        connect.tap()
+        let folder = app.buttons["Folder"]
+        XCTAssertTrue(folder.waitForExistence(timeout: 15))
+        reveal(folder)
+        folder.tap()
+        let rootShortcut = app.buttons["webdav-root"]
+        XCTAssertTrue(rootShortcut.waitForExistence(timeout: 15), "Nested WebDAV folder has no root breadcrumb")
+        reveal(rootShortcut)
+        rootShortcut.tap()
+        XCTAssertTrue(app.buttons["Owned.mp4"].waitForExistence(timeout: 15), "Root listing did not return")
+        XCTAssertFalse(app.buttons["webdav-root"].exists, "Root must not show a redundant ancestor shortcut")
+    }
+
     func testInlineSeekControlsArePresentAndDisabledWithoutMedia() {
         jump("播放器")
         let back = app.buttons["seek-back-15"]

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Owned, localhost-only RFC 4918 fixture for native WebDAV CI."""
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from time import sleep
 
 XML = b'''<?xml version="1.0" encoding="utf-8"?>
 <d:multistatus xmlns:d="DAV:">
@@ -12,6 +13,20 @@ XML = b'''<?xml version="1.0" encoding="utf-8"?>
 
 class Handler(BaseHTTPRequestHandler):
     def do_PROPFIND(self):
+        # Consume the entity before replying/closing. Closing a TCP connection
+        # with unread request bytes can send RST; CFNetwork then loses the last
+        # chunk and reports -1005 instead of exercising the client's byte cap.
+        try:
+            size = int(self.headers.get('Content-Length', '0'))
+        except ValueError:
+            self.send_error(400)
+            return
+        if not 0 <= size <= 4096 or self.headers.get('Transfer-Encoding'):
+            self.send_error(400)
+            return
+        if len(self.rfile.read(size)) != size:
+            self.send_error(400)
+            return
         if self.path == '/dav/':
             if self.headers.get('Depth') != '1':
                 self.send_error(400)
@@ -21,6 +36,16 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header('Content-Length', str(len(XML)))
             self.end_headers()
             self.wfile.write(XML)
+        elif self.path == '/dav/Folder/':
+            body = b'''<?xml version="1.0" encoding="utf-8"?>
+<d:multistatus xmlns:d="DAV:">
+  <d:response><d:href>/dav/Folder/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+</d:multistatus>'''
+            self.send_response(207)
+            self.send_header('Content-Type', 'application/xml; charset=utf-8')
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
         elif self.path == '/dav/redirect/':
             self.send_response(302)
             self.send_header('Location', 'https://foreign.example/dav/')
@@ -50,16 +75,26 @@ class Handler(BaseHTTPRequestHandler):
             except (BrokenPipeError, ConnectionResetError):
                 pass
         elif self.path == '/dav/large-streamed/':
-            # No Content-Length: exercise the actual incremental byte limit.
+            # A valid keep-alive HTTP/1.1 chunked body with no Content-Length.
+            # Pace small chunks so CFNetwork delivers incremental data callbacks
+            # before the final chunk (an immediate close was reported as -1005
+            # instead of reaching the 1 MiB application-level size guard).
+            # Exactly 128 * 8192 + 1 decoded bytes cross the bound.
+            self.protocol_version = 'HTTP/1.1'
             self.send_response(207)
             self.send_header('Content-Type', 'application/xml')
-            self.send_header('Connection', 'close')
-            self.close_connection = True
+            self.send_header('Transfer-Encoding', 'chunked')
             self.end_headers()
             try:
-                self.wfile.write(b'x' * 1_048_577)
+                for chunk in ([b'x' * 8_192] * 128 + [b'x']):
+                    self.wfile.write(f'{len(chunk):X}\r\n'.encode('ascii'))
+                    self.wfile.write(chunk + b'\r\n')
+                    self.wfile.flush()
+                    sleep(0.004)
+                self.wfile.write(b'0\r\n\r\n')
+                self.wfile.flush()
             except (BrokenPipeError, ConnectionResetError):
-                pass  # Expected when the bounded client cancels its transfer.
+                pass  # Expected when the bounded client cancels the transfer.
         elif self.path in ('/dav/unauthorized/', '/dav/forbidden/', '/dav/ok-not-multistatus/', '/dav/empty-multistatus/'):
             status = {
                 '/dav/unauthorized/': 401,

@@ -117,8 +117,14 @@ enum NativeWebDAV {
                   let path = segments(candidate, root: root),
                   path.count == folderSegments.count + 1, path.starts(with: folderSegments),
                   let name = path.last, name.count <= 180 else { continue }
-            let normalized = record.directory && !candidate.path.hasSuffix("/")
-                ? candidate.appendingPathComponent("", isDirectory: true) : candidate
+            // URL.path omits a directory's trailing slash on Darwin. Appending
+            // an empty component there changed an existing /Folder/ href into
+            // /Folder// and broke the next PROPFIND on strict WebDAV servers.
+            guard var components = URLComponents(url: candidate, resolvingAgainstBaseURL: false) else { continue }
+            if record.directory && !components.percentEncodedPath.hasSuffix("/") {
+                components.percentEncodedPath += "/"
+            }
+            guard let normalized = components.url else { continue }
             let item = NativeWebDAVItem(url: normalized, name: name, isDirectory: record.directory)
             unique[item.id] = item
         }
@@ -153,6 +159,31 @@ enum NativeWebDAV {
             (!mediaOnly || item.isDirectory || playable(item)) &&
             (term.isEmpty || item.name.localizedCaseInsensitiveContains(term))
         }
+    }
+
+    /// Return canonical ancestors inside the connected root only. Never derive
+    /// a network destination from a displayed breadcrumb label.
+    /// Limit the depth to avoid constructing unbounded navigation controls.
+    static func navigationPath(root: URL, folder: URL) -> [URL] {
+        guard let rootSegments = segments(root, root: root),
+              contains(folder, root: root),
+              URLComponents(url: folder, resolvingAgainstBaseURL: false)?.percentEncodedPath.hasSuffix("/") == true else { return [] }
+        var path = [folder]
+        var current = folder
+        // Explicit default ports, host casing and equivalent encoded segments
+        // may differ in URL serialization while still identifying this root.
+        for _ in 0...32 {
+            if segments(current, root: root) == rootSegments {
+                path[path.count - 1] = root
+                return Array(path.reversed())
+            }
+            guard path.count <= 32 else { return [] }
+            let parent = current.deletingLastPathComponent()
+            guard parent != current, contains(parent, root: root) else { return [] }
+            path.append(parent)
+            current = parent
+        }
+        return []
     }
 
     static func list(root: URL, folder: URL, username: String, password: String) async throws -> [NativeWebDAVItem] {
