@@ -1,6 +1,6 @@
 # TV-Next roadmap
 
-Updated: 2026-10-28. Current code backlog: [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md). This is a delivery plan, not a claim that every feature exists.
+Updated: 2026-10-29. Current code backlog: [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md). This is a delivery plan, not a claim that every feature exists.
 
 ## Goals and non-goals
 
@@ -31,7 +31,7 @@ Tracking: https://github.com/Kahen/TV-Next/issues/2. Detailed implementation/aut
 - [x] Keyboard/focus/active-view behavior on Web; labeled native controls, section navigation and large-text layout; lifecycle progress save and native background pause.
 - [x] Owned MP4/HLS playback regression on Chromium/Firefox/WebKit; native XCTest and production SwiftUI XCUI workflows for both iPhone/iPad simulators (PR #37 requires a passing final-head gate).
 
-Per explicit user instruction on 2026-10-25, close the implementation issue once code and automated acceptance pass; physical-device/installed-PWA acceptance is independently tracked in [#38](https://github.com/Kahen/TV-Next/issues/38). P1 basic system PiP is implemented; full background-media controls and AirPlay remain P4 implementation tasks (#5).
+Per explicit user instruction on 2026-10-25, close the implementation issue once code and automated acceptance pass; physical-device/installed-PWA acceptance is independently tracked in [#38](https://github.com/Kahen/TV-Next/issues/38). P1 basic system PiP is implemented; P4 adds opt-in background audio/system controls and AirPlay. Physical behavior remains separately tracked.
 
 ## P2 — FongMi core semantics
 
@@ -62,22 +62,33 @@ Tracking: https://github.com/Kahen/TV-Next/issues/4
 
 Acceptance: declared supported plugin fixtures pass on server; never execute remote code in the browser or iOS app. JVM bytecode alone is NOT a promise of Android JAR support.
 
+### Approved owned-JAR contract slice
+
+PR #85 adds an OS-isolated, version-2 harness which actually loads a separately
+compiled, statically preflighted and SHA-256-checked owned JAR through the original
+Spider media signatures. See [PURE_JVM_SPIDER.md](PURE_JVM_SPIDER.md). External
+artifact/dependency approval, representative corpus, live host/API activation,
+controlled egress, Android/DEX and real JS/Python compatibility remain pending.
+This increment does not close P3.
+
 ## P4 — Advanced media features
 
 Tracking: https://github.com/Kahen/TV-Next/issues/5
 
-- [x] External SRT/WebVTT timing offset, bounded ASS/SSA Dialogue text, Web/native danmaku parsers and timeline overlays.
-- [x] Basic native system PiP and AirPlay route picker; playback speed controls and AList/OpenList browsing.
-- [x] Native AVPlayer audio/embedded subtitle selection and bounded per-title audio preferences; per-title subtitle preferences (#60, PR gates passed).
-- [ ] Styled ASS positioning/karaoke/fonts, decoder diagnostics, **automatic** intro/outro skip and broader format support remain. Native iOS manual per-title skip markers are implemented in PR #69 (subject to final CI); see [IOS_INTRO_OUTRO.md](IOS_INTRO_OUTRO.md).
-- [x] Opt-in native background audio and system play/pause/finite-VOD seek/skip metadata controls; see NATIVE_BACKGROUND_PLAYBACK.md for final-head test gates and limits.
-- [ ] Physical background/lock-screen/PiP/AirPlay delivery, quality/codec/energy matrix.
+- [x] External SRT/WebVTT offsets, bounded ASS/SSA dialogue text, Web/native danmaku parsers and overlays.
+- [x] Native PiP/AirPlay, audio/embedded subtitle selection and preferences, opt-in background audio and system media controls.
+- [x] AList/OpenList browsing and bounded native read-only WebDAV with local filtering, refresh, parent/root breadcrumbs and credential revocation.
+- [x] Native per-title manual intro/outro markers and explicit opt-in automatic skipping of those markers; no automatic detection/provider metadata claim.
+- [x] Native foreground offline media-file downloads, persistent completed copies, local playback/deletion and byte/count quotas; see IOS_OFFLINE_MEDIA.md.
+- [x] Native subscription external subtitle resources and stale subtitle/danmaku request invalidation.
+- [x] Read-only native codec/dimensions/audio/buffer/error diagnostics with credential redaction; actual hardware decoder selection is not exposed.
+- [ ] Styled ASS/fonts/karaoke, advanced subtitle matching/headers and provider-supplied/automatic skip detection.
+- [ ] Authorized LAN DLNA and SMB inputs with secure credentials.
+- [ ] HLS/background/resumable/authenticated offline download lifecycle and direct cloud login/QR/OAuth.
 - [ ] Optional transcoding sidecar with measured resource limits.
-- [x] Native iOS read-only WebDAV Depth:1 browsing with optional HTTPS Basic credentials and authenticated relay playback (PR #67); bounded incremental PROPFIND response-size hardening is tracked in #70. RFC 4918 successful propstat/direct href correctness is tracked in #72. Physical/provider verification remains open.
-- [ ] Authorized LAN DLNA discovery/control and SMB inputs with secure credentials; broader WebDAV auth/provider support remains.
-- [ ] Offline cache/download lifecycle and direct cloud login/QR/OAuth.
+- [ ] Physical iPhone/iPad codec, PiP/AirPlay/background, WebDAV/storage and energy acceptance.
 
-Acceptance: device matrix includes iPhone/iPad models, Safari/Chrome/Firefox, and H.264/H.265/AAC compatibility tests.
+Acceptance: device matrix includes iPhone/iPad models, Safari/Chrome/Firefox, and H.264/H.265/AAC compatibility tests. Automated simulator/owned-fixture success remains distinct from physical acceptance.
 
 ## P5 — Multi-device + home server
 
@@ -98,7 +109,8 @@ Tracking: https://github.com/Kahen/TV-Next/issues/7
 
 - [ ] Additional provider formats/legacy quirks; explicit compatibility status per module
 - [ ] Security reviews: sandbox escapes, SSRF, XSS, content injection, auth, supply chain
-- [ ] Automated dependency audits, license attribution and source disclosure
+- [x] Web npm audit/SBOM, immutable Action/image input pins, gated unsigned Web/API/Linux amd64 candidate bundles with matching source and checksums.
+- [ ] Remaining JVM/container/license/SBOM/provenance audit, signed artifacts and source/notice review
 - [ ] Native signing, TestFlight, App Store policy review; no promise of approval
 - [ ] Versioned REST contract, migration plan and release channels
 - [ ] macOS/tvOS investigation when stable (not required for initial release)

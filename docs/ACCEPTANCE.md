@@ -14,15 +14,18 @@
 
 ## Phase evidence
 
-| Phase | Completion gate | Current blocker |
+| Phase | Completion gate | Current remaining work |
 | --- | --- | --- |
-| P0 | Clean checkout, Docker smoke, API/Web/iOS build | GitHub Linux Docker Compose smoke verified; independent NAS deployment and Apple real-device behavior not yet verified |
-| P1 | Implementation: persistent library/import/player/UI plus browser E2E and iPhone/iPad simulator tests (PR #37). Physical: separate #38 | Final-head automation must pass to close #2; physical codec/lifecycle/installed-PWA acceptance remains #38 |
-| P2 | Real permitted FongMi corpus: home, category, search, details, episodes, line selection, IPTV XMLTV/EPG; Web and iOS parity | Type 0/1/2/4 source browsing, native guide and feed cache/scheduler implemented; search/filter/actions and bounded timeshift/catchup subset implemented; broader real corpus, track preferences and long-tail compatibility required |
-| P3 | Java/JAR, JS and Python permitted Spider fixtures; isolated runtime; egress deny, crash, quota and timeout tests; Android-specific plugin limits disclosed | Bundled fixed-data Node/Python/Java Docker process harness prototyped; dynamic Java/JAR adapter, real Spider compatibility corpus, runtime integration and security review missing; non-executing JVM bytecode preflight is available but is not security approval |
-| P4 | Real-device codecs, ASS/danmaku, PiP/background, AirPlay/DLNA, SMB/WebDAV, transcoding when claimed | Major advanced modules unimplemented |
-| P5 | Auth, pairing, ACL, backup/restore, TLS, SSRF/DNS rebinding and redirect regression, NAS deployment load test | Auth/sync/remote/NAS core merged in #27; media relay and remaining deployment/security gates required |
-| P6 | Security threat model/review, dependency/SBOM/license audit, reproducible builds, rollback, compatibility matrix, signed iOS/TestFlight path if required | P1–P5 incomplete, Apple signing/equipment and audit evidence unavailable |
+| P1 | Code, browser E2E and native simulator acceptance | Implementation #2 closed; physical Apple/installed-PWA matrix remains #38 |
+| P2 | Source/protocol parity across both clients and a permitted representative corpus | HTTP type 0/1/2/4, filters/search/live replay/EPG and native track preferences implemented; interactive/parser/long-tail/Web gaps and real corpus remain #3 |
+| P3 | Real supported Spider adapters, isolated runtime/egress and approved corpus | Fixture workers and optional Android bridge are implemented; actual Android/JVM/JS/Python plugin compatibility and independent review remain #4/#45 |
+| P4 | Advanced native media, network inputs/download/transcoding and device matrix | Native captions/tracks/PiP/background/AirPlay/WebDAV/markers/file downloads implemented; remaining styled ASS, SMB/DLNA, HLS/offline/cloud/transcoding and physical acceptance remain #5/#38 |
+| P5 | ACL/egress/sync/restore plus actual NAS and remote-network assessment | Account/relay/cache/sync/remote/NAS automated paths implemented; remote operational/security acceptance remains #6 |
+| P6 | Audited reproducible signed artifacts, rollback, compatibility and Apple distribution | Web audit/SBOM, immutable inputs and unsigned candidate packaging implemented; JVM/container/license/provenance/performance/rollback/signing and resource gates remain #7 |
+
+See [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) for the complete current
+inventory and PR evidence. Dated ledger entries below describe their own historical
+snapshots and must not be read as the present implementation backlog.
 
 ## Release hold
 
