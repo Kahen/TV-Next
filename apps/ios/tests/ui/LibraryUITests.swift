@@ -1,3 +1,4 @@
+import UIKit
 import XCTest
 
 /// Exercises production views, persistence and navigation; no seeded library or test-only app routes.
@@ -50,6 +51,15 @@ final class LibraryUITests: XCTestCase {
                 bounds = app.windows.allElementsBoundByIndex.map(\.frame)
                     .filter { !$0.isEmpty && !$0.isInfinite }
                     .max { $0.width * $0.height < $1.width * $1.height } ?? .zero
+            }
+            if bounds.isEmpty || bounds.isInfinite {
+                // The test runner shares the simulator's UIKit screen. Keep a
+                // nonzero point-space fallback if AX publishes no window frame.
+                let screen = UIScreen.main.bounds
+                let landscape = XCUIDevice.shared.orientation == .landscapeLeft || XCUIDevice.shared.orientation == .landscapeRight
+                bounds = CGRect(x: 0, y: 0,
+                    width: landscape ? max(screen.width, screen.height) : min(screen.width, screen.height),
+                    height: landscape ? min(screen.width, screen.height) : max(screen.width, screen.height))
             }
             return bounds.insetBy(dx: 8, dy: 90)
         }
