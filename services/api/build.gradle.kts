@@ -37,3 +37,11 @@ tasks.withType<org.gradle.api.tasks.bundling.AbstractArchiveTask>().configureEac
     isPreserveFileTimestamps = false
     isReproducibleFileOrder = true
 }
+
+// This service is launched with `java -jar`, not the jarmode extractor.
+// Spring Boot otherwise injects spring-boot-jarmode-tools into BOOT-INF/lib
+// outside the reviewed Gradle runtime resolution/checksum baseline.
+// Exclude that unused executable tool instead of silently whitelisting it.
+tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
+    includeTools.set(false)
+}
