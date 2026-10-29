@@ -1,9 +1,10 @@
 import Foundation
 
-/// Explicit, user-created boundaries. No provider inference or automatic skipping.
+/// Explicit, user-created boundaries. No provider inference.
 struct NativeIntroOutroMarkers: Codable, Equatable {
     var introEnd: Double?
     var outroStart: Double?
+    var automatic: Bool?
 
     func isValid(duration: Double) -> Bool {
         guard duration.isFinite, duration >= 120, duration < 604_800 else { return false }
@@ -20,12 +21,12 @@ struct NativeIntroOutroMarkers: Codable, Equatable {
     }
 
     func settingIntro(_ time: Double, duration: Double) -> NativeIntroOutroMarkers? {
-        let candidate = NativeIntroOutroMarkers(introEnd: time, outroStart: outroStart)
+        let candidate = NativeIntroOutroMarkers(introEnd: time, outroStart: outroStart, automatic: automatic)
         return candidate.isValid(duration: duration) ? candidate : nil
     }
 
     func settingOutro(_ time: Double, duration: Double) -> NativeIntroOutroMarkers? {
-        let candidate = NativeIntroOutroMarkers(introEnd: introEnd, outroStart: time)
+        let candidate = NativeIntroOutroMarkers(introEnd: introEnd, outroStart: time, automatic: automatic)
         return candidate.isValid(duration: duration) ? candidate : nil
     }
 
@@ -39,6 +40,39 @@ struct NativeIntroOutroMarkers: Codable, Equatable {
         guard isValid(duration: duration), let outroStart,
               current.isFinite, current >= outroStart, current < duration - 1 else { return nil }
         return duration - 1
+    }
+}
+
+/// At most one intro and one outro seek per playback. Discontinuous position
+/// changes are treated as explicit seeking, so rewatching a marked section does
+/// not trap the user in an automatic seek loop. Paused playback never seeks.
+struct NativeAutomaticSkipState {
+    private var introSkipped = false
+    private var outroSkipped = false
+    private var previousTime: Double?
+
+    mutating func target(markers: NativeIntroOutroMarkers, current: Double,
+                         duration: Double, playing: Bool) -> Double? {
+        guard markers.automatic == true, markers.isValid(duration: duration),
+              current.isFinite, current >= 0, current <= duration else { return nil }
+        let previous = previousTime
+        previousTime = current
+        guard playing else { return nil }
+        if let previous, abs(current - previous) > 3 {
+            if let intro = markers.introEnd, current < intro { introSkipped = true }
+            if let outro = markers.outroStart, current >= outro { outroSkipped = true }
+            return nil
+        }
+        if !introSkipped, let target = markers.introTarget(current: current, duration: duration) {
+            introSkipped = true
+            return target
+        }
+        if !outroSkipped, let previous, let outro = markers.outroStart,
+           previous < outro, let target = markers.outroTarget(current: current, duration: duration) {
+            outroSkipped = true
+            return target
+        }
+        return nil
     }
 }
 

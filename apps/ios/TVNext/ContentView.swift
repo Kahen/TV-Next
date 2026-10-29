@@ -16,6 +16,7 @@ struct ContentView: View {
     @State private var scrollDestination: String?
     @State private var navigationRequest = UUID()
     @StateObject private var library = MediaLibraryStore()
+    @StateObject private var offline = NativeOfflineDownloads()
     @StateObject private var remote = NativeRemoteControl()
     @AppStorage("tv-next-api-url") private var serverURL = "http://localhost:8080"
     @State private var homeSession: NativeHomeSession?
@@ -74,6 +75,7 @@ struct ContentView: View {
                     playerSection.id("player")
                     quickPlaySection.id("quick-play")
                     localMediaSection.id("local-media")
+                    NativeOfflineSection(downloads: offline, library: library).id("offline")
                     importSection.id("import")
                     HomeServerSection(serverURL:$serverURL,library:library,onSessionChange:{ homeSession=$0;remote.configure($0,server:$1);library.configureRelay(server:$1,session:$0) },remoteState:remote.state).id("home-server")
                     EpgSection(serverURL:serverURL,session:homeSession,channels:library.channels,playbackGeneration:library.playbackGeneration) { library.play($0) }
@@ -117,6 +119,7 @@ struct ContentView: View {
                         Button("播放器") { navigate(to: "player") }
                         Button("快速播放") { navigate(to: "quick-play") }
                         Button("本机文件与字幕") { navigate(to: "local-media") }
+                        Button("离线媒体") { navigate(to: "offline") }
                         Button("导入播放列表") { navigate(to: "import") }
                         Button("JSON 配置") { navigate(to: "config") }
                         Button("TVBox 订阅") { navigate(to: "subscription") }
@@ -150,6 +153,7 @@ struct ContentView: View {
             .onChange(of: scenePhase) { _, phase in
                 if phase == .inactive { library.savePosition() }
                 if phase == .background {
+                    offline.cancel()
                     mediaGeneration = UUID()
                     isLoadingMedia = false
                     library.setApplicationBackground(true)

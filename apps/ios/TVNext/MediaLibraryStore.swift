@@ -346,6 +346,7 @@ final class MediaLibraryStore: ObservableObject {
     private let defaults: UserDefaults
     private let introOutroStore: NativeIntroOutroMarkerStore
     @Published private(set) var introOutroMarkers: NativeIntroOutroMarkers?
+    private var automaticSkipState = NativeAutomaticSkipState()
     private var timeObserver: Any?
     private var statusObservation: NSKeyValueObservation?
     private var durationObservation: NSKeyValueObservation?
@@ -398,7 +399,10 @@ final class MediaLibraryStore: ObservableObject {
             Task { @MainActor [weak self] in self?.updateSystemMetadata() }
         }
         mediaTimeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 1, preferredTimescale: 600), queue: .main) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.updateSystemMetadata() }
+            Task { @MainActor [weak self] in
+                self?.tickAutomaticSkip()
+                self?.updateSystemMetadata()
+            }
         }
         let center = NotificationCenter.default
         audioObservers.append(center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] note in
@@ -523,6 +527,7 @@ final class MediaLibraryStore: ObservableObject {
         durationObservation?.invalidate()
         current = channel
         introOutroMarkers = nil
+        automaticSkipState = NativeAutomaticSkipState()
         recent.removeAll { $0.url == channel.url }
         var history=channel;history.replay=nil
         recent.insert(history, at: 0)
@@ -591,6 +596,7 @@ final class MediaLibraryStore: ObservableObject {
         localFileName = name
         current = nil
         introOutroMarkers = nil
+        automaticSkipState = NativeAutomaticSkipState()
         clearCaptions()
         statusObservation?.invalidate()
         durationObservation?.invalidate()
@@ -602,6 +608,22 @@ final class MediaLibraryStore: ObservableObject {
         player.playImmediately(atRate: playbackSpeed)
         activateSystemControls()
         // Local sandbox files are intentionally NOT added to persistent library/history.
+    }
+
+    /// Deleting an offline copy must first release its active AVPlayerItem.
+    func stopLocalFile(_ file: URL) {
+        guard currentLocalFile == file else { return }
+        playbackGeneration += 1
+        player.pause()
+        player.replaceCurrentItem(with: nil)
+        resetMediaSelections()
+        statusObservation?.invalidate()
+        durationObservation?.invalidate()
+        currentLocalFile = nil
+        localFileName = nil
+        clearCaptions()
+        playbackError = nil
+        mediaControls?.invalidate()
     }
 
     /// Status callbacks may arrive after another selection, clear or relay cancellation.
@@ -650,8 +672,8 @@ final class MediaLibraryStore: ObservableObject {
         introOutroMarkers = introOutroStore.markers(for: digest, duration: duration)
     }
 
-    /// Markers are only available for a ready, finite remote VOD. They never
-    /// run automatically or attach to local files, live or replay sessions.
+    /// Markers are only available for a ready, finite remote VOD.
+    /// They do not attach to local files, live or replay sessions.
     private func introOutroContext() -> (digest: String, duration: Double, time: Double)? {
         guard let digest = mediaPreferenceKey(),
               let item = player.currentItem, item.status == .readyToPlay,
@@ -701,6 +723,22 @@ final class MediaLibraryStore: ObservableObject {
         guard let digest = mediaPreferenceKey() else { return }
         introOutroStore.remove(digest: digest)
         introOutroMarkers = nil
+        automaticSkipState = NativeAutomaticSkipState()
+    }
+
+    func setAutomaticSkipEnabled(_ enabled: Bool) {
+        guard let context = introOutroContext(), var markers = introOutroMarkers else { return }
+        markers.automatic = enabled
+        guard introOutroStore.save(markers, digest: context.digest, duration: context.duration) else { return }
+        introOutroMarkers = markers
+        automaticSkipState = NativeAutomaticSkipState()
+    }
+
+    private func tickAutomaticSkip() {
+        guard let context = introOutroContext(), let markers = introOutroMarkers,
+              let target = automaticSkipState.target(markers: markers, current: context.time,
+                  duration: context.duration, playing: player.timeControlStatus == .playing) else { return }
+        _ = handleSystemPlaybackCommand(.seek(target))
     }
 
     func retryPlayback() {
