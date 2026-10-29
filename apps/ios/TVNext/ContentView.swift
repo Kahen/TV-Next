@@ -27,6 +27,8 @@ struct ContentView: View {
     @State private var remoteDanmaku: [NativePlaybackResource] = []
     @State private var remoteSubtitles: [NativePlaybackResource] = []
     @State private var remoteResourceGeneration: Int?
+    @State private var remoteDanmakuRequest = UUID()
+    @State private var remoteDanmakuTask: Task<Void, Never>?
     @State private var choosingDanmaku = false
     @State private var manualURL = ""
     @State private var quickPlayError: String?
@@ -160,6 +162,8 @@ struct ContentView: View {
                 if phase == .background {
                     offline.cancel()
                     remoteCaptions.cancel()
+                    remoteDanmakuRequest = UUID()
+                    remoteDanmakuTask?.cancel()
                     mediaGeneration = UUID()
                     isLoadingMedia = false
                     library.setApplicationBackground(true)
@@ -246,6 +250,8 @@ struct ContentView: View {
             }
             .onChange(of: library.playbackGeneration) { _, generation in
                 remoteCaptions.cancel()
+                remoteDanmakuRequest = UUID()
+                remoteDanmakuTask?.cancel()
                 captionFileName = nil
                 captionOffsetSeconds = 0
                 danmaku = []
@@ -261,6 +267,7 @@ struct ContentView: View {
                 remote.configure(nil,server:serverURL)
                 library.suspendPlayback()
                 remoteCaptions.cancel()
+                remoteDanmakuTask?.cancel()
             }
             }
         }
@@ -283,13 +290,22 @@ struct ContentView: View {
                 ForEach(remoteDanmaku) { resource in
                     Button("加载 " + resource.name) {
                         let key = library.current?.url
-                        Task { @MainActor in
+                        let generation = library.playbackGeneration
+                        let request = UUID()
+                        remoteDanmakuRequest = request
+                        remoteDanmakuTask?.cancel()
+                        remoteDanmakuTask = Task { @MainActor in
                             do {
                                 guard let url = URL(string: serverURL) else { throw APIError.invalidServer }
                                 let result: NativeTextResponse = try await TVNextAPI(server: url).request("resources/text", body: NativeResourceRequest(url: resource.url))
-                                guard library.current?.url == key else { return }
+                                guard !Task.isCancelled, library.current?.url == key,
+                                      library.playbackGeneration == generation,
+                                      remoteDanmakuRequest == request else { return }
                                 danmaku = try DanmakuParser.parse(result.content)
-                            } catch { errorMessage = error.localizedDescription }
+                            } catch {
+                                if !Task.isCancelled, library.playbackGeneration == generation,
+                                   remoteDanmakuRequest == request { errorMessage = "弹幕加载失败，请重试或选择其他来源。" }
+                            }
                         }
                     }
                 }
@@ -300,7 +316,11 @@ struct ContentView: View {
                 HStack { Text("时长"); Slider(value: $danmakuOptions.duration, in: 4...15, step: 1) }
                 HStack { Text("偏移 \(Int(danmakuOptions.offset)) 秒"); Slider(value: $danmakuOptions.offset, in: -120...120, step: 1) }
                 TextField("屏蔽词，逗号分隔", text: $danmakuOptions.blocked).textFieldStyle(.roundedBorder)
-                Button("清空弹幕") { danmaku = [] }
+                Button("清空弹幕") {
+                    remoteDanmakuRequest = UUID()
+                    remoteDanmakuTask?.cancel()
+                    danmaku = []
+                }
             }
         }
     }
