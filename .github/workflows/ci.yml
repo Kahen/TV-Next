@@ -68,7 +68,10 @@ jobs:
       - name: Inventory exact shipped JVM libraries
         working-directory: .
         run: |
-          jars=(services/api/build/libs/*.jar)
+          jars=()
+          for candidate in services/api/build/libs/*.jar; do
+            if [[ "$candidate" != *-plain.jar ]]; then jars+=("$candidate"); fi
+          done
           test "${#jars[@]}" -eq 1
           python3 scripts/generate_jvm_sbom.py --jar "${jars[0]}" --version 0.1.0-SNAPSHOT --output services/api/build/reports/sbom-api.cdx.json
       - name: Preserve JVM dependency evidence
