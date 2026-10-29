@@ -2,7 +2,7 @@
 
 This is the current code/acceptance inventory. Historical issue comments and older
 milestone ledgers describe their own commits; an unchecked old checkbox is not
-proof that current code is missing. PRs #79–#91 contain the latest implementation increments;
+proof that current code is missing. PRs #79–#93 contain the latest implementation increments;
 only merged changes with passing final-head CI count as delivered on main.
 
 | Phase | Implemented code | Remaining implementation | External acceptance |
@@ -10,9 +10,9 @@ only merged changes with passing final-head CI count as delivered on main.
 | P1 | Web/iOS persistent libraries, imports/export/local files, favorites/history/resume, player controls, PWA shell, real-browser and iPhone/iPad simulator acceptance; #2 closed | No reopened P1 implementation task | Physical Apple devices and installed PWA, #38 |
 | P2 | Source-derived type 0/1/2/4 subscriptions, categories/filters/search/details/lines, bounded cross-site search, HTTP action web subset, live imports/XMLTV.gz scheduling, bounded timeshift/catchup; native AVPlayer audio/subtitle preferences; native subscription external captions in #80 | Interactive login/QR actions, parser/WebView chains, wider replay/provider variants, broader Web track/preference parity | Permitted representative provider corpus and real playback, #3 |
 | P3 | Bundled Java/Node/Python fixture workers and OS-isolation tests; bounded nonexecuting JAR/DEX preflight; administrator-bound Android SpiderTest bridge, five media operations, device auth and Web/iOS capability UI; #85 adds a preflighted/hash-checked owned-JAR loader using original Spider media signatures inside the OS sandbox | External pure-JVM artifact/dependency approval and representative corpus (#45), authorized dispatcher/API activation, real JS/QuickJS/Python adapters, controlled egress and stateful Android sessions/actions/proxy callbacks | Actual ARM Android DEX/native execution, permitted plugin corpus and independent isolation/security review, #4 |
-| P4 | External SRT/VTT/text ASS/SSA, offsets/danmaku; native PiP/AirPlay/audio/subtitle preferences/background controls; AList/OpenList and read-only WebDAV; native manual markers; #79 fixes exact collection hrefs/breadcrumbs; #80 adds opt-in marker auto-skip, offline media files, native subscription captions and stale-resource cancellation; #84 adds offline deletion confirmation/storage usage; #86 adds private read-only codec/buffer/error diagnostics; #89 binds WebDAV requests/playback to immutable connection credentials | Styled ASS/fonts/karaoke, broader subtitle matching/headers, SMB/DLNA, HLS/background/resumable downloads, optional transcoding, direct cloud login/QR/OAuth and automatic skip detection/provider metadata | Physical codec/seek/PiP/AirPlay/background/WebDAV/storage/energy matrix, #5 and #38 |
+| P4 | External SRT/VTT/text ASS/SSA, offsets/danmaku; native PiP/AirPlay/audio/subtitle preferences/background controls; AList/OpenList and read-only WebDAV; native manual markers; #79 fixes exact collection hrefs/breadcrumbs; #80 adds opt-in marker auto-skip, offline media files, native subscription captions and stale-resource cancellation; #84 adds offline deletion confirmation/storage usage; #86 adds private read-only codec/buffer/error diagnostics; #89 binds WebDAV requests/playback to immutable connection credentials; #92 retains bounded overlapping caption dialogue | Styled ASS/fonts/karaoke, broader subtitle matching/headers, SMB/DLNA, HLS/background/resumable downloads, optional transcoding, direct cloud login/QR/OAuth and automatic skip detection/provider metadata | Physical codec/seek/PiP/AirPlay/background/WebDAV/storage/energy matrix, #5 and #38 |
 | P5 | Accounts, hashed device tokens, one-use pairing/revocation, CAS library sync, authenticated WS remote, H2/PostgreSQL/NAS restart/restore, diagnostics, EPG scheduling, private provider health/cache and bounded DNS-pinned HTTP/HLS relay | Remaining remote-access deployment controls and operational hardening | Actual NAS/remote-network restore/load/ACL/egress assessment, #6 |
-| P6 | npm lock/audit/CycloneDX SBOM; all-or-nothing Web/API/PostgreSQL/browser/native/Compose/NAS/isolation gate; #81 pins Actions and Docker inputs with official metadata provenance and CI drift rejection; #82 builds gated unsigned Web/API/Linux amd64 candidates with matching source, Web SBOM/audit and checksums; #88 requires host/Docker API JAR byte equality; #90 locks API/tooling versions and verifies artifact/metadata SHA-256; #91 inventories exact shipped JVM library bytes | Independent JVM/container/license review, runtime/container SBOM/provenance beyond API libraries, measured performance budgets, signed/ARM/native artifacts, broader reproducibility and actual rollback/distribution acceptance | Independent security/license review, Apple signing/TestFlight/distribution decision, #7 |
+| P6 | npm lock/audit/CycloneDX SBOM; all-or-nothing Web/API/PostgreSQL/browser/native/Compose/NAS/isolation gate; #81 pins Actions and Docker inputs with official metadata provenance and CI drift rejection; #82 builds gated unsigned Web/API/Linux amd64 candidates with matching source, Web SBOM/audit and checksums; #88 requires host/Docker API JAR byte equality; #90 locks API/tooling versions and verifies artifact/metadata SHA-256; #91 inventories exact shipped JVM library bytes; #93 refreshes the vendor maintenance versions/checksums and rejects known-version regressions | Independent JVM/container/license review, runtime/container SBOM/provenance beyond API libraries, measured performance budgets, signed/ARM/native artifacts, broader reproducibility and actual rollback/distribution acceptance | Independent security/license review, Apple signing/TestFlight/distribution decision, #7 |
 
 ## This iteration
 
@@ -84,6 +84,20 @@ only merged changes with passing final-head CI count as delivered on main.
   This is a flat library inventory; dependency edges, license/vulnerability clearance
   and JDK/OS coverage are not inferred. See [JVM_RUNTIME_SBOM.md](JVM_RUNTIME_SBOM.md).
 
+- [#92](https://github.com/Kahen/TV-Next/pull/92): native SRT/WebVTT/ASS/SSA text
+  preserves overlapping dialogue/languages through the shared inline/fullscreen
+  selector. Up to four active cues and 2,000 total characters are rendered, with
+  the same finite offset and inclusive-start/exclusive-end semantics. See
+  [NATIVE_OVERLAPPING_CAPTIONS.md](NATIVE_OVERLAPPING_CAPTIONS.md).
+- [#93](https://github.com/Kahen/TV-Next/pull/93): vendor maintenance updates move
+  Boot/Framework to 3.5.16/6.2.19, Tomcat to 10.1.61 and Logback to 1.5.38.
+  The refreshed baseline has 131 locked modules and 518 exact checksums; 304 shared
+  freshly collected files retained identical bytes, and three existing accepted
+  metadata checksums cover the cold Docker context. Version-family regression
+  floors preserve the reviewed fixes. This is targeted dependency remediation,
+  with independent vulnerability/license/provenance review still open. See
+  [JVM_MAINTENANCE_SECURITY.md](JVM_MAINTENANCE_SECURITY.md).
+
 ## Remaining code, in priority order
 
 1. **Real Spider compatibility:** validate the supplied Android/native subscription
@@ -103,8 +117,8 @@ only merged changes with passing final-head CI count as delivered on main.
 5. **Distribution:** independent JVM/container/dependency/license evidence, full
    runtime/container SBOM and release provenance, measured budgets, ARM/native/signature
    support, broader reproducibility, rollback drills and Apple signing/TestFlight.
-   Unsigned candidate packaging, API binary equality, JVM version/checksum baselines
-   and the shipped-library SBOM are implemented in #82/#88/#90/#91; these increments
+   Unsigned candidate packaging, API binary equality, JVM version/checksum baselines,
+   the shipped-library SBOM and maintenance security refresh are implemented in #82/#88/#90/#91/#93; these increments
    do not complete the remaining distribution gates.
 
 ## Evidence and resource gates

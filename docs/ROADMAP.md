@@ -77,7 +77,7 @@ This increment does not close P3.
 
 Tracking: https://github.com/Kahen/TV-Next/issues/5
 
-- [x] External SRT/WebVTT offsets, bounded ASS/SSA dialogue text, Web/native danmaku parsers and overlays.
+- [x] External SRT/WebVTT offsets, bounded ASS/SSA dialogue text and overlapping native text cues (#92), Web/native danmaku parsers and overlays.
 - [x] Native PiP/AirPlay, audio/embedded subtitle selection and preferences, opt-in background audio and system media controls.
 - [x] AList/OpenList browsing and bounded native read-only WebDAV with local filtering, refresh, parent/root breadcrumbs and credential revocation.
 - [x] Native per-title manual intro/outro markers and explicit opt-in automatic skipping of those markers; no automatic detection/provider metadata claim.
@@ -112,7 +112,7 @@ Tracking: https://github.com/Kahen/TV-Next/issues/7
 - [ ] Additional provider formats/legacy quirks; explicit compatibility status per module
 - [ ] Security reviews: sandbox escapes, SSRF, XSS, content injection, auth, supply chain
 - [x] Web npm audit/SBOM, immutable Action/image inputs, gated unsigned Web/API/Linux amd64 candidates with exact source/checksums and host/Docker API JAR byte equality.
-- [x] Strict JVM version/checksum evidence, real failure probes and a CycloneDX inventory of the exact shipped API library bytes (#90/#91).
+- [x] Strict JVM version/checksum evidence, real failure probes and a CycloneDX inventory of the exact shipped API library bytes (#90/#91); vendor maintenance security updates with exact refreshed evidence and version-family regression floors (#93).
 - [ ] Independent JVM/container/license review, complete runtime/container SBOM/provenance, signed artifacts and source/notice review
 - [ ] Native signing, TestFlight, App Store policy review; no promise of approval
 - [ ] Versioned REST contract, migration plan and release channels
