@@ -12,6 +12,20 @@ XML = b'''<?xml version="1.0" encoding="utf-8"?>
 
 class Handler(BaseHTTPRequestHandler):
     def do_PROPFIND(self):
+        # Consume the entity before replying/closing. Closing a TCP connection
+        # with unread request bytes can send RST; CFNetwork then loses the last
+        # chunk and reports -1005 instead of exercising the client's byte cap.
+        try:
+            size = int(self.headers.get('Content-Length', '0'))
+        except ValueError:
+            self.send_error(400)
+            return
+        if not 0 <= size <= 4096 or self.headers.get('Transfer-Encoding'):
+            self.send_error(400)
+            return
+        if len(self.rfile.read(size)) != size:
+            self.send_error(400)
+            return
         if self.path == '/dav/':
             if self.headers.get('Depth') != '1':
                 self.send_error(400)
