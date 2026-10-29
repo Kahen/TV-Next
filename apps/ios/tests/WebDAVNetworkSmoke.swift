@@ -21,6 +21,34 @@ import Foundation
                 fatalError("Unexpected redirect result for \(path): \(error)")
             }
         }
+        // Non-207 responses must retain their original status even when the
+        // response callback is omitted and only URLSessionTask.response exists.
+        for (path, status) in [("ok-not-multistatus", 200), ("missing", 404)] {
+            do {
+                _ = try await NativeWebDAV.list(root: root, folder: root.appendingPathComponent(path, isDirectory: true), username: "", password: "")
+                fatalError("Accepted non-207 WebDAV status \(status)")
+            } catch NativeWebDAVError.httpStatus(let code) where code == status {
+                // Expected.
+            } catch {
+                fatalError("Unexpected WebDAV status result for \(path): \(error)")
+            }
+        }
+        for path in ["unauthorized", "forbidden"] {
+            do {
+                _ = try await NativeWebDAV.list(root: root, folder: root.appendingPathComponent(path, isDirectory: true), username: "", password: "")
+                fatalError("Accepted unauthorized WebDAV response: \(path)")
+            } catch NativeWebDAVError.unauthorized {
+                // Expected.
+            } catch {
+                fatalError("Unexpected WebDAV auth result for \(path): \(error)")
+            }
+        }
+        do {
+            _ = try await NativeWebDAV.list(root: root, folder: root.appendingPathComponent("empty-multistatus", isDirectory: true), username: "", password: "")
+            fatalError("Accepted empty WebDAV multistatus")
+        } catch NativeWebDAVError.invalidResponse {
+            // Valid 207 status is not sufficient without valid DAV XML.
+        }
         do {
             _ = try await NativeWebDAV.list(root: root, folder: root, username: "alice", password: "pw")
             fatalError("Sent credentials over HTTP")
@@ -38,6 +66,8 @@ import Foundation
             } catch NativeWebDAVError.responseTooLarge {
                 // The declared and the unknown-length transfer must both stop
                 // at the same bound, without parsing or returning partial items.
+            } catch {
+                fatalError("Unexpected oversized WebDAV response for \(path): \(error)")
             }
         }
         // A rejected oversized transfer must not poison the next connection.
