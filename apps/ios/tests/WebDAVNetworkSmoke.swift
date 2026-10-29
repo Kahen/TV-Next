@@ -7,12 +7,19 @@ import Foundation
         do { entries = try await NativeWebDAV.list(root: root, folder: root, username: "", password: "") }
         catch { fatalError("Initial WebDAV listing failed: \(error)") }
         precondition(entries.map(\.name) == ["Folder", "Owned.mp4"])
-        let redirect = root.appendingPathComponent("redirect", isDirectory: true)
-        do {
-            _ = try await NativeWebDAV.list(root: root, folder: redirect, username: "", password: "")
-            fatalError("Followed a cross-origin redirect")
-        } catch NativeWebDAVError.httpStatus(302) {
-            // The client rejects redirects and reports the original response.
+        // URLSession can complete a rejected redirect without a separate
+        // didReceive(response:) callback. Both local and external Location
+        // values must consistently surface the original 302, never follow it.
+        for path in ["redirect", "redirect-local"] {
+            let redirect = root.appendingPathComponent(path, isDirectory: true)
+            do {
+                _ = try await NativeWebDAV.list(root: root, folder: redirect, username: "", password: "")
+                fatalError("Followed a WebDAV redirect: \(path)")
+            } catch NativeWebDAVError.httpStatus(302) {
+                // Expected: explicit original status, not an ambiguous transport error.
+            } catch {
+                fatalError("Unexpected redirect result for \(path): \(error)")
+            }
         }
         do {
             _ = try await NativeWebDAV.list(root: root, folder: root, username: "alice", password: "pw")
