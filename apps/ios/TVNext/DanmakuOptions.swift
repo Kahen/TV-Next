@@ -24,6 +24,20 @@ enum DanmakuOptionsStore {
         options.blocked.utf8.count <= 4_096
     }
 
+    /// Limit editable blocked words on Unicode scalar boundaries, never splitting UTF-8.
+    static func boundedBlocked(_ raw: String) -> String {
+        guard raw.utf8.count > 4_096 else { return raw }
+        var remaining = 4_096
+        var scalars = String.UnicodeScalarView()
+        for scalar in raw.unicodeScalars {
+            let bytes = scalar.utf8.count
+            if bytes > remaining { break }
+            scalars.append(scalar)
+            remaining -= bytes
+        }
+        return String(scalars)
+    }
+
     static func load(from defaults: UserDefaults = .standard) -> DanmakuOptions {
         guard let data = defaults.data(forKey: key), data.count <= maximumBytes,
               let value = try? JSONDecoder().decode(DanmakuOptions.self, from: data),
