@@ -327,8 +327,11 @@ private final class WebDAVXMLCollector: NSObject, XMLParserDelegate {
         if path == ["multistatus", "response", "propstat"] {
             if let property, property.hasStatus, !property.invalidStatus,
                property.hasResourceType, Self.successfulStatus(property.status) {
-                active?.hasResourceType = true
-                active?.directory = (active?.directory ?? false) || property.directory
+                if var record = active {
+                    record.hasResourceType = true
+                    record.directory = record.directory || property.directory
+                    active = record
+                }
             }
             property = nil
         } else if path == ["multistatus", "response"] {
