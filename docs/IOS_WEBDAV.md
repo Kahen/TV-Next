@@ -31,3 +31,7 @@ The localhost fixture explicitly closes responses without `Content-Length`. The 
 ## Local WebDAV browse controls (P4, #76)
 
 Native Swift smoke and XCTest verify trimmed case-insensitive matching, folder retention, supported/unsupported suffixes, and empty results. Production iPhone/iPad XCUI checks invalid URL rejection and, against the owned localhost RFC 4918 fixture, a successful folder listing, media-only folder retention, case-insensitive search, same-folder refresh, and disconnect cleanup. Existing Swift network smoke verifies bounded Depth:1 transport. No real WebDAV provider, large-directory server-side search or physical-device behavior is claimed.
+
+## Bounded native breadcrumb navigation (P4, #78)
+
+When browsing a nested WebDAV directory, the iPhone/iPad SwiftUI view displays horizontally scrollable root/ancestor shortcuts in addition to **上级目录**. Each shortcut reuses a validated, canonical ancestor URL under the connected root; labels are not concatenated into requests. Breadcrumb generation is capped at 32 directory levels and returns no shortcuts for invalid, outside-root, non-directory or over-depth inputs. Moving to an ancestor uses the existing cancelable, bounded Depth:1 PROPFIND and resets the local filename search. Swift smoke/XCTest cover root, nested, foreign-origin, sibling, file URL and depth boundaries. Production iPhone/iPad XCUI navigates into an owned localhost folder and back to root. This is not server-side search, SMB/DLNA, or physical-device/provider verification.
