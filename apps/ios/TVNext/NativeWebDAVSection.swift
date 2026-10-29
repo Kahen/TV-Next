@@ -7,7 +7,8 @@ struct NativeWebDAVSection: View {
     @State private var address = ""
     @State private var username = ""
     @State private var password = ""
-    @State private var root: URL?
+    @State private var connection: NativeWebDAVConnection?
+    private var root: URL? { connection?.root }
     @State private var folder: URL?
     @State private var entries: [NativeWebDAVItem] = []
     @State private var filter = ""
@@ -40,6 +41,8 @@ struct NativeWebDAVSection: View {
                 if busy { ProgressView("读取目录…") }
                 if let error { Text(error).font(.caption).foregroundStyle(.red).accessibilityIdentifier("webdav-error") }
                 if let root, let folder {
+                    Text("已连接：" + (root.host ?? "") + "。修改地址或账号后需重新连接。")
+                        .font(.caption).foregroundStyle(.secondary)
                     Text("当前目录：" + folder.path).font(.caption).textSelection(.enabled)
                     // Each shortcut is a validated ancestor URL, not a path
                     // reconstructed from a potentially untrusted filename.
@@ -95,7 +98,7 @@ struct NativeWebDAVSection: View {
         if let root { onDisconnect(root) }
         task?.cancel()
         requestID = UUID()
-        root = nil
+        connection = nil
         folder = nil
         entries = []
         filter = ""
@@ -103,14 +106,14 @@ struct NativeWebDAVSection: View {
         busy = false
         error = nil
         do {
-            let url = try NativeWebDAV.rootURL(address, username: username, password: password)
-            root = url
-            open(url)
+            let active = try NativeWebDAVConnection(address: address, username: username, password: password)
+            connection = active
+            open(active.root)
         } catch { self.error = error.localizedDescription }
     }
 
     private func open(_ next: URL) {
-        guard let root, NativeWebDAV.contains(next, root: root) else {
+        guard let active = connection, NativeWebDAV.contains(next, root: active.root) else {
             error = NativeWebDAVError.invalidFolder.localizedDescription
             return
         }
@@ -119,11 +122,9 @@ struct NativeWebDAVSection: View {
         requestID = id
         busy = true
         error = nil
-        let user = username
-        let secret = password
         task = Task { @MainActor in
             do {
-                let result = try await NativeWebDAV.list(root: root, folder: next, username: user, password: secret)
+                let result = try await active.list(folder: next)
                 guard !Task.isCancelled, requestID == id else { return }
                 if folder != next { filter = "" }
                 folder = next
@@ -136,13 +137,13 @@ struct NativeWebDAVSection: View {
     }
 
     private func play(_ entry: NativeWebDAVItem) {
-        guard let root, NativeWebDAV.contains(entry.url, root: root),
+        guard let active = connection, NativeWebDAV.contains(entry.url, root: active.root),
               NativeWebDAV.playable(entry), MediaAddress.valid(entry.url.absoluteString) else {
             error = NativeWebDAVError.invalidFolder.localizedDescription
             return
         }
         do {
-            let auth = try NativeWebDAV.authorization(username: username, password: password, root: root)
+            let auth = try active.authorization(for: entry.url)
             let headers = auth.map { ["Authorization": $0] }
             onPlay(TVChannel(name: entry.name, url: entry.url.absoluteString,
                              group: "WebDAV", logo: nil, tvgId: nil, headers: headers))
@@ -154,7 +155,7 @@ struct NativeWebDAVSection: View {
         task?.cancel()
         task = nil
         requestID = UUID()
-        root = nil
+        connection = nil
         folder = nil
         entries = []
         filter = ""

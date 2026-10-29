@@ -3,6 +3,41 @@ import XCTest
 @testable import TVNext
 
 final class NativeWebDAVTests: XCTestCase {
+    func testActiveConnectionKeepsOriginalCredentialsWhenFormChanges() throws {
+        var draftAddress = "https://first.example/dav"
+        var draftUsername = "alice"
+        var draftPassword = "first-secret"
+        let active = try NativeWebDAVConnection(address: draftAddress, username: draftUsername, password: draftPassword)
+        draftAddress = "https://second.example/files"
+        draftUsername = "bob"
+        draftPassword = "second-secret"
+        let next = try NativeWebDAVConnection(address: draftAddress, username: draftUsername, password: draftPassword)
+        let media = active.root.appendingPathComponent("Owned.mp4")
+        XCTAssertEqual(try active.authorization(for: media), "Basic " + Data("alice:first-secret".utf8).base64EncodedString())
+        XCTAssertEqual(try next.authorization(for: next.root), "Basic " + Data("bob:second-secret".utf8).base64EncodedString())
+        for outside in ["https://second.example/dav/Owned.mp4", "http://first.example/dav/Owned.mp4",
+                        "https://first.example:444/dav/Owned.mp4", "https://first.example/dav2/Owned.mp4",
+                        "https://first.example/dav/Owned.mp4?token=secret"] {
+            XCTAssertThrowsError(try active.authorization(for: URL(string: outside)!)) { error in
+                guard let failure = error as? NativeWebDAVError, case .invalidFolder = failure else {
+                    return XCTFail("Expected invalidFolder")
+                }
+            }
+        }
+        let anonymous = try NativeWebDAVConnection(address: "http://first.example/dav", username: "", password: "")
+        XCTAssertNil(try anonymous.authorization(for: anonymous.root))
+    }
+
+    func testCredentialBoundsCountUTF8BytesBeforeConnecting() throws {
+        let accepted = try NativeWebDAVConnection(address: "https://example.test/dav",
+            username: String(repeating: "é", count: 128), password: String(repeating: "é", count: 512))
+        XCTAssertNotNil(try accepted.authorization(for: accepted.root))
+        XCTAssertThrowsError(try NativeWebDAVConnection(address: "https://example.test/dav",
+            username: String(repeating: "é", count: 129), password: "pw"))
+        XCTAssertThrowsError(try NativeWebDAVConnection(address: "https://example.test/dav",
+            username: "alice", password: String(repeating: "密", count: 400)))
+    }
+
     func testSafeDepthOneListingRejectsForeignAndTraversalHrefs() throws {
         let root = try NativeWebDAV.rootURL("https://example.test/dav")
         let folder = root.appendingPathComponent("Media", isDirectory: true)
