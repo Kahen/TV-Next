@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "verified_on": "2026-10-29",
+  "image_metadata_repository": "docker-library/repo-info",
+  "images": [
+    {
+      "image": "node:22-alpine",
+      "digest": "sha256:fe4f6d74e20370acb04ad889077d14d0f64a9c8ea6a42bc60cddf1e844699914",
+      "source_ref": "880fe606805fdf66aded72df644a85506976a614",
+      "source_path": "repos/node/remote/22-alpine.md",
+      "source_blob": "279dac59bbce919d05d8d10224c247daf0dec976"
+    },
+    {
+      "image": "nginx:stable-alpine",
+      "digest": "sha256:0e52bd054126cdc040b1276c0af347aeb02a41b9cfe305d6094767ac30e97949",
+      "source_ref": "880fe606805fdf66aded72df644a85506976a614",
+      "source_path": "repos/nginx/remote/stable-alpine.md",
+      "source_blob": "b730960a9f5517f0adf2ad37d63fb6a102ae8720"
+    },
+    {
+      "image": "eclipse-temurin:21-jre",
+      "digest": "sha256:f37956012e0cb88400e5b3689aeae2d2d735364c1922ae2225536163b5a99f56",
+      "source_ref": "880fe606805fdf66aded72df644a85506976a614",
+      "source_path": "repos/eclipse-temurin/remote/21-jre.md",
+      "source_blob": "fc1d66a52007a477427ec0b687af48fa56a9007a"
+    },
+    {
+      "image": "eclipse-temurin:21-jdk-alpine",
+      "digest": "sha256:fd52084c35bbac78890d95d57707d31ffc9d7a3324199e89c06be2a9dc71bfa0",
+      "source_ref": "880fe606805fdf66aded72df644a85506976a614",
+      "source_path": "repos/eclipse-temurin/remote/21-jdk-alpine.md",
+      "source_blob": "43e7c412757da6b5c7f01e576e0acb08c81e0217"
+    },
+    {
+      "image": "eclipse-temurin:21-jre-alpine",
+      "digest": "sha256:b48e02e0ea88d7bfb305335df94923bdef394905f4147dccd52e873cf17b1088",
+      "source_ref": "880fe606805fdf66aded72df644a85506976a614",
+      "source_path": "repos/eclipse-temurin/remote/21-jre-alpine.md",
+      "source_blob": "5c1725ad82e5484a16e206c4a3bb2081d603783d"
+    },
+    {
+      "image": "python:3.12-alpine",
+      "digest": "sha256:5789aa194f757888f41fa3d48e14b6feaa1b57c0af0b56fcb1372d6474d3bff0",
+      "source_ref": "880fe606805fdf66aded72df644a85506976a614",
+      "source_path": "repos/python/remote/3.12-alpine.md",
+      "source_blob": "ac422ac98b4da766d4eaff43d7dd2af8c14b859c"
+    },
+    {
+      "image": "postgres:17-alpine",
+      "digest": "sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b",
+      "source_ref": "880fe606805fdf66aded72df644a85506976a614",
+      "source_path": "repos/postgres/remote/17-alpine.md",
+      "source_blob": "81c7b1af769fd2a31e830bd2957fc3e1b1c633bb"
+    },
+    {
+      "image": "gradle:8.14.3-jdk21",
+      "digest": "sha256:21bd311ed01360c189b8870c6b6e988199ff10f72d445d02fb39d3cff9da91d7",
+      "source_ref": "e70cd2a467b7bde5f7cd0d354a52caa14c8cbfac",
+      "source_path": "repos/gradle/remote/8.14.3-jdk21.md",
+      "source_blob": "1cf755e37f59376baa7814f8f29d5be1a5887d19"
+    }
+  ],
+  "actions": [
+    {
+      "action": "actions/checkout",
+      "tag": "v4",
+      "commit": "11d5960a326750d5838078e36cf38b85af677262"
+    },
+    {
+      "action": "actions/setup-node",
+      "tag": "v4",
+      "commit": "49933ea5288caeca8642d1e84afbd3f7d6820020"
+    },
+    {
+      "action": "actions/setup-java",
+      "tag": "v4",
+      "commit": "cf277c60eb25467037889841efdb72551f06f6c3"
+    },
+    {
+      "action": "actions/upload-artifact",
+      "tag": "v4",
+      "commit": "ea165f8d65b6e75b540449e92b4886f43607fa02"
+    },
+    {
+      "action": "actions/setup-python",
+      "tag": "v5",
+      "commit": "a26af69be951a213d495a4c3e4e4022e16d87065"
+    },
+    {
+      "action": "gradle/actions/setup-gradle",
+      "tag": "v4",
+      "commit": "ed408507eac070d1f99cc633dbcf757c94c7933a"
+    }
+  ]
+}
