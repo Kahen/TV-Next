@@ -101,6 +101,53 @@ final class LibraryUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["webdav-error"].exists)
     }
 
+    func testWebDAVFilterAndRefreshAreConnectionScoped() {
+        jump("WebDAV 文件")
+        let connect = app.buttons["webdav-connect"]
+        reveal(connect)
+        XCTAssertFalse(connect.isEnabled)
+        XCTAssertFalse(app.buttons["webdav-refresh"].exists)
+        XCTAssertFalse(app.textFields["webdav-filter"].exists)
+        enter(app.textFields["webdav-url"], "javascript:alert(1)")
+        reveal(connect)
+        connect.tap()
+        XCTAssertTrue(app.staticTexts["webdav-error"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["webdav-refresh"].exists)
+        reveal(app.buttons["webdav-disconnect"])
+        app.buttons["webdav-disconnect"].tap()
+        XCTAssertFalse(app.staticTexts["webdav-error"].exists)
+    }
+
+    func testWebDAVRefreshAndLocalFilterAgainstOwnedFixture() {
+        jump("WebDAV 文件")
+        enter(app.textFields["webdav-url"], "http://127.0.0.1:8767/dav/")
+        let connect = app.buttons["webdav-connect"]
+        reveal(connect)
+        connect.tap()
+        let owned = app.buttons["Owned.mp4"]
+        let folder = app.buttons["Folder"]
+        XCTAssertTrue(owned.waitForExistence(timeout: 15), "Localhost Depth:1 listing did not load")
+        XCTAssertTrue(folder.exists)
+        let toggle = app.switches["webdav-media-only"]
+        reveal(toggle)
+        toggle.tap()
+        XCTAssertTrue(owned.exists)
+        XCTAssertTrue(folder.exists, "Media-only mode must retain navigable folders")
+        enter(app.textFields["webdav-filter"], "owned")
+        XCTAssertTrue(owned.exists, "Case-insensitive local search lost the matching file")
+        XCTAssertFalse(folder.exists, "Search should narrow the visible listing")
+        let refresh = app.buttons["webdav-refresh"]
+        reveal(refresh)
+        refresh.tap()
+        XCTAssertTrue(owned.waitForExistence(timeout: 15))
+        XCTAssertFalse(folder.exists, "Refreshing the same folder must preserve its local search")
+        let disconnect = app.buttons["webdav-disconnect"]
+        reveal(disconnect)
+        disconnect.tap()
+        XCTAssertFalse(app.textFields["webdav-filter"].exists)
+        XCTAssertFalse(refresh.exists)
+    }
+
     func testInlineSeekControlsArePresentAndDisabledWithoutMedia() {
         jump("播放器")
         let back = app.buttons["seek-back-15"]

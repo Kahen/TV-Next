@@ -150,7 +150,16 @@ jobs:
           grep -q 'EXT-X-MEDIA:TYPE=SUBTITLES' /tmp/tvnext-audio-hls/master.m3u8
           python3 -m http.server 8766 --bind 127.0.0.1 --directory /tmp/tvnext-audio-hls > /tmp/tvnext-audio-server.log 2>&1 &
           audio_pid=$!
-          trap 'kill "$fixture_pid" "$audio_pid" 2>/dev/null || true' EXIT
+          # The production SwiftUI WebDAV browser is exercised against the same
+          # localhost-only RFC 4918 fixture used by the Swift network smoke.
+          python3 ../../scripts/webdav_fixture_server.py > /tmp/tvnext-webdav-ui-fixture.log 2>&1 &
+          webdav_pid=$!
+          trap 'kill "$fixture_pid" "$audio_pid" "$webdav_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl --silent http://127.0.0.1:8767/dav/ -o /dev/null; then break; fi
+            sleep 1
+          done
+          curl --silent http://127.0.0.1:8767/dav/ -o /dev/null
           for attempt in {1..30}; do
             if curl --fail --silent http://127.0.0.1:8766/master.m3u8 -o /dev/null; then break; fi
             sleep 1

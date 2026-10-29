@@ -10,6 +10,8 @@ struct NativeWebDAVSection: View {
     @State private var root: URL?
     @State private var folder: URL?
     @State private var entries: [NativeWebDAVItem] = []
+    @State private var filter = ""
+    @State private var mediaOnly = false
     @State private var busy = false
     @State private var error: String?
     @State private var requestID = UUID()
@@ -39,9 +41,20 @@ struct NativeWebDAVSection: View {
                 if let error { Text(error).font(.caption).foregroundStyle(.red).accessibilityIdentifier("webdav-error") }
                 if let root, let folder {
                     Text("当前目录：" + folder.path).font(.caption).textSelection(.enabled)
-                    Button("上级目录") { open(folder.deletingLastPathComponent()) }
-                        .disabled(busy || folder == root)
-                    ForEach(entries) { entry in
+                    HStack {
+                        Button("上级目录") { open(folder.deletingLastPathComponent()) }
+                            .disabled(busy || folder == root)
+                        Button("刷新当前目录") { open(folder) }
+                            .disabled(busy)
+                            .accessibilityIdentifier("webdav-refresh")
+                    }
+                    TextField("筛选当前目录文件名", text: $filter)
+                        .textFieldStyle(.roundedBorder)
+                        .accessibilityIdentifier("webdav-filter")
+                    Toggle("仅显示可播放文件（保留文件夹）", isOn: $mediaOnly)
+                        .accessibilityIdentifier("webdav-media-only")
+                    let visible = NativeWebDAV.visibleEntries(entries, search: filter, mediaOnly: mediaOnly)
+                    ForEach(visible) { entry in
                         Button {
                             if entry.isDirectory { open(entry.url) } else { play(entry) }
                         } label: {
@@ -50,8 +63,10 @@ struct NativeWebDAVSection: View {
                         }
                         .disabled(busy || (!entry.isDirectory && !NativeWebDAV.playable(entry)))
                     }
-                    if entries.isEmpty && !busy { Text("目录为空，或没有可安全展示的文件。").font(.caption) }
-                    Text("最多显示 200 项；仅可播放 AVPlayer 支持的媒体文件。")
+                    if visible.isEmpty && !busy { Text("目录为空，或当前筛选没有匹配项。").font(.caption) }
+                    Text("当前显示 \(visible.count)/\(entries.count) 项。")
+                        .font(.caption2).foregroundStyle(.secondary)
+                    Text("最多读取并显示前 200 项；筛选不向服务器发送查询。")
                         .font(.caption2).foregroundStyle(.secondary)
                 }
             }
@@ -67,6 +82,8 @@ struct NativeWebDAVSection: View {
         root = nil
         folder = nil
         entries = []
+        filter = ""
+        mediaOnly = false
         busy = false
         error = nil
         do {
@@ -92,6 +109,7 @@ struct NativeWebDAVSection: View {
             do {
                 let result = try await NativeWebDAV.list(root: root, folder: next, username: user, password: secret)
                 guard !Task.isCancelled, requestID == id else { return }
+                if folder != next { filter = "" }
                 folder = next
                 entries = result
             } catch {
@@ -123,6 +141,8 @@ struct NativeWebDAVSection: View {
         root = nil
         folder = nil
         entries = []
+        filter = ""
+        mediaOnly = false
         username = ""
         password = ""
         busy = false

@@ -72,6 +72,22 @@ final class NativeWebDAVTests: XCTestCase {
         XCTAssertTrue(entries.dropFirst().allSatisfy { !$0.isDirectory })
     }
 
+    func testLocalFilenameFilterAndMediaOnlyKeepFoldersNavigable() throws {
+        let root = try NativeWebDAV.rootURL("https://example.test/dav")
+        let entries = [
+            NativeWebDAVItem(url: root.appendingPathComponent("Season", isDirectory: true), name: "Season", isDirectory: true),
+            NativeWebDAVItem(url: root.appendingPathComponent("Owned.MP4"), name: "Owned.MP4", isDirectory: false),
+            NativeWebDAVItem(url: root.appendingPathComponent("notes.txt"), name: "notes.txt", isDirectory: false)
+        ]
+        XCTAssertEqual(NativeWebDAV.visibleEntries(entries, search: "", mediaOnly: false).count, 3)
+        XCTAssertEqual(NativeWebDAV.visibleEntries(entries, search: "", mediaOnly: true).map(\.name), ["Season", "Owned.MP4"])
+        XCTAssertEqual(NativeWebDAV.visibleEntries(entries, search: " owned ", mediaOnly: true).map(\.name), ["Owned.MP4"])
+        XCTAssertEqual(NativeWebDAV.visibleEntries(entries, search: "season", mediaOnly: true).map(\.name), ["Season"])
+        XCTAssertEqual(NativeWebDAV.visibleEntries(entries, search: "notes", mediaOnly: false).map(\.name), ["notes.txt"])
+        XCTAssertTrue(NativeWebDAV.visibleEntries(entries, search: "notes", mediaOnly: true).isEmpty)
+        XCTAssertTrue(NativeWebDAV.visibleEntries(entries, search: "not-found", mediaOnly: false).isEmpty)
+    }
+
     func testCredentialPolicyAndInvalidResponses() throws {
         let root = try NativeWebDAV.rootURL("https://example.test/dav")
         XCTAssertEqual(try NativeWebDAV.authorization(username: "alice", password: "pw", root: root), "Basic YWxpY2U6cHc=")
