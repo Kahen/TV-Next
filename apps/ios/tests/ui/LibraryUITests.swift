@@ -42,10 +42,21 @@ final class LibraryUITests: XCTestCase {
         // XCTest can throw while evaluating hittability for a SwiftUI child
         // outside the viewport. Check existence and safe geometry first, also
         // inside waits; a hittable-only predicate bypasses that protection.
+        func viewport() -> CGRect {
+            // AVKit may insert an empty auxiliary window ahead of the main
+            // window. Using firstMatch made drag distances zero after playback.
+            var bounds = app.frame
+            if bounds.isEmpty || bounds.isInfinite {
+                bounds = app.windows.allElementsBoundByIndex.map(\.frame)
+                    .filter { !$0.isEmpty && !$0.isInfinite }
+                    .max { $0.width * $0.height < $1.width * $1.height } ?? .zero
+            }
+            return bounds.insetBy(dx: 8, dy: 90)
+        }
         func visible() -> Bool {
             guard element.exists else { return false }
             let frame = element.frame
-            let viewport = app.windows.firstMatch.frame.insetBy(dx: 8, dy: 90)
+            let viewport = viewport()
             return !frame.isEmpty && !frame.isInfinite && viewport.contains(frame)
         }
         let reachable = NSPredicate { _, _ in visible() && element.isHittable }
@@ -58,8 +69,10 @@ final class LibraryUITests: XCTestCase {
                 continue
             }
             let frame = element.frame
-            let viewport = app.windows.firstMatch.frame.insetBy(dx: 8, dy: 90)
+            let viewport = viewport()
+            guard !viewport.isEmpty else { app.activate(); continue }
             if visible() && element.isHittable { return }
+            print("Reveal frame=\(frame), viewport=\(viewport)")
             // Short controlled drags avoid oscillating past a control when its
             // layout moves after keyboard dismissal or a validation message.
             let amount: CGFloat
