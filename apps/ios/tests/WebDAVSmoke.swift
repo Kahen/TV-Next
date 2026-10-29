@@ -82,6 +82,23 @@ import Foundation
         let verified = try NativeWebDAV.parse(Data(mixed.utf8), root: root, folder: folder)
         precondition(verified.map(\.name) == ["Folder", "Good.mp4", "Nested.mp4", "Spoofed.mp4"], "Incorrect propstat/href scope: \(verified)")
         precondition(verified[0].isDirectory && verified.dropFirst().allSatisfy { !$0.isDirectory })
+        // Response status validation must be identical whether URLSession calls
+        // didReceive(response:) or exposes the response only at completion.
+        precondition(NativeWebDAV.responseError(statusCode: 207, expectedLength: -1) == nil)
+        precondition(NativeWebDAV.responseError(statusCode: 207, expectedLength: 1_048_576) == nil)
+        guard case .some(.responseTooLarge) = NativeWebDAV.responseError(statusCode: 207, expectedLength: 1_048_577) else {
+            fatalError("Accepted an oversized declared PROPFIND response")
+        }
+        for status in [401, 403] {
+            guard case .some(.unauthorized) = NativeWebDAV.responseError(statusCode: status, expectedLength: 0) else {
+                fatalError("Lost WebDAV authorization failure for HTTP \\(status)")
+            }
+        }
+        for status in [200, 302, 404, 500] {
+            guard case .some(.httpStatus(status)) = NativeWebDAV.responseError(statusCode: status, expectedLength: 0) else {
+                fatalError("Lost WebDAV non-207 status \\(status)")
+            }
+        }
         print("Native WebDAV bounded listing and RFC 4918 status smoke passed")
     }
 }
