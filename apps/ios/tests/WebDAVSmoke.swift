@@ -91,12 +91,12 @@ import Foundation
         }
         for status in [401, 403] {
             guard case .some(.unauthorized) = NativeWebDAV.responseError(statusCode: status, expectedLength: 0) else {
-                fatalError("Lost WebDAV authorization failure for HTTP \\(status)")
+                fatalError("Lost WebDAV authorization failure for HTTP \(status)")
             }
         }
         for status in [200, 302, 404, 500] {
             guard case .some(.httpStatus(status)) = NativeWebDAV.responseError(statusCode: status, expectedLength: 0) else {
-                fatalError("Lost WebDAV non-207 status \\(status)")
+                fatalError("Lost WebDAV non-207 status \(status)")
             }
         }
         print("Native WebDAV bounded listing and RFC 4918 status smoke passed")
