@@ -309,8 +309,19 @@ struct ContentView: View {
                         }
                     }
                 }
-                Toggle("显示弹幕", isOn: $danmakuOptions.enabled)
-                    .accessibilityIdentifier("danmaku-enabled-toggle")
+                HStack {
+                    Toggle("显示弹幕", isOn: $danmakuOptions.enabled)
+                        .fixedSize(horizontal: true, vertical: false)
+                        .accessibilityIdentifier("danmaku-enabled-toggle")
+                    Spacer(minLength: 8)
+                    // A separate, explicit action remains usable when a large
+                    // iPad accessibility row does not hit-test the switch thumb.
+                    Button(danmakuOptions.enabled ? "关闭弹幕" : "开启弹幕") {
+                        danmakuOptions.enabled.toggle()
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier("danmaku-enabled-action")
+                }
                 // Stable, user-visible state feedback; XCUI switch.value differs by iOS locale.
                 Text(danmakuOptions.enabled ? "弹幕已开启" : "弹幕已关闭")
                     .font(.caption2).foregroundStyle(.secondary)
