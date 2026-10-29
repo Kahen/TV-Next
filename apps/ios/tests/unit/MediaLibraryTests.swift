@@ -207,6 +207,24 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertNil(store.introOutroMarkers)
     }
 
+    func testAutomaticSkipIsOptInOncePerPlaybackAndHonorsExplicitSeeks() {
+        var markers = NativeIntroOutroMarkers(introEnd: 90, outroStart: 1100)
+        var state = NativeAutomaticSkipState()
+        XCTAssertNil(state.target(markers: markers, current: 0, duration: 1200, playing: true))
+        markers.automatic = true
+        XCTAssertNil(state.target(markers: markers, current: 0, duration: 1200, playing: false))
+        XCTAssertEqual(state.target(markers: markers, current: 1, duration: 1200, playing: true), 90)
+        XCTAssertNil(state.target(markers: markers, current: 0, duration: 1200, playing: true))
+        state = NativeAutomaticSkipState()
+        XCTAssertNil(state.target(markers: markers, current: 1099, duration: 1200, playing: true))
+        XCTAssertEqual(state.target(markers: markers, current: 1100, duration: 1200, playing: true), 1199)
+        XCTAssertNil(state.target(markers: markers, current: 1101, duration: 1200, playing: true))
+        state = NativeAutomaticSkipState()
+        XCTAssertNil(state.target(markers: markers, current: 500, duration: 1200, playing: true))
+        XCTAssertNil(state.target(markers: markers, current: 1100, duration: 1200, playing: true))
+        XCTAssertNil(state.target(markers: markers, current: .nan, duration: 1200, playing: true))
+    }
+
     func testBoundedSkipTargetRejectsInvalidAndClampsBothDirections() {
         XCTAssertEqual(NativePlaybackCommand.boundedSkipTarget(current: 1, interval: -15, duration: 3), 0)
         XCTAssertEqual(NativePlaybackCommand.boundedSkipTarget(current: 1, interval: 15, duration: 3), 3)

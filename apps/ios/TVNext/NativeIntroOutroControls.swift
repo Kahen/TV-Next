@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Manual markers only: never detects, downloads or automatically skips content.
+/// User-created boundaries, with explicit opt-in automatic playback skipping.
 struct NativeIntroOutroControls: View {
     @ObservedObject var library: MediaLibraryStore
     @State private var feedback: String?
@@ -8,7 +8,7 @@ struct NativeIntroOutroControls: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("手动片头 / 片尾标记").font(.subheadline).fontWeight(.medium)
-            Text("播放长视频时，在片头结束或片尾开始的位置手动标记；以后打开同一影片可按需跳过，不会自动跳转。")
+            Text("在片头结束或片尾开始的位置手动标记；可按需跳过，或为这部影片开启自动跳过。手动拖回已跳过的部分不会反复跳转。")
                 .font(.caption).foregroundStyle(.secondary)
             HStack {
                 Button("标记片头结束") { act(library.markIntroEnd(), error: "只能在长于 2 分钟的视频前半段标记片头结束。") }
@@ -19,6 +19,10 @@ struct NativeIntroOutroControls: View {
             .buttonStyle(.bordered)
             .disabled(library.player.currentItem == nil)
             if let markers = library.introOutroMarkers {
+                Toggle("自动跳过这部影片的标记片段", isOn: Binding(
+                    get: { library.introOutroMarkers?.automatic == true },
+                    set: { library.setAutomaticSkipEnabled($0) }
+                )).accessibilityIdentifier("automatic-intro-outro")
                 HStack {
                     Button("跳过片头") { act(library.skipMarkedIntro(), error: "当前播放位置已经超过片头，或媒体不支持定位。") }
                         .accessibilityIdentifier("skip-marked-intro")

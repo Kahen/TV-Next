@@ -30,7 +30,10 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(menu.waitForExistence(timeout: 5))
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: menu)], timeout: 5), .completed)
         menu.tap()
-        app.buttons[name].tap()
+        let destination = app.buttons[name]
+        destination.tap()
+        let dismissed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: destination)
+        XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 5), .completed, "Navigation menu did not dismiss")
     }
 
     private func reveal(_ element: XCUIElement) {
@@ -38,16 +41,20 @@ final class LibraryUITests: XCTestCase {
         let reachable = NSPredicate(format: "hittable == true")
         if XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: reachable, object: element)], timeout: 3) == .completed { return }
         for _ in 0..<8 {
+            // Offscreen children may be absent from a SwiftUI accessibility
+            // snapshot. Reading frame/identifier first throws before scrolling.
+            guard element.exists else { app.swipeUp(); continue }
             if element.isHittable { return }
             print("Reveal target \(element.identifier): exists=\(element.exists) frame=\(element.frame)")
             let frame = element.frame
-            if element.exists && frame.maxY < app.windows.firstMatch.frame.minY + 100 {
+            if frame.maxY < app.windows.firstMatch.frame.minY + 100 {
                 app.swipeDown()
             } else {
                 app.swipeUp()
             }
         }
         if XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: reachable, object: element)], timeout: 2) == .completed { return }
+        guard element.exists else { XCTFail("Target absent after bounded scrolling: \(app.debugDescription)"); return }
         if !element.isHittable { print("Unreachable element: \(element.debugDescription)\n\(app.debugDescription)") }
         XCTAssertTrue(element.isHittable)
     }
@@ -175,6 +182,33 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(forward.exists)
         XCTAssertFalse(back.isEnabled)
         XCTAssertFalse(forward.isEnabled)
+    }
+
+    func testOfflineDownloadSurvivesRelaunchAndCanBePlayedAndDeleted() {
+        jump("离线媒体")
+        let previous = app.buttons["offline-delete-Owned Offline"]
+        if previous.exists { reveal(previous); previous.tap() }
+        enter(app.textFields["offline-url"], "http://127.0.0.1:8765/fixture.mp4")
+        enter(app.textFields["offline-name"], "Owned Offline")
+        let download = app.buttons["offline-download"]
+        reveal(download)
+        download.tap()
+        let play = app.buttons["offline-play-Owned Offline"]
+        XCTAssertTrue(play.waitForExistence(timeout: 30))
+        app.terminate()
+        app.launch()
+        jump("离线媒体")
+        reveal(play)
+        play.tap()
+        jump("播放器")
+        let current = app.staticTexts["current-media"]
+        reveal(current)
+        XCTAssertTrue(current.label.contains("Owned Offline"))
+        jump("离线媒体")
+        let remove = app.buttons["offline-delete-Owned Offline"]
+        reveal(remove)
+        remove.tap()
+        XCTAssertFalse(play.exists)
     }
 
     func testManualIntroOutroControlsDoNotMarkWithoutMedia() {
