@@ -4,6 +4,7 @@ import XCTest
 @MainActor
 final class LibraryUITests: XCTestCase {
     private var app: XCUIApplication!
+    private var currentSection = "媒体库"
 
     override func setUp() async throws {
         continueAfterFailure = false
@@ -34,29 +35,44 @@ final class LibraryUITests: XCTestCase {
         destination.tap()
         let dismissed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: destination)
         XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 5), .completed, "Navigation menu did not dismiss")
+        currentSection = name
     }
 
     private func reveal(_ element: XCUIElement) {
-        // Menu dismissal and ScrollViewReader animation settle after the action returns.
-        let reachable = NSPredicate(format: "hittable == true")
-        if XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: reachable, object: element)], timeout: 3) == .completed { return }
-        for _ in 0..<8 {
-            // Offscreen children may be absent from a SwiftUI accessibility
-            // snapshot. Reading frame/identifier first throws before scrolling.
-            guard element.exists else { app.swipeUp(); continue }
-            if element.isHittable { return }
-            print("Reveal target \(element.identifier): exists=\(element.exists) frame=\(element.frame)")
+        // XCTest can throw while evaluating hittability for a SwiftUI child
+        // outside the viewport. Check existence and safe geometry first, also
+        // inside waits; a hittable-only predicate bypasses that protection.
+        func visible() -> Bool {
+            guard element.exists else { return false }
             let frame = element.frame
-            if frame.maxY < app.windows.firstMatch.frame.minY + 100 {
-                app.swipeDown()
-            } else {
-                app.swipeUp()
-            }
+            let viewport = app.windows.firstMatch.frame.insetBy(dx: 8, dy: 90)
+            return !frame.isEmpty && !frame.isInfinite && viewport.contains(frame)
         }
-        if XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: reachable, object: element)], timeout: 2) == .completed { return }
-        guard element.exists else { XCTFail("Target absent after bounded scrolling: \(app.debugDescription)"); return }
-        if !element.isHittable { print("Unreachable element: \(element.debugDescription)\n\(app.debugDescription)") }
-        XCTAssertTrue(element.isHittable)
+        let reachable = NSPredicate { _, _ in visible() && element.isHittable }
+        if XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: reachable, object: element)], timeout: 3) == .completed { return }
+        var resetToSection = false
+        for _ in 0..<12 {
+            guard element.exists else {
+                if !resetToSection { jump(currentSection); resetToSection = true }
+                else { app.swipeUp() }
+                continue
+            }
+            let frame = element.frame
+            let viewport = app.windows.firstMatch.frame.insetBy(dx: 8, dy: 90)
+            if visible() && element.isHittable { return }
+            // Short controlled drags avoid oscillating past a control when its
+            // layout moves after keyboard dismissal or a validation message.
+            let amount: CGFloat
+            if !frame.isEmpty && frame.minY < viewport.minY {
+                amount = min(viewport.minY - frame.minY + 30, viewport.height * 0.25)
+            } else {
+                amount = -min(max(30, frame.maxY - viewport.maxY + 30), viewport.height * 0.25)
+            }
+            let origin = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            origin.press(forDuration: 0.05, thenDragTo: origin.withOffset(CGVector(dx: 0, dy: amount)))
+        }
+        let reached = XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: reachable, object: element)], timeout: 2) == .completed
+        XCTAssertTrue(reached, "Target was not visible and hittable after bounded scrolling")
     }
 
     private func enter(_ element: XCUIElement, _ text: String) {
