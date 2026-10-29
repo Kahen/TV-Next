@@ -1,10 +1,10 @@
 FROM eclipse-temurin:21-jdk-alpine@sha256:fd52084c35bbac78890d95d57707d31ffc9d7a3324199e89c06be2a9dc71bfa0 AS builder
 WORKDIR /build
-COPY java/Json.java java/ProviderFailure.java jvm-spider/ApprovedSpiderLoader.java jvm-spider/JvmSpiderWorker.java ./
+COPY java/Json.java java/ProviderFailure.java jvm-spider/ApprovedSpiderLoader.java jvm-spider/JvmSpiderWorker.java jvm-spider/VerificationSmoke.java ./
 COPY jvm-spider/api ./api
 COPY jvm-spider/fixtures ./fixtures
 RUN mkdir host providers \
-    && javac --release 21 -encoding UTF-8 -d host $(find api -name '*.java') Json.java ProviderFailure.java ApprovedSpiderLoader.java JvmSpiderWorker.java \
+    && javac --release 21 -encoding UTF-8 -d host $(find api -name '*.java') Json.java ProviderFailure.java ApprovedSpiderLoader.java JvmSpiderWorker.java VerificationSmoke.java \
     && jar --create --file host.jar --date=2020-01-01T00:00:00Z -C host . \
     && javac --release 21 -encoding UTF-8 -cp host.jar -d providers $(find fixtures -name '*.java') \
     && jar --create --file approved.jar --date=2020-01-01T00:00:00Z -C providers .

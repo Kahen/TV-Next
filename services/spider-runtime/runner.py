@@ -27,6 +27,11 @@ APPROVED_TEST_PROVIDERS = frozenset({
     "owned-paged", "owned-fallback", "owned-throwing", "owned-invalid", "owned-cleanup",
     "owned-timeout", "owned-output", "owned-oom", "owned-processes", "owned-policy",
 })
+APPROVED_ERRORS = frozenset({
+    "invalid-request", "provider-not-approved", "jar-integrity", "jar-preflight", "unsupported-api",
+    "unsupported-method", "unsupported-pagination", "provider-execution", "invalid-provider-response",
+    "provider-cleanup-failed", "provider-resource-limit", "request-too-large", "output-too-large", "nonzero-exit",
+})
 METHODS = frozenset({"home", "category", "search", "detail", "player"})
 DIAGNOSTICS = frozenset({"__probe_network", "__probe_write", "__probe_policy", "__probe_output", "__crash", "__sleep"})
 MAX_INPUT = 16_384
@@ -137,6 +142,8 @@ def _run_runtime(
     timeout: float = 7.0, *, diagnostic: bool = False, version: int = 1,
     provider: str | None = None,
 ) -> RuntimeResponse:
+    if version not in (1, 2):
+        raise ValueError("unsupported protocol version")
     if runtime not in (IMAGES if version == 1 else APPROVED_IMAGES):
         raise ValueError("unsupported runtime")
     if method not in (DIAGNOSTICS if diagnostic and version == 1 else METHODS):
@@ -198,6 +205,8 @@ def _run_runtime(
                         code = "nonzero-exit"
                 except (ValueError, UnicodeDecodeError, AttributeError):
                     code = "nonzero-exit"
+                if version == 2 and code not in APPROVED_ERRORS:
+                    code = "provider-execution"
                 raise RuntimeFailure("runtime rejected request: " + code)
             try:
                 result = json.loads(payload.decode("utf-8"))

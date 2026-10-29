@@ -29,12 +29,7 @@ final class ApprovedSpiderLoader implements AutoCloseable {
             entry = "com.github.catvod.spider.OwnedVariants$" + VARIANTS.get(provider);
         }
         Path jar = Path.of("/worker/approved.jar");
-        if (Files.size(jar) > 16 * 1024 * 1024) throw new ProviderFailure("jar-integrity");
-        Map<?, ?> manifest = (Map<?, ?>) Json.parse(Files.readString(Path.of("/worker/approved.json")));
-        if (!"pure-jvm-candidate".equals(manifest.get("status"))) throw new ProviderFailure("jar-preflight");
-        byte[] digest = MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(jar));
-        if (!(manifest.get("sha256") instanceof String expected) || !expected.matches("[a-f0-9]{64}") ||
-            !MessageDigest.isEqual(digest, HexFormat.of().parseHex(expected))) throw new ProviderFailure("jar-integrity");
+        verify(jar, Path.of("/worker/approved.json"));
         classes = new URLClassLoader(new URL[] { jar.toUri().toURL() }, ClassLoader.getPlatformClassLoader()) {
             @Override protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
                 // Share exactly the host contract. Provider-owned classes cannot
@@ -58,6 +53,19 @@ final class ApprovedSpiderLoader implements AutoCloseable {
             classes.close();
             throw failure;
         }
+    }
+
+    /** Integrity/preflight verification is completed before opening a classloader. */
+    static void verify(Path jar, Path report) throws Exception {
+        if (Files.size(jar) > 16 * 1024 * 1024 || Files.size(report) > 65_536) throw new ProviderFailure("jar-integrity");
+        Map<?, ?> manifest;
+        try { manifest = (Map<?, ?>) Json.parse(Files.readString(report)); }
+        catch (Exception e) { throw new ProviderFailure("jar-preflight"); }
+        if (manifest == null || !(manifest.get("version") instanceof Long version) || version != 1L ||
+            !"pure-jvm-candidate".equals(manifest.get("status"))) throw new ProviderFailure("jar-preflight");
+        byte[] digest = MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(jar));
+        if (!(manifest.get("sha256") instanceof String expected) || !expected.matches("[a-f0-9]{64}") ||
+            !MessageDigest.isEqual(digest, HexFormat.of().parseHex(expected))) throw new ProviderFailure("jar-integrity");
     }
 
     @Override public void close() throws IOException {

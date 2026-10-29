@@ -62,10 +62,12 @@ class ApprovedJvmSpiderTests(unittest.TestCase):
                  json.dumps(normal | {'provider':'owned-policy'}).encode()]
         for wire in cases:
             name = 'tvnext-fixture-' + uuid.uuid4().hex[:20]
+            completed = False
             try:
                 result = subprocess.run(docker_command('java-spider', name), input=wire, capture_output=True, timeout=9)
+                completed = True
             finally:
-                if not _remove_container(name):
+                if not _remove_container(name, pending_creation=not completed):
                     raise RuntimeCleanupFailure('raw-wire container cleanup unconfirmed')
             self.assertEqual(result.returncode, 2, result.stderr[:300])
             response = json.loads(result.stdout)
@@ -117,6 +119,21 @@ class ApprovedJvmSpiderTests(unittest.TestCase):
         finally:
             if not _remove_container(container, pending_creation=pending):
                 raise RuntimeCleanupFailure('preflight evidence container cleanup unconfirmed')
+
+    def test_mutated_jar_and_invalid_preflight_are_rejected_before_class_initialization(self):
+        name = 'tvnext-fixture-' + uuid.uuid4().hex[:20]
+        command = docker_command('java-spider', name)
+        command[-1:-1] = ['--entrypoint', 'java']
+        command += ['-cp', '/worker/host.jar', 'VerificationSmoke']
+        completed = False
+        try:
+            result = subprocess.run(command, capture_output=True, timeout=9)
+            completed = True
+            self.assertEqual(result.returncode, 0, result.stderr[:500])
+            self.assertIn(b'malformed pin rejection passed', result.stdout)
+        finally:
+            if not _remove_container(name, pending_creation=not completed):
+                raise RuntimeCleanupFailure('pin-verification smoke cleanup unconfirmed')
 
 
 if __name__ == '__main__':

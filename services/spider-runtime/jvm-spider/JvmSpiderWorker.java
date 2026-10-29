@@ -15,6 +15,9 @@ import java.util.Set;
 public final class JvmSpiderWorker {
     private static final int LIMIT = 16_384;
     private static final Set<String> METHODS = Set.of("home", "category", "search", "detail", "player");
+    private static final Set<String> ERRORS = Set.of("invalid-request", "provider-not-approved", "jar-integrity",
+        "jar-preflight", "unsupported-api", "unsupported-method", "unsupported-pagination", "provider-execution",
+        "invalid-provider-response", "provider-cleanup-failed", "provider-resource-limit", "request-too-large", "output-too-large");
 
     @SuppressWarnings("unchecked")
     static Map<String, Object> object(Object value) {
@@ -133,7 +136,7 @@ public final class JvmSpiderWorker {
                 if (wrapped.getTargetException()==null) break;
                 error=wrapped.getTargetException();
             }
-            String code=error instanceof ProviderFailure ? error.getMessage() :
+            String code=error instanceof ProviderFailure && ERRORS.contains(error.getMessage()) ? error.getMessage() :
                 error instanceof LinkageError ? "unsupported-api" :
                 error instanceof OutOfMemoryError ? "provider-resource-limit" : "provider-execution";
             // Code is selected locally; exceptions and reflection targets are not serialized.
