@@ -28,6 +28,15 @@ final class LibraryUITests: XCTestCase {
     }
 
     private func jump(_ name: String) {
+        if name == "媒体库" {
+            // A dedicated production toolbar action avoids compact iPhone Menu
+            // truncation; every test uses this path when clearing local state.
+            let shortcut = app.buttons["library-navigation"]
+            XCTAssertTrue(shortcut.waitForExistence(timeout: 5))
+            shortcut.tap()
+            currentSection = name
+            return
+        }
         let menu = app.buttons["section-navigation"]
         XCTAssertTrue(menu.waitForExistence(timeout: 5))
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: menu)], timeout: 5), .completed)
