@@ -13,6 +13,7 @@ struct NativeWebDAVSection: View {
     @State private var entries: [NativeWebDAVItem] = []
     @State private var filter = ""
     @State private var mediaOnly = false
+    @State private var descending = false
     @State private var busy = false
     @State private var error: String?
     @State private var requestID = UUID()
@@ -72,7 +73,13 @@ struct NativeWebDAVSection: View {
                         .accessibilityIdentifier("webdav-filter")
                     Toggle("仅显示可播放文件（保留文件夹）", isOn: $mediaOnly)
                         .accessibilityIdentifier("webdav-media-only")
-                    let visible = NativeWebDAV.visibleEntries(entries, search: filter, mediaOnly: mediaOnly)
+                    Button(descending ? "名称排序：降序" : "名称排序：升序") {
+                        descending.toggle()
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier("webdav-sort")
+                    let visible = NativeWebDAV.visibleEntries(entries, search: filter, mediaOnly: mediaOnly,
+                                                               sortOrder: descending ? .descending : .ascending)
                     ForEach(visible) { entry in
                         Button {
                             if entry.isDirectory { open(entry.url) } else { play(entry) }
@@ -103,6 +110,7 @@ struct NativeWebDAVSection: View {
         entries = []
         filter = ""
         mediaOnly = false
+        descending = false
         busy = false
         error = nil
         do {
@@ -160,6 +168,7 @@ struct NativeWebDAVSection: View {
         entries = []
         filter = ""
         mediaOnly = false
+        descending = false
         username = ""
         password = ""
         busy = false
