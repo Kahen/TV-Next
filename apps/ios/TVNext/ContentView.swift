@@ -22,7 +22,7 @@ struct ContentView: View {
     @AppStorage("tv-next-api-url") private var serverURL = "http://localhost:8080"
     @State private var homeSession: NativeHomeSession?
     @State private var danmaku: [DanmakuComment] = []
-    @State private var danmakuOptions = DanmakuOptions()
+    @State private var danmakuOptions = DanmakuOptionsStore.load()
     @State private var remoteResourceKey: String?
     @State private var remoteDanmaku: [NativePlaybackResource] = []
     @State private var remoteSubtitles: [NativePlaybackResource] = []
@@ -309,19 +309,43 @@ struct ContentView: View {
                         }
                     }
                 }
-                Toggle("显示弹幕", isOn: $danmakuOptions.enabled)
+                HStack {
+                    Toggle("显示弹幕", isOn: $danmakuOptions.enabled)
+                        .fixedSize(horizontal: true, vertical: false)
+                        .accessibilityIdentifier("danmaku-enabled-toggle")
+                    Spacer(minLength: 8)
+                    // A separate, explicit action remains usable when a large
+                    // iPad accessibility row does not hit-test the switch thumb.
+                    Button(danmakuOptions.enabled ? "关闭弹幕" : "开启弹幕") {
+                        danmakuOptions.enabled.toggle()
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier("danmaku-enabled-action")
+                }
+                // Stable, user-visible state feedback; XCUI switch.value differs by iOS locale.
+                Text(danmakuOptions.enabled ? "弹幕已开启" : "弹幕已关闭")
+                    .font(.caption2).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("danmaku-enabled-status")
                 HStack { Text("透明度"); Slider(value: $danmakuOptions.opacity, in: 0.1...1) }
                 HStack { Text("字号"); Slider(value: $danmakuOptions.fontSize, in: 12...40, step: 1) }
                 HStack { Text("显示区域"); Slider(value: $danmakuOptions.area, in: 0.25...1, step: 0.25) }
                 HStack { Text("时长"); Slider(value: $danmakuOptions.duration, in: 4...15, step: 1) }
                 HStack { Text("偏移 \(Int(danmakuOptions.offset)) 秒"); Slider(value: $danmakuOptions.offset, in: -120...120, step: 1) }
-                TextField("屏蔽词，逗号分隔", text: $danmakuOptions.blocked).textFieldStyle(.roundedBorder)
+                TextField("屏蔽词，逗号分隔", text: Binding(
+                    get: { danmakuOptions.blocked },
+                    set: { danmakuOptions.blocked = DanmakuOptionsStore.boundedBlocked($0) }
+                )).textFieldStyle(.roundedBorder)
+                Text("显示设置仅保存在本机，不保存弹幕内容或媒体地址。")
+                    .font(.caption2).foregroundStyle(.secondary)
                 Button("清空弹幕") {
                     remoteDanmakuRequest = UUID()
                     remoteDanmakuTask?.cancel()
                     danmaku = []
                 }
             }
+        }
+        .onChange(of: danmakuOptions) { _, options in
+            DanmakuOptionsStore.save(options)
         }
     }
 
