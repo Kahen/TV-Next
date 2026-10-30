@@ -18,12 +18,22 @@ import FoundationNetworking
         precondition(playing == .playing)
         let position = try await NativeDLNA.queryPosition(endpoint: endpoint)
         precondition(position.seconds == 42 && position.durationSeconds == 120)
+        let forward = try await NativeDLNA.seekRelative(endpoint: endpoint, deltaSeconds: 15)
+        let afterForward = try await NativeDLNA.queryPosition(endpoint: endpoint)
+        precondition(forward == 57 && afterForward.seconds == 57)
+        let backward = try await NativeDLNA.seekRelative(endpoint: endpoint, deltaSeconds: -15)
+        let afterBackward = try await NativeDLNA.queryPosition(endpoint: endpoint)
+        precondition(backward == 42 && afterBackward.seconds == 42)
         try await NativeDLNA.send(.pause, endpoint: endpoint)
         let paused = try await NativeDLNA.queryState(endpoint: endpoint)
         precondition(paused == .pausedPlayback)
+        let pausedSeek = try await NativeDLNA.seekRelative(endpoint: endpoint, deltaSeconds: 15)
+        precondition(pausedSeek == 57)
         try await NativeDLNA.send(.stop, endpoint: endpoint)
         let stopped = try await NativeDLNA.queryState(endpoint: endpoint)
         precondition(stopped == .stopped)
+        do { _ = try await NativeDLNA.seekRelative(endpoint: endpoint, deltaSeconds: 15); fatalError("Seek succeeded without active media") }
+        catch NativeDLNAError.unsupportedSeek { }
         let resetPosition = try await NativeDLNA.queryPosition(endpoint: endpoint)
         precondition(resetPosition.seconds == 0)
         for (path, status) in [("redirect", 302), ("fault", 500)] {

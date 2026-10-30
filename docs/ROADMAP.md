@@ -153,3 +153,7 @@ An opt-in GetTransportInfo status query extends the manually configured private-
 ### Native DLNA position query increment (#104)
 
 - [ ] Read-only iPhone/iPad GetPositionInfo with bounded RelTime/TrackDuration parsing and explicit SwiftUI control; complete only after final-head simulator and aggregate CI. This is not seeking, SSDP discovery or real-device acceptance.
+
+### P4 native manual DLNA bounded REL_TIME seek (#106)
+
+An explicit native iPhone/iPad ±15-second seek control follows FongMi mobile `DLNACast.java` REL_TIME semantics. Each operation checks fresh device transport state and position, requires known finite duration, clamps target, and sends bounded SOAP Seek to the same manually configured private IPv4 renderer. Owned fixture, Swift smoke, XCTest/XCUI and final-head aggregate CI are required. This does not add SSDP, live seeking, real TV compatibility, SMB, or signed distribution. See [IOS_DLNA.md](IOS_DLNA.md).

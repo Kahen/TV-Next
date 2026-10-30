@@ -109,3 +109,7 @@ A native iPhone/iPad manual renderer now supports explicit AVTransport v1 GetTra
 ## Native DLNA read-only position snapshot (P4, #104)
 
 The native manual DLNA view adds an explicit GetPositionInfo request and a strict bounded SOAP RelTime/TrackDuration parser. No automatic polling, seek, persistence, SSDP or extra destination is introduced. Positive/negative Swift smoke, owned loopback transport, Python fixture and production iPhone/iPad XCUI are part of the new slice; only final-head successful CI constitutes automated acceptance. Real TV/Apple hardware and signed release remain unverified; parent #5 stays open.
+
+## 2026-10-30 native manual DLNA bounded seek (#106)
+
+A new iPhone/iPad explicit ±15-second REL_TIME seek subset uses fresh AVTransport GetTransportInfo/GetPositionInfo and strict finite-duration clamping before a private-LAN SOAP Seek. The owned fixture and positive/negative Swift/Python/XCTest/XCUI regressions are tracked in the feature PR; only a successful final-head full gate permits merging/closing the implementation issue. SSDP, real renderer models, SMB, independent security review, physical Apple devices and signed distribution remain unverified. P4 #5 and P2–P6 remain open.

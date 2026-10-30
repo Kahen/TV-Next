@@ -90,3 +90,7 @@ The read-only GetTransportInfo feature is an implementation slice, not full P4 a
 ### Native DLNA position query (#104)
 
 Acceptance requires strict direct SOAP GetPositionInfo RelTime/TrackDuration validation, positive and adversarial Swift smoke/XCTest, owned localhost Python/Swift network tests, production iPhone/iPad XCUI and all final-head aggregate jobs green. The read-only result must not be presented as verified real-device playback or seek support. Keep P4 #5 open.
+
+## Native manual DLNA finite-media relative seek (P4, #106)
+
+Explicit ±15-second native SwiftUI actions issue fresh GetTransportInfo and GetPositionInfo before AVTransport v1 Seek REL_TIME. Only PLAYING/PAUSED_PLAYBACK with positive known duration may seek; target is clamped and canonical. Unsupported/invalid states, unknown live duration, malformed times, invalid SOAP/HTTP, oversized responses, redirects and cancellation must fail closed. Owned Python fixture, Swift positive/negative smoke, localhost network test, XCTest and iPhone/iPad production XCUI plus final-head complete integration CI are required. A SOAP acknowledgement is not physical renderer playback evidence; P4 #5, device tests and P6 release gates remain open.

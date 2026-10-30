@@ -127,6 +127,46 @@ final class NativeDLNATests: XCTestCase {
         }
     }
 
+    func testBoundedSeekTargetAndInvalidInput() throws {
+        let endpoint = try NativeDLNA.rendererURL("http://127.0.0.1:8768/upnp/control/AVTransport1")
+        let request = try NativeDLNA.request(.seek, endpoint: endpoint, seekSeconds: 57)
+        XCTAssertEqual(request.value(forHTTPHeaderField: "SOAPACTION"),
+                       "\"urn:schemas-upnp-org:service:AVTransport:1#Seek\"")
+        XCTAssertTrue(String(decoding: request.httpBody!, as: UTF8.self)
+            .contains("<Unit>REL_TIME</Unit><Target>00:00:57</Target>"))
+        for value in [-1, 360000, Int.max] {
+            XCTAssertThrowsError(try NativeDLNA.request(.seek, endpoint: endpoint, seekSeconds: value))
+        }
+        XCTAssertThrowsError(try NativeDLNA.request(.seek, endpoint: endpoint))
+        XCTAssertEqual(try NativeDLNASeek.relativeTarget(
+            position: NativeDLNAPosition(seconds: 2, durationSeconds: 120), deltaSeconds: -15), 0)
+        XCTAssertEqual(try NativeDLNASeek.relativeTarget(
+            position: NativeDLNAPosition(seconds: 119, durationSeconds: 120), deltaSeconds: 15), 120)
+        XCTAssertThrowsError(try NativeDLNASeek.relativeTarget(
+            position: NativeDLNAPosition(seconds: 0, durationSeconds: nil), deltaSeconds: 15))
+        XCTAssertThrowsError(try NativeDLNASeek.relativeTarget(
+            position: NativeDLNAPosition(seconds: 0, durationSeconds: 0), deltaSeconds: 15))
+        XCTAssertThrowsError(try NativeDLNASeek.relativeTarget(
+            position: NativeDLNAPosition(seconds: 42, durationSeconds: 120), deltaSeconds: Int.max))
+    }
+
+    func testOwnedLoopbackRelativeSeekAndStoppedRejection() async throws {
+        let endpoint = try NativeDLNA.rendererURL("http://127.0.0.1:8768/upnp/control/AVTransport1")
+        let media = try NativeDLNA.mediaURL("https://media.example/owned.mp4?a=1&b=2")
+        try await NativeDLNA.cast(endpoint: endpoint, media: media)
+        let forward = try await NativeDLNA.seekRelative(endpoint: endpoint, deltaSeconds: 15)
+        XCTAssertEqual(forward, 57)
+        let afterForward = try await NativeDLNA.queryPosition(endpoint: endpoint)
+        XCTAssertEqual(afterForward.seconds, 57)
+        let backward = try await NativeDLNA.seekRelative(endpoint: endpoint, deltaSeconds: -15)
+        XCTAssertEqual(backward, 42)
+        try await NativeDLNA.send(.stop, endpoint: endpoint)
+        do {
+            _ = try await NativeDLNA.seekRelative(endpoint: endpoint, deltaSeconds: 15)
+            XCTFail("Seek succeeded on stopped renderer")
+        } catch NativeDLNAError.unsupportedSeek { }
+    }
+
     func testPositionInfoOwnedLoopbackQuery() async throws {
         let endpoint = try NativeDLNA.rendererURL("http://127.0.0.1:8768/upnp/control/AVTransport1")
         let media = try NativeDLNA.mediaURL("https://media.example/owned.mp4?a=1&b=2")
