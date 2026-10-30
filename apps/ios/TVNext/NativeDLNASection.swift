@@ -55,6 +55,9 @@ struct NativeDLNASection: View {
             Button("查询设备播放状态") { run(.getTransportInfo) }
                 .disabled(busy || endpoint == nil)
                 .accessibilityIdentifier("dlna-query-state")
+            Button("查询播放进度") { run(.getPositionInfo) }
+                .disabled(busy || endpoint == nil)
+                .accessibilityIdentifier("dlna-query-position")
             if busy { ProgressView("正在等待 DLNA 设备…") }
             if let status { Text(status).accessibilityIdentifier("dlna-status") }
             if let error { Text(error).foregroundStyle(.red).accessibilityIdentifier("dlna-error") }
@@ -93,6 +96,10 @@ struct NativeDLNASection: View {
                     guard !Task.isCancelled else { return }
                     castStarted = state.canControlPlayback
                     status = "设备状态：\(state.localizedLabel)"
+                } else if action == .getPositionInfo {
+                    let position = try await NativeDLNA.queryPosition(endpoint: endpoint)
+                    guard !Task.isCancelled else { return }
+                    status = "设备进度：\(position.localizedLabel)"
                 } else {
                     try await NativeDLNA.send(action, endpoint: endpoint)
                 }
