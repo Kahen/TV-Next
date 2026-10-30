@@ -117,3 +117,8 @@ A new iPhone/iPad explicit ±15-second REL_TIME seek subset uses fresh AVTranspo
 ## Native DLNA explicit pause/resume control (P4, #108)
 
 A native SwiftUI **继续播放** button is enabled only after an acknowledged pause or a fresh user-requested PAUSED_PLAYBACK state. A second fresh GetTransportInfo immediately precedes Play(Speed=1), rejecting stopped, already-playing and unsupported states. Renderer/media edits and failures clear the local paused state. The owned loopback SOAP fixture is exercised by positive/negative Swift network smoke, XCTest and production iPhone/iPad XCUI. This is pending final-HEAD integration CI, and does not establish actual TV/Apple device support, SSDP, SMB or release readiness.
+
+
+## Native DLNA absolute time seek (P4, #110)
+
+A native SwiftUI HH:MM:SS field and explicit seek action extend the manually configured private-LAN AVTransport subset. Input is strictly ASCII and validated before network access; the action checks fresh renderer state and finite media duration and rejects targets beyond the reported duration. Owned fixture, positive/negative Swift smoke/XCTest, network and production iPhone/iPad XCUI are part of the PR; final-head full CI remains required. No SSDP, real renderer compatibility, SMB, physical device acceptance or signed distribution is implied.
