@@ -1,5 +1,6 @@
 """Owned loopback-only DLNA AVTransport SOAP fixture; no external streams."""
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from time import sleep
 from xml.etree import ElementTree as ET
 
 HOST, PORT = '127.0.0.1', 8768
@@ -29,6 +30,14 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(302, b'', {'Location': 'http://127.0.0.1:8768/upnp/control/AVTransport1'})
         if self.path == '/oversize':
             return self.reply(200, b'X' * 32769)
+        if self.path == '/slow':
+            self.send_response(200)
+            self.send_header('Content-Length', '1024')
+            self.end_headers()
+            self.wfile.write(b'x')
+            self.wfile.flush()
+            sleep(12)
+            return
         if self.path == '/fault':
             return self.reply(500, b'<s:Fault>owned failure</s:Fault>')
         if self.path != '/upnp/control/AVTransport1':
