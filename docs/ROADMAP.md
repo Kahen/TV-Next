@@ -166,3 +166,7 @@ The iPhone/iPad SwiftUI DLNA controls now offer explicit Play resume after an ac
 ### P4 native DLNA explicit absolute seek (#110)
 
 An iPhone/iPad HH:MM:SS input requests a bounded absolute AVTransport REL_TIME Seek after fresh state and finite-duration queries. Strict ASCII time parsing and rejection of out-of-duration targets avoid surprising playback positions. Owned Swift/loopback/XCTest/XCUI and final-head full CI are required before accepting this increment. No SSDP, real TV, SMB, device validation or signed distribution; parent #5 remains open.
+
+### Native DLNA explicit device-description import (P4, #112)
+
+A user-entered private IPv4 HTTP UPnP device-description URL can be resolved to a single same-origin AVTransport:1 control URL in the native SwiftUI page. Bounded GET, strict XML service selection and negative security fixtures prevent arbitrary remote control endpoint substitution; no SSDP discovery or background scanning is added. Swift smoke, owned localhost network, XCTest, iPhone/iPad XCUI and full final-head CI are required. Parent P4 #5 remains open for actual discovery, SMB, media compatibility and hardware acceptance.
