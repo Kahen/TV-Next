@@ -138,6 +138,8 @@ private final class NativeDLNABoundedTransport: NSObject, URLSessionDataDelegate
     private var response: URLResponse?
     private var continuation: CheckedContinuation<(Data, URLResponse), Error>?
     private var finished = false
+    private var cancelled = false
+    private let completionLock = NSLock()
 
     private init(maxBytes: Int) { self.maxBytes = maxBytes }
 
@@ -146,23 +148,53 @@ private final class NativeDLNABoundedTransport: NSObject, URLSessionDataDelegate
         let configuration = URLSessionConfiguration.ephemeral
         configuration.httpShouldSetCookies = false
         configuration.httpCookieAcceptPolicy = .never
+        configuration.timeoutIntervalForResource = 8
+        configuration.connectionProxyDictionary = [:]
         let session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
-        defer { session.invalidateAndCancel() }
+        // Create the task before cancellation is registered. Cancelling a task
+        // never invalidates its session before URLSession creates that task.
+        let task = session.dataTask(with: request)
+        let deadline = Task {
+            try? await Task.sleep(nanoseconds: 8_000_000_000)
+            if !Task.isCancelled { delegate.abort(task, error: URLError(.timedOut)) }
+        }
+        defer { deadline.cancel(); session.invalidateAndCancel() }
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<(Data, URLResponse), Error>) in
-                delegate.continuation = continuation
-                session.dataTask(with: request).resume()
+                delegate.begin(continuation, task: task)
             }
         } onCancel: {
-            session.invalidateAndCancel()
+            delegate.abort(task, error: CancellationError())
         }
     }
 
+    private func begin(_ pending: CheckedContinuation<(Data, URLResponse), Error>, task: URLSessionDataTask) {
+        completionLock.lock()
+        if cancelled || finished {
+            completionLock.unlock()
+            pending.resume(throwing: CancellationError())
+            return
+        }
+        continuation = pending
+        completionLock.unlock()
+        task.resume()
+    }
+
+    private func abort(_ task: URLSessionDataTask, error: Error) {
+        completionLock.lock()
+        cancelled = true
+        completionLock.unlock()
+        task.cancel()
+        finish(.failure(error))
+    }
+
     private func finish(_ result: Result<(Data, URLResponse), Error>) {
-        guard !finished else { return }
+        completionLock.lock()
+        guard !finished else { completionLock.unlock(); return }
         finished = true
         let pending = continuation
         continuation = nil
+        completionLock.unlock()
         pending?.resume(with: result)
     }
 
