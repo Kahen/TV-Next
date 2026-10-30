@@ -10,6 +10,27 @@ import FoundationNetworking
         let set = try NativeDLNA.request(.setURI, endpoint: endpoint, media: media)
         precondition(String(decoding: set.httpBody!, as: UTF8.self).contains("a=1&amp;b=2"))
         precondition(set.value(forHTTPHeaderField: "SOAPACTION") == "\"urn:schemas-upnp-org:service:AVTransport:1#SetAVTransportURI\"")
+        let seek = try NativeDLNA.request(.seek, endpoint: endpoint, seekSeconds: 57)
+        precondition(seek.value(forHTTPHeaderField: "SOAPACTION") == "\"urn:schemas-upnp-org:service:AVTransport:1#Seek\"")
+        precondition(String(decoding: seek.httpBody!, as: UTF8.self).contains("<Unit>REL_TIME</Unit><Target>00:00:57</Target>"))
+        for bad in [-1, 360000, Int.max] {
+            do { _ = try NativeDLNA.request(.seek, endpoint: endpoint, seekSeconds: bad); fatalError("Accepted invalid seek") }
+            catch NativeDLNAError.invalidSeek { }
+        }
+        do { _ = try NativeDLNA.request(.seek, endpoint: endpoint); fatalError("Accepted missing target") }
+        catch NativeDLNAError.invalidSeek { }
+        let forwardTarget = try NativeDLNASeek.relativeTarget(position: NativeDLNAPosition(seconds: 42, durationSeconds: 120), deltaSeconds: 15)
+        precondition(forwardTarget == 57)
+        let lowerBound = try NativeDLNASeek.relativeTarget(position: NativeDLNAPosition(seconds: 4, durationSeconds: 120), deltaSeconds: -15)
+        precondition(lowerBound == 0)
+        let upperBound = try NativeDLNASeek.relativeTarget(position: NativeDLNAPosition(seconds: 119, durationSeconds: 120), deltaSeconds: 15)
+        precondition(upperBound == 120)
+        for position in [NativeDLNAPosition(seconds: 10, durationSeconds: nil), NativeDLNAPosition(seconds: 0, durationSeconds: 0)] {
+            do { _ = try NativeDLNASeek.relativeTarget(position: position, deltaSeconds: 15); fatalError("Accepted nonfinite seek") }
+            catch NativeDLNAError.unsupportedSeek { }
+        }
+        do { _ = try NativeDLNASeek.relativeTarget(position: NativeDLNAPosition(seconds: 42, durationSeconds: 120), deltaSeconds: Int.max); fatalError("Accepted unbounded delta") }
+        catch NativeDLNAError.invalidSeek { }
         let pause = try NativeDLNA.request(.pause, endpoint: endpoint)
         precondition(String(decoding: pause.httpBody!, as: UTF8.self).contains("<u:Pause"))
         for invalid in ["https://192.168.1.2:1400/upnp", "http://8.8.8.8:1400/upnp", "http://example.com:1400/upnp", "http://192.168.1.2:1400/", "http://user:pw@192.168.1.2:1400/upnp", "http://192.168.1.2:1400/upnp?x=1", "http://192.168.1.2:1400/upnp/%2e%2e/admin", "http://192.168.1.2:1400/upnp#fragment", "http://192.168.1.02:1400/upnp"] {

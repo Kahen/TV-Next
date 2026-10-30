@@ -460,12 +460,15 @@ final class LibraryUITests: XCTestCase {
         XCTAssertFalse(app.buttons["dlna-pause"].isEnabled)
         XCTAssertFalse(app.buttons["dlna-query-state"].isEnabled)
         XCTAssertFalse(app.buttons["dlna-query-position"].isEnabled)
+        XCTAssertFalse(app.buttons["dlna-seek-forward"].isEnabled)
+        XCTAssertFalse(app.buttons["dlna-seek-back"].isEnabled)
         enter(app.textFields["dlna-renderer-url"], "http://8.8.8.8:1400/upnp/control")
         enter(app.textFields["dlna-media-url"], "https://media.example/owned.mp4?a=1&b=2")
         reveal(cast)
         XCTAssertFalse(cast.isEnabled, "Public WAN control endpoints must not be contacted")
         XCTAssertFalse(app.buttons["dlna-query-state"].isEnabled)
         XCTAssertFalse(app.buttons["dlna-query-position"].isEnabled)
+        XCTAssertFalse(app.buttons["dlna-seek-forward"].isEnabled)
         XCTAssertFalse(app.staticTexts["dlna-status"].exists)
     }
 
@@ -488,6 +491,16 @@ final class LibraryUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "label == %@", "设备进度：00:00:42 / 00:02:00"), object: status)], timeout: 15), .completed)
 
+        let seekForward = app.buttons["dlna-seek-forward"]
+        reveal(seekForward)
+        XCTAssertTrue(seekForward.isEnabled)
+        seekForward.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "已请求跳转至：00:00:57"), object: status)], timeout: 15), .completed)
+        reveal(position)
+        position.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "设备进度：00:00:57 / 00:02:00"), object: status)], timeout: 15), .completed)
         let query = app.buttons["dlna-query-state"]
         reveal(query)
         XCTAssertTrue(query.isEnabled)
