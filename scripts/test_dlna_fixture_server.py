@@ -43,6 +43,22 @@ class DLNAFixtureTests(unittest.TestCase):
             self.assertEqual(status, 200)
             self.assertIn((action + 'Response').encode(), body)
 
+    def test_transport_state_tracks_commands(self):
+        self.assertEqual(self.post('/upnp/control/AVTransport1', 'SetAVTransportURI',
+                                   'https://media.example/owned.mp4?a=1&amp;b=2')[0], 200)
+        status, body = self.post('/upnp/control/AVTransport1', 'GetTransportInfo')
+        self.assertEqual(status, 200)
+        self.assertIn(b'<CurrentTransportState>STOPPED</CurrentTransportState>', body)
+        self.assertEqual(self.post('/upnp/control/AVTransport1', 'Play')[0], 200)
+        self.assertIn(b'<CurrentTransportState>PLAYING</CurrentTransportState>',
+                      self.post('/upnp/control/AVTransport1', 'GetTransportInfo')[1])
+        self.assertEqual(self.post('/upnp/control/AVTransport1', 'Pause')[0], 200)
+        self.assertIn(b'<CurrentTransportState>PAUSED_PLAYBACK</CurrentTransportState>',
+                      self.post('/upnp/control/AVTransport1', 'GetTransportInfo')[1])
+        self.assertEqual(self.post('/upnp/control/AVTransport1', 'Stop')[0], 200)
+        self.assertIn(b'<CurrentTransportState>STOPPED</CurrentTransportState>',
+                      self.post('/upnp/control/AVTransport1', 'GetTransportInfo')[1])
+
     def test_rejects_invalid_action_and_uri(self):
         self.assertEqual(self.post('/upnp/control/AVTransport1', 'Delete')[0], 400)
         self.assertEqual(self.post('/upnp/control/AVTransport1', 'SetAVTransportURI', 'file:///private/a')[0], 400)

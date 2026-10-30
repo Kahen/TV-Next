@@ -100,3 +100,7 @@ Read-only native WebDAV requests optional `DAV:getcontentlength` in the same Dep
 ## Native manual DLNA AVTransport subset (P4, #100)
 
 Native SwiftUI now exposes a manually entered LAN AVTransport control URL and direct HTTP(S) media URL. A bounded SOAP v1 client issues SetAVTransportURI → Play, and separate Pause/Stop, following FongMi's mobile DLNACast sequence. Renderer endpoints are restricted to explicit private/loopback IPv4 HTTP literals; redirects, credentialed URLs and oversized/malformed SOAP responses are rejected. A synthetic localhost fixture and iPhone/iPad XCTest/XCUI cover positive/negative paths; **final-head CI is required before accepting this increment**. This is not SSDP discovery, real renderer/codec interoperability, credentialed media relay, signed distribution or physical-device acceptance. See [IOS_DLNA.md](IOS_DLNA.md). P4 #5 remains open.
+
+## Native DLNA read-only transport status (P4, #102)
+
+A native iPhone/iPad manual renderer now supports explicit AVTransport v1 GetTransportInfo and a read-only status button, reusing the bounded SOAP transport. The parser requires one direct CurrentTransportState in the correct SOAP action response and accepts only known UPnP state values; invalid/nested/duplicate/foreign values fail closed. A stateful owned fixture, positive/negative Swift smoke, XCTest and production XCUI test the reported transitions. Final-head CI evidence belongs to the feature PR. This is not SSDP discovery, a physical TV compatibility result, a decoder test or a security audit.
