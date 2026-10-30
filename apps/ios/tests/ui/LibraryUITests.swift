@@ -278,7 +278,9 @@ final class LibraryUITests: XCTestCase {
             previous.tap()
             XCTAssertTrue(app.alerts["删除离线媒体？"].waitForExistence(timeout: 5))
             app.alerts.buttons["删除离线文件"].tap()
-            XCTAssertFalse(previous.exists)
+            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "exists == false"), object: previous)], timeout: 5), .completed,
+                "Confirmed cleanup must remove the previous offline catalog entry")
         }
         enter(app.textFields["offline-url"], "http://127.0.0.1:8765/fixture.mp4")
         enter(app.textFields["offline-name"], "Owned Offline")
@@ -313,7 +315,9 @@ final class LibraryUITests: XCTestCase {
         remove.tap()
         XCTAssertTrue(confirmation.waitForExistence(timeout: 5))
         confirmation.buttons["删除离线文件"].tap()
-        XCTAssertFalse(play.exists, "Confirmed deletion must remove the offline catalog entry")
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"), object: play)], timeout: 5), .completed,
+            "Confirmed deletion must remove the offline catalog entry")
         jump("播放器")
         XCTAssertTrue(app.staticTexts["current-media"].label.contains("尚未选择媒体"), "Confirmed deletion must release the active local player item")
     }
