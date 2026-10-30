@@ -139,3 +139,8 @@ Known-advisory build/test packages are upgraded with a regenerated npm lockfile.
 ## 2026-10-28 live replay increment
 
 Original FongMi timeshift Result resolution and the bounded programme catchup subset now have Web/iOS controls, authenticated capability relay and historical XMLTV views. See [LIVE_REPLAY.md](LIVE_REPLAY.md) for the pinned source mapping, supported date/time tokens, explicit exclusions and regression coverage. [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) reconciles previously merged action/search/AirPlay/Keychain work with the remaining code backlog. P2–P6 are still incomplete.
+
+
+### P4 native DLNA manual-control increment (#100)
+
+A first iOS AVTransport v1 manual-control slice adds direct SetAVTransportURI/Play/Pause/Stop with explicit LAN renderer endpoint validation and bounded SOAP transport, following FongMi mobile DLNACast. It does **not** fulfill the broader DLNA discovery, renderer interoperability or physical-device acceptance checkbox above. Final-head CI and details: [IOS_DLNA.md](IOS_DLNA.md). Parent P4 #5 stays open.

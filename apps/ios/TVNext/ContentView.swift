@@ -88,6 +88,7 @@ struct ContentView: View {
                     ConfigPreviewSection().id("config")
                     CloudSection(serverURL: serverURL) { library.play($0) }.id("cloud")
                     NativeWebDAVSection(onPlay: { library.play($0) }, onDisconnect: { library.revokeWebDAV(root: $0) }).id("webdav")
+                    NativeDLNASection(library: library).id("dlna")
                     SubscriptionSection(serverURL: serverURL, session:homeSession, onPlay: { playback, title in
                         library.play(TVChannel(name: title + " · " + playback.name, url: playback.url, group: playback.lineName, logo: nil, tvgId: nil, headers:playback.headers, timeshift:playback.timeshift))
                         remoteResourceKey = playback.url
@@ -121,6 +122,14 @@ struct ContentView: View {
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle("TV-Next")
             .toolbar {
+                // A dedicated library shortcut keeps all Menu actions reachable on
+                // compact iPhones: the 14th Menu item was not exposed by XCUI.
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { navigate(to: "library") } label: {
+                        Label("媒体库", systemImage: "square.stack")
+                    }
+                    .accessibilityIdentifier("library-navigation")
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         Button("播放器") { navigate(to: "player") }
@@ -132,10 +141,10 @@ struct ContentView: View {
                         Button("TVBox 订阅") { navigate(to: "subscription") }
                         Button("网盘文件") { navigate(to: "cloud") }
                         Button("WebDAV 文件") { navigate(to: "webdav") }
+                        Button("DLNA 投屏") { navigate(to: "dlna") }
                         Button("直播节目表") { navigate(to: serverURL+"|"+(homeSession?.token ?? "")) }
                         Button("家庭服务器") { navigate(to: "home-server") }
                         Button("弹幕设置") { navigate(to: "danmaku") }
-                        Button("媒体库") { navigate(to: "library") }
                     } label: { Label("功能导航", systemImage: "line.3.horizontal") }
                     .accessibilityIdentifier("section-navigation")
                 }

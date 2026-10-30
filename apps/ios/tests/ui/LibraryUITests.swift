@@ -28,6 +28,15 @@ final class LibraryUITests: XCTestCase {
     }
 
     private func jump(_ name: String) {
+        if name == "媒体库" {
+            // A dedicated production toolbar action avoids compact iPhone Menu
+            // truncation; every test uses this path when clearing local state.
+            let shortcut = app.buttons["library-navigation"]
+            XCTAssertTrue(shortcut.waitForExistence(timeout: 5))
+            shortcut.tap()
+            currentSection = name
+            return
+        }
         let menu = app.buttons["section-navigation"]
         XCTAssertTrue(menu.waitForExistence(timeout: 5))
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: menu)], timeout: 5), .completed)
@@ -442,5 +451,43 @@ final class LibraryUITests: XCTestCase {
         app.buttons["inspect-config"].tap()
         XCTAssertFalse(app.staticTexts["config-error"].exists)
         XCTAssertTrue(app.staticTexts["Owned Fixture"].exists)
+    }
+
+    func testManualDLNARejectsUnsafeRendererWithoutNetworking() {
+        jump("DLNA 投屏")
+        let cast = app.buttons["dlna-cast"]
+        XCTAssertFalse(cast.isEnabled)
+        XCTAssertFalse(app.buttons["dlna-pause"].isEnabled)
+        enter(app.textFields["dlna-renderer-url"], "http://8.8.8.8:1400/upnp/control")
+        enter(app.textFields["dlna-media-url"], "https://media.example/owned.mp4?a=1&b=2")
+        reveal(cast)
+        XCTAssertFalse(cast.isEnabled, "Public WAN control endpoints must not be contacted")
+        XCTAssertFalse(app.staticTexts["dlna-status"].exists)
+    }
+
+    func testManualDLNACastPauseStopAgainstOwnedLoopbackFixture() {
+        jump("DLNA 投屏")
+        enter(app.textFields["dlna-renderer-url"], "http://127.0.0.1:8768/upnp/control/AVTransport1")
+        enter(app.textFields["dlna-media-url"], "https://media.example/owned.mp4?a=1&b=2")
+        let cast = app.buttons["dlna-cast"]
+        reveal(cast)
+        XCTAssertTrue(cast.isEnabled)
+        cast.tap()
+        let status = app.staticTexts["dlna-status"]
+        XCTAssertTrue(status.waitForExistence(timeout: 15), "Owned SOAP SetURI + Play did not complete")
+        XCTAssertEqual(status.label, "投屏已开始")
+        XCTAssertFalse(app.staticTexts["dlna-error"].exists)
+        let pause = app.buttons["dlna-pause"]
+        reveal(pause)
+        XCTAssertTrue(pause.isEnabled)
+        pause.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "已发送暂停命令"), object: status)], timeout: 15), .completed)
+        let stop = app.buttons["dlna-stop"]
+        reveal(stop)
+        stop.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "已发送停止命令"), object: status)], timeout: 15), .completed)
+        XCTAssertFalse(stop.isEnabled)
     }
 }
