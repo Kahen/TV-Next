@@ -148,3 +148,8 @@ A first iOS AVTransport v1 manual-control slice adds direct SetAVTransportURI/Pl
 ### P4 native manual DLNA state query (#102)
 
 An opt-in GetTransportInfo status query extends the manually configured private-LAN AVTransport control slice. SwiftUI reports device-acknowledged transport state, distinct from Play/Pause/Stop command acknowledgements; bounded namespace-aware XML parsing rejects invalid or ambiguous values. Owned SOAP fixtures and simulator tests are required before merge. SSDP discovery, physical renderer compatibility and signed distribution remain outstanding. See [IOS_DLNA.md](IOS_DLNA.md).
+
+
+### Native DLNA position query increment (#104)
+
+- [ ] Read-only iPhone/iPad GetPositionInfo with bounded RelTime/TrackDuration parsing and explicit SwiftUI control; complete only after final-head simulator and aggregate CI. This is not seeking, SSDP discovery or real-device acceptance.
