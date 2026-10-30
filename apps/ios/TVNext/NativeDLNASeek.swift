@@ -14,8 +14,9 @@ enum NativeDLNASeek {
 
     /// Parse only canonical ASCII HH:MM:SS before any network request.
     static func parseAbsolute(_ text: String) throws -> Int {
+        guard text.utf8.count == 8 else { throw NativeDLNAError.invalidSeek }
         let bytes = Array(text.utf8)
-        guard bytes.count == 8, bytes[2] == 58, bytes[5] == 58 else {
+        guard bytes[2] == 58, bytes[5] == 58 else {
             throw NativeDLNAError.invalidSeek
         }
         for index in [0, 1, 3, 4, 6, 7] {
@@ -49,10 +50,8 @@ enum NativeDLNASeek {
 }
 
 extension NativeDLNA {
-    /// Fresh device state and position are required before each explicit Seek.
-    /// A renderer can change state between requests; the final SOAP response
-    /// is only a command acknowledgement, not proof of completed playback.
     /// Non-atomic fresh-state, fresh-position, then explicit REL_TIME Seek.
+    /// A SOAP acknowledgement is not proof of completed playback.
     static func seekAbsolute(endpoint: URL, targetText: String) async throws -> Int {
         let requested = try NativeDLNASeek.parseAbsolute(targetText)
         let approved = try rendererURL(endpoint.absoluteString)
