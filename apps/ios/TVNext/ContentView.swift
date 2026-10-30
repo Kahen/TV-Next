@@ -122,11 +122,16 @@ struct ContentView: View {
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle("TV-Next")
             .toolbar {
+                // A dedicated library shortcut keeps all Menu actions reachable on
+                // compact iPhones: the 14th Menu item was not exposed by XCUI.
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { navigate(to: "library") } label: {
+                        Label("媒体库", systemImage: "square.stack")
+                    }
+                    .accessibilityIdentifier("library-navigation")
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
-                        // Keep the library destination visible on compact iPhone menus.
-                        // XCTest clears device-local state through this production route.
-                        Button("媒体库") { navigate(to: "library") }
                         Button("播放器") { navigate(to: "player") }
                         Button("快速播放") { navigate(to: "quick-play") }
                         Button("本机文件与字幕") { navigate(to: "local-media") }
