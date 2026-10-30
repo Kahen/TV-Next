@@ -108,6 +108,33 @@ final class NativeWebDAVTests: XCTestCase {
         XCTAssertTrue(entries.dropFirst().allSatisfy { !$0.isDirectory })
     }
 
+    func testFolderFirstNaturalSortIsLocalAndStable() throws {
+        let root = try NativeWebDAV.rootURL("https://example.test/dav")
+        func item(_ name: String, folder: Bool = false) -> NativeWebDAVItem {
+            NativeWebDAVItem(url: root.appendingPathComponent(name, isDirectory: folder),
+                             name: name, isDirectory: folder)
+        }
+        let unsorted = [item("clip10.mp4"), item("Season10", folder: true),
+                        item("notes.txt"), item("clip2.mp4"), item("Season2", folder: true)]
+        XCTAssertEqual(NativeWebDAV.visibleEntries(unsorted, search: "", mediaOnly: false).map(\.name),
+                       ["Season2", "Season10", "clip2.mp4", "clip10.mp4", "notes.txt"])
+        XCTAssertEqual(NativeWebDAV.visibleEntries(unsorted, search: "", mediaOnly: false,
+                                                   sortOrder: .descending).map(\.name),
+                       ["Season10", "Season2", "notes.txt", "clip10.mp4", "clip2.mp4"])
+        XCTAssertEqual(NativeWebDAV.visibleEntries(unsorted, search: " CLIP ", mediaOnly: true,
+                                                   sortOrder: .descending).map(\.name),
+                       ["clip10.mp4", "clip2.mp4"])
+        XCTAssertTrue(NativeWebDAV.visibleEntries(unsorted, search: "notes", mediaOnly: true,
+                                                  sortOrder: .descending).isEmpty)
+        XCTAssertTrue(NativeWebDAV.visibleEntries([], search: "", mediaOnly: false,
+                                                  sortOrder: .descending).isEmpty)
+        let aliases = [NativeWebDAVItem(url: root.appendingPathComponent("b.mp4"), name: "Same", isDirectory: false),
+                       NativeWebDAVItem(url: root.appendingPathComponent("a.mp4"), name: "Same", isDirectory: false)]
+        XCTAssertEqual(NativeWebDAV.visibleEntries(aliases, search: "", mediaOnly: false,
+                                                   sortOrder: .descending).map(\.url.lastPathComponent),
+                       ["a.mp4", "b.mp4"], "Equal names must not reorder unpredictably")
+    }
+
     func testLocalFilenameFilterAndMediaOnlyKeepFoldersNavigable() throws {
         let root = try NativeWebDAV.rootURL("https://example.test/dav")
         let entries = [

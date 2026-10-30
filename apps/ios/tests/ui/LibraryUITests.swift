@@ -157,6 +157,7 @@ final class LibraryUITests: XCTestCase {
         XCTAssertFalse(connect.isEnabled)
         XCTAssertFalse(app.buttons["webdav-refresh"].exists)
         XCTAssertFalse(app.textFields["webdav-filter"].exists)
+        XCTAssertFalse(app.buttons["webdav-sort"].exists)
         enter(app.textFields["webdav-url"], "javascript:alert(1)")
         reveal(connect)
         connect.tap()
@@ -177,6 +178,11 @@ final class LibraryUITests: XCTestCase {
         let folder = app.buttons["Folder"]
         XCTAssertTrue(owned.waitForExistence(timeout: 15), "Localhost Depth:1 listing did not load")
         XCTAssertTrue(folder.exists)
+        let sort = app.buttons["webdav-sort"]
+        reveal(sort)
+        XCTAssertTrue(sort.label.contains("升序"))
+        sort.tap()
+        XCTAssertTrue(sort.label.contains("降序"), "Native sort button must update its real state")
         let toggle = app.switches["webdav-media-only"]
         reveal(toggle)
         toggle.tap()
@@ -199,11 +205,13 @@ final class LibraryUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["webdav-error"].waitForExistence(timeout: 2),
                        "Editing an unconnected form applied credentials to the active server")
         XCTAssertTrue(owned.waitForExistence(timeout: 15))
+        XCTAssertTrue(sort.label.contains("降序"), "Refresh must preserve the local sort selection")
         XCTAssertFalse(folder.exists, "Refreshing the same folder must preserve its local search")
         let disconnect = app.buttons["webdav-disconnect"]
         reveal(disconnect)
         disconnect.tap()
         XCTAssertFalse(app.textFields["webdav-filter"].exists)
+        XCTAssertFalse(sort.exists)
         XCTAssertFalse(refresh.exists)
     }
 

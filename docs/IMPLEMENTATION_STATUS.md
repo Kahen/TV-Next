@@ -87,3 +87,7 @@ Production iPhone/iPad XCUI covers owned-fixture download, relaunch, playback,
 cancel and confirm. See [IOS_OFFLINE_DELETE.md](IOS_OFFLINE_DELETE.md).
 Final-head simulator/integration gates and physical-device acceptance are distinct;
 this does not implement resumable/HLS/DRM downloads, SMB/DLNA or signed releases.
+
+## Native WebDAV folder-first sorting (P4, #96)
+
+The native connected-directory view now offers a local ascending/descending natural filename sort. Folders remain first; a deterministic URL tie-breaker avoids unstable equal-name ordering. The selected order survives directory navigation and refresh but resets on new connection/disconnect. This does not change Depth:1 requests, the 200-entry limit, credential handling or media relay. Positive/negative/boundary Swift smoke and XCTest plus production SwiftUI XCUI are added; final-head CI, physical-device and external-provider verification are separate. Parent P4 #5 remains open.

@@ -36,6 +36,25 @@ import Foundation
         precondition(items.map(\.name) == ["Sub", "Owned Film.mp4"], "Unexpected children: \(items)")
         precondition(items[0].url.absoluteString == "https://media.example/dav/Movies/Sub/")
         precondition(!NativeWebDAV.playable(items[0]) && NativeWebDAV.playable(items[1]))
+
+        // Sorting is local and deterministic; directories stay first in both orders.
+        let sortCandidates = [
+            NativeWebDAVItem(url: root.appendingPathComponent("Season10", isDirectory: true), name: "Season10", isDirectory: true),
+            NativeWebDAVItem(url: root.appendingPathComponent("clip10.mp4"), name: "clip10.mp4", isDirectory: false),
+            NativeWebDAVItem(url: root.appendingPathComponent("Season2", isDirectory: true), name: "Season2", isDirectory: true),
+            NativeWebDAVItem(url: root.appendingPathComponent("clip2.mp4"), name: "clip2.mp4", isDirectory: false),
+            NativeWebDAVItem(url: root.appendingPathComponent("notes.txt"), name: "notes.txt", isDirectory: false)
+        ]
+        precondition(NativeWebDAV.visibleEntries(sortCandidates, search: "", mediaOnly: false).map(\.name) ==
+                     ["Season2", "Season10", "clip2.mp4", "clip10.mp4", "notes.txt"])
+        precondition(NativeWebDAV.visibleEntries(sortCandidates, search: "", mediaOnly: false,
+                                                 sortOrder: .descending).map(\.name) ==
+                     ["Season10", "Season2", "notes.txt", "clip10.mp4", "clip2.mp4"])
+        precondition(NativeWebDAV.visibleEntries(sortCandidates, search: " CLIP ", mediaOnly: true,
+                                                 sortOrder: .descending).map(\.name) == ["clip10.mp4", "clip2.mp4"])
+        precondition(NativeWebDAV.visibleEntries(sortCandidates, search: "notes", mediaOnly: true,
+                                                 sortOrder: .descending).isEmpty)
+
         precondition(NativeWebDAV.contains(folder, root: root))
         precondition(!NativeWebDAV.contains(URL(string: "https://media.example/dav2")!, root: root))
         precondition(!NativeWebDAV.contains(URL(string: "https://evil.example/dav/Movies")!, root: root))
