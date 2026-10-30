@@ -25,3 +25,11 @@ The initial final-head [full integration run #41005691395](https://github.com/Ka
 ## Remaining work
 
 SSDP discovery and device description parsing with network permission and multicast-entitlement assessment, real renderer models, DLNA URI metadata/DIDL-Lite compatibility, authenticated media relay for approved streams, seek and remote position, external subtitles, background behavior and physical iPhone/iPad tests remain P4/P5 tasks. Parent #5 stays open; release/signing gates remain P6.
+
+## Read-only renderer playback state query (P4, #102)
+
+The native **查询设备播放状态** button sends the standard AVTransport v1 `GetTransportInfo` action to the same manually approved LAN control endpoint. The app displays the **device-reported** `CurrentTransportState` separately from acknowledgements for SetURI/Play/Pause/Stop. A query can report STOPPED, PLAYING, PAUSED_PLAYBACK, TRANSITIONING, NO_MEDIA_PRESENT, RECORDING or PAUSED_RECORDING. Unknown, absent, duplicated, nested or foreign-namespace states are rejected rather than displayed as verified playback. A successful state query is not proof that the renderer decoded video or that the screen is showing the requested media.
+
+The query uses the same explicit private IPv4 control URL, 8-second overall deadline, no redirects/cookies/proxy, 32 KiB streamed cap, cancellation and strict SOAP namespace validation as manual casting. No automatic SSDP discovery, background polling, credentials or URL persistence is added. A user may query an already-playing renderer; pause/stop become available only when its reported state permits playback control. An invalid/public endpoint leaves the query disabled.
+
+Automated coverage: positive and negative Swift smoke/XCTest for exact state extraction, missing/unknown/duplicate/nested/foreign values and response limits; an owned stateful localhost SOAP fixture verifies Play → PAUSED_PLAYBACK → STOPPED; production SwiftUI XCUI exercises the real query button on both simulator families. Final-HEAD integration CI and physical renderer testing remain separate. No physical iPhone/iPad, real TV, SSDP, security audit or signed distribution is claimed.
