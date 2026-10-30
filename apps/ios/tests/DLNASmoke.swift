@@ -32,7 +32,8 @@ import FoundationNetworking
         let query = try NativeDLNA.request(.getTransportInfo, endpoint: endpoint)
         precondition(query.value(forHTTPHeaderField: "SOAPACTION") == "\"urn:schemas-upnp-org:service:AVTransport:1#GetTransportInfo\"")
         let stateSOAP = Data("<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\"><s:Body><u:GetTransportInfoResponse xmlns:u=\"urn:schemas-upnp-org:service:AVTransport:1\"><CurrentTransportState>PLAYING</CurrentTransportState></u:GetTransportInfoResponse></s:Body></s:Envelope>".utf8)
-        precondition(try NativeDLNA.parseStateResponse(stateSOAP, response: response) == .playing)
+        let reportedState = try NativeDLNA.parseStateResponse(stateSOAP, response: response)
+        precondition(reportedState == .playing)
         let missing = Data("<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\"><s:Body><u:GetTransportInfoResponse xmlns:u=\"urn:schemas-upnp-org:service:AVTransport:1\"/></s:Body></s:Envelope>".utf8)
         do { _ = try NativeDLNA.parseStateResponse(missing, response: response); fatalError("Accepted missing state") }
         catch NativeDLNAError.invalidResponse { }
