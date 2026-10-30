@@ -19,12 +19,14 @@ class DLNAFixtureTests(unittest.TestCase):
         cls.server.server_close()
         cls.thread.join(timeout=3)
 
-    def post(self, path, action='Play', media=None):
+    def post(self, path, action='Play', media=None, target=None):
         arguments = '<InstanceID>0</InstanceID>'
         if action == 'SetAVTransportURI':
             arguments += f'<CurrentURI>{media}</CurrentURI><CurrentURIMetaData></CurrentURIMetaData>'
         if action == 'Play':
             arguments += '<Speed>1</Speed>'
+        if action == 'Seek':
+            arguments += f'<Unit>REL_TIME</Unit><Target>{target}</Target>'
         body = (f'<s:Envelope xmlns:s="{SOAP}"><s:Body>'
                 f'<u:{action} xmlns:u="{SERVICE}">{arguments}</u:{action}>'
                 f'</s:Body></s:Envelope>')
@@ -72,6 +74,23 @@ class DLNAFixtureTests(unittest.TestCase):
         self.assertEqual(self.post('/upnp/control/AVTransport1', 'Stop')[0], 200)
         self.assertIn(b'<RelTime>00:00:00</RelTime>',
                       self.post('/upnp/control/AVTransport1', 'GetPositionInfo')[1])
+
+    def test_seek_tracks_position_and_rejects_invalid_or_stopped_requests(self):
+        self.assertEqual(self.post('/upnp/control/AVTransport1', 'SetAVTransportURI',
+                                   'https://media.example/owned.mp4?a=1&amp;b=2')[0], 200)
+        self.assertEqual(self.post('/upnp/control/AVTransport1', 'Seek', target='00:00:57')[0], 400)
+        self.assertEqual(self.post('/upnp/control/AVTransport1', 'Play')[0], 200)
+        self.assertEqual(self.post('/upnp/control/AVTransport1', 'Seek', target='00:00:57')[0], 200)
+        self.assertIn(b'<RelTime>00:00:57</RelTime>',
+                      self.post('/upnp/control/AVTransport1', 'GetPositionInfo')[1])
+        for target in ('00:02:01', '00:60:00', '-1', '00:00:57extra', '00:00:57:00', ''):
+            self.assertEqual(self.post('/upnp/control/AVTransport1', 'Seek', target=target)[0], 400)
+        self.assertIn(b'<RelTime>00:00:57</RelTime>',
+                      self.post('/upnp/control/AVTransport1', 'GetPositionInfo')[1])
+        self.assertEqual(self.post('/upnp/control/AVTransport1', 'Pause')[0], 200)
+        self.assertEqual(self.post('/upnp/control/AVTransport1', 'Seek', target='00:00:42')[0], 200)
+        self.assertEqual(self.post('/upnp/control/AVTransport1', 'Stop')[0], 200)
+        self.assertEqual(self.post('/upnp/control/AVTransport1', 'Seek', target='00:00:15')[0], 400)
 
     def test_rejects_invalid_action_and_uri(self):
         self.assertEqual(self.post('/upnp/control/AVTransport1', 'Delete')[0], 400)

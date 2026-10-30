@@ -1,6 +1,7 @@
 """Owned loopback-only DLNA AVTransport SOAP fixture; no external streams."""
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from time import sleep
+import re
 from xml.etree import ElementTree as ET
 
 HOST, PORT = '127.0.0.1', 8768
@@ -47,7 +48,7 @@ class Handler(BaseHTTPRequestHandler):
             assert 0 < size <= 8192
             payload = self.rfile.read(size)
             action = self.headers['SOAPACTION'].strip('"').split('#', 1)[1]
-            assert action in ('SetAVTransportURI', 'Play', 'Pause', 'Stop', 'GetTransportInfo', 'GetPositionInfo')
+            assert action in ('SetAVTransportURI', 'Play', 'Pause', 'Stop', 'GetTransportInfo', 'GetPositionInfo', 'Seek')
             root = ET.fromstring(payload)
             body = root.find(f'{{{SOAP}}}Body')
             assert body is not None
@@ -60,6 +61,16 @@ class Handler(BaseHTTPRequestHandler):
                 assert node.findtext('Speed') == '1'
             if action in ('GetTransportInfo', 'GetPositionInfo'):
                 assert len(node) == 1
+            if action == 'Seek':
+                assert [child.tag for child in node] == ['InstanceID', 'Unit', 'Target']
+                assert node.findtext('Unit') == 'REL_TIME'
+                target = node.findtext('Target')
+                assert target is not None and re.fullmatch(r'[0-9]{2}:[0-9]{2}:[0-9]{2}', target)
+                hours, minutes, seconds = map(int, target.split(':'))
+                assert minutes < 60 and seconds < 60
+                requested_seconds = hours * 3600 + minutes * 60 + seconds
+                assert 0 <= requested_seconds <= 120
+                assert getattr(self.server, 'transport_state', 'STOPPED') in ('PLAYING', 'PAUSED_PLAYBACK')
         except (AssertionError, ValueError, KeyError, IndexError, ET.ParseError):
             return self.reply(400, b'invalid SOAP')
         if action == 'SetAVTransportURI':
@@ -68,6 +79,8 @@ class Handler(BaseHTTPRequestHandler):
         elif action == 'Play':
             self.server.transport_state = 'PLAYING'
             self.server.position_seconds = 42
+        elif action == 'Seek':
+            self.server.position_seconds = requested_seconds
         elif action == 'Pause':
             self.server.transport_state = 'PAUSED_PLAYBACK'
         elif action == 'Stop':
@@ -78,7 +91,9 @@ class Handler(BaseHTTPRequestHandler):
                             '<CurrentTransportStatus>OK</CurrentTransportStatus>'
                             '<CurrentSpeed>1</CurrentSpeed>') if action == 'GetTransportInfo' else (
             f'<TrackDuration>00:02:00</TrackDuration>'
-            f'<RelTime>00:00:{getattr(self.server, "position_seconds", 0):02d}</RelTime>'
+            f'<RelTime>{getattr(self.server, "position_seconds", 0)//3600:02d}:'
+            f'{getattr(self.server, "position_seconds", 0)//60%60:02d}:'
+            f'{getattr(self.server, "position_seconds", 0)%60:02d}</RelTime>'
         ) if action == 'GetPositionInfo' else ''
         result = (f'<s:Envelope xmlns:s="{SOAP}"><s:Body>'
                   f'<u:{action}Response xmlns:u="{SERVICE}">{response_content}</u:{action}Response>'
