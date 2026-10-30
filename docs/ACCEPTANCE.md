@@ -100,3 +100,8 @@ Explicit ±15-second native SwiftUI actions issue fresh GetTransportInfo and Get
 - [ ] Final-HEAD iPhone/iPad simulator XCUI: pause → resume → fresh PLAYING state, and disabled control for invalid/unconfigured endpoint.
 - [ ] Final-HEAD Swift network smoke/XCTest: paused resume succeeds, stopped and already-playing requests are rejected before Play; complete Web/API/PostgreSQL/Compose/NAS/Spider gate succeeds.
 - [ ] Physical iPhone/iPad and actual renderer interoperability remain separate; do not infer SSDP/SMB, independent security audit or signed release.
+
+
+## Native DLNA explicit absolute seek (P4, #110)
+
+Verify canonical ASCII HH:MM:SS (00:00:00 to 99:59:59), malformed/Unicode/negative and out-of-duration rejection, unknown-duration/STOPPED rejection, fresh state/position queries, and bounded REL_TIME SOAP. Require Swift smoke, owned localhost network, XCTest and production SwiftUI XCUI on iPhone/iPad plus final-head Web/API, PostgreSQL, NAS, Compose and Spider isolation success. Acknowledgement does not prove real renderer playback. No physical-device or Apple signing claim.
