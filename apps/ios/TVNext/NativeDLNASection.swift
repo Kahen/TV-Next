@@ -51,10 +51,10 @@ struct NativeDLNASection: View {
                 Button("停止") { run(.stop) }
                     .disabled(busy || endpoint == nil || !castStarted)
                     .accessibilityIdentifier("dlna-stop")
-                Button("查询状态") { run(.getTransportInfo) }
-                    .disabled(busy || endpoint == nil)
-                    .accessibilityIdentifier("dlna-query-state")
             }
+            Button("查询设备播放状态") { run(.getTransportInfo) }
+                .disabled(busy || endpoint == nil)
+                .accessibilityIdentifier("dlna-query-state")
             if busy { ProgressView("正在等待 DLNA 设备…") }
             if let status { Text(status).accessibilityIdentifier("dlna-status") }
             if let error { Text(error).foregroundStyle(.red).accessibilityIdentifier("dlna-error") }
