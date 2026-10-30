@@ -81,3 +81,7 @@ Verify direct successful `DAV:getcontentlength` values, zero and malformed/negat
 ## Native manual DLNA control regression (P4, #100)
 
 The new iOS-only, explicit AVTransport v1 SetURI/Play/Pause/Stop path is tested with a locally owned HTTP SOAP renderer. Endpoint validation restricts control traffic to private IPv4 literal addresses; fixture tests cover malformed/foreign endpoints, media URLs, SOAP escaping, redirects, HTTP faults and a 32 KiB response cap. Both iPhone and iPad production XCUI must pass on the final PR HEAD. These checks do **not** establish SSDP discovery, real renderer/media playback, local-network permission on physical hardware, independent security review or signed distribution. See [IOS_DLNA.md](IOS_DLNA.md). Do not close P4 parent #5.
+
+## Native DLNA status-query evidence (#102)
+
+The read-only GetTransportInfo feature is an implementation slice, not full P4 acceptance. Verify final PR HEAD iPhone/iPad simulator XCTest/XCUI, native Swift smoke, owned localhost SOAP state transitions, and full Web/API/Compose/NAS/Spider isolation integration before merging. Rejection fixtures cover missing, nested, duplicate, unknown and foreign-namespace CurrentTransportState. Real DLNA renderer, local-network permission, codec and physical Apple-device tests remain open. See [IOS_DLNA.md](IOS_DLNA.md).
