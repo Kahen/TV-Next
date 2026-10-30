@@ -90,6 +90,23 @@ jobs:
           PYTHON
           swiftc -warnings-as-errors TVNext/NativeWebDAV.swift tests/WebDAVNetworkSmoke.swift -o /tmp/tvnext-webdav-network-tests
           /tmp/tvnext-webdav-network-tests
+      - name: Verify bounded native DLNA SOAP and owned loopback transport
+        working-directory: apps/ios
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s ../../scripts -p 'test_dlna_fixture_server.py'
+          swiftc -warnings-as-errors TVNext/NativeDLNA.swift tests/DLNASmoke.swift -o /tmp/tvnext-dlna-tests
+          /tmp/tvnext-dlna-tests
+          python3 ../../scripts/dlna_fixture_server.py > /tmp/tvnext-dlna-fixture.log 2>&1 &
+          dlna_pid=$!
+          trap 'kill "$dlna_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..20}; do
+            if curl --fail --silent http://127.0.0.1:8768/health -o /dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:8768/health -o /dev/null
+          swiftc -warnings-as-errors TVNext/NativeDLNA.swift tests/DLNANetworkSmoke.swift -o /tmp/tvnext-dlna-network-tests
+          /tmp/tvnext-dlna-network-tests
       - name: Verify manual intro/outro marker bounds and local persistence
         working-directory: apps/ios
         run: |
@@ -175,7 +192,15 @@ jobs:
           # localhost-only RFC 4918 fixture used by the Swift network smoke.
           python3 ../../scripts/webdav_fixture_server.py > /tmp/tvnext-webdav-ui-fixture.log 2>&1 &
           webdav_pid=$!
-          trap 'kill "$fixture_pid" "$audio_pid" "$webdav_pid" 2>/dev/null || true' EXIT
+          # Real SwiftUI DLNA buttons exercise the same owned SOAP fixture.
+          python3 ../../scripts/dlna_fixture_server.py > /tmp/tvnext-dlna-ui-fixture.log 2>&1 &
+          dlna_pid=$!
+          trap 'kill "$fixture_pid" "$audio_pid" "$webdav_pid" "$dlna_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8768/health -o /dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:8768/health -o /dev/null
           for attempt in {1..30}; do
             if curl --silent http://127.0.0.1:8767/dav/ -o /dev/null; then break; fi
             sleep 1
