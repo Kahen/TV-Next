@@ -80,8 +80,10 @@ final class NativeDLNATests: XCTestCase {
                                   ("NO_MEDIA_PRESENT", .noMediaPresent)] {
             XCTAssertEqual(try NativeDLNA.parseStateResponse(soap("<CurrentTransportState>\(value)</CurrentTransportState>"), response: response), expected)
         }
+        XCTAssertEqual(try NativeDLNA.parseStateResponse(soap("<CurrentTransportState><![CDATA[PLAYING]]></CurrentTransportState>"), response: response), .playing)
         for invalid in [
             "",
+            "<CurrentTransportState>PLAYING<![CDATA[INVALID]]></CurrentTransportState>",
             "<CurrentTransportState>UNKNOWN</CurrentTransportState>",
             "<CurrentTransportState>PLAYING</CurrentTransportState><CurrentTransportState>STOPPED</CurrentTransportState>",
             "<Extra><CurrentTransportState>PLAYING</CurrentTransportState></Extra>",
