@@ -43,6 +43,29 @@ import FoundationNetworking
         let missing = Data("<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\"><s:Body><u:GetTransportInfoResponse xmlns:u=\"urn:schemas-upnp-org:service:AVTransport:1\"/></s:Body></s:Envelope>".utf8)
         do { _ = try NativeDLNA.parseStateResponse(missing, response: response); fatalError("Accepted missing state") }
         catch NativeDLNAError.invalidResponse { }
+        let positionRequest = try NativeDLNA.request(.getPositionInfo, endpoint: endpoint)
+        precondition(positionRequest.value(forHTTPHeaderField: "SOAPACTION") == "\"urn:schemas-upnp-org:service:AVTransport:1#GetPositionInfo\"")
+        func positionSOAP(_ fields: String) -> Data {
+            Data("<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\"><s:Body><u:GetPositionInfoResponse xmlns:u=\"urn:schemas-upnp-org:service:AVTransport:1\">\(fields)</u:GetPositionInfoResponse></s:Body></s:Envelope>".utf8)
+        }
+        let good = try NativeDLNA.parsePositionResponse(positionSOAP("<TrackDuration>00:02:00</TrackDuration><RelTime>00:00:42</RelTime>"), response: response)
+        precondition(good == NativeDLNAPosition(seconds: 42, durationSeconds: 120))
+        precondition(good.localizedLabel == "00:00:42 / 00:02:00")
+        let unknown = try NativeDLNA.parsePositionResponse(positionSOAP("<TrackDuration>NOT_IMPLEMENTED</TrackDuration><RelTime><![CDATA[00:00:42]]></RelTime>"), response: response)
+        precondition(unknown.durationSeconds == nil && unknown.seconds == 42)
+        for bad in [
+            "<TrackDuration>00:02:00</TrackDuration>",
+            "<TrackDuration>00:02:00</TrackDuration><RelTime>NOT_IMPLEMENTED</RelTime>",
+            "<TrackDuration>00:02:00</TrackDuration><RelTime>00:60:00</RelTime>",
+            "<TrackDuration>00:02:00</TrackDuration><RelTime>00:02:01</RelTime>",
+            "<TrackDuration>00:02:00</TrackDuration><RelTime>00:00:42</RelTime><RelTime>00:00:41</RelTime>",
+            "<TrackDuration>00:02:00</TrackDuration><RelTime>00:00:42<![CDATA[99]]></RelTime>",
+            "<TrackDuration>00:02:00</TrackDuration><x:RelTime xmlns:x=\"urn:untrusted\">00:00:42</x:RelTime>",
+            "<TrackDuration>00:02:00</TrackDuration><Outer><RelTime>00:00:42</RelTime></Outer>"
+        ] {
+            do { _ = try NativeDLNA.parsePositionResponse(positionSOAP(bad), response: response); fatalError("Accepted malformed position") }
+            catch NativeDLNAError.invalidResponse { }
+        }
         print("Native manual DLNA SOAP and private endpoint contract passed")
     }
 }
