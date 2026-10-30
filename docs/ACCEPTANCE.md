@@ -72,3 +72,7 @@ This does not complete P1–P6: actual type 3 Spider, direct cloud login/QR/OAut
 ### P4 iOS WebDAV local sort acceptance (#96)
 
 The local folder-first ascending/descending sort is an iPhone/iPad UI slice, not a WebDAV server capability. Acceptance requires deterministic Swift smoke/XCTest (numeric names, directories, filters, empty listings and ties), production SwiftUI XCUI with owned localhost WebDAV, and final-head aggregate CI. Physical devices, third-party providers, SMB/DLNA and P4/P6 release gates remain unverified. Record exact passing Actions runs in #96 before closing the implementation issue.
+
+### P4 iOS WebDAV size metadata acceptance (#98)
+
+Verify direct successful `DAV:getcontentlength` values, zero and malformed/negative/overflow/foreign/failed/duplicate/conflicting values with Swift smoke and XCTest; run production SwiftUI XCUI against the owned localhost fixture and both iPhone/iPad simulator targets. All final-head Web/API, Compose, NAS and Spider isolation jobs must pass before merging. This is metadata display, not verified file length or real-provider/device compatibility.

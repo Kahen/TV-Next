@@ -135,6 +135,33 @@ final class NativeWebDAVTests: XCTestCase {
                        ["a.mp4", "b.mp4"], "Equal names must not reorder unpredictably")
     }
 
+    func testSuccessfulDAVContentLengthIsBoundedAndScopedToPropstat() throws {
+        let root = try NativeWebDAV.rootURL("https://example.test/dav")
+        let folder = root.appendingPathComponent("Movies", isDirectory: true)
+        let xml = """
+        <d:multistatus xmlns:d="DAV:" xmlns:x="urn:foreign">
+          <d:response><d:href>/dav/Movies/Good.mp4</d:href><d:propstat><d:prop><d:resourcetype/><d:getcontentlength>2048</d:getcontentlength></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+          <d:response><d:href>/dav/Movies/Zero.mp4</d:href><d:propstat><d:prop><d:resourcetype/><d:getcontentlength>0</d:getcontentlength></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+          <d:response><d:href>/dav/Movies/Bad.mp4</d:href><d:propstat><d:prop><d:resourcetype/><d:getcontentlength>-1</d:getcontentlength></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+          <d:response><d:href>/dav/Movies/Overflow.mp4</d:href><d:propstat><d:prop><d:resourcetype/><d:getcontentlength>9223372036854775808</d:getcontentlength></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+          <d:response><d:href>/dav/Movies/Failed.mp4</d:href><d:propstat><d:prop><d:resourcetype/></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><d:getcontentlength>1024</d:getcontentlength></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response>
+          <d:response><d:href>/dav/Movies/Foreign.mp4</d:href><d:propstat><d:prop><d:resourcetype/><x:getcontentlength>999</x:getcontentlength></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+          <d:response><d:href>/dav/Movies/Folder/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype><d:getcontentlength>999</d:getcontentlength></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+          <d:response><d:href>/dav/Movies/Conflict.mp4</d:href><d:propstat><d:prop><d:resourcetype/><d:getcontentlength>100</d:getcontentlength></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><d:getcontentlength>200</d:getcontentlength></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+          <d:response><d:href>/dav/Movies/Duplicate.mp4</d:href><d:propstat><d:prop><d:resourcetype/><d:getcontentlength>10</d:getcontentlength><d:getcontentlength>10</d:getcontentlength></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+        </d:multistatus>
+        """
+        let items = try NativeWebDAV.parse(Data(xml.utf8), root: root, folder: folder)
+        XCTAssertEqual(items.count, 9)
+        XCTAssertEqual(items.first(where: { $0.name == "Good.mp4" })?.sizeBytes, 2048)
+        XCTAssertEqual(items.first(where: { $0.name == "Zero.mp4" })?.sizeBytes, 0)
+        XCTAssertTrue(items.filter { !["Good.mp4", "Zero.mp4"].contains($0.name) }.allSatisfy { $0.sizeBytes == nil })
+        for value in ["-1", "+1", "1.5", "NaN", "9223372036854775808", "8796093022209", ""] {
+            XCTAssertNil(NativeWebDAV.contentLength(value))
+        }
+        XCTAssertEqual(NativeWebDAV.contentLength(" 1048576 "), 1_048_576)
+    }
+
     func testLocalFilenameFilterAndMediaOnlyKeepFoldersNavigable() throws {
         let root = try NativeWebDAV.rootURL("https://example.test/dav")
         let entries = [

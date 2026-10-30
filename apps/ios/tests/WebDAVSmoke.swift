@@ -55,6 +55,23 @@ import Foundation
         precondition(NativeWebDAV.visibleEntries(sortCandidates, search: "notes", mediaOnly: true,
                                                  sortOrder: .descending).isEmpty)
 
+        let sizeXML = """
+        <d:multistatus xmlns:d="DAV:" xmlns:x="urn:foreign">
+          <d:response><d:href>/dav/Movies/Good.mp4</d:href><d:propstat><d:prop><d:resourcetype/><d:getcontentlength>2048</d:getcontentlength></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+          <d:response><d:href>/dav/Movies/Bad.mp4</d:href><d:propstat><d:prop><d:resourcetype/><d:getcontentlength>-1</d:getcontentlength></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+          <d:response><d:href>/dav/Movies/Foreign.mp4</d:href><d:propstat><d:prop><d:resourcetype/><x:getcontentlength>999</x:getcontentlength></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+          <d:response><d:href>/dav/Movies/Folder/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype><d:getcontentlength>999</d:getcontentlength></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+        </d:multistatus>
+        """
+        let sizes = try NativeWebDAV.parse(Data(sizeXML.utf8), root: root, folder: folder)
+        precondition(sizes.first(where: { $0.name == "Good.mp4" })?.sizeBytes == 2048)
+        precondition(sizes.filter { $0.name != "Good.mp4" }.allSatisfy { $0.sizeBytes == nil })
+        precondition(NativeWebDAV.contentLength("0") == 0)
+        precondition(NativeWebDAV.contentLength(" 1048576 ") == 1_048_576)
+        for invalid in ["-1", "+1", "1.5", "NaN", "9223372036854775808", "8796093022209", ""] {
+            precondition(NativeWebDAV.contentLength(invalid) == nil)
+        }
+
         precondition(NativeWebDAV.contains(folder, root: root))
         precondition(!NativeWebDAV.contains(URL(string: "https://media.example/dav2")!, root: root))
         precondition(!NativeWebDAV.contains(URL(string: "https://evil.example/dav/Movies")!, root: root))

@@ -81,13 +81,20 @@ struct NativeWebDAVSection: View {
                     let visible = NativeWebDAV.visibleEntries(entries, search: filter, mediaOnly: mediaOnly,
                                                                sortOrder: descending ? .descending : .ascending)
                     ForEach(visible) { entry in
-                        Button {
-                            if entry.isDirectory { open(entry.url) } else { play(entry) }
-                        } label: {
-                            Label(entry.name, systemImage: entry.isDirectory ? "folder" : "play.circle")
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                        HStack(spacing: 8) {
+                            Button {
+                                if entry.isDirectory { open(entry.url) } else { play(entry) }
+                            } label: {
+                                Label(entry.name, systemImage: entry.isDirectory ? "folder" : "play.circle")
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .disabled(busy || (!entry.isDirectory && !NativeWebDAV.playable(entry)))
+                            if !entry.isDirectory, let bytes = entry.sizeBytes {
+                                Text(ByteCountFormatter.string(fromByteCount: bytes, countStyle: .binary))
+                                    .font(.caption).foregroundStyle(.secondary)
+                                    .accessibilityIdentifier("webdav-size-\(entry.name)")
+                            }
                         }
-                        .disabled(busy || (!entry.isDirectory && !NativeWebDAV.playable(entry)))
                     }
                     if visible.isEmpty && !busy { Text("目录为空，或当前筛选没有匹配项。").font(.caption) }
                     Text("当前显示 \(visible.count)/\(entries.count) 项。")

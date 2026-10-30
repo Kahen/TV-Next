@@ -91,3 +91,7 @@ this does not implement resumable/HLS/DRM downloads, SMB/DLNA or signed releases
 ## Native WebDAV folder-first sorting (P4, #96)
 
 The native connected-directory view now offers a local ascending/descending natural filename sort. Folders remain first; a deterministic URL tie-breaker avoids unstable equal-name ordering. The selected order survives directory navigation and refresh but resets on new connection/disconnect. This does not change Depth:1 requests, the 200-entry limit, credential handling or media relay. Positive/negative/boundary Swift smoke and XCTest plus production SwiftUI XCUI are added; final-head CI, physical-device and external-provider verification are separate. Parent P4 #5 remains open.
+
+## Native WebDAV bounded file sizes (P4, #98)
+
+Read-only native WebDAV requests optional `DAV:getcontentlength` in the same Depth:1 listing, displays validated file byte counts and omits unknown/folder sizes. Successful direct DAV propstat scope and 0–8 TiB decimal bounds prevent malformed/foreign/failed metadata from being shown. No extra network request, credential persistence, server-side sort, SMB/DLNA or device acceptance is implied. Final-head Swift smoke/XCTest/XCUI and full integration evidence belong to issue #98; parent #5 stays open.
