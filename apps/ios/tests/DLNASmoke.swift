@@ -34,6 +34,12 @@ import FoundationNetworking
         let stateSOAP = Data("<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\"><s:Body><u:GetTransportInfoResponse xmlns:u=\"urn:schemas-upnp-org:service:AVTransport:1\"><CurrentTransportState>PLAYING</CurrentTransportState></u:GetTransportInfoResponse></s:Body></s:Envelope>".utf8)
         let reportedState = try NativeDLNA.parseStateResponse(stateSOAP, response: response)
         precondition(reportedState == .playing)
+        let cdata = Data(String(decoding: stateSOAP, as: UTF8.self).replacingOccurrences(of: ">PLAYING<", with: "><![CDATA[PLAYING]]><").utf8)
+        let cdataState = try NativeDLNA.parseStateResponse(cdata, response: response)
+        precondition(cdataState == .playing)
+        let spoofed = Data(String(decoding: stateSOAP, as: UTF8.self).replacingOccurrences(of: ">PLAYING<", with: ">PLAYING<![CDATA[INVALID]]><").utf8)
+        do { _ = try NativeDLNA.parseStateResponse(spoofed, response: response); fatalError("Accepted mixed CDATA spoof") }
+        catch NativeDLNAError.invalidResponse { }
         let missing = Data("<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\"><s:Body><u:GetTransportInfoResponse xmlns:u=\"urn:schemas-upnp-org:service:AVTransport:1\"/></s:Body></s:Envelope>".utf8)
         do { _ = try NativeDLNA.parseStateResponse(missing, response: response); fatalError("Accepted missing state") }
         catch NativeDLNAError.invalidResponse { }
