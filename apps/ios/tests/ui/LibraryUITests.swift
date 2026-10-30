@@ -558,4 +558,40 @@ final class LibraryUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "label == %@", "设备状态：已停止"), object: status)], timeout: 15), .completed)
     }
+
+    func testDLNAImportsControlURLFromOwnedDeviceDescription() {
+        jump("DLNA 投屏")
+        let importButton = app.buttons["dlna-import-description"]
+        XCTAssertFalse(importButton.isEnabled)
+        enter(app.textFields["dlna-description-url"], "http://127.0.0.1:8768/device.xml")
+        reveal(importButton)
+        XCTAssertTrue(importButton.isEnabled)
+        importButton.tap()
+        let renderer = app.textFields["dlna-renderer-url"]
+        let expected = "http://127.0.0.1:8768/upnp/control/AVTransport1"
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "value == %@", expected), object: renderer)], timeout: 15), .completed,
+            "Native UI did not populate the same-origin AVTransport control URL")
+        let query = app.buttons["dlna-query-state"]
+        reveal(query)
+        XCTAssertTrue(query.isEnabled, "Imported renderer must be accepted by the existing manual controller")
+        query.tap()
+        XCTAssertTrue(app.staticTexts["dlna-status"].waitForExistence(timeout: 15))
+        XCTAssertFalse(app.staticTexts["dlna-error"].exists)
+    }
+
+    func testDLNARejectsForeignDeviceDescriptionWithoutChangingRenderer() {
+        jump("DLNA 投屏")
+        let importButton = app.buttons["dlna-import-description"]
+        enter(app.textFields["dlna-description-url"], "http://127.0.0.1:8768/device-foreign.xml")
+        reveal(importButton)
+        XCTAssertTrue(importButton.isEnabled)
+        importButton.tap()
+        XCTAssertTrue(app.staticTexts["dlna-error"].waitForExistence(timeout: 15))
+        let renderer = app.textFields["dlna-renderer-url"]
+        XCTAssertFalse((renderer.value as? String ?? "").contains("8.8.8.8"),
+                       "A foreign description must not change the renderer endpoint")
+        XCTAssertFalse(app.buttons["dlna-query-state"].isEnabled)
+    }
+
 }
