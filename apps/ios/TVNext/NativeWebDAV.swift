@@ -10,6 +10,8 @@ struct NativeWebDAVItem: Identifiable, Equatable {
     let url: URL
     let name: String
     let isDirectory: Bool
+    // Optional DAV:getcontentlength metadata, never used to allocate memory.
+    var sizeBytes: Int64? = nil
     var id: String { url.absoluteString }
 }
 
@@ -155,7 +157,8 @@ enum NativeWebDAV {
                 components.percentEncodedPath += "/"
             }
             guard let normalized = components.url else { continue }
-            let item = NativeWebDAVItem(url: normalized, name: name, isDirectory: record.directory)
+            let item = NativeWebDAVItem(url: normalized, name: name, isDirectory: record.directory,
+                                        sizeBytes: record.directory ? nil : record.sizeBytes)
             unique[item.id] = item
         }
         return Array(unique.values).sorted {
@@ -173,6 +176,15 @@ enum NativeWebDAV {
         if statusCode != 207 { return .httpStatus(statusCode) }
         if expectedLength > Int64(maxBytes) { return .responseTooLarge }
         return nil
+    }
+
+    /// Untrusted optional byte metadata: decimal only, 0–8 TiB, no overflow.
+    static func contentLength(_ raw: String) -> Int64? {
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty, value.utf8.count <= 20,
+              value.utf8.allSatisfy({ (48...57).contains($0) }),
+              let bytes = Int64(value), bytes <= 8 * 1_099_511_627_776 else { return nil }
+        return bytes
     }
 
     static func playable(_ item: NativeWebDAVItem) -> Bool {
@@ -234,7 +246,7 @@ enum NativeWebDAV {
         request.setValue("1", forHTTPHeaderField: "Depth")
         request.setValue("application/xml", forHTTPHeaderField: "Accept")
         request.setValue("application/xml; charset=utf-8", forHTTPHeaderField: "Content-Type")
-        request.httpBody = Data("<?xml version=\"1.0\" encoding=\"utf-8\"?><d:propfind xmlns:d=\"DAV:\"><d:prop><d:resourcetype/></d:prop></d:propfind>".utf8)
+        request.httpBody = Data("<?xml version=\"1.0\" encoding=\"utf-8\"?><d:propfind xmlns:d=\"DAV:\"><d:prop><d:resourcetype/><d:getcontentlength/></d:prop></d:propfind>".utf8)
         if let auth { request.setValue(auth, forHTTPHeaderField: "Authorization") }
         request.timeoutInterval = 15
         // The URLSession data delegate enforces the cap per received chunk,
@@ -362,6 +374,8 @@ private final class WebDAVXMLCollector: NSObject, XMLParserDelegate {
         var directory = false
         var hasResourceType = false
         var invalidHref = false
+        var sizeBytes: Int64?
+        var invalidLength = false
     }
     private struct PropertyStatus {
         var status = ""
@@ -369,6 +383,9 @@ private final class WebDAVXMLCollector: NSObject, XMLParserDelegate {
         var invalidStatus = false
         var hasResourceType = false
         var directory = false
+        var lengthSeen = false
+        var invalidLength = false
+        var lengthText = ""
     }
 
     var records: [Record] = []
@@ -416,6 +433,9 @@ private final class WebDAVXMLCollector: NSObject, XMLParserDelegate {
             property?.hasResourceType = true
         } else if path == ["multistatus", "response", "propstat", "prop", "resourcetype", "collection"] {
             property?.directory = true
+        } else if path == ["multistatus", "response", "propstat", "prop", "getcontentlength"] {
+            if property?.lengthSeen == true { property?.invalidLength = true }
+            property?.lengthSeen = true
         }
     }
 
@@ -426,6 +446,8 @@ private final class WebDAVXMLCollector: NSObject, XMLParserDelegate {
             responseStatus? += string
         } else if path == ["multistatus", "response", "propstat", "status"] {
             property?.status += string
+        } else if path == ["multistatus", "response", "propstat", "prop", "getcontentlength"] {
+            property?.lengthText += string
         }
     }
 
@@ -433,12 +455,28 @@ private final class WebDAVXMLCollector: NSObject, XMLParserDelegate {
                 qualifiedName qName: String?) {
         if path == ["multistatus", "response", "propstat"] {
             if let property, property.hasStatus, !property.invalidStatus,
-               property.hasResourceType, Self.successfulStatus(property.status) {
-                if var record = active {
+               Self.successfulStatus(property.status), var record = active {
+                if property.hasResourceType {
                     record.hasResourceType = true
                     record.directory = record.directory || property.directory
-                    active = record
                 }
+                // Ignore failed/foreign/nested properties and conflicting values.
+                // Malformed metadata must not hide an otherwise valid file.
+                if property.lengthSeen {
+                    if property.invalidLength || record.invalidLength {
+                        record.sizeBytes = nil
+                        record.invalidLength = true
+                    } else if let bytes = NativeWebDAV.contentLength(property.lengthText) {
+                        if let existing = record.sizeBytes, existing != bytes {
+                            record.sizeBytes = nil
+                            record.invalidLength = true
+                        } else { record.sizeBytes = bytes }
+                    } else {
+                        record.sizeBytes = nil
+                        record.invalidLength = true
+                    }
+                }
+                active = record
             }
             property = nil
         } else if path == ["multistatus", "response"] {

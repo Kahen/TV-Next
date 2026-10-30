@@ -178,6 +178,9 @@ final class LibraryUITests: XCTestCase {
         let folder = app.buttons["Folder"]
         XCTAssertTrue(owned.waitForExistence(timeout: 15), "Localhost Depth:1 listing did not load")
         XCTAssertTrue(folder.exists)
+        XCTAssertTrue(app.staticTexts["webdav-size-Owned.mp4"].waitForExistence(timeout: 5),
+                      "Successful DAV:getcontentlength must appear beside the native file")
+        XCTAssertFalse(app.staticTexts["webdav-size-Folder"].exists, "Directories must never display a file size")
         let sort = app.buttons["webdav-sort"]
         reveal(sort)
         XCTAssertTrue(sort.label.contains("升序"))
