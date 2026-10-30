@@ -14,8 +14,11 @@ import FoundationNetworking
         do { try await alreadyCancelled.value; fatalError("Pre-cancelled task succeeded") }
         catch is CancellationError { }
         try await NativeDLNA.cast(endpoint: endpoint, media: media)
+        precondition(try await NativeDLNA.queryState(endpoint: endpoint) == .playing)
         try await NativeDLNA.send(.pause, endpoint: endpoint)
+        precondition(try await NativeDLNA.queryState(endpoint: endpoint) == .pausedPlayback)
         try await NativeDLNA.send(.stop, endpoint: endpoint)
+        precondition(try await NativeDLNA.queryState(endpoint: endpoint) == .stopped)
         for (path, status) in [("redirect", 302), ("fault", 500)] {
             let bad = try NativeDLNA.rendererURL("http://127.0.0.1:8768/\(path)")
             do { try await NativeDLNA.send(.play, endpoint: bad); fatalError("Accepted \(path)") }
