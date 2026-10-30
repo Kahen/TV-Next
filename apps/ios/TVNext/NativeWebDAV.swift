@@ -13,6 +13,11 @@ struct NativeWebDAVItem: Identifiable, Equatable {
     var id: String { url.absoluteString }
 }
 
+/// Local ordering only; never changes the remote PROPFIND request.
+enum NativeWebDAVSortOrder {
+    case ascending, descending
+}
+
 /// Immutable active connection. Editing the form must never send another
 /// server's credentials to an existing listing or playback destination.
 struct NativeWebDAVConnection {
@@ -178,11 +183,21 @@ enum NativeWebDAV {
     /// Filter only the already validated Depth:1 listing. Keep folders visible
     /// in media-only mode so users can still navigate to playable files.
     /// Search is local, never interpolated into URLs, headers or PROPFIND XML.
-    static func visibleEntries(_ entries: [NativeWebDAVItem], search: String, mediaOnly: Bool) -> [NativeWebDAVItem] {
+    static func visibleEntries(_ entries: [NativeWebDAVItem], search: String, mediaOnly: Bool,
+                               sortOrder: NativeWebDAVSortOrder = .ascending) -> [NativeWebDAVItem] {
         let term = search.trimmingCharacters(in: .whitespacesAndNewlines)
         return entries.filter { item in
             (!mediaOnly || item.isDirectory || playable(item)) &&
             (term.isEmpty || item.name.localizedCaseInsensitiveContains(term))
+        }.sorted { lhs, rhs in
+            // Keep folders navigable at the top even in descending order.
+            if lhs.isDirectory != rhs.isDirectory { return lhs.isDirectory }
+            let order = lhs.name.localizedStandardCompare(rhs.name)
+            if order == .orderedSame { return lhs.url.absoluteString < rhs.url.absoluteString }
+            switch sortOrder {
+            case .ascending: return order == .orderedAscending
+            case .descending: return order == .orderedDescending
+            }
         }
     }
 
