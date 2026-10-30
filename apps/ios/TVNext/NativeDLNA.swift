@@ -22,7 +22,7 @@ enum NativeDLNAError: LocalizedError, Equatable {
 }
 
 enum NativeDLNAAction: String {
-    case setURI = "SetAVTransportURI", play = "Play", pause = "Pause", stop = "Stop"
+    case setURI = "SetAVTransportURI", play = "Play", pause = "Pause", stop = "Stop", getTransportInfo = "GetTransportInfo"
 }
 
 /// Manual, opt-in AVTransport subset. No SSDP, arbitrary hosts or credentialed streams.
@@ -89,7 +89,7 @@ enum NativeDLNA {
         case .setURI:
             argument = "<CurrentURI>\(xmlEscaped(media!.absoluteString))</CurrentURI><CurrentURIMetaData></CurrentURIMetaData>"
         case .play: argument = "<Speed>1</Speed>"
-        case .pause, .stop: argument = ""
+        case .pause, .stop, .getTransportInfo: argument = ""
         }
         let body = """
         <?xml version="1.0" encoding="utf-8"?>
@@ -132,7 +132,7 @@ enum NativeDLNA {
 }
 
 /// Strict 32 KiB streaming cap, no redirects, no cookies, finite request timeout.
-private final class NativeDLNABoundedTransport: NSObject, URLSessionDataDelegate, @unchecked Sendable {
+final class NativeDLNABoundedTransport: NSObject, URLSessionDataDelegate, @unchecked Sendable {
     private let maxBytes: Int
     private var received = Data()
     private var response: URLResponse?
