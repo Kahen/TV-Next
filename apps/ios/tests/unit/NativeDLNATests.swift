@@ -52,4 +52,14 @@ final class NativeDLNATests: XCTestCase {
         do { try await NativeDLNA.send(.play, endpoint: oversized); XCTFail("Accepted oversized body") }
         catch NativeDLNAError.responseTooLarge { }
     }
+
+    func testPreCancelledRequestThrowsInsteadOfCrashingSession() async throws {
+        let endpoint = try NativeDLNA.rendererURL("http://127.0.0.1:8768/upnp/control/AVTransport1")
+        let pending = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            try await NativeDLNA.send(.play, endpoint: endpoint)
+        }
+        do { try await pending.value; XCTFail("Pre-cancelled request unexpectedly succeeded") }
+        catch is CancellationError { }
+    }
 }
