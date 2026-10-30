@@ -237,4 +237,44 @@ final class NativeDLNATests: XCTestCase {
         XCTAssertEqual(resumedState, .playing)
     }
 
+
+    func testDeviceDescriptionParserRejectsAmbiguousAndForeignControlURLs() throws {
+        let source = try NativeDLNADescription.location("http://127.0.0.1:8768/device.xml")
+        func xml(_ services: String) -> Data {
+            Data("<root xmlns=\"urn:schemas-upnp-org:device-1-0\"><device><serviceList>\(services)</serviceList></device></root>".utf8)
+        }
+        func service(_ control: String) -> String {
+            "<service><serviceType>\(NativeDLNA.service)</serviceType><controlURL>\(control)</controlURL></service>"
+        }
+        let good = try NativeDLNADescription.parse(xml(service("/upnp/control/AVTransport1")), location: source)
+        XCTAssertEqual(good.absoluteString, "http://127.0.0.1:8768/upnp/control/AVTransport1")
+        for value in ["http://8.8.8.8:8768/AVTransport", "http://127.0.0.1:9999/AVTransport",
+                      "/../admin", "/upnp/%2e%2e/admin", "//127.0.0.1:8768/admin",
+                      "/upnp/control?secret=x", "file:///private/secret"] {
+            XCTAssertThrowsError(try NativeDLNADescription.parse(xml(service(value)), location: source))
+        }
+        XCTAssertThrowsError(try NativeDLNADescription.parse(xml(service("/a") + service("/b")), location: source))
+        XCTAssertThrowsError(try NativeDLNADescription.parse(xml(service("<nested>/a</nested>")), location: source))
+        XCTAssertThrowsError(try NativeDLNADescription.parse(
+            Data("<!DOCTYPE root [<!ENTITY secret SYSTEM \"file:///etc/passwd\">]>".utf8) +
+                xml(service("/upnp/control/AVTransport1")), location: source))
+    }
+
+    func testOwnedDeviceDescriptionImportNeverFollowsExternalURL() async throws {
+        let imported = try await NativeDLNADescription.load("http://127.0.0.1:8768/device.xml")
+        XCTAssertEqual(imported.absoluteString, "http://127.0.0.1:8768/upnp/control/AVTransport1")
+        do {
+            _ = try await NativeDLNADescription.load("http://127.0.0.1:8768/device-foreign.xml")
+            XCTFail("Accepted public AVTransport URL")
+        } catch NativeDLNAError.invalidDescription { }
+        do {
+            _ = try await NativeDLNADescription.load("http://127.0.0.1:8768/device-redirect")
+            XCTFail("Followed redirect to untrusted device description")
+        } catch NativeDLNAError.httpStatus(let status) { XCTAssertEqual(status, 302) }
+        do {
+            _ = try await NativeDLNADescription.load("http://127.0.0.1:8768/device-oversize")
+            XCTFail("Accepted oversized XML")
+        } catch NativeDLNAError.responseTooLarge { }
+    }
+
 }
