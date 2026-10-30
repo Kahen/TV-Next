@@ -31,6 +31,28 @@ import FoundationNetworking
         }
         do { _ = try NativeDLNASeek.relativeTarget(position: NativeDLNAPosition(seconds: 42, durationSeconds: 120), deltaSeconds: Int.max); fatalError("Accepted unbounded delta") }
         catch NativeDLNAError.invalidSeek { }
+        let absolute90 = try NativeDLNASeek.parseAbsolute("00:01:30")
+        let absoluteMax = try NativeDLNASeek.parseAbsolute("99:59:59")
+        let absoluteZero = try NativeDLNASeek.parseAbsolute("00:00:00")
+        precondition(absolute90 == 90 && absoluteMax == NativeDLNASeek.maxSeconds && absoluteZero == 0)
+        for invalid in ["0:01:30", "00:60:00", "00:00:60", "100:00:00",
+                        "00:01:3a", " 00:01:30", "00:01:30 ", "００:０１:３０",
+                        "00:01:30\n", "-1:00:00"] {
+            do { _ = try NativeDLNASeek.parseAbsolute(invalid); fatalError("Accepted malformed absolute time") }
+            catch NativeDLNAError.invalidSeek { }
+        }
+        let finite = NativeDLNAPosition(seconds: 42, durationSeconds: 120)
+        let absoluteStart = try NativeDLNASeek.absoluteTarget(position: finite, requestedSeconds: 0)
+        let absoluteEnd = try NativeDLNASeek.absoluteTarget(position: finite, requestedSeconds: 120)
+        precondition(absoluteStart == 0 && absoluteEnd == 120)
+        for invalid in [-1, 121, Int.max] {
+            do { _ = try NativeDLNASeek.absoluteTarget(position: finite, requestedSeconds: invalid); fatalError("Accepted out-of-duration absolute seek") }
+            catch NativeDLNAError.invalidSeek { }
+        }
+        do {
+            _ = try NativeDLNASeek.absoluteTarget(position: NativeDLNAPosition(seconds: 42, durationSeconds: nil), requestedSeconds: 30)
+            fatalError("Accepted unknown-duration absolute seek")
+        } catch NativeDLNAError.unsupportedSeek { }
         let pause = try NativeDLNA.request(.pause, endpoint: endpoint)
         precondition(String(decoding: pause.httpBody!, as: UTF8.self).contains("<u:Pause"))
         for invalid in ["https://192.168.1.2:1400/upnp", "http://8.8.8.8:1400/upnp", "http://example.com:1400/upnp", "http://192.168.1.2:1400/", "http://user:pw@192.168.1.2:1400/upnp", "http://192.168.1.2:1400/upnp?x=1", "http://192.168.1.2:1400/upnp/%2e%2e/admin", "http://192.168.1.2:1400/upnp#fragment", "http://192.168.1.02:1400/upnp"] {
