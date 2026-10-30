@@ -6,6 +6,7 @@ struct NativeDLNASection: View {
     @ObservedObject var library: MediaLibraryStore
     @State private var rendererAddress = ""
     @State private var mediaAddress = ""
+    @State private var seekTime = ""
     @State private var status: String?
     @State private var error: String?
     @State private var busy = false
@@ -70,7 +71,17 @@ struct NativeDLNASection: View {
                     .disabled(busy || endpoint == nil)
                     .accessibilityIdentifier("dlna-seek-forward")
             }
-            Text("跳转前会重新查询设备状态和有限媒体时长；不支持直播或未知时长。")
+            HStack(spacing: 12) {
+                TextField("00:01:30", text: $seekTime)
+                    .keyboardType(.numbersAndPunctuation)
+                    .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    .accessibilityIdentifier("dlna-seek-time")
+                Button("跳转到指定时间") { runAbsoluteSeek() }
+                    .disabled(busy || endpoint == nil ||
+                              (try? NativeDLNASeek.parseAbsolute(seekTime)) == nil)
+                    .accessibilityIdentifier("dlna-seek-absolute")
+            }
+            Text("跳转前会重新查询设备状态和有限媒体时长；指定时间必须是 HH:MM:SS 且不超过总时长，不支持直播。")
                 .font(.caption).foregroundStyle(.secondary)
             if busy { ProgressView("正在等待 DLNA 设备…") }
             if let status { Text(status).accessibilityIdentifier("dlna-status") }
@@ -91,8 +102,29 @@ struct NativeDLNASection: View {
         busy = false
         castStarted = false
         paused = false
+        seekTime = ""
         status = nil
         error = nil
+    }
+
+    private func runAbsoluteSeek() {
+        guard !busy, let endpoint else { return }
+        let targetText = seekTime
+        guard (try? NativeDLNASeek.parseAbsolute(targetText)) != nil else { return }
+        busy = true
+        status = nil
+        error = nil
+        task = Task { @MainActor in
+            do {
+                let target = try await NativeDLNA.seekAbsolute(endpoint: endpoint, targetText: targetText)
+                guard !Task.isCancelled else { return }
+                status = "已请求跳转至：" + (try NativeDLNASeek.target(target))
+            } catch {
+                guard !Task.isCancelled else { return }
+                self.error = error.localizedDescription
+            }
+            if !Task.isCancelled { busy = false }
+        }
     }
 
     private func runSeek(_ deltaSeconds: Int) {

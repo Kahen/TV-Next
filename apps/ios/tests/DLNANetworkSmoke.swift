@@ -24,6 +24,21 @@ import FoundationNetworking
         let backward = try await NativeDLNA.seekRelative(endpoint: endpoint, deltaSeconds: -15)
         let afterBackward = try await NativeDLNA.queryPosition(endpoint: endpoint)
         precondition(backward == 42 && afterBackward.seconds == 42)
+        let absolute = try await NativeDLNA.seekAbsolute(endpoint: endpoint, targetText: "00:01:30")
+        precondition(absolute == 90)
+        let afterAbsolute = try await NativeDLNA.queryPosition(endpoint: endpoint)
+        precondition(afterAbsolute.seconds == 90)
+        do {
+            _ = try await NativeDLNA.seekAbsolute(endpoint: endpoint, targetText: "00:02:01")
+            fatalError("Accepted seek past duration")
+        } catch NativeDLNAError.invalidSeek { }
+        do {
+            _ = try await NativeDLNA.seekAbsolute(endpoint: endpoint, targetText: "00:00:99")
+            fatalError("Accepted malformed seek")
+        } catch NativeDLNAError.invalidSeek { }
+        // Restore the original fixture position before the existing paused +15s regression.
+        let restored = try await NativeDLNA.seekAbsolute(endpoint: endpoint, targetText: "00:00:42")
+        precondition(restored == 42)
         try await NativeDLNA.send(.pause, endpoint: endpoint)
         let paused = try await NativeDLNA.queryState(endpoint: endpoint)
         precondition(paused == .pausedPlayback)
@@ -39,6 +54,10 @@ import FoundationNetworking
         catch NativeDLNAError.unsupportedResume { }
         let stopped = try await NativeDLNA.queryState(endpoint: endpoint)
         precondition(stopped == .stopped)
+        do {
+            _ = try await NativeDLNA.seekAbsolute(endpoint: endpoint, targetText: "00:00:30")
+            fatalError("Accepted absolute seek on stopped renderer")
+        } catch NativeDLNAError.unsupportedSeek { }
         do { _ = try await NativeDLNA.seekRelative(endpoint: endpoint, deltaSeconds: 15); fatalError("Seek succeeded without active media") }
         catch NativeDLNAError.unsupportedSeek { }
         let resetPosition = try await NativeDLNA.queryPosition(endpoint: endpoint)

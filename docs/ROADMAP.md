@@ -161,3 +161,8 @@ An explicit native iPhone/iPad ±15-second seek control follows FongMi mobile `D
 ### P4 native manual DLNA pause/resume slice (#108)
 
 The iPhone/iPad SwiftUI DLNA controls now offer explicit Play resume after an acknowledged pause or reported PAUSED_PLAYBACK. Before resuming, a fresh AVTransport GetTransportInfo must still report PAUSED_PLAYBACK; stopped/playing/transitioning/recording states are rejected. Existing private IPv4, no-redirect/cookie/proxy, 8-second per-request and 32 KiB SOAP bounds apply. This slice is subject to final-HEAD full CI; SSDP, SMB, real renderer and Apple-device acceptance remain pending.
+
+
+### P4 native DLNA explicit absolute seek (#110)
+
+An iPhone/iPad HH:MM:SS input requests a bounded absolute AVTransport REL_TIME Seek after fresh state and finite-duration queries. Strict ASCII time parsing and rejection of out-of-duration targets avoid surprising playback positions. Owned Swift/loopback/XCTest/XCUI and final-head full CI are required before accepting this increment. No SSDP, real TV, SMB, device validation or signed distribution; parent #5 remains open.
