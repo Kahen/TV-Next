@@ -82,7 +82,6 @@ struct NativeDLNASection: View {
                     .accessibilityIdentifier("dlna-seek-absolute")
             }
             Text("跳转前会重新查询设备状态和有限媒体时长；指定时间必须是 HH:MM:SS 且不超过总时长，不支持直播。")
-
                 .font(.caption).foregroundStyle(.secondary)
             if busy { ProgressView("正在等待 DLNA 设备…") }
             if let status { Text(status).accessibilityIdentifier("dlna-status") }
