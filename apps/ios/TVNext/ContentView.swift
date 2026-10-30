@@ -124,6 +124,9 @@ struct ContentView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
+                        // Keep the library destination visible on compact iPhone menus.
+                        // XCTest clears device-local state through this production route.
+                        Button("媒体库") { navigate(to: "library") }
                         Button("播放器") { navigate(to: "player") }
                         Button("快速播放") { navigate(to: "quick-play") }
                         Button("本机文件与字幕") { navigate(to: "local-media") }
@@ -137,7 +140,6 @@ struct ContentView: View {
                         Button("直播节目表") { navigate(to: serverURL+"|"+(homeSession?.token ?? "")) }
                         Button("家庭服务器") { navigate(to: "home-server") }
                         Button("弹幕设置") { navigate(to: "danmaku") }
-                        Button("媒体库") { navigate(to: "library") }
                     } label: { Label("功能导航", systemImage: "line.3.horizontal") }
                     .accessibilityIdentifier("section-navigation")
                 }
