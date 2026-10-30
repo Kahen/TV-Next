@@ -94,3 +94,9 @@ Acceptance requires strict direct SOAP GetPositionInfo RelTime/TrackDuration val
 ## Native manual DLNA finite-media relative seek (P4, #106)
 
 Explicit ±15-second native SwiftUI actions issue fresh GetTransportInfo and GetPositionInfo before AVTransport v1 Seek REL_TIME. Only PLAYING/PAUSED_PLAYBACK with positive known duration may seek; target is clamped and canonical. Unsupported/invalid states, unknown live duration, malformed times, invalid SOAP/HTTP, oversized responses, redirects and cancellation must fail closed. Owned Python fixture, Swift positive/negative smoke, localhost network test, XCTest and iPhone/iPad production XCUI plus final-head complete integration CI are required. A SOAP acknowledgement is not physical renderer playback evidence; P4 #5, device tests and P6 release gates remain open.
+
+### P4 native manual DLNA resume (#108)
+
+- [ ] Final-HEAD iPhone/iPad simulator XCUI: pause → resume → fresh PLAYING state, and disabled control for invalid/unconfigured endpoint.
+- [ ] Final-HEAD Swift network smoke/XCTest: paused resume succeeds, stopped and already-playing requests are rejected before Play; complete Web/API/PostgreSQL/Compose/NAS/Spider gate succeeds.
+- [ ] Physical iPhone/iPad and actual renderer interoperability remain separate; do not infer SSDP/SMB, independent security audit or signed release.

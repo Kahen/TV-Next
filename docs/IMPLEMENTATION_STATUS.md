@@ -113,3 +113,7 @@ The native manual DLNA view adds an explicit GetPositionInfo request and a stric
 ## 2026-10-30 native manual DLNA bounded seek (#106)
 
 A new iPhone/iPad explicit ±15-second REL_TIME seek subset uses fresh AVTransport GetTransportInfo/GetPositionInfo and strict finite-duration clamping before a private-LAN SOAP Seek. The owned fixture and positive/negative Swift/Python/XCTest/XCUI regressions are tracked in the feature PR; only a successful final-head full gate permits merging/closing the implementation issue. SSDP, real renderer models, SMB, independent security review, physical Apple devices and signed distribution remain unverified. P4 #5 and P2–P6 remain open.
+
+## Native DLNA explicit pause/resume control (P4, #108)
+
+A native SwiftUI **继续播放** button is enabled only after an acknowledged pause or a fresh user-requested PAUSED_PLAYBACK state. A second fresh GetTransportInfo immediately precedes Play(Speed=1), rejecting stopped, already-playing and unsupported states. Renderer/media edits and failures clear the local paused state. The owned loopback SOAP fixture is exercised by positive/negative Swift network smoke, XCTest and production iPhone/iPad XCUI. This is pending final-HEAD integration CI, and does not establish actual TV/Apple device support, SSDP, SMB or release readiness.

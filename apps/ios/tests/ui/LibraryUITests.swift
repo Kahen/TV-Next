@@ -278,7 +278,9 @@ final class LibraryUITests: XCTestCase {
             previous.tap()
             XCTAssertTrue(app.alerts["删除离线媒体？"].waitForExistence(timeout: 5))
             app.alerts.buttons["删除离线文件"].tap()
-            XCTAssertFalse(previous.exists)
+            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "exists == false"), object: previous)], timeout: 5), .completed,
+                "Confirmed cleanup must remove the previous offline catalog entry")
         }
         enter(app.textFields["offline-url"], "http://127.0.0.1:8765/fixture.mp4")
         enter(app.textFields["offline-name"], "Owned Offline")
@@ -313,7 +315,9 @@ final class LibraryUITests: XCTestCase {
         remove.tap()
         XCTAssertTrue(confirmation.waitForExistence(timeout: 5))
         confirmation.buttons["删除离线文件"].tap()
-        XCTAssertFalse(play.exists, "Confirmed deletion must remove the offline catalog entry")
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"), object: play)], timeout: 5), .completed,
+            "Confirmed deletion must remove the offline catalog entry")
         jump("播放器")
         XCTAssertTrue(app.staticTexts["current-media"].label.contains("尚未选择媒体"), "Confirmed deletion must release the active local player item")
     }
@@ -458,6 +462,7 @@ final class LibraryUITests: XCTestCase {
         let cast = app.buttons["dlna-cast"]
         XCTAssertFalse(cast.isEnabled)
         XCTAssertFalse(app.buttons["dlna-pause"].isEnabled)
+        XCTAssertFalse(app.buttons["dlna-resume"].isEnabled)
         XCTAssertFalse(app.buttons["dlna-query-state"].isEnabled)
         XCTAssertFalse(app.buttons["dlna-query-position"].isEnabled)
         XCTAssertFalse(app.buttons["dlna-seek-forward"].isEnabled)
@@ -517,6 +522,17 @@ final class LibraryUITests: XCTestCase {
         query.tap()
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "label == %@", "设备状态：已暂停"), object: status)], timeout: 15), .completed)
+        let resume = app.buttons["dlna-resume"]
+        reveal(resume)
+        XCTAssertTrue(resume.isEnabled)
+        resume.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "已发送继续播放命令"), object: status)], timeout: 15), .completed)
+        XCTAssertFalse(resume.isEnabled)
+        reveal(query)
+        query.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "设备状态：正在播放"), object: status)], timeout: 15), .completed)
         let stop = app.buttons["dlna-stop"]
         reveal(stop)
         stop.tap()

@@ -29,7 +29,14 @@ import FoundationNetworking
         precondition(paused == .pausedPlayback)
         let pausedSeek = try await NativeDLNA.seekRelative(endpoint: endpoint, deltaSeconds: 15)
         precondition(pausedSeek == 57)
+        try await NativeDLNA.resumePaused(endpoint: endpoint)
+        let resumed = try await NativeDLNA.queryState(endpoint: endpoint)
+        precondition(resumed == .playing)
+        do { try await NativeDLNA.resumePaused(endpoint: endpoint); fatalError("Resume succeeded while already playing") }
+        catch NativeDLNAError.unsupportedResume { }
         try await NativeDLNA.send(.stop, endpoint: endpoint)
+        do { try await NativeDLNA.resumePaused(endpoint: endpoint); fatalError("Resume succeeded after stop") }
+        catch NativeDLNAError.unsupportedResume { }
         let stopped = try await NativeDLNA.queryState(endpoint: endpoint)
         precondition(stopped == .stopped)
         do { _ = try await NativeDLNA.seekRelative(endpoint: endpoint, deltaSeconds: 15); fatalError("Seek succeeded without active media") }

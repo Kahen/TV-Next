@@ -133,3 +133,15 @@ private final class NativeDLNAStateParser: NSObject, XMLParserDelegate {
         }
     }
 }
+
+extension NativeDLNA {
+    /// A fresh device state is required: a prior pause acknowledgement alone
+    /// cannot authorize resuming a renderer that has since stopped or changed.
+    static func resumePaused(endpoint: URL) async throws {
+        let approved = try rendererURL(endpoint.absoluteString)
+        let state = try await queryState(endpoint: approved)
+        guard state == .pausedPlayback else { throw NativeDLNAError.unsupportedResume }
+        try Task.checkCancellation()
+        try await send(.play, endpoint: approved)
+    }
+}
