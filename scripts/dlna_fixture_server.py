@@ -76,7 +76,10 @@ class Handler(BaseHTTPRequestHandler):
         state = getattr(self.server, 'transport_state', 'STOPPED')
         response_content = (f'<CurrentTransportState>{state}</CurrentTransportState>'
                             '<CurrentTransportStatus>OK</CurrentTransportStatus>'
-                            '<CurrentSpeed>1</CurrentSpeed>') if action == 'GetTransportInfo' else (\n            f'<TrackDuration>00:02:00</TrackDuration>'\n            f'<RelTime>00:00:{getattr(self.server, "position_seconds", 0):02d}</RelTime>'\n        ) if action == 'GetPositionInfo' else ''
+                            '<CurrentSpeed>1</CurrentSpeed>') if action == 'GetTransportInfo' else (
+            f'<TrackDuration>00:02:00</TrackDuration>'
+            f'<RelTime>00:00:{getattr(self.server, "position_seconds", 0):02d}</RelTime>'
+        ) if action == 'GetPositionInfo' else ''
         result = (f'<s:Envelope xmlns:s="{SOAP}"><s:Body>'
                   f'<u:{action}Response xmlns:u="{SERVICE}">{response_content}</u:{action}Response>'
                   f'</s:Body></s:Envelope>').encode()
