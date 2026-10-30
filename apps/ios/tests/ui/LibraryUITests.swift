@@ -467,6 +467,7 @@ final class LibraryUITests: XCTestCase {
         XCTAssertFalse(app.buttons["dlna-query-position"].isEnabled)
         XCTAssertFalse(app.buttons["dlna-seek-forward"].isEnabled)
         XCTAssertFalse(app.buttons["dlna-seek-back"].isEnabled)
+        XCTAssertFalse(app.buttons["dlna-seek-absolute"].isEnabled)
         enter(app.textFields["dlna-renderer-url"], "http://8.8.8.8:1400/upnp/control")
         enter(app.textFields["dlna-media-url"], "https://media.example/owned.mp4?a=1&b=2")
         reveal(cast)
@@ -474,6 +475,7 @@ final class LibraryUITests: XCTestCase {
         XCTAssertFalse(app.buttons["dlna-query-state"].isEnabled)
         XCTAssertFalse(app.buttons["dlna-query-position"].isEnabled)
         XCTAssertFalse(app.buttons["dlna-seek-forward"].isEnabled)
+        XCTAssertFalse(app.buttons["dlna-seek-absolute"].isEnabled)
         XCTAssertFalse(app.staticTexts["dlna-status"].exists)
     }
 
@@ -506,6 +508,18 @@ final class LibraryUITests: XCTestCase {
         position.tap()
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "label == %@", "设备进度：00:00:57 / 00:02:00"), object: status)], timeout: 15), .completed)
+        let absoluteButton = app.buttons["dlna-seek-absolute"]
+        XCTAssertFalse(absoluteButton.isEnabled)
+        enter(app.textFields["dlna-seek-time"], "00:01:30")
+        reveal(absoluteButton)
+        XCTAssertTrue(absoluteButton.isEnabled)
+        absoluteButton.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "已请求跳转至：00:01:30"), object: status)], timeout: 15), .completed)
+        reveal(position)
+        position.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "设备进度：00:01:30 / 00:02:00"), object: status)], timeout: 15), .completed)
         let query = app.buttons["dlna-query-state"]
         reveal(query)
         XCTAssertTrue(query.isEnabled)
