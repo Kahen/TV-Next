@@ -188,6 +188,12 @@ private final class NativeDLNABoundedTransport: NSObject, URLSessionDataDelegate
         finish(.failure(error))
     }
 
+    private var isFinished: Bool {
+        completionLock.lock()
+        defer { completionLock.unlock() }
+        return finished
+    }
+
     private func finish(_ result: Result<(Data, URLResponse), Error>) {
         completionLock.lock()
         guard !finished else { completionLock.unlock(); return }
@@ -214,7 +220,7 @@ private final class NativeDLNABoundedTransport: NSObject, URLSessionDataDelegate
     }
 
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
-        guard !finished else { return }
+        guard !isFinished else { return }
         guard data.count <= maxBytes - received.count else {
             finish(.failure(NativeDLNAError.responseTooLarge))
             dataTask.cancel()
@@ -224,7 +230,7 @@ private final class NativeDLNABoundedTransport: NSObject, URLSessionDataDelegate
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        guard !finished else { return }
+        guard !isFinished else { return }
         let finalResponse = response ?? task.response
         guard let http = finalResponse as? HTTPURLResponse else {
             finish(.failure(error ?? NativeDLNAError.invalidResponse)); return
