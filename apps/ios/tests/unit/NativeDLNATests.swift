@@ -41,8 +41,14 @@ final class NativeDLNATests: XCTestCase {
         let endpoint = try NativeDLNA.rendererURL("http://127.0.0.1:8768/upnp/control/AVTransport1")
         let media = try NativeDLNA.mediaURL("https://media.example/owned.mp4?a=1&b=2")
         try await NativeDLNA.cast(endpoint: endpoint, media: media)
+        let playing = try await NativeDLNA.queryState(endpoint: endpoint)
+        XCTAssertEqual(playing, .playing)
         try await NativeDLNA.send(.pause, endpoint: endpoint)
+        let paused = try await NativeDLNA.queryState(endpoint: endpoint)
+        XCTAssertEqual(paused, .pausedPlayback)
         try await NativeDLNA.send(.stop, endpoint: endpoint)
+        let stopped = try await NativeDLNA.queryState(endpoint: endpoint)
+        XCTAssertEqual(stopped, .stopped)
         for (path, status) in [("redirect", 302), ("fault", 500)] {
             let url = try NativeDLNA.rendererURL("http://127.0.0.1:8768/\(path)")
             do { try await NativeDLNA.send(.play, endpoint: url); XCTFail("Accepted \(path)") }
@@ -62,4 +68,32 @@ final class NativeDLNATests: XCTestCase {
         do { try await pending.value; XCTFail("Pre-cancelled request unexpectedly succeeded") }
         catch is CancellationError { }
     }
+    func testTransportStateRequiresSingleDirectBoundedKnownValue() throws {
+        let endpoint = try NativeDLNA.rendererURL("http://127.0.0.1:8768/upnp/control/AVTransport1")
+        let response = HTTPURLResponse(url: endpoint, statusCode: 200, httpVersion: nil, headerFields: nil)!
+        func soap(_ content: String) -> Data {
+            Data("<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\"><s:Body><u:GetTransportInfoResponse xmlns:u=\"urn:schemas-upnp-org:service:AVTransport:1\">\(content)</u:GetTransportInfoResponse></s:Body></s:Envelope>".utf8)
+        }
+        for (value, expected) in [("PLAYING", NativeDLNATransportState.playing),
+                                  ("PAUSED_PLAYBACK", .pausedPlayback),
+                                  ("STOPPED", .stopped),
+                                  ("NO_MEDIA_PRESENT", .noMediaPresent)] {
+            XCTAssertEqual(try NativeDLNA.parseStateResponse(soap("<CurrentTransportState>\(value)</CurrentTransportState>"), response: response), expected)
+        }
+        for invalid in [
+            "",
+            "<CurrentTransportState>UNKNOWN</CurrentTransportState>",
+            "<CurrentTransportState>PLAYING</CurrentTransportState><CurrentTransportState>STOPPED</CurrentTransportState>",
+            "<Extra><CurrentTransportState>PLAYING</CurrentTransportState></Extra>",
+            "<x:CurrentTransportState xmlns:x=\"urn:untrusted\">PLAYING</x:CurrentTransportState>",
+            "<CurrentTransportState><Nested>PLAYING</Nested></CurrentTransportState>",
+            "<CurrentTransportState>\(String(repeating: "A", count: 65))</CurrentTransportState>"
+        ] {
+            XCTAssertThrowsError(try NativeDLNA.parseStateResponse(soap(invalid), response: response), "Accepted invalid state: \(invalid)")
+        }
+        let wrong = Data("<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\"><s:Body><u:PlayResponse xmlns:u=\"urn:schemas-upnp-org:service:AVTransport:1\"><CurrentTransportState>PLAYING</CurrentTransportState></u:PlayResponse></s:Body></s:Envelope>".utf8)
+        XCTAssertThrowsError(try NativeDLNA.parseStateResponse(wrong, response: response))
+        XCTAssertThrowsError(try NativeDLNA.parseStateResponse(Data(repeating: 65, count: 32769), response: response))
+    }
+
 }
