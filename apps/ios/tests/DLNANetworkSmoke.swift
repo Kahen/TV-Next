@@ -36,6 +36,9 @@ import FoundationNetworking
             _ = try await NativeDLNA.seekAbsolute(endpoint: endpoint, targetText: "00:00:99")
             fatalError("Accepted malformed seek")
         } catch NativeDLNAError.invalidSeek { }
+        // Restore the original fixture position before the existing paused +15s regression.
+        let restored = try await NativeDLNA.seekAbsolute(endpoint: endpoint, targetText: "00:00:42")
+        precondition(restored == 42)
         try await NativeDLNA.send(.pause, endpoint: endpoint)
         let paused = try await NativeDLNA.queryState(endpoint: endpoint)
         precondition(paused == .pausedPlayback)
