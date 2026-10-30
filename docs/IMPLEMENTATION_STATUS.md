@@ -95,3 +95,8 @@ The native connected-directory view now offers a local ascending/descending natu
 ## Native WebDAV bounded file sizes (P4, #98)
 
 Read-only native WebDAV requests optional `DAV:getcontentlength` in the same Depth:1 listing, displays validated file byte counts and omits unknown/folder sizes. Successful direct DAV propstat scope and 0–8 TiB decimal bounds prevent malformed/foreign/failed metadata from being shown. No extra network request, credential persistence, server-side sort, SMB/DLNA or device acceptance is implied. Final-head Swift smoke/XCTest/XCUI and full integration evidence belong to issue #98; parent #5 stays open.
+
+
+## Native manual DLNA AVTransport subset (P4, #100)
+
+Native SwiftUI now exposes a manually entered LAN AVTransport control URL and direct HTTP(S) media URL. A bounded SOAP v1 client issues SetAVTransportURI → Play, and separate Pause/Stop, following FongMi's mobile DLNACast sequence. Renderer endpoints are restricted to explicit private/loopback IPv4 HTTP literals; redirects, credentialed URLs and oversized/malformed SOAP responses are rejected. A synthetic localhost fixture and iPhone/iPad XCTest/XCUI cover positive/negative paths; **final-head CI is required before accepting this increment**. This is not SSDP discovery, real renderer/codec interoperability, credentialed media relay, signed distribution or physical-device acceptance. See [IOS_DLNA.md](IOS_DLNA.md). P4 #5 remains open.
