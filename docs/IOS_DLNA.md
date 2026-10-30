@@ -2,7 +2,7 @@
 
 ## Source mapping and scope
 
-Reference: [FongMi/TV mobile DLNACast.java](https://github.com/FongMi/TV/blob/fongmi/app/src/mobile/java/com/fongmi/android/tv/dlna/DLNACast.java). The original uses jUPnP to find a renderer's AVTransport service and sends SetAVTransportURI, Play and optional Seek. TV-Next's **initial native subset** implements **manual** AVTransport v1 SetAVTransportURI → Play, Pause and Stop. It does **not** implement SSDP/M-SEARCH discovery, device descriptions, automatic device selection, seek, DLNA metadata generation, remote subtitle injection, transcoding or provider-specific headers.
+Reference: [FongMi/TV mobile DLNACast.java](https://github.com/FongMi/TV/blob/fongmi/app/src/mobile/java/com/fongmi/android/tv/dlna/DLNACast.java). The original uses jUPnP to find a renderer's AVTransport service and sends SetAVTransportURI, Play and optional Seek. TV-Next's **initial native subset** implements **manual** AVTransport v1 SetAVTransportURI → Play, Pause and Stop. It does **not** implement SSDP/M-SEARCH discovery, device descriptions, automatic device selection, automatic start-position resume, DLNA metadata generation, remote subtitle injection, transcoding or provider-specific headers. Explicit manual ±15-second REL_TIME seeking is separately described below.
 
 In the native **DLNA 投屏** section, enter the device's **actual AVTransport control URL** (not its device-description URL), for example http://192.168.1.20:1400/MediaRenderer/AVTransport/Control, and a direct HTTP(S) media URL the renderer can fetch independently. You can copy a current native channel's URL only when it does not require custom headers or replay resolution. A successful SOAP response means the command was acknowledged; it does **not** prove that the renderer decoded/played the media.
 
@@ -24,7 +24,7 @@ The initial final-head [full integration run #41005691395](https://github.com/Ka
 
 ## Remaining work
 
-SSDP discovery and device description parsing with network permission and multicast-entitlement assessment, real renderer models, DLNA URI metadata/DIDL-Lite compatibility, authenticated media relay for approved streams, seek and remote position, external subtitles, background behavior and physical iPhone/iPad tests remain P4/P5 tasks. Parent #5 stays open; release/signing gates remain P6.
+SSDP discovery and device description parsing with network permission and multicast-entitlement assessment, real renderer models, DLNA URI metadata/DIDL-Lite compatibility, authenticated media relay for approved streams, automatic start-position resume, external subtitles, background behavior and physical iPhone/iPad tests remain P4/P5 tasks. Parent #5 stays open; release/signing gates remain P6.
 
 ## Read-only renderer playback state query (P4, #102)
 
