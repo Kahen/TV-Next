@@ -184,8 +184,10 @@ private final class NativeDLNABoundedTransport: NSObject, URLSessionDataDelegate
         completionLock.lock()
         cancelled = true
         completionLock.unlock()
-        task.cancel()
+        // Resolve the continuation with the intended cancellation/deadline
+        // error before URLSession can race to report NSURLErrorCancelled.
         finish(.failure(error))
+        task.cancel()
     }
 
     private var isFinished: Bool {
