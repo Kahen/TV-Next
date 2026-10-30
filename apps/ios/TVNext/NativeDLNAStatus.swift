@@ -100,10 +100,23 @@ private final class NativeDLNAStateParser: NSObject, XMLParserDelegate {
         stack.append((elementName, ns))
     }
 
-    func parser(_ parser: XMLParser, foundCharacters string: String) {
+    private func appendStateText(_ text: String) {
         guard collecting else { return }
-        raw += string
+        raw += text
         if raw.utf8.count > 64 { invalid = true }
+    }
+
+    func parser(_ parser: XMLParser, foundCharacters string: String) {
+        appendStateText(string)
+    }
+
+    func parser(_ parser: XMLParser, foundCDATA CDATABlock: Data) {
+        guard collecting else { return }
+        guard let text = String(data: CDATABlock, encoding: .utf8) else {
+            invalid = true
+            return
+        }
+        appendStateText(text)
     }
 
     func parser(_ parser: XMLParser, didEndElement elementName: String,
