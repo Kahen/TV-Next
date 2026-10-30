@@ -7,6 +7,12 @@ import FoundationNetworking
     static func main() async throws {
         let endpoint = try NativeDLNA.rendererURL("http://127.0.0.1:8768/upnp/control/AVTransport1")
         let media = try NativeDLNA.mediaURL("https://media.example/owned.mp4?a=1&b=2")
+        let alreadyCancelled = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            try await NativeDLNA.send(.play, endpoint: endpoint)
+        }
+        do { try await alreadyCancelled.value; fatalError("Pre-cancelled task succeeded") }
+        catch is CancellationError { }
         try await NativeDLNA.cast(endpoint: endpoint, media: media)
         try await NativeDLNA.send(.pause, endpoint: endpoint)
         try await NativeDLNA.send(.stop, endpoint: endpoint)
@@ -18,6 +24,10 @@ import FoundationNetworking
         let oversized = try NativeDLNA.rendererURL("http://127.0.0.1:8768/oversize")
         do { try await NativeDLNA.send(.play, endpoint: oversized); fatalError("Accepted oversized response") }
         catch NativeDLNAError.responseTooLarge { }
-        print("Native manual DLNA loopback SOAP/redirect/size-cap integration passed")
+        let slow = try NativeDLNA.rendererURL("http://127.0.0.1:8768/slow")
+        let start = Date()
+        do { try await NativeDLNA.send(.play, endpoint: slow); fatalError("Accepted slow response") }
+        catch { precondition(Date().timeIntervalSince(start) < 11, "Response deadline exceeded") }
+        print("Native manual DLNA loopback SOAP/redirect/size-cap/cancellation/deadline integration passed")
     }
 }
