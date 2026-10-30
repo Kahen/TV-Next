@@ -104,3 +104,8 @@ Native SwiftUI now exposes a manually entered LAN AVTransport control URL and di
 ## Native DLNA read-only transport status (P4, #102)
 
 A native iPhone/iPad manual renderer now supports explicit AVTransport v1 GetTransportInfo and a read-only status button, reusing the bounded SOAP transport. The parser requires one direct CurrentTransportState in the correct SOAP action response and accepts only known UPnP state values; invalid/nested/duplicate/foreign values fail closed. A stateful owned fixture, positive/negative Swift smoke, XCTest and production XCUI test the reported transitions. Final-head CI evidence belongs to the feature PR. This is not SSDP discovery, a physical TV compatibility result, a decoder test or a security audit.
+
+
+## Native DLNA read-only position snapshot (P4, #104)
+
+The native manual DLNA view adds an explicit GetPositionInfo request and a strict bounded SOAP RelTime/TrackDuration parser. No automatic polling, seek, persistence, SSDP or extra destination is introduced. Positive/negative Swift smoke, owned loopback transport, Python fixture and production iPhone/iPad XCUI are part of the new slice; only final-head successful CI constitutes automated acceptance. Real TV/Apple hardware and signed release remain unverified; parent #5 stays open.

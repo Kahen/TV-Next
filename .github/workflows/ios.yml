@@ -95,7 +95,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m unittest discover -s ../../scripts -p 'test_dlna_fixture_server.py'
-          swiftc -warnings-as-errors TVNext/NativeDLNA.swift TVNext/NativeDLNAStatus.swift tests/DLNASmoke.swift -o /tmp/tvnext-dlna-tests
+          swiftc -warnings-as-errors TVNext/NativeDLNA.swift TVNext/NativeDLNAStatus.swift TVNext/NativeDLNAPosition.swift tests/DLNASmoke.swift -o /tmp/tvnext-dlna-tests
           /tmp/tvnext-dlna-tests
           python3 ../../scripts/dlna_fixture_server.py > /tmp/tvnext-dlna-fixture.log 2>&1 &
           dlna_pid=$!
@@ -105,7 +105,7 @@ jobs:
             sleep 1
           done
           curl --fail --silent http://127.0.0.1:8768/health -o /dev/null
-          swiftc -warnings-as-errors TVNext/NativeDLNA.swift TVNext/NativeDLNAStatus.swift tests/DLNANetworkSmoke.swift -o /tmp/tvnext-dlna-network-tests
+          swiftc -warnings-as-errors TVNext/NativeDLNA.swift TVNext/NativeDLNAStatus.swift TVNext/NativeDLNAPosition.swift tests/DLNANetworkSmoke.swift -o /tmp/tvnext-dlna-network-tests
           /tmp/tvnext-dlna-network-tests
       - name: Verify manual intro/outro marker bounds and local persistence
         working-directory: apps/ios

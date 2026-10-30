@@ -459,11 +459,13 @@ final class LibraryUITests: XCTestCase {
         XCTAssertFalse(cast.isEnabled)
         XCTAssertFalse(app.buttons["dlna-pause"].isEnabled)
         XCTAssertFalse(app.buttons["dlna-query-state"].isEnabled)
+        XCTAssertFalse(app.buttons["dlna-query-position"].isEnabled)
         enter(app.textFields["dlna-renderer-url"], "http://8.8.8.8:1400/upnp/control")
         enter(app.textFields["dlna-media-url"], "https://media.example/owned.mp4?a=1&b=2")
         reveal(cast)
         XCTAssertFalse(cast.isEnabled, "Public WAN control endpoints must not be contacted")
         XCTAssertFalse(app.buttons["dlna-query-state"].isEnabled)
+        XCTAssertFalse(app.buttons["dlna-query-position"].isEnabled)
         XCTAssertFalse(app.staticTexts["dlna-status"].exists)
     }
 
@@ -479,6 +481,13 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(status.waitForExistence(timeout: 15), "Owned SOAP SetURI + Play did not complete")
         XCTAssertEqual(status.label, "投屏已开始")
         XCTAssertFalse(app.staticTexts["dlna-error"].exists)
+        let position = app.buttons["dlna-query-position"]
+        reveal(position)
+        XCTAssertTrue(position.isEnabled)
+        position.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "设备进度：00:00:42 / 00:02:00"), object: status)], timeout: 15), .completed)
+
         let query = app.buttons["dlna-query-state"]
         reveal(query)
         XCTAssertTrue(query.isEnabled)

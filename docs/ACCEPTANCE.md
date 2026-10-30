@@ -85,3 +85,8 @@ The new iOS-only, explicit AVTransport v1 SetURI/Play/Pause/Stop path is tested 
 ## Native DLNA status-query evidence (#102)
 
 The read-only GetTransportInfo feature is an implementation slice, not full P4 acceptance. Verify final PR HEAD iPhone/iPad simulator XCTest/XCUI, native Swift smoke, owned localhost SOAP state transitions, and full Web/API/Compose/NAS/Spider isolation integration before merging. Rejection fixtures cover missing, nested, duplicate, unknown and foreign-namespace CurrentTransportState. Real DLNA renderer, local-network permission, codec and physical Apple-device tests remain open. See [IOS_DLNA.md](IOS_DLNA.md).
+
+
+### Native DLNA position query (#104)
+
+Acceptance requires strict direct SOAP GetPositionInfo RelTime/TrackDuration validation, positive and adversarial Swift smoke/XCTest, owned localhost Python/Swift network tests, production iPhone/iPad XCUI and all final-head aggregate jobs green. The read-only result must not be presented as verified real-device playback or seek support. Keep P4 #5 open.

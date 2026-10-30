@@ -16,12 +16,16 @@ import FoundationNetworking
         try await NativeDLNA.cast(endpoint: endpoint, media: media)
         let playing = try await NativeDLNA.queryState(endpoint: endpoint)
         precondition(playing == .playing)
+        let position = try await NativeDLNA.queryPosition(endpoint: endpoint)
+        precondition(position.seconds == 42 && position.durationSeconds == 120)
         try await NativeDLNA.send(.pause, endpoint: endpoint)
         let paused = try await NativeDLNA.queryState(endpoint: endpoint)
         precondition(paused == .pausedPlayback)
         try await NativeDLNA.send(.stop, endpoint: endpoint)
         let stopped = try await NativeDLNA.queryState(endpoint: endpoint)
         precondition(stopped == .stopped)
+        let resetPosition = try await NativeDLNA.queryPosition(endpoint: endpoint)
+        precondition(resetPosition.seconds == 0)
         for (path, status) in [("redirect", 302), ("fault", 500)] {
             let bad = try NativeDLNA.rendererURL("http://127.0.0.1:8768/\(path)")
             do { try await NativeDLNA.send(.play, endpoint: bad); fatalError("Accepted \(path)") }

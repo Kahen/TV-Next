@@ -22,7 +22,7 @@ enum NativeDLNAError: LocalizedError, Equatable {
 }
 
 enum NativeDLNAAction: String {
-    case setURI = "SetAVTransportURI", play = "Play", pause = "Pause", stop = "Stop", getTransportInfo = "GetTransportInfo"
+    case setURI = "SetAVTransportURI", play = "Play", pause = "Pause", stop = "Stop", getTransportInfo = "GetTransportInfo", getPositionInfo = "GetPositionInfo"
 }
 
 /// Manual, opt-in AVTransport subset. No SSDP, arbitrary hosts or credentialed streams.
@@ -89,7 +89,7 @@ enum NativeDLNA {
         case .setURI:
             argument = "<CurrentURI>\(xmlEscaped(media!.absoluteString))</CurrentURI><CurrentURIMetaData></CurrentURIMetaData>"
         case .play: argument = "<Speed>1</Speed>"
-        case .pause, .stop, .getTransportInfo: argument = ""
+        case .pause, .stop, .getTransportInfo, .getPositionInfo: argument = ""
         }
         let body = """
         <?xml version="1.0" encoding="utf-8"?>
