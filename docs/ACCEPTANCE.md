@@ -76,3 +76,8 @@ The local folder-first ascending/descending sort is an iPhone/iPad UI slice, not
 ### P4 iOS WebDAV size metadata acceptance (#98)
 
 Verify direct successful `DAV:getcontentlength` values, zero and malformed/negative/overflow/foreign/failed/duplicate/conflicting values with Swift smoke and XCTest; run production SwiftUI XCUI against the owned localhost fixture and both iPhone/iPad simulator targets. All final-head Web/API, Compose, NAS and Spider isolation jobs must pass before merging. This is metadata display, not verified file length or real-provider/device compatibility.
+
+
+## Native manual DLNA control regression (P4, #100)
+
+The new iOS-only, explicit AVTransport v1 SetURI/Play/Pause/Stop path is tested with a locally owned HTTP SOAP renderer. Endpoint validation restricts control traffic to private IPv4 literal addresses; fixture tests cover malformed/foreign endpoints, media URLs, SOAP escaping, redirects, HTTP faults and a 32 KiB response cap. Both iPhone and iPad production XCUI must pass on the final PR HEAD. These checks do **not** establish SSDP discovery, real renderer/media playback, local-network permission on physical hardware, independent security review or signed distribution. See [IOS_DLNA.md](IOS_DLNA.md). Do not close P4 parent #5.
