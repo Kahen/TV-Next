@@ -58,6 +58,16 @@ struct NativeDLNASection: View {
             Button("查询播放进度") { run(.getPositionInfo) }
                 .disabled(busy || endpoint == nil)
                 .accessibilityIdentifier("dlna-query-position")
+            HStack(spacing: 12) {
+                Button("快退15秒") { runSeek(-NativeDLNASeek.stepSeconds) }
+                    .disabled(busy || endpoint == nil)
+                    .accessibilityIdentifier("dlna-seek-back")
+                Button("快进15秒") { runSeek(NativeDLNASeek.stepSeconds) }
+                    .disabled(busy || endpoint == nil)
+                    .accessibilityIdentifier("dlna-seek-forward")
+            }
+            Text("跳转前会重新查询设备状态和有限媒体时长；不支持直播或未知时长。")
+                .font(.caption).foregroundStyle(.secondary)
             if busy { ProgressView("正在等待 DLNA 设备…") }
             if let status { Text(status).accessibilityIdentifier("dlna-status") }
             if let error { Text(error).foregroundStyle(.red).accessibilityIdentifier("dlna-error") }
@@ -78,6 +88,24 @@ struct NativeDLNASection: View {
         castStarted = false
         status = nil
         error = nil
+    }
+
+    private func runSeek(_ deltaSeconds: Int) {
+        guard !busy, let endpoint else { return }
+        busy = true
+        status = nil
+        error = nil
+        task = Task { @MainActor in
+            do {
+                let target = try await NativeDLNA.seekRelative(endpoint: endpoint, deltaSeconds: deltaSeconds)
+                guard !Task.isCancelled else { return }
+                status = "已请求跳转至：" + (try NativeDLNASeek.target(target))
+            } catch {
+                guard !Task.isCancelled else { return }
+                self.error = error.localizedDescription
+            }
+            if !Task.isCancelled { busy = false }
+        }
     }
 
     private func run(_ action: NativeDLNAAction) {

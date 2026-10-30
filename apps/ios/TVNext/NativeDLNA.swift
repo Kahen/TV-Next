@@ -7,13 +7,15 @@ import FoundationXML
 #endif
 
 enum NativeDLNAError: LocalizedError, Equatable {
-    case invalidRenderer, invalidMedia, unsupportedMedia, responseTooLarge, invalidResponse, httpStatus(Int)
+    case invalidRenderer, invalidMedia, unsupportedMedia, invalidSeek, unsupportedSeek, responseTooLarge, invalidResponse, httpStatus(Int)
 
     var errorDescription: String? {
         switch self {
         case .invalidRenderer: return "DLNA 控制地址必须是局域网 IPv4 HTTP 地址，且不能包含凭据、查询或重定向。"
         case .invalidMedia: return "只能投屏不带凭据的直接 HTTP(S) 媒体地址。"
         case .unsupportedMedia: return "当前媒体需要额外请求头、重放解析或本地文件，不能直接交给 DLNA 设备。"
+        case .invalidSeek: return "DLNA 跳转位置无效，必须位于 00:00:00 至 99:59:59。"
+        case .unsupportedSeek: return "设备未处于播放/暂停状态，或没有可跳转的有限时长媒体。"
         case .responseTooLarge: return "DLNA 设备返回的数据超过 32 KiB。"
         case .invalidResponse: return "DLNA 设备响应无效或返回 SOAP Fault。"
         case .httpStatus(let status): return "DLNA 设备返回 HTTP \(status)。"
@@ -22,7 +24,7 @@ enum NativeDLNAError: LocalizedError, Equatable {
 }
 
 enum NativeDLNAAction: String {
-    case setURI = "SetAVTransportURI", play = "Play", pause = "Pause", stop = "Stop", getTransportInfo = "GetTransportInfo", getPositionInfo = "GetPositionInfo"
+    case setURI = "SetAVTransportURI", play = "Play", pause = "Pause", stop = "Stop", getTransportInfo = "GetTransportInfo", getPositionInfo = "GetPositionInfo", seek = "Seek"
 }
 
 /// Manual, opt-in AVTransport subset. No SSDP, arbitrary hosts or credentialed streams.
@@ -77,8 +79,10 @@ enum NativeDLNA {
             .replacingOccurrences(of: "'", with: "&apos;")
     }
 
-    static func request(_ action: NativeDLNAAction, endpoint: URL, media: URL? = nil) throws -> URLRequest {
+    static func request(_ action: NativeDLNAAction, endpoint: URL, media: URL? = nil, seekSeconds: Int? = nil) throws -> URLRequest {
         if action == .setURI && media == nil { throw NativeDLNAError.invalidMedia }
+        if action == .seek && seekSeconds == nil { throw NativeDLNAError.invalidSeek }
+        if action != .seek && seekSeconds != nil { throw NativeDLNAError.invalidSeek }
         var request = URLRequest(url: endpoint, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 8)
         request.httpMethod = "POST"
         request.setValue("text/xml; charset=utf-8", forHTTPHeaderField: "Content-Type")
@@ -89,6 +93,9 @@ enum NativeDLNA {
         case .setURI:
             argument = "<CurrentURI>\(xmlEscaped(media!.absoluteString))</CurrentURI><CurrentURIMetaData></CurrentURIMetaData>"
         case .play: argument = "<Speed>1</Speed>"
+        case .seek:
+            let target = try NativeDLNASeek.target(seekSeconds!)
+            argument = "<Unit>REL_TIME</Unit><Target>\(target)</Target>"
         case .pause, .stop, .getTransportInfo, .getPositionInfo: argument = ""
         }
         let body = """
@@ -116,10 +123,10 @@ enum NativeDLNA {
         guard parser.parse(), collector.valid else { throw NativeDLNAError.invalidResponse }
     }
 
-    static func send(_ action: NativeDLNAAction, endpoint: URL, media: URL? = nil) async throws {
+    static func send(_ action: NativeDLNAAction, endpoint: URL, media: URL? = nil, seekSeconds: Int? = nil) async throws {
         let approved = try rendererURL(endpoint.absoluteString)
         let checkedMedia = try media.map { try mediaURL($0.absoluteString) }
-        let request = try request(action, endpoint: approved, media: checkedMedia)
+        let request = try request(action, endpoint: approved, media: checkedMedia, seekSeconds: seekSeconds)
         let (data, response) = try await NativeDLNABoundedTransport.load(request, maxBytes: maxResponseBytes)
         try validate(data, response: response, action: action)
     }
