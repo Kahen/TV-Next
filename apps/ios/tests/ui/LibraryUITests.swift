@@ -458,6 +458,7 @@ final class LibraryUITests: XCTestCase {
         let cast = app.buttons["dlna-cast"]
         XCTAssertFalse(cast.isEnabled)
         XCTAssertFalse(app.buttons["dlna-pause"].isEnabled)
+        XCTAssertFalse(app.buttons["dlna-resume"].isEnabled)
         XCTAssertFalse(app.buttons["dlna-query-state"].isEnabled)
         XCTAssertFalse(app.buttons["dlna-query-position"].isEnabled)
         XCTAssertFalse(app.buttons["dlna-seek-forward"].isEnabled)
@@ -517,6 +518,17 @@ final class LibraryUITests: XCTestCase {
         query.tap()
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "label == %@", "设备状态：已暂停"), object: status)], timeout: 15), .completed)
+        let resume = app.buttons["dlna-resume"]
+        reveal(resume)
+        XCTAssertTrue(resume.isEnabled)
+        resume.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "已发送继续播放命令"), object: status)], timeout: 15), .completed)
+        XCTAssertFalse(resume.isEnabled)
+        reveal(query)
+        query.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "设备状态：正在播放"), object: status)], timeout: 15), .completed)
         let stop = app.buttons["dlna-stop"]
         reveal(stop)
         stop.tap()

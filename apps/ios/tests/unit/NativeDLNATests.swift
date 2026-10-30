@@ -176,4 +176,28 @@ final class NativeDLNATests: XCTestCase {
         XCTAssertEqual(position.durationSeconds, 120)
     }
 
+
+    func testResumeRequiresFreshPausedState() async throws {
+        let endpoint = try NativeDLNA.rendererURL("http://127.0.0.1:8768/upnp/control/AVTransport1")
+        let media = try NativeDLNA.mediaURL("https://media.example/owned.mp4?a=1&b=2")
+        try await NativeDLNA.send(.stop, endpoint: endpoint)
+        do {
+            try await NativeDLNA.resumePaused(endpoint: endpoint)
+            XCTFail("Stopped renderer was resumed")
+        } catch NativeDLNAError.unsupportedResume { }
+
+        try await NativeDLNA.cast(endpoint: endpoint, media: media)
+        do {
+            try await NativeDLNA.resumePaused(endpoint: endpoint)
+            XCTFail("Already-playing renderer was resumed")
+        } catch NativeDLNAError.unsupportedResume { }
+
+        try await NativeDLNA.send(.pause, endpoint: endpoint)
+        let pausedState = try await NativeDLNA.queryState(endpoint: endpoint)
+        XCTAssertEqual(pausedState, .pausedPlayback)
+        try await NativeDLNA.resumePaused(endpoint: endpoint)
+        let resumedState = try await NativeDLNA.queryState(endpoint: endpoint)
+        XCTAssertEqual(resumedState, .playing)
+    }
+
 }

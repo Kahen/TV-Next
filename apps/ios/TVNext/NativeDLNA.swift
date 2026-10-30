@@ -7,7 +7,7 @@ import FoundationXML
 #endif
 
 enum NativeDLNAError: LocalizedError, Equatable {
-    case invalidRenderer, invalidMedia, unsupportedMedia, invalidSeek, unsupportedSeek, responseTooLarge, invalidResponse, httpStatus(Int)
+    case invalidRenderer, invalidMedia, unsupportedMedia, invalidSeek, unsupportedSeek, unsupportedResume, responseTooLarge, invalidResponse, httpStatus(Int)
 
     var errorDescription: String? {
         switch self {
@@ -16,6 +16,7 @@ enum NativeDLNAError: LocalizedError, Equatable {
         case .unsupportedMedia: return "当前媒体需要额外请求头、重放解析或本地文件，不能直接交给 DLNA 设备。"
         case .invalidSeek: return "DLNA 跳转位置无效，必须位于 00:00:00 至 99:59:59。"
         case .unsupportedSeek: return "设备未处于播放/暂停状态，或没有可跳转的有限时长媒体。"
+        case .unsupportedResume: return "设备当前不是暂停播放状态，无法继续播放。"
         case .responseTooLarge: return "DLNA 设备返回的数据超过 32 KiB。"
         case .invalidResponse: return "DLNA 设备响应无效或返回 SOAP Fault。"
         case .httpStatus(let status): return "DLNA 设备返回 HTTP \(status)。"

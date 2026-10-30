@@ -10,6 +10,7 @@ struct NativeDLNASection: View {
     @State private var error: String?
     @State private var busy = false
     @State private var castStarted = false
+    @State private var paused = false
     @State private var task: Task<Void, Never>?
 
     private var endpoint: URL? { try? NativeDLNA.rendererURL(rendererAddress) }
@@ -52,6 +53,9 @@ struct NativeDLNASection: View {
                     .disabled(busy || endpoint == nil || !castStarted)
                     .accessibilityIdentifier("dlna-stop")
             }
+            Button("继续播放") { run(.play) }
+                .disabled(busy || endpoint == nil || !paused)
+                .accessibilityIdentifier("dlna-resume")
             Button("查询设备播放状态") { run(.getTransportInfo) }
                 .disabled(busy || endpoint == nil)
                 .accessibilityIdentifier("dlna-query-state")
@@ -86,6 +90,7 @@ struct NativeDLNASection: View {
         task = nil
         busy = false
         castStarted = false
+        paused = false
         status = nil
         error = nil
     }
@@ -112,6 +117,7 @@ struct NativeDLNASection: View {
         guard !busy, let endpoint else { return }
         let media = self.media
         if action == .setURI && media == nil { return }
+        if action == .play && !paused { return }
         busy = true
         status = nil
         error = nil
@@ -123,7 +129,10 @@ struct NativeDLNASection: View {
                     let state = try await NativeDLNA.queryState(endpoint: endpoint)
                     guard !Task.isCancelled else { return }
                     castStarted = state.canControlPlayback
+                    paused = state == .pausedPlayback
                     status = "设备状态：\(state.localizedLabel)"
+                } else if action == .play {
+                    try await NativeDLNA.resumePaused(endpoint: endpoint)
                 } else if action == .getPositionInfo {
                     let position = try await NativeDLNA.queryPosition(endpoint: endpoint)
                     guard !Task.isCancelled else { return }
@@ -132,12 +141,14 @@ struct NativeDLNASection: View {
                     try await NativeDLNA.send(action, endpoint: endpoint)
                 }
                 guard !Task.isCancelled else { return }
-                if action == .setURI { castStarted = true; status = "投屏已开始" }
-                if action == .pause { status = "已发送暂停命令" }
-                if action == .stop { castStarted = false; status = "已发送停止命令" }
+                if action == .setURI { castStarted = true; paused = false; status = "投屏已开始" }
+                if action == .pause { paused = true; status = "已发送暂停命令" }
+                if action == .play { paused = false; status = "已发送继续播放命令" }
+                if action == .stop { castStarted = false; paused = false; status = "已发送停止命令" }
             } catch {
                 guard !Task.isCancelled else { return }
                 castStarted = false
+                paused = false
                 self.error = error.localizedDescription
             }
             if !Task.isCancelled { busy = false }

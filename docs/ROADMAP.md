@@ -157,3 +157,7 @@ An opt-in GetTransportInfo status query extends the manually configured private-
 ### P4 native manual DLNA bounded REL_TIME seek (#106)
 
 An explicit native iPhone/iPad ±15-second seek control follows FongMi mobile `DLNACast.java` REL_TIME semantics. Each operation checks fresh device transport state and position, requires known finite duration, clamps target, and sends bounded SOAP Seek to the same manually configured private IPv4 renderer. Owned fixture, Swift smoke, XCTest/XCUI and final-head aggregate CI are required. This does not add SSDP, live seeking, real TV compatibility, SMB, or signed distribution. See [IOS_DLNA.md](IOS_DLNA.md).
+
+### P4 native manual DLNA pause/resume slice (#108)
+
+The iPhone/iPad SwiftUI DLNA controls now offer explicit Play resume after an acknowledged pause or reported PAUSED_PLAYBACK. Before resuming, a fresh AVTransport GetTransportInfo must still report PAUSED_PLAYBACK; stopped/playing/transitioning/recording states are rejected. Existing private IPv4, no-redirect/cookie/proxy, 8-second per-request and 32 KiB SOAP bounds apply. This slice is subject to final-HEAD full CI; SSDP, SMB, real renderer and Apple-device acceptance remain pending.
