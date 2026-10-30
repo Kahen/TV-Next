@@ -122,3 +122,7 @@ A native SwiftUI **继续播放** button is enabled only after an acknowledged p
 ## Native DLNA absolute time seek (P4, #110)
 
 A native SwiftUI HH:MM:SS field and explicit seek action extend the manually configured private-LAN AVTransport subset. Input is strictly ASCII and validated before network access; the action checks fresh renderer state and finite media duration and rejects targets beyond the reported duration. Owned fixture, positive/negative Swift smoke/XCTest, network and production iPhone/iPad XCUI are part of the PR; final-head full CI remains required. No SSDP, real renderer compatibility, SMB, physical device acceptance or signed distribution is implied.
+
+## Native opt-in DLNA device-description import (P4, #112)
+
+The manual iOS DLNA page now accepts an explicitly supplied private-LAN UPnP device-description URL and imports its unique, same-origin AVTransport:1 control endpoint after a bounded GET and strict XML validation. No SSDP, multicast discovery, automatic playback, credentials, URLBase trust or additional server endpoint. Positive/negative Swift smoke, localhost network, XCTest, production SwiftUI XCUI and final-head CI are required before implementation acceptance. Real TV/iPhone/iPad, broader UPnP compatibility, SMB, independent security review and signing are not claimed.
