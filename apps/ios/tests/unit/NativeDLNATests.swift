@@ -3,6 +3,43 @@ import XCTest
 @testable import TVNext
 
 final class NativeDLNATests: XCTestCase {
+    func testAbsoluteSeekStrictTimeAndDuration() throws {
+        XCTAssertEqual(try NativeDLNASeek.parseAbsolute("00:01:30"), 90)
+        XCTAssertEqual(try NativeDLNASeek.parseAbsolute("99:59:59"), NativeDLNASeek.maxSeconds)
+        XCTAssertEqual(try NativeDLNASeek.parseAbsolute("00:00:00"), 0)
+        for invalid in ["1:01:30", "00:60:00", "00:00:60", "100:00:00",
+                        "00:01:3a", "00:01:30 ", "00:01:30\n", "００:０１:３０"] {
+            XCTAssertThrowsError(try NativeDLNASeek.parseAbsolute(invalid))
+        }
+        let finite = NativeDLNAPosition(seconds: 42, durationSeconds: 120)
+        XCTAssertEqual(try NativeDLNASeek.absoluteTarget(position: finite, requestedSeconds: 0), 0)
+        XCTAssertEqual(try NativeDLNASeek.absoluteTarget(position: finite, requestedSeconds: 120), 120)
+        for invalid in [-1, 121, Int.max] {
+            XCTAssertThrowsError(try NativeDLNASeek.absoluteTarget(position: finite, requestedSeconds: invalid))
+        }
+        XCTAssertThrowsError(try NativeDLNASeek.absoluteTarget(
+            position: NativeDLNAPosition(seconds: 42, durationSeconds: nil), requestedSeconds: 30))
+    }
+
+    func testOwnedLoopbackAbsoluteSeekAndStoppedRejection() async throws {
+        let endpoint = try NativeDLNA.rendererURL("http://127.0.0.1:8768/upnp/control/AVTransport1")
+        let media = try NativeDLNA.mediaURL("https://media.example/owned.mp4?a=1&b=2")
+        try await NativeDLNA.cast(endpoint: endpoint, media: media)
+        let requested = try await NativeDLNA.seekAbsolute(endpoint: endpoint, targetText: "00:01:30")
+        XCTAssertEqual(requested, 90)
+        let reported = try await NativeDLNA.queryPosition(endpoint: endpoint)
+        XCTAssertEqual(reported.seconds, 90)
+        do {
+            _ = try await NativeDLNA.seekAbsolute(endpoint: endpoint, targetText: "00:02:01")
+            XCTFail("Accepted absolute seek beyond duration")
+        } catch NativeDLNAError.invalidSeek { }
+        try await NativeDLNA.send(.stop, endpoint: endpoint)
+        do {
+            _ = try await NativeDLNA.seekAbsolute(endpoint: endpoint, targetText: "00:00:30")
+            XCTFail("Accepted absolute seek on stopped renderer")
+        } catch NativeDLNAError.unsupportedSeek { }
+    }
+
     func testRendererPrivateLiteralValidation() throws {
         for address in ["http://10.0.0.2:1400/upnp/control", "http://172.16.1.2:49152/AVTransport", "http://172.31.255.254:80/upnp", "http://192.168.1.20:1400/MediaRenderer/AVTransport/Control", "http://127.0.0.1:8768/upnp/control/AVTransport1"] {
             XCTAssertNoThrow(try NativeDLNA.rendererURL(address))
