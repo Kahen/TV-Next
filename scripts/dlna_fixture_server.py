@@ -47,7 +47,7 @@ class Handler(BaseHTTPRequestHandler):
             assert 0 < size <= 8192
             payload = self.rfile.read(size)
             action = self.headers['SOAPACTION'].strip('"').split('#', 1)[1]
-            assert action in ('SetAVTransportURI', 'Play', 'Pause', 'Stop', 'GetTransportInfo')
+            assert action in ('SetAVTransportURI', 'Play', 'Pause', 'Stop', 'GetTransportInfo', 'GetPositionInfo')
             root = ET.fromstring(payload)
             body = root.find(f'{{{SOAP}}}Body')
             assert body is not None
@@ -58,22 +58,25 @@ class Handler(BaseHTTPRequestHandler):
                 assert node.find('CurrentURIMetaData') is not None
             if action == 'Play':
                 assert node.findtext('Speed') == '1'
-            if action == 'GetTransportInfo':
+            if action in ('GetTransportInfo', 'GetPositionInfo'):
                 assert len(node) == 1
         except (AssertionError, ValueError, KeyError, IndexError, ET.ParseError):
             return self.reply(400, b'invalid SOAP')
         if action == 'SetAVTransportURI':
             self.server.transport_state = 'STOPPED'
+            self.server.position_seconds = 0
         elif action == 'Play':
             self.server.transport_state = 'PLAYING'
+            self.server.position_seconds = 42
         elif action == 'Pause':
             self.server.transport_state = 'PAUSED_PLAYBACK'
         elif action == 'Stop':
             self.server.transport_state = 'STOPPED'
+            self.server.position_seconds = 0
         state = getattr(self.server, 'transport_state', 'STOPPED')
         response_content = (f'<CurrentTransportState>{state}</CurrentTransportState>'
                             '<CurrentTransportStatus>OK</CurrentTransportStatus>'
-                            '<CurrentSpeed>1</CurrentSpeed>') if action == 'GetTransportInfo' else ''
+                            '<CurrentSpeed>1</CurrentSpeed>') if action == 'GetTransportInfo' else (\n            f'<TrackDuration>00:02:00</TrackDuration>'\n            f'<RelTime>00:00:{getattr(self.server, "position_seconds", 0):02d}</RelTime>'\n        ) if action == 'GetPositionInfo' else ''
         result = (f'<s:Envelope xmlns:s="{SOAP}"><s:Body>'
                   f'<u:{action}Response xmlns:u="{SERVICE}">{response_content}</u:{action}Response>'
                   f'</s:Body></s:Envelope>').encode()
