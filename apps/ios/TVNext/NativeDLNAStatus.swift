@@ -43,6 +43,10 @@ extension NativeDLNA {
         let approved = try rendererURL(endpoint.absoluteString)
         let request = try request(.getTransportInfo, endpoint: approved)
         let (data, response) = try await NativeDLNABoundedTransport.load(request, maxBytes: maxResponseBytes)
+        return try parseStateResponse(data, response: response)
+    }
+
+    static func parseStateResponse(_ data: Data, response: URLResponse) throws -> NativeDLNATransportState {
         try validate(data, response: response, action: .getTransportInfo)
         return try NativeDLNAStateParser.parse(data)
     }
