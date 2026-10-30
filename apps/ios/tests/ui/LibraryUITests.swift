@@ -458,10 +458,12 @@ final class LibraryUITests: XCTestCase {
         let cast = app.buttons["dlna-cast"]
         XCTAssertFalse(cast.isEnabled)
         XCTAssertFalse(app.buttons["dlna-pause"].isEnabled)
+        XCTAssertFalse(app.buttons["dlna-query-state"].isEnabled)
         enter(app.textFields["dlna-renderer-url"], "http://8.8.8.8:1400/upnp/control")
         enter(app.textFields["dlna-media-url"], "https://media.example/owned.mp4?a=1&b=2")
         reveal(cast)
         XCTAssertFalse(cast.isEnabled, "Public WAN control endpoints must not be contacted")
+        XCTAssertFalse(app.buttons["dlna-query-state"].isEnabled)
         XCTAssertFalse(app.staticTexts["dlna-status"].exists)
     }
 
@@ -477,17 +479,31 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(status.waitForExistence(timeout: 15), "Owned SOAP SetURI + Play did not complete")
         XCTAssertEqual(status.label, "投屏已开始")
         XCTAssertFalse(app.staticTexts["dlna-error"].exists)
+        let query = app.buttons["dlna-query-state"]
+        reveal(query)
+        XCTAssertTrue(query.isEnabled)
+        query.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "设备状态：正在播放"), object: status)], timeout: 15), .completed)
         let pause = app.buttons["dlna-pause"]
         reveal(pause)
         XCTAssertTrue(pause.isEnabled)
         pause.tap()
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "label == %@", "已发送暂停命令"), object: status)], timeout: 15), .completed)
+        reveal(query)
+        query.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "设备状态：已暂停"), object: status)], timeout: 15), .completed)
         let stop = app.buttons["dlna-stop"]
         reveal(stop)
         stop.tap()
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "label == %@", "已发送停止命令"), object: status)], timeout: 15), .completed)
         XCTAssertFalse(stop.isEnabled)
+        reveal(query)
+        query.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "设备状态：已停止"), object: status)], timeout: 15), .completed)
     }
 }
