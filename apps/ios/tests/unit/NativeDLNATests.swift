@@ -98,4 +98,42 @@ final class NativeDLNATests: XCTestCase {
         XCTAssertThrowsError(try NativeDLNA.parseStateResponse(Data(repeating: 65, count: 32769), response: response))
     }
 
+    func testPositionInfoRejectsMalformedAndSpoofedValues() throws {
+        let endpoint = try NativeDLNA.rendererURL("http://127.0.0.1:8768/upnp/control/AVTransport1")
+        let response = HTTPURLResponse(url: endpoint, statusCode: 200, httpVersion: nil, headerFields: nil)!
+        func soap(_ fields: String) -> Data {
+            Data("<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\"><s:Body><u:GetPositionInfoResponse xmlns:u=\"urn:schemas-upnp-org:service:AVTransport:1\">\(fields)</u:GetPositionInfoResponse></s:Body></s:Envelope>".utf8)
+        }
+        let valid = try NativeDLNA.parsePositionResponse(
+            soap("<TrackDuration>00:02:00</TrackDuration><RelTime>00:00:42</RelTime>"), response: response)
+        XCTAssertEqual(valid, NativeDLNAPosition(seconds: 42, durationSeconds: 120))
+        XCTAssertEqual(valid.localizedLabel, "00:00:42 / 00:02:00")
+        let unknown = try NativeDLNA.parsePositionResponse(
+            soap("<TrackDuration>NOT_IMPLEMENTED</TrackDuration><RelTime><![CDATA[00:00:42]]></RelTime>"), response: response)
+        XCTAssertNil(unknown.durationSeconds)
+        for invalid in [
+            "<TrackDuration>00:02:00</TrackDuration>",
+            "<RelTime>00:00:42</RelTime>",
+            "<TrackDuration>00:02:00</TrackDuration><RelTime>00:00:42</RelTime><RelTime>00:00:41</RelTime>",
+            "<TrackDuration>00:02:00</TrackDuration><RelTime>00:02:01</RelTime>",
+            "<TrackDuration>00:02:00</TrackDuration><RelTime>00:60:00</RelTime>",
+            "<TrackDuration>00:02:00</TrackDuration><RelTime>NOT_IMPLEMENTED</RelTime>",
+            "<TrackDuration>00:02:00</TrackDuration><RelTime>00:00:42<![CDATA[99]]></RelTime>",
+            "<TrackDuration>00:02:00</TrackDuration><x:RelTime xmlns:x=\"urn:foreign\">00:00:42</x:RelTime>",
+            "<TrackDuration>00:02:00</TrackDuration><Wrapper><RelTime>00:00:42</RelTime></Wrapper>",
+            "<TrackDuration>00:02:00</TrackDuration><RelTime>\(String(repeating: "1", count: 64))</RelTime>"
+        ] {
+            XCTAssertThrowsError(try NativeDLNA.parsePositionResponse(soap(invalid), response: response), invalid)
+        }
+    }
+
+    func testPositionInfoOwnedLoopbackQuery() async throws {
+        let endpoint = try NativeDLNA.rendererURL("http://127.0.0.1:8768/upnp/control/AVTransport1")
+        let media = try NativeDLNA.mediaURL("https://media.example/owned.mp4?a=1&b=2")
+        try await NativeDLNA.cast(endpoint: endpoint, media: media)
+        let position = try await NativeDLNA.queryPosition(endpoint: endpoint)
+        XCTAssertEqual(position.seconds, 42)
+        XCTAssertEqual(position.durationSeconds, 120)
+    }
+
 }
