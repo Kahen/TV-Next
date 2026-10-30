@@ -78,9 +78,13 @@ private final class DescriptionCollector: NSObject, XMLParserDelegate {
     func parser(_ parser: XMLParser, didStartElement name: String,
                 namespaceURI: String?, qualifiedName: String?, attributes: [String: String]) {
         if collecting != nil { invalid = true }
-        if !correctNamespace(namespaceURI) { invalid = true }
+        if stack.isEmpty {
+            if name != "root" || !correctNamespace(namespaceURI) { invalid = true }
+        } else if ["device", "serviceList", "service", "serviceType", "controlURL"].contains(name),
+                  !correctNamespace(namespaceURI) {
+            invalid = true
+        }
         stack.append(name)
-        if stack.count == 1 && name != "root" { invalid = true }
         if isService(stack) { serviceFields = [:] }
         if fields.contains(name) && isService(Array(stack.dropLast())) {
             if serviceFields[name] != nil || collecting != nil { invalid = true }
@@ -108,7 +112,7 @@ private final class DescriptionCollector: NSObject, XMLParserDelegate {
 
     func parser(_ parser: XMLParser, didEndElement name: String,
                 namespaceURI: String?, qualifiedName: String?) {
-        guard stack.last == name, correctNamespace(namespaceURI) else { invalid = true; return }
+        guard stack.last == name else { invalid = true; return }
         if collecting == name && isService(Array(stack.dropLast())) {
             serviceFields[name] = text.trimmingCharacters(in: .whitespacesAndNewlines)
             collecting = nil
