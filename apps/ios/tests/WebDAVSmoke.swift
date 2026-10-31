@@ -52,9 +52,12 @@ import Foundation
         let conflict = modifiedRecord("Conflict.mp4", dateTag).replacingOccurrences(
             of: "</d:response>",
             with: "<d:propstat><d:prop><d:getlastmodified>Tue, 02 Jan 2024 12:34:56 GMT</d:getlastmodified></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>")
+        let failedMetadata = modifiedRecord("Failed.mp4", "").replacingOccurrences(
+            of: "</d:response>",
+            with: "<d:propstat><d:prop>\(dateTag)</d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response>")
         let modifiedXML = "<d:multistatus xmlns:d=\"DAV:\" xmlns:x=\"urn:foreign\">" +
             modifiedRecord("Good.mp4", dateTag) +
-            modifiedRecord("Failed.mp4", dateTag, status: "HTTP/1.1 404 Not Found") +
+            failedMetadata +
             modifiedRecord("Foreign.mp4", "<x:getlastmodified>\(goodDate)</x:getlastmodified>") +
             modifiedRecord("Nested.mp4", "<d:getlastmodified><d:span>\(goodDate)</d:span></d:getlastmodified>") +
             modifiedRecord("Duplicate.mp4", dateTag + dateTag) +
