@@ -148,23 +148,23 @@ final class LibraryUITests: XCTestCase {
         let entry = app.buttons["smb-files-import"]
         reveal(entry)
         XCTAssertTrue(entry.isEnabled)
+        XCTAssertTrue(app.staticTexts["current-media"].label.contains("尚未选择媒体"))
         entry.tap()
-        // UIDocumentPicker can be hosted by the app or by the Files process,
-        // depending on simulator OS. Require an actual dismiss control rather
-        // than merely checking that our import button remains visible.
-        let documents = XCUIApplication(bundleIdentifier: "com.apple.DocumentsApp")
-        let cancelButtons = [
-            app.buttons["Cancel"], app.buttons["取消"],
-            documents.buttons["Cancel"], documents.buttons["取消"]
-        ]
-        let opened = cancelButtons.first { $0.waitForExistence(timeout: 5) }
-        if opened == nil {
-            print("SMB picker app hierarchy: \(app.debugDescription)")
-            print("SMB picker Files hierarchy: \(documents.debugDescription)")
-        }
-        XCTAssertNotNil(opened, "System document picker did not expose a Cancel control")
-        opened?.tap()
+
+        // An app-owned sheet hosts the real UIDocumentPickerViewController.
+        // The system Files process is not guaranteed to expose its controls
+        // through the host app's accessibility tree on CI simulators.
+        let dismiss = app.buttons["smb-picker-dismiss"]
+        XCTAssertTrue(dismiss.waitForExistence(timeout: 10), "Files import sheet did not open")
+        XCTAssertTrue(app.staticTexts["选择本地媒体"].exists)
+        dismiss.tap()
+        let closed = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"), object: dismiss
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [closed], timeout: 5), .completed)
         XCTAssertTrue(entry.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["current-media"].label.contains("尚未选择媒体"),
+                      "Cancelling the Files picker must not start playback")
     }
 
     func testNativeWebDAVFormRejectsUnsafeURLWithoutNetworking() {
