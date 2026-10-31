@@ -10,6 +10,7 @@ struct NativeDLNASection: View {
     @State private var importedModelName: String?
     @State private var rendererAddress = ""
     @State private var mediaAddress = ""
+    @State private var metadataTitle = ""
     @State private var seekTime = ""
     @State private var status: String?
     @State private var error: String?
@@ -72,6 +73,11 @@ struct NativeDLNASection: View {
                 .keyboardType(.URL).textContentType(.URL)
                 .accessibilityIdentifier("dlna-media-url")
                 .onChange(of: mediaAddress) { _, _ in reset() }
+            TextField("可选视频标题（DIDL-Lite）", text: $metadataTitle)
+                .accessibilityIdentifier("dlna-metadata-title")
+                .onChange(of: metadataTitle) { _, _ in reset() }
+            Text("可选：仅向手动指定的电视发送标题与媒体 URL；不传请求头、不持久化。留空保持空元数据兼容模式。")
+                .font(.caption).foregroundStyle(.secondary)
             Button("使用当前播放地址") {
                 guard let current = library.current,
                       (current.headers ?? [:]).isEmpty,
@@ -85,7 +91,8 @@ struct NativeDLNASection: View {
             .accessibilityIdentifier("dlna-use-current")
             HStack(spacing: 12) {
                 Button("投屏播放") { run(.setURI) }
-                    .disabled(busy || endpoint == nil || media == nil)
+                    .disabled(busy || endpoint == nil || media == nil ||
+                              (!metadataTitle.isEmpty && (try? NativeDLNA.validatedMetadataTitle(metadataTitle)) == nil))
                     .accessibilityIdentifier("dlna-cast")
                 Button("暂停") { run(.pause) }
                     .disabled(busy || endpoint == nil || !castStarted)
@@ -236,7 +243,8 @@ struct NativeDLNASection: View {
         task = Task { @MainActor in
             do {
                 if action == .setURI {
-                    try await NativeDLNA.cast(endpoint: endpoint, media: media!)
+                    try await NativeDLNA.cast(endpoint: endpoint, media: media!,
+                                              metadataTitle: metadataTitle.isEmpty ? nil : metadataTitle)
                 } else if action == .getTransportInfo {
                     let state = try await NativeDLNA.queryState(endpoint: endpoint)
                     guard !Task.isCancelled else { return }

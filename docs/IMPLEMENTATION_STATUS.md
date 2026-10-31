@@ -142,3 +142,8 @@ The iPhone/iPad read-only Depth:1 PROPFIND now requests optional `DAV:getlastmod
 ## Native UPnP optional renderer modelName (P4, #118)
 
 The explicit, user-entered LAN description import parses one bounded optional direct `root/device/modelName` and displays it in native SwiftUI beside the approved control URL and optional friendly name. Empty/missing is valid; duplicate, nested, foreign, control/bidi or oversized model names fail closed. Model data is display-only and never persisted or used for endpoint trust. Owned Python loopback, Swift parser/network smoke, XCTest and production iPhone/iPad XCUI are required; final-head full CI is pending before merge. This does not establish SSDP multicast discovery, SMB, physical Apple/TV interoperability, legal Spider corpus, independent security audit or signed release.
+
+
+## Native opt-in DLNA DIDL-Lite metadata (P4, #122)
+
+This PR adds a user-entered optional title to native manual casting. Empty title preserves the existing empty CurrentURIMetaData; a bounded, validated title generates a FongMi-inspired DIDL-Lite videoItem with the same direct media URL and generic video protocolInfo. It does not serialize provider headers, persist the title, or add any network destination. Positive/negative Swift smoke, owned localhost SOAP fixture and production iPhone/iPad XCTest/XCUI are required, followed by final-head aggregate CI. Physical TV/Apple device compatibility, SSDP entitlement, SMB, security audit and signed release remain unverified.

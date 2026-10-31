@@ -7,13 +7,14 @@ import FoundationXML
 #endif
 
 enum NativeDLNAError: LocalizedError, Equatable {
-    case invalidRenderer, invalidMedia, unsupportedMedia, invalidSeek, unsupportedSeek, unsupportedResume, responseTooLarge, invalidResponse, invalidDescription, httpStatus(Int)
+    case invalidRenderer, invalidMedia, unsupportedMedia, invalidMetadata, invalidSeek, unsupportedSeek, unsupportedResume, responseTooLarge, invalidResponse, invalidDescription, httpStatus(Int)
 
     var errorDescription: String? {
         switch self {
         case .invalidRenderer: return "DLNA 控制地址必须是局域网 IPv4 HTTP 地址，且不能包含凭据、查询或重定向。"
         case .invalidMedia: return "只能投屏不带凭据的直接 HTTP(S) 媒体地址。"
         case .unsupportedMedia: return "当前媒体需要额外请求头、重放解析或本地文件，不能直接交给 DLNA 设备。"
+        case .invalidMetadata: return "DIDL-Lite 视频标题无效或元数据超出大小限制。"
         case .invalidSeek: return "DLNA 跳转位置无效，必须位于 00:00:00 至 99:59:59。"
         case .unsupportedSeek: return "设备未处于播放/暂停状态，或没有可跳转的有限时长媒体。"
         case .unsupportedResume: return "设备当前不是暂停播放状态，无法继续播放。"
@@ -81,8 +82,42 @@ enum NativeDLNA {
             .replacingOccurrences(of: "'", with: "&apos;")
     }
 
-    static func request(_ action: NativeDLNAAction, endpoint: URL, media: URL? = nil, seekSeconds: Int? = nil) throws -> URLRequest {
+
+    /// Optional DIDL-Lite metadata matching FongMi's VideoItem and ProtocolInfo.
+    /// Never serialize provider headers or make additional network requests.
+    static func validatedMetadataTitle(_ title: String) throws -> String {
+        guard !title.isEmpty, title == title.trimmingCharacters(in: .whitespacesAndNewlines),
+              title.count <= 80, title.utf8.count <= 160,
+              !title.unicodeScalars.contains(where: { scalar in
+                  let value = scalar.value
+                  // XML 1.0 excludes FFFE/FFFF; reject Unicode noncharacters on every plane.
+                  let xmlSafe = (0x20...0xD7FF).contains(value) ||
+                      (0xE000...0xFFFD).contains(value) || (0x10000...0x10FFFF).contains(value)
+                  let noncharacter = (0xFDD0...0xFDEF).contains(value) ||
+                      (value & 0xFFFE) == 0xFFFE
+                  return !xmlSafe || noncharacter || CharacterSet.controlCharacters.contains(scalar) ||
+                      value == 0x200E || value == 0x200F ||
+                      (0x202A...0x202E).contains(value) || (0x2066...0x2069).contains(value)
+              }) else { throw NativeDLNAError.invalidMetadata }
+        return title
+    }
+
+    static func didlMetadata(media: URL, title: String) throws -> String {
+        let safeTitle = try validatedMetadataTitle(title)
+        let safeMedia = try mediaURL(media.absoluteString)
+        let didl = """
+        <DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/"><item id="0" parentID="-1" restricted="1"><dc:title>\(xmlEscaped(safeTitle))</dc:title><upnp:class>object.item.videoItem</upnp:class><res protocolInfo="http-get:*:video/*:*">\(xmlEscaped(safeMedia.absoluteString))</res></item></DIDL-Lite>
+        """
+        guard didl.utf8.count <= 4096 else { throw NativeDLNAError.invalidMetadata }
+        return didl
+    }
+
+    static func request(_ action: NativeDLNAAction, endpoint: URL, media: URL? = nil, seekSeconds: Int? = nil, metadataTitle: String? = nil) throws -> URLRequest {
         if action == .setURI && media == nil { throw NativeDLNAError.invalidMedia }
+        // The request builder is also called by protocol tests; do not rely on
+        // send() as the only media URL validation boundary.
+        let approvedMedia = try media.map { try mediaURL($0.absoluteString) }
+        if action != .setURI && metadataTitle != nil { throw NativeDLNAError.invalidMetadata }
         if action == .seek && seekSeconds == nil { throw NativeDLNAError.invalidSeek }
         if action != .seek && seekSeconds != nil { throw NativeDLNAError.invalidSeek }
         var request = URLRequest(url: endpoint, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 8)
@@ -93,7 +128,8 @@ enum NativeDLNA {
         let argument: String
         switch action {
         case .setURI:
-            argument = "<CurrentURI>\(xmlEscaped(media!.absoluteString))</CurrentURI><CurrentURIMetaData></CurrentURIMetaData>"
+            let metadata = try metadataTitle.map { try didlMetadata(media: approvedMedia!, title: $0) } ?? ""
+            argument = "<CurrentURI>\(xmlEscaped(approvedMedia!.absoluteString))</CurrentURI><CurrentURIMetaData>\(xmlEscaped(metadata))</CurrentURIMetaData>"
         case .play: argument = "<Speed>1</Speed>"
         case .seek:
             let target = try NativeDLNASeek.target(seekSeconds!)
@@ -105,6 +141,7 @@ enum NativeDLNA {
         <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:\(action.rawValue) xmlns:u="\(service)"><InstanceID>0</InstanceID>\(argument)</u:\(action.rawValue)></s:Body></s:Envelope>
         """
         request.httpBody = Data(body.utf8)
+        if metadataTitle != nil && request.httpBody!.count > 8192 { throw NativeDLNAError.invalidMetadata }
         return request
     }
 
@@ -125,16 +162,16 @@ enum NativeDLNA {
         guard parser.parse(), collector.valid else { throw NativeDLNAError.invalidResponse }
     }
 
-    static func send(_ action: NativeDLNAAction, endpoint: URL, media: URL? = nil, seekSeconds: Int? = nil) async throws {
+    static func send(_ action: NativeDLNAAction, endpoint: URL, media: URL? = nil, seekSeconds: Int? = nil, metadataTitle: String? = nil) async throws {
         let approved = try rendererURL(endpoint.absoluteString)
         let checkedMedia = try media.map { try mediaURL($0.absoluteString) }
-        let request = try request(action, endpoint: approved, media: checkedMedia, seekSeconds: seekSeconds)
+        let request = try request(action, endpoint: approved, media: checkedMedia, seekSeconds: seekSeconds, metadataTitle: metadataTitle)
         let (data, response) = try await NativeDLNABoundedTransport.load(request, maxBytes: maxResponseBytes)
         try validate(data, response: response, action: action)
     }
 
-    static func cast(endpoint: URL, media: URL) async throws {
-        try await send(.setURI, endpoint: endpoint, media: media)
+    static func cast(endpoint: URL, media: URL, metadataTitle: String? = nil) async throws {
+        try await send(.setURI, endpoint: endpoint, media: media, metadataTitle: metadataTitle)
         try Task.checkCancellation()
         try await send(.play, endpoint: endpoint)
     }
