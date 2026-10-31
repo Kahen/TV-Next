@@ -29,6 +29,10 @@ struct NativeDLNASection: View {
                 .textInputAutocapitalization(.never).autocorrectionDisabled()
                 .keyboardType(.URL).textContentType(.URL)
                 .accessibilityIdentifier("dlna-description-url")
+                .onChange(of: descriptionAddress) { _, _ in
+                    importedControlAddress = nil
+                    importedDeviceName = nil
+                }
             Button("从设备描述导入控制地址") { importDescription() }
                 .disabled(busy || (try? NativeDLNADescription.location(descriptionAddress)) == nil)
                 .accessibilityIdentifier("dlna-import-description")
@@ -147,6 +151,11 @@ struct NativeDLNASection: View {
             do {
                 let imported = try await NativeDLNADescription.loadDetails(source)
                 guard !Task.isCancelled else { return }
+                guard descriptionAddress == source else {
+                    busy = false
+                    task = nil
+                    return
+                }
                 // Clear the completed task before changing the renderer field:
                 // its existing onChange reset must not cancel the importer.
                 task = nil
@@ -156,6 +165,11 @@ struct NativeDLNASection: View {
                 importedDeviceName = imported.friendlyName
             } catch {
                 guard !Task.isCancelled else { return }
+                guard descriptionAddress == source else {
+                    busy = false
+                    task = nil
+                    return
+                }
                 self.error = error.localizedDescription
                 busy = false
                 task = nil
