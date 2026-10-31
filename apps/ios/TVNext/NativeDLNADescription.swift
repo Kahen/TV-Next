@@ -14,6 +14,7 @@ enum NativeDLNADescription {
     struct Details: Equatable {
         let controlURL: URL
         let friendlyName: String?
+        let modelName: String?
     }
 
     static func location(_ text: String) throws -> URL {
@@ -54,7 +55,7 @@ enum NativeDLNADescription {
         parser.delegate = collector
         guard parser.parse(), !collector.invalid, collector.stack.isEmpty,
               let control = collector.control else { throw NativeDLNAError.invalidDescription }
-        return Details(controlURL: try resolve(control, from: approved), friendlyName: collector.friendlyName)
+        return Details(controlURL: try resolve(control, from: approved), friendlyName: collector.friendlyName, modelName: collector.modelName)
     }
 
     static func resolve(_ raw: String, from location: URL) throws -> URL {
@@ -79,8 +80,9 @@ private final class DescriptionCollector: NSObject, XMLParserDelegate {
     private(set) var stack: [String] = []
     private(set) var control: String?
     private(set) var friendlyName: String?
+    private(set) var modelName: String?
     private(set) var invalid = false
-    private var friendlyNameSeen = false
+    private var identitySeen = Set<String>()
     private var serviceFields: [String: String] = [:]
     private var collecting: String?
     private var text = ""
@@ -95,14 +97,14 @@ private final class DescriptionCollector: NSObject, XMLParserDelegate {
         if collecting != nil { invalid = true }
         if stack.isEmpty {
             if name != "root" || !correctNamespace(namespaceURI) { invalid = true }
-        } else if ["device", "serviceList", "service", "serviceType", "controlURL", "friendlyName"].contains(name),
+        } else if ["device", "serviceList", "service", "serviceType", "controlURL", "friendlyName", "modelName"].contains(name),
                   !correctNamespace(namespaceURI) {
             invalid = true
         }
         stack.append(name)
-        if stack == ["root", "device", "friendlyName"] {
-            if friendlyNameSeen { invalid = true }
-            friendlyNameSeen = true
+        if stack.count == 3 && stack[0] == "root" && stack[1] == "device" &&
+            (name == "friendlyName" || name == "modelName") {
+            if !identitySeen.insert(name).inserted { invalid = true }
             collecting = name
             text = ""
         }
@@ -116,7 +118,7 @@ private final class DescriptionCollector: NSObject, XMLParserDelegate {
 
     private func append(_ fragment: String) {
         guard let collecting else { return }
-        let limit = collecting == "controlURL" ? 256 : (collecting == "friendlyName" ? 160 : 128)
+        let limit = collecting == "controlURL" ? 256 : ((collecting == "friendlyName" || collecting == "modelName") ? 160 : 128)
         guard fragment.utf8.count <= limit, text.utf8.count <= limit - fragment.utf8.count else {
             invalid = true
             return
@@ -134,7 +136,8 @@ private final class DescriptionCollector: NSObject, XMLParserDelegate {
     func parser(_ parser: XMLParser, didEndElement name: String,
                 namespaceURI: String?, qualifiedName: String?) {
         guard stack.last == name else { invalid = true; return }
-        if collecting == name && stack == ["root", "device", "friendlyName"] {
+        if collecting == name && stack.count == 3 && stack[0] == "root" && stack[1] == "device" &&
+            (name == "friendlyName" || name == "modelName") {
             let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
             // Check raw XML text before trimming: even leading/trailing controls are unsafe.
             // Names are display-only; reject controls and Unicode bidi overrides.
@@ -145,7 +148,8 @@ private final class DescriptionCollector: NSObject, XMLParserDelegate {
                     (0x202A...0x202E).contains(code) || (0x2066...0x2069).contains(code)
             }
             if unsafe || value.count > 80 { invalid = true }
-            friendlyName = value.isEmpty ? nil : value
+            if name == "friendlyName" { friendlyName = value.isEmpty ? nil : value }
+            else { modelName = value.isEmpty ? nil : value }
             collecting = nil
             text = ""
         } else if collecting == name && isService(Array(stack.dropLast())) {
