@@ -106,7 +106,22 @@ class Handler(BaseHTTPRequestHandler):
             assert node is not None and node.findtext('InstanceID') == '0'
             if action == 'SetAVTransportURI':
                 assert node.findtext('CurrentURI') == 'https://media.example/owned.mp4?a=1&b=2'
-                assert node.find('CurrentURIMetaData') is not None
+                metadata_node = node.find('CurrentURIMetaData')
+                assert metadata_node is not None
+                metadata = metadata_node.text or ''
+                if metadata:
+                    didl_ns = '{urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/}'
+                    dc_ns = '{http://purl.org/dc/elements/1.1/}'
+                    upnp_ns = '{urn:schemas-upnp-org:metadata-1-0/upnp/}'
+                    didl = ET.fromstring(metadata)
+                    assert didl.tag == didl_ns + 'DIDL-Lite' and len(didl) == 1
+                    item = didl.find(didl_ns + 'item')
+                    assert item is not None and item.attrib == {'id': '0', 'parentID': '-1', 'restricted': '1'}
+                    assert item.findtext(dc_ns + 'title') in ('Owned Video', 'Owned & <Demo>')
+                    assert item.findtext(upnp_ns + 'class') == 'object.item.videoItem'
+                    res = item.find(didl_ns + 'res')
+                    assert res is not None and res.attrib == {'protocolInfo': 'http-get:*:video/*:*'}
+                    assert res.text == 'https://media.example/owned.mp4?a=1&b=2'
             if action == 'Play':
                 assert node.findtext('Speed') == '1'
             if action in ('GetTransportInfo', 'GetPositionInfo'):
