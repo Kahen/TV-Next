@@ -114,6 +114,9 @@ enum NativeDLNA {
 
     static func request(_ action: NativeDLNAAction, endpoint: URL, media: URL? = nil, seekSeconds: Int? = nil, metadataTitle: String? = nil) throws -> URLRequest {
         if action == .setURI && media == nil { throw NativeDLNAError.invalidMedia }
+        // The request builder is also called by protocol tests; do not rely on
+        // send() as the only media URL validation boundary.
+        let approvedMedia = try media.map { try mediaURL($0.absoluteString) }
         if action != .setURI && metadataTitle != nil { throw NativeDLNAError.invalidMetadata }
         if action == .seek && seekSeconds == nil { throw NativeDLNAError.invalidSeek }
         if action != .seek && seekSeconds != nil { throw NativeDLNAError.invalidSeek }
@@ -125,8 +128,8 @@ enum NativeDLNA {
         let argument: String
         switch action {
         case .setURI:
-            let metadata = try metadataTitle.map { try didlMetadata(media: media!, title: $0) } ?? ""
-            argument = "<CurrentURI>\(xmlEscaped(media!.absoluteString))</CurrentURI><CurrentURIMetaData>\(xmlEscaped(metadata))</CurrentURIMetaData>"
+            let metadata = try metadataTitle.map { try didlMetadata(media: approvedMedia!, title: $0) } ?? ""
+            argument = "<CurrentURI>\(xmlEscaped(approvedMedia!.absoluteString))</CurrentURI><CurrentURIMetaData>\(xmlEscaped(metadata))</CurrentURIMetaData>"
         case .play: argument = "<Speed>1</Speed>"
         case .seek:
             let target = try NativeDLNASeek.target(seekSeconds!)
