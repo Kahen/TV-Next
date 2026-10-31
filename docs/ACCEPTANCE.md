@@ -109,3 +109,9 @@ Verify canonical ASCII HH:MM:SS (00:00:00 to 99:59:59), malformed/Unicode/negati
 ### P4 native manual UPnP description import (#112)
 
 Acceptance slice: explicit user-entered private IPv4 device-description URL; bounded no-redirect HTTP GET; single direct AVTransport:1 service; same-IP/port controlURL; no URLBase trust; malformed/duplicate/public/DTD/traversal/oversize rejection; native SwiftUI form with actual imported endpoint and error handling. Owned Python, Swift parser and network, XCTest and production iPhone/iPad XCUI are mandatory; final HEAD Web/API plus complete integration gate must succeed before issue closure. This does not close P4 #5, establish SSDP discovery, physical-device compatibility, security audit or Apple signing.
+
+### P4 SSDP response parser prerequisite (#114)
+
+Before merging the parser-only slice, require strict positive/negative datagram smoke, native XCTest on both iPhone/iPad simulators, and the complete final-head Web/API/PostgreSQL/Compose/NAS/Spider isolation gate. The parser must reject forged public/foreign LOCATION, ambiguous/duplicate headers, unsupported ST/USN, malformed HTTPU and overlong datagrams. This does **not** establish M-SEARCH transport, iOS multicast entitlement, real LAN discovery or device interoperability; do not close #114 or parent #5 from this subset.
+
+The SSDP-only parser must reject even a sender-matched `127.0.0.1` LOCATION; explicit localhost fixture support in the manual DLNA transport does not grant loopback devices discovery eligibility.
