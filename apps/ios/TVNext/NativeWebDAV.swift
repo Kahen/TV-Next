@@ -462,6 +462,10 @@ private final class WebDAVXMLCollector: NSObject, XMLParserDelegate {
         } else if path == ["multistatus", "response", "propstat", "prop", "getlastmodified"] {
             if property?.modifiedSeen == true { property?.invalidModified = true }
             property?.modifiedSeen = true
+        } else if path.count > 5 && Array(path.prefix(5)) ==
+                    ["multistatus", "response", "propstat", "prop", "getlastmodified"] {
+            // Mixed text plus nested markup is not a direct DAV timestamp.
+            property?.invalidModified = true
         }
     }
 
