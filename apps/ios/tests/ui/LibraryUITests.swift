@@ -581,6 +581,9 @@ final class LibraryUITests: XCTestCase {
         let renderer = app.textFields["dlna-renderer-url"]
         let expected = "http://127.0.0.1:8768/upnp/control/AVTransport1"
         XCTAssertEqual(imported.label, "已导入控制地址：\(expected)")
+        let importedName = app.staticTexts["dlna-imported-name"]
+        XCTAssertTrue(importedName.waitForExistence(timeout: 5))
+        XCTAssertEqual(importedName.label, "设备名称：TV-Next Test Renderer")
         reveal(renderer)
         XCTAssertEqual(renderer.value as? String, expected,
                        "Native UI did not populate the same-origin AVTransport control URL")
@@ -604,6 +607,7 @@ final class LibraryUITests: XCTestCase {
         XCTAssertFalse((renderer.value as? String ?? "").contains("8.8.8.8"),
                        "A foreign description must not change the renderer endpoint")
         XCTAssertFalse(app.buttons["dlna-query-state"].isEnabled)
+        XCTAssertFalse(app.staticTexts["dlna-imported-name"].exists)
     }
 
 }
