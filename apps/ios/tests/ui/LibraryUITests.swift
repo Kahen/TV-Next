@@ -593,6 +593,11 @@ final class LibraryUITests: XCTestCase {
         query.tap()
         XCTAssertTrue(app.staticTexts["dlna-status"].waitForExistence(timeout: 15))
         XCTAssertFalse(app.staticTexts["dlna-error"].exists)
+        // Editing the source must not keep displaying identity from the previous device.
+        reveal(description)
+        description.tap()
+        description.typeText("x")
+        XCTAssertFalse(importedName.exists)
     }
 
     func testDLNARejectsForeignDeviceDescriptionWithoutChangingRenderer() {
