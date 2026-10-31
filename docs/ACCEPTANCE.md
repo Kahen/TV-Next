@@ -115,3 +115,7 @@ Acceptance slice: explicit user-entered private IPv4 device-description URL; bou
 Before merging the parser-only slice, require strict positive/negative datagram smoke, native XCTest on both iPhone/iPad simulators, and the complete final-head Web/API/PostgreSQL/Compose/NAS/Spider isolation gate. The parser must reject forged public/foreign LOCATION, ambiguous/duplicate headers, unsupported ST/USN, malformed HTTPU and overlong datagrams. This does **not** establish M-SEARCH transport, iOS multicast entitlement, real LAN discovery or device interoperability; do not close #114 or parent #5 from this subset.
 
 The SSDP-only parser must reject even a sender-matched `127.0.0.1` LOCATION; explicit localhost fixture support in the manual DLNA transport does not grant loopback devices discovery eligibility.
+
+### Native DLNA optional renderer friendlyName (#116)
+
+Acceptance requires one bounded direct UPnP `root/device/friendlyName` displayed only after successful explicit description import, while preserving the same-origin AVTransport control URL. Missing name remains valid; duplicate, nested, foreign-namespace, control/bidi and oversized names must fail closed. Owned localhost HTTP fixture, Swift positive/negative smoke and network test, XCTest and production SwiftUI XCUI on iPhone/iPad plus final-head 3-job Web/API and 9-job aggregate CI are mandatory before merging/closing #116. Real renderer identity, multicast discovery, physical iPhone/iPad, Spider legality/security review and signing remain unverified.

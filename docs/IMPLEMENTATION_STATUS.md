@@ -130,3 +130,7 @@ The manual iOS DLNA page now accepts an explicitly supplied private-LAN UPnP dev
 ## Native SSDP response parser prerequisite (P4, #114)
 
 A pure Swift, non-networking parser now screens bounded SSDP M-SEARCH HTTPU response datagrams and sender-matched private IPv4 LOCATION candidates before any future UPnP device-description fetch. Adversarial Swift smoke/XCTest cases cover forged origin, duplicate headers, unsupported targets, malformed line endings, trailing bodies and size limits. This is not a multicast implementation or a user-visible discovery feature. Final-head iPhone/iPad simulator and aggregate CI must pass before accepting the parser increment. SSDP M-SEARCH transport, Apple multicast entitlement/provisioning, actual iPhone/iPad and renderer tests remain open under #114 and parent #5.
+
+## Native optional UPnP renderer friendlyName (P4, #116)
+
+An explicit native DLNA device-description import now returns a bounded, display-only friendly name alongside the previously validated same-origin AVTransport control URL. Names are optional, not trusted as device identity, and neither persisted nor used as authorization. Malformed/duplicate/nested/foreign/oversized/control/bidi names are rejected; owned Swift smoke/XCTest/XCUI and loopback fixtures are required, with final-head full CI before merging. SSDP transport/entitlement, real renderer interoperability, SMB, Apple hardware acceptance and P6 release remain open.

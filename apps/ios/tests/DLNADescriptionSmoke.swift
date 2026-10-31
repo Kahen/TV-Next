@@ -13,6 +13,11 @@ import FoundationNetworking
             "<service><serviceType>\(type)</serviceType><controlURL>\(control)</controlURL></service>"
         }
         let parsed = try NativeDLNADescription.parse(xml(service()), location: location)
+        let unnamed = try NativeDLNADescription.parseDetails(xml(service()), location: location)
+        precondition(unnamed.friendlyName == nil)
+        let named = Data("<root xmlns=\"\(NativeDLNADescription.deviceNamespace)\"><device><friendlyName>客厅电视 TV-Next</friendlyName><serviceList>\(service())</serviceList></device></root>".utf8)
+        let details = try NativeDLNADescription.parseDetails(named, location: location)
+        precondition(details.controlURL == parsed && details.friendlyName == "客厅电视 TV-Next")
         precondition(parsed.absoluteString == "http://127.0.0.1:8768/upnp/control/AVTransport1")
         let ignored = service("urn:schemas-upnp-org:service:RenderingControl:1", "/other")
         let withOtherService = try NativeDLNADescription.parse(xml(ignored + service()), location: location)
@@ -26,7 +31,11 @@ import FoundationNetworking
         precondition(sameOrigin == parsed)
         let cdata = try NativeDLNADescription.parse(xml(service(NativeDLNA.service, "<![CDATA[/upnp/control/AVTransport1]]>")), location: location)
         precondition(cdata == parsed)
-        let invalid: [Data] = [
+        let duplicateName = Data("<root xmlns=\"\(NativeDLNADescription.deviceNamespace)\"><device><friendlyName>One</friendlyName><friendlyName>Two</friendlyName><serviceList>\(service())</serviceList></device></root>".utf8)
+        let nestedName = Data("<root xmlns=\"\(NativeDLNADescription.deviceNamespace)\"><device><friendlyName><fake>Forged</fake></friendlyName><serviceList>\(service())</serviceList></device></root>".utf8)
+        let unsafeName = Data("<root xmlns=\"\(NativeDLNADescription.deviceNamespace)\"><device><friendlyName>Bad\u{202E}Name</friendlyName><serviceList>\(service())</serviceList></device></root>".utf8)
+        let longName = Data("<root xmlns=\"\(NativeDLNADescription.deviceNamespace)\"><device><friendlyName>\(String(repeating: "A", count: 161))</friendlyName><serviceList>\(service())</serviceList></device></root>".utf8)
+        let invalid: [Data] = [duplicateName, nestedName, unsafeName, longName,
             xml(""), xml(service() + service()),
             xml(service(NativeDLNA.service, "http://8.8.8.8:8768/upnp/control")),
             xml(service(NativeDLNA.service, "http://127.0.0.1:9999/upnp/control")),

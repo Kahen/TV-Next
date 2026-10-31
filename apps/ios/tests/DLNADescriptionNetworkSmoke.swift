@@ -7,7 +7,10 @@ import FoundationNetworking
     static func main() async throws {
         let control = try await NativeDLNADescription.load("http://127.0.0.1:8768/device.xml")
         precondition(control.absoluteString == "http://127.0.0.1:8768/upnp/control/AVTransport1")
-        for path in ["device-foreign.xml", "device-duplicate.xml", "device-missing.xml", "device-doctype.xml"] {
+        let details = try await NativeDLNADescription.loadDetails("http://127.0.0.1:8768/device.xml")
+        precondition(details.controlURL == control && details.friendlyName == "TV-Next Test Renderer")
+        for path in ["device-foreign.xml", "device-duplicate.xml", "device-missing.xml", "device-doctype.xml",
+                     "device-name-duplicate.xml", "device-name-unsafe.xml"] {
             do {
                 _ = try await NativeDLNADescription.load("http://127.0.0.1:8768/\(path)")
                 fatalError("Accepted invalid LAN description \(path)")
