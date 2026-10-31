@@ -63,6 +63,26 @@ final class NativeDLNATests: XCTestCase {
         XCTAssertThrowsError(try NativeDLNA.mediaURL("https://media.example/video.mp4", replay: true))
     }
 
+    func testOptInDIDLLiteMetadataAndInvalidTitles() throws {
+        let endpoint = try NativeDLNA.rendererURL("http://127.0.0.1:8768/upnp/control/AVTransport1")
+        let media = try NativeDLNA.mediaURL("https://media.example/owned.mp4?a=1&b=2")
+        let empty = try NativeDLNA.request(.setURI, endpoint: endpoint, media: media)
+        XCTAssertTrue(String(decoding: empty.httpBody!, as: UTF8.self).contains("<CurrentURIMetaData></CurrentURIMetaData>"))
+        let didl = try NativeDLNA.didlMetadata(media: media, title: "Owned & <Demo>")
+        XCTAssertTrue(didl.contains("<dc:title>Owned &amp; &lt;Demo&gt;</dc:title>"))
+        XCTAssertTrue(didl.contains("http-get:*:video/*:*"))
+        XCTAssertTrue(didl.contains("owned.mp4?a=1&amp;b=2"))
+        let request = try NativeDLNA.request(.setURI, endpoint: endpoint, media: media, metadataTitle: "Owned & <Demo>")
+        let soap = String(decoding: request.httpBody!, as: UTF8.self)
+        XCTAssertTrue(soap.contains("&lt;DIDL-Lite"))
+        XCTAssertTrue(soap.contains("Owned &amp;amp; &amp;lt;Demo&amp;gt;"))
+        for title in ["", " ", " Bad", "Bad\nTitle", "Bad\u{202E}Title",
+                      String(repeating: "A", count: 81), String(repeating: "é", count: 81)] {
+            XCTAssertThrowsError(try NativeDLNA.didlMetadata(media: media, title: title))
+        }
+        XCTAssertThrowsError(try NativeDLNA.request(.play, endpoint: endpoint, metadataTitle: "Owned"))
+    }
+
     func testNamespacedResponseAndMalformedResponseRejection() throws {
         let endpoint = try NativeDLNA.rendererURL("http://127.0.0.1:8768/upnp/control/AVTransport1")
         let response = HTTPURLResponse(url: endpoint, statusCode: 200, httpVersion: nil, headerFields: nil)!
