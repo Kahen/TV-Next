@@ -40,13 +40,18 @@ enum NativeSSDPResponse {
             guard !line.isEmpty, !line.hasPrefix(" "), !line.hasPrefix("\t"),
                   let colon = line.firstIndex(of: ":") else { throw ValidationError.malformed }
             let name = String(line[..<colon])
+            // HTTP token punctuation includes dots used by BOOTID.UPNP.ORG.
+            let tokenPunctuation: Set<UInt8> = [33, 35, 36, 37, 38, 39, 42, 43, 45, 46, 94, 95, 96, 124, 126]
             guard !name.isEmpty, name.utf8.allSatisfy({
-                (65...90).contains($0) || (97...122).contains($0) || (48...57).contains($0) || $0 == 45
+                (65...90).contains($0) || (97...122).contains($0) || (48...57).contains($0) || tokenPunctuation.contains($0)
             }) else { throw ValidationError.malformed }
             let key = name.lowercased()
             guard headers.count < maxHeaders, headers[key] == nil else { throw ValidationError.malformed }
             let value = line[line.index(after: colon)...].trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !value.isEmpty, value.utf8.count <= 512 else { throw ValidationError.malformed }
+            // UPnP 1.1 requires an intentionally empty EXT: response header.
+            guard (key == "ext" || !value.isEmpty), value.utf8.count <= 512 else {
+                throw ValidationError.malformed
+            }
             headers[key] = value
         }
         guard let st = headers["st"], st == mediaRenderer || st == avTransport else {
