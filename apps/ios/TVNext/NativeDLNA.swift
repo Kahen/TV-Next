@@ -90,7 +90,12 @@ enum NativeDLNA {
               title.count <= 80, title.utf8.count <= 160,
               !title.unicodeScalars.contains(where: { scalar in
                   let value = scalar.value
-                  return CharacterSet.controlCharacters.contains(scalar) ||
+                  // XML 1.0 excludes FFFE/FFFF; reject Unicode noncharacters on every plane.
+                  let xmlSafe = (0x20...0xD7FF).contains(value) ||
+                      (0xE000...0xFFFD).contains(value) || (0x10000...0x10FFFF).contains(value)
+                  let noncharacter = (0xFDD0...0xFDEF).contains(value) ||
+                      (value & 0xFFFE) == 0xFFFE
+                  return !xmlSafe || noncharacter || CharacterSet.controlCharacters.contains(scalar) ||
                       value == 0x200E || value == 0x200F ||
                       (0x202A...0x202E).contains(value) || (0x2066...0x2069).contains(value)
               }) else { throw NativeDLNAError.invalidMetadata }
