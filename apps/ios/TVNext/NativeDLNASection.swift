@@ -6,6 +6,7 @@ struct NativeDLNASection: View {
     @ObservedObject var library: MediaLibraryStore
     @State private var descriptionAddress = ""
     @State private var importedControlAddress: String?
+    @State private var importedDeviceName: String?
     @State private var rendererAddress = ""
     @State private var mediaAddress = ""
     @State private var seekTime = ""
@@ -37,6 +38,11 @@ struct NativeDLNASection: View {
                 Text("已导入控制地址：\(importedControlAddress)")
                     .font(.caption).foregroundStyle(.secondary)
                     .accessibilityIdentifier("dlna-imported-control")
+                if let importedDeviceName {
+                    Text("设备名称：\(importedDeviceName)")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .accessibilityIdentifier("dlna-imported-name")
+                }
             }
             TextField("http://192.168.1.20:1400/MediaRenderer/AVTransport/Control", text: $rendererAddress)
                 .textInputAutocapitalization(.never).autocorrectionDisabled()
@@ -44,7 +50,10 @@ struct NativeDLNASection: View {
                 .accessibilityIdentifier("dlna-renderer-url")
                 .onChange(of: rendererAddress) { _, newValue in
                     reset()
-                    if importedControlAddress != newValue { importedControlAddress = nil }
+                    if importedControlAddress != newValue {
+                        importedControlAddress = nil
+                        importedDeviceName = nil
+                    }
                 }
             TextField("https://media.example/owned.mp4", text: $mediaAddress)
                 .textInputAutocapitalization(.never).autocorrectionDisabled()
@@ -130,19 +139,21 @@ struct NativeDLNASection: View {
         guard !busy, (try? NativeDLNADescription.location(descriptionAddress)) != nil else { return }
         let source = descriptionAddress
         importedControlAddress = nil
+        importedDeviceName = nil
         busy = true
         status = nil
         error = nil
         task = Task { @MainActor in
             do {
-                let imported = try await NativeDLNADescription.load(source)
+                let imported = try await NativeDLNADescription.loadDetails(source)
                 guard !Task.isCancelled else { return }
                 // Clear the completed task before changing the renderer field:
                 // its existing onChange reset must not cancel the importer.
                 task = nil
                 busy = false
-                rendererAddress = imported.absoluteString
-                importedControlAddress = imported.absoluteString
+                rendererAddress = imported.controlURL.absoluteString
+                importedControlAddress = imported.controlURL.absoluteString
+                importedDeviceName = imported.friendlyName
             } catch {
                 guard !Task.isCancelled else { return }
                 self.error = error.localizedDescription
