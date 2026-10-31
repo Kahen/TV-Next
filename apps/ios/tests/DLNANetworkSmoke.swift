@@ -14,6 +14,7 @@ import FoundationNetworking
         do { try await alreadyCancelled.value; fatalError("Pre-cancelled task succeeded") }
         catch is CancellationError { }
         try await NativeDLNA.cast(endpoint: endpoint, media: media)
+        try await NativeDLNA.cast(endpoint: endpoint, media: media, metadataTitle: "Owned & <Demo>")
         let playing = try await NativeDLNA.queryState(endpoint: endpoint)
         precondition(playing == .playing)
         let position = try await NativeDLNA.queryPosition(endpoint: endpoint)
