@@ -1,0 +1,60 @@
+import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
+
+@main struct DLNADescriptionSmoke {
+    static func main() throws {
+        let location = try NativeDLNADescription.location("http://127.0.0.1:8768/device.xml")
+        func xml(_ services: String, namespace: String = NativeDLNADescription.deviceNamespace) -> Data {
+            Data("<root xmlns=\"\(namespace)\"><device><serviceList>\(services)</serviceList></device></root>".utf8)
+        }
+        func service(_ type: String = NativeDLNA.service, _ control: String = "/upnp/control/AVTransport1") -> String {
+            "<service><serviceType>\(type)</serviceType><controlURL>\(control)</controlURL></service>"
+        }
+        let parsed = try NativeDLNADescription.parse(xml(service()), location: location)
+        precondition(parsed.absoluteString == "http://127.0.0.1:8768/upnp/control/AVTransport1")
+        let ignored = service("urn:schemas-upnp-org:service:RenderingControl:1", "/other")
+        let withOtherService = try NativeDLNADescription.parse(xml(ignored + service()), location: location)
+        precondition(withOtherService == parsed)
+        let extended = Data("<root xmlns=\"urn:schemas-upnp-org:device-1-0\"><device><vendor:feature xmlns:vendor=\"urn:vendor\">ignored</vendor:feature><serviceList>\(service())</serviceList></device></root>".utf8)
+        let withExtension = try NativeDLNADescription.parse(extended, location: location)
+        precondition(withExtension == parsed)
+        let relative = try NativeDLNADescription.parse(xml(service(NativeDLNA.service, "upnp/control/AVTransport1")), location: location)
+        precondition(relative == parsed)
+        let sameOrigin = try NativeDLNADescription.parse(xml(service(NativeDLNA.service, "http://127.0.0.1:8768/upnp/control/AVTransport1")), location: location)
+        precondition(sameOrigin == parsed)
+        let cdata = try NativeDLNADescription.parse(xml(service(NativeDLNA.service, "<![CDATA[/upnp/control/AVTransport1]]>")), location: location)
+        precondition(cdata == parsed)
+        let invalid: [Data] = [
+            xml(""), xml(service() + service()),
+            xml(service(NativeDLNA.service, "http://8.8.8.8:8768/upnp/control")),
+            xml(service(NativeDLNA.service, "http://127.0.0.1:9999/upnp/control")),
+            xml(service(NativeDLNA.service, "//127.0.0.1:8768/upnp/control")),
+            xml(service(NativeDLNA.service, "/../admin")),
+            xml(service(NativeDLNA.service, "/upnp/%2e%2e/admin")),
+            xml(service(NativeDLNA.service, "/upnp/control?token=x")),
+            xml(service(NativeDLNA.service, "/upnp/control#fragment")),
+            xml(service(NativeDLNA.service, "file:///private/secret")),
+            xml(service(NativeDLNA.service, "<fake>/upnp/control</fake>")),
+            xml(service().replacingOccurrences(of: "</service>", with: "<controlURL>/another</controlURL></service>")),
+            xml("<outer>" + service() + "</outer>"),
+            xml(service(), namespace: "urn:untrusted"),
+            Data("<!DOCTYPE root [<!ENTITY x SYSTEM \"file:///etc/passwd\">]>".utf8) + xml(service()),
+            Data(repeating: 65, count: NativeDLNA.maxResponseBytes + 1)
+        ]
+        for (index, body) in invalid.enumerated() {
+            do {
+                _ = try NativeDLNADescription.parse(body, location: location)
+                fatalError("Accepted invalid device description #\(index)")
+            } catch NativeDLNAError.invalidDescription { }
+        }
+        for unsafe in ["https://127.0.0.1:8768/device.xml", "http://8.8.8.8:8768/device.xml",
+                       "http://example.com:8768/device.xml", "http://127.0.0.1/device.xml",
+                       "http://user:pw@127.0.0.1:8768/device.xml", "http://127.0.0.1:8768/device.xml?x=1"] {
+            do { _ = try NativeDLNADescription.location(unsafe); fatalError("Accepted unsafe location") }
+            catch NativeDLNAError.invalidRenderer { }
+        }
+        print("Bounded LAN UPnP device description parser positive/negative smoke passed")
+    }
+}
