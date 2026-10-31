@@ -28,6 +28,7 @@ final class NativeSSDPResponseTests: XCTestCase {
             packet(st: "ssdp:all"),
             Data("HTTP/1.1 200 OK\nLOCATION: http://192.168.1.20:1400/device.xml\n\n".utf8),
             packet() + Data("trailing body".utf8),
+            packet() + Data("\rX-Forged: value".utf8),
             Data(repeating: 65, count: NativeSSDPResponse.maxDatagramBytes + 1)
         ]
         for (index, data) in cases.enumerated() {
