@@ -18,6 +18,12 @@ final class NativeSSDPResponseTests: XCTestCase {
         }
     }
 
+    func testUPnP11EmptyEXTAndDottedHeaderNames() throws {
+        let standard = Data("HTTP/1.1 200 OK\r\nST: \(NativeSSDPResponse.mediaRenderer)\r\nUSN: uuid:owned-123::\(NativeSSDPResponse.mediaRenderer)\r\nLOCATION: http://192.168.1.20:1400/device.xml\r\nEXT:\r\nBOOTID.UPNP.ORG: 1\r\nCONFIGID.UPNP.ORG: 2\r\nSEARCHPORT.UPNP.ORG: 1900\r\n\r\n".utf8)
+        let parsed = try NativeSSDPResponse.parse(standard, senderIPv4: "192.168.1.20")
+        XCTAssertEqual(parsed.location.absoluteString, "http://192.168.1.20:1400/device.xml")
+    }
+
     func testRejectsForgedOriginDuplicatesAndUnsupportedTargets() {
         let cases = [
             packet(location: "http://8.8.8.8:1400/device.xml"),
