@@ -72,7 +72,10 @@ enum NativeSSDPResponse {
         do {
             url = try NativeDLNA.rendererURL(raw)
             let sender = try NativeDLNA.rendererURL("http://\(senderIPv4):1900/ssdp")
-            guard url.host == sender.host else { throw ValidationError.unsafeLocation }
+            // Loopback is permitted for explicit localhost test fixtures, not a LAN SSDP discovery candidate.
+            guard let host = url.host, !host.hasPrefix("127."), host == sender.host else {
+                throw ValidationError.unsafeLocation
+            }
         } catch { throw ValidationError.unsafeLocation }
         return Candidate(location: url, serviceType: st, uniqueServiceName: usn)
     }

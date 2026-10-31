@@ -40,6 +40,14 @@ import Foundation
         }
         do { _ = try NativeSSDPResponse.parse(packet(), senderIPv4: "8.8.8.8"); fatalError("Accepted public sender") }
         catch NativeSSDPResponse.ValidationError.unsafeLocation { }
+        // Even a matching loopback sender and LOCATION cannot advertise a LAN renderer.
+        do {
+            _ = try NativeSSDPResponse.parse(
+                packet(NativeSSDPResponse.mediaRenderer, "http://127.0.0.1:1400/device.xml"),
+                senderIPv4: "127.0.0.1"
+            )
+            fatalError("Accepted a loopback SSDP discovery candidate")
+        } catch NativeSSDPResponse.ValidationError.unsafeLocation { }
         print("SSDP bounded M-SEARCH response parser positive/negative smoke passed")
     }
 }

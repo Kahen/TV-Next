@@ -24,6 +24,15 @@ final class NativeSSDPResponseTests: XCTestCase {
         XCTAssertEqual(parsed.location.absoluteString, "http://192.168.1.20:1400/device.xml")
     }
 
+    func testRejectsMatchingLoopbackSenderAndLocation() {
+        XCTAssertThrowsError(try NativeSSDPResponse.parse(
+            packet(location: "http://127.0.0.1:1400/device.xml"),
+            senderIPv4: "127.0.0.1"
+        )) { error in
+            XCTAssertEqual(error as? NativeSSDPResponse.ValidationError, .unsafeLocation)
+        }
+    }
+
     func testRejectsForgedOriginDuplicatesAndUnsupportedTargets() {
         let cases = [
             packet(location: "http://8.8.8.8:1400/device.xml"),
