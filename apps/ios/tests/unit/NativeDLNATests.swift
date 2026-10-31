@@ -263,6 +263,34 @@ final class NativeDLNATests: XCTestCase {
         }
     }
 
+    func testOptionalUPnPModelNameIsDisplayOnlyAndBounded() throws {
+        let source = try NativeDLNADescription.location("http://127.0.0.1:8768/device.xml")
+        let ns = NativeDLNADescription.deviceNamespace
+        func xml(_ model: String) -> Data {
+            Data("<root xmlns=\"\(ns)\"><device><friendlyName>Living Room</friendlyName>\(model)<serviceList><service><serviceType>\(NativeDLNA.service)</serviceType><controlURL>/upnp/control/AVTransport1</controlURL></service></serviceList></device></root>".utf8)
+        }
+        let valid = try NativeDLNADescription.parseDetails(xml("<modelName>TV-Next Model 1</modelName>"), location: source)
+        XCTAssertEqual(valid.friendlyName, "Living Room")
+        XCTAssertEqual(valid.modelName, "TV-Next Model 1")
+        XCTAssertEqual(valid.controlURL.absoluteString, "http://127.0.0.1:8768/upnp/control/AVTransport1")
+        XCTAssertNil(try NativeDLNADescription.parseDetails(xml(""), location: source).modelName)
+        XCTAssertNil(try NativeDLNADescription.parseDetails(xml("<modelName/>"), location: source).modelName)
+        let boundary = try NativeDLNADescription.parseDetails(
+            xml("<modelName>\(String(repeating: "é", count: 80))</modelName>"), location: source)
+        XCTAssertEqual(boundary.modelName?.utf8.count, 160)
+        for bad in [
+            "<modelName>One</modelName><modelName>Two</modelName>",
+            "<modelName>TV<child/>Next</modelName>",
+            "<x:modelName xmlns:x=\"urn:foreign\">Spoof</x:modelName>",
+            "<modelName>Bad\u{202E}Name</modelName>",
+            "<modelName>Bad\nName</modelName>",
+            "<modelName>\(String(repeating: "é", count: 81))</modelName>"
+        ] {
+            XCTAssertThrowsError(try NativeDLNADescription.parseDetails(xml(bad), location: source),
+                                 "Accepted untrusted modelName: \(bad)")
+        }
+    }
+
     func testDeviceDescriptionParserRejectsAmbiguousAndForeignControlURLs() throws {
         let source = try NativeDLNADescription.location("http://127.0.0.1:8768/device.xml")
         func xml(_ services: String) -> Data {
