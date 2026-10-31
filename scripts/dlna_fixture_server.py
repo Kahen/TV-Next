@@ -16,7 +16,30 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
     def do_GET(self):
-        return self.reply(200, b'ok') if self.path == '/health' else self.reply(404, b'not found')
+        if self.path == '/health':
+            return self.reply(200, b'ok')
+        if self.path == '/device-redirect':
+            return self.reply(302, b'', {'Location': 'http://8.8.8.8/device.xml'})
+        if self.path == '/device-oversize':
+            return self.reply(200, b'X' * 32769)
+        if self.path in ('/device.xml', '/device-foreign.xml', '/device-duplicate.xml',
+                         '/device-missing.xml', '/device-doctype.xml'):
+            service = ('<service><serviceType>' + SERVICE + '</serviceType>'
+                       '<controlURL>/upnp/control/AVTransport1</controlURL></service>')
+            if self.path == '/device-foreign.xml':
+                service = service.replace('/upnp/control/AVTransport1',
+                                          'http://8.8.8.8:8768/upnp/control')
+            if self.path == '/device-duplicate.xml':
+                service += service
+            if self.path == '/device-missing.xml':
+                service = ''
+            xml = ('<root xmlns="urn:schemas-upnp-org:device-1-0">'
+                   '<URLBase>http://8.8.8.8:80/</URLBase>'
+                   '<device><serviceList>' + service + '</serviceList></device></root>')
+            if self.path == '/device-doctype.xml':
+                xml = '<!DOCTYPE root [<!ENTITY secret SYSTEM "file:///etc/passwd">]>' + xml
+            return self.reply(200, xml.encode(), {'Content-Type': 'text/xml; charset=utf-8'})
+        return self.reply(404, b'not found')
 
     def reply(self, status, body, headers=None):
         self.send_response(status)

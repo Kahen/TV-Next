@@ -105,3 +105,7 @@ Explicit ±15-second native SwiftUI actions issue fresh GetTransportInfo and Get
 ## Native DLNA explicit absolute seek (P4, #110)
 
 Verify canonical ASCII HH:MM:SS (00:00:00 to 99:59:59), malformed/Unicode/negative and out-of-duration rejection, unknown-duration/STOPPED rejection, fresh state/position queries, and bounded REL_TIME SOAP. Require Swift smoke, owned localhost network, XCTest and production SwiftUI XCUI on iPhone/iPad plus final-head Web/API, PostgreSQL, NAS, Compose and Spider isolation success. Acknowledgement does not prove real renderer playback. No physical-device or Apple signing claim.
+
+### P4 native manual UPnP description import (#112)
+
+Acceptance slice: explicit user-entered private IPv4 device-description URL; bounded no-redirect HTTP GET; single direct AVTransport:1 service; same-IP/port controlURL; no URLBase trust; malformed/duplicate/public/DTD/traversal/oversize rejection; native SwiftUI form with actual imported endpoint and error handling. Owned Python, Swift parser and network, XCTest and production iPhone/iPad XCUI are mandatory; final HEAD Web/API plus complete integration gate must succeed before issue closure. This does not close P4 #5, establish SSDP discovery, physical-device compatibility, security audit or Apple signing.

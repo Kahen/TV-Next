@@ -38,6 +38,30 @@ class DLNAFixtureTests(unittest.TestCase):
         finally:
             connection.close()
 
+    def test_owned_device_descriptions_and_rejections(self):
+        for path, expected_status, expected_fragment in [
+            ('/device.xml', 200, b'/upnp/control/AVTransport1'),
+            ('/device-foreign.xml', 200, b'http://8.8.8.8:8768'),
+            ('/device-duplicate.xml', 200, b'<service><serviceType>'),
+            ('/device-missing.xml', 200, b'<serviceList></serviceList>'),
+            ('/device-doctype.xml', 200, b'<!DOCTYPE'),
+            ('/device-redirect', 302, b''),
+            ('/device-oversize', 200, b'X' * 32769),
+        ]:
+            connection = http.client.HTTPConnection('127.0.0.1', self.server.server_port, timeout=3)
+            try:
+                connection.request('GET', path)
+                response = connection.getresponse()
+                self.assertEqual(response.status, expected_status)
+                body = response.read()
+                self.assertIn(expected_fragment, body)
+                if path == '/device-oversize':
+                    self.assertEqual(len(body), 32769)
+                if path == '/device-redirect':
+                    self.assertEqual(response.getheader('Location'), 'http://8.8.8.8/device.xml')
+            finally:
+                connection.close()
+
     def test_valid_actions(self):
         for action in ('SetAVTransportURI', 'Play', 'Pause', 'Stop'):
             status, body = self.post('/upnp/control/AVTransport1', action,
