@@ -157,6 +157,13 @@ final class LibraryUITests: XCTestCase {
         let dismiss = app.buttons["smb-picker-dismiss"]
         XCTAssertTrue(dismiss.waitForExistence(timeout: 10), "Files import sheet did not open")
         XCTAssertTrue(app.staticTexts["选择本地媒体"].exists)
+        // A button may exist in the AX tree while the UIKit document picker
+        // obscures it. Require a genuinely hittable bottom-safe-area action.
+        let tappable = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "hittable == true"), object: dismiss
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [tappable], timeout: 10), .completed,
+                       "SMB picker close action is obscured by the system picker")
         dismiss.tap()
         let closed = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "exists == false"), object: dismiss
