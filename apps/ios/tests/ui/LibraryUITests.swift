@@ -489,6 +489,7 @@ final class LibraryUITests: XCTestCase {
         jump("DLNA 投屏")
         enter(app.textFields["dlna-renderer-url"], "http://127.0.0.1:8768/upnp/control/AVTransport1")
         enter(app.textFields["dlna-media-url"], "https://media.example/owned.mp4?a=1&b=2")
+        enter(app.textFields["dlna-metadata-title"], "Owned Video")
         let cast = app.buttons["dlna-cast"]
         reveal(cast)
         XCTAssertTrue(cast.isEnabled)
