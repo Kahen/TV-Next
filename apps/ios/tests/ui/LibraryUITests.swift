@@ -159,8 +159,8 @@ final class LibraryUITests: XCTestCase {
         ]
         let opened = cancelButtons.first { $0.waitForExistence(timeout: 5) }
         if opened == nil {
-            print("SMB picker app hierarchy: \\(app.debugDescription)")
-            print("SMB picker Files hierarchy: \\(documents.debugDescription)")
+            print("SMB picker app hierarchy: \(app.debugDescription)")
+            print("SMB picker Files hierarchy: \(documents.debugDescription)")
         }
         XCTAssertNotNil(opened, "System document picker did not expose a Cancel control")
         opened?.tap()
