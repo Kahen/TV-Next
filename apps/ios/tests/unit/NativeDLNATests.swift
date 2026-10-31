@@ -76,6 +76,17 @@ final class NativeDLNATests: XCTestCase {
         let soap = String(decoding: request.httpBody!, as: UTF8.self)
         XCTAssertTrue(soap.contains("&lt;DIDL-Lite"))
         XCTAssertTrue(soap.contains("Owned &amp;amp; &amp;lt;Demo&amp;gt;"))
+        // Both the embedded DIDL document and its outer SOAP envelope must
+        // remain well-formed after escaping untrusted titles and URL queries.
+        XCTAssertTrue(XMLParser(data: Data(didl.utf8)).parse())
+        XCTAssertTrue(XMLParser(data: request.httpBody!).parse())
+        for unsafeMedia in ["file:///private/owned.mp4", "https://user:pass@media.example/owned.mp4"] {
+            XCTAssertThrowsError(try NativeDLNA.request(
+                .setURI, endpoint: endpoint, media: URL(string: unsafeMedia)!))
+            XCTAssertThrowsError(try NativeDLNA.request(
+                .setURI, endpoint: endpoint, media: URL(string: unsafeMedia)!,
+                metadataTitle: "Owned"))
+        }
         let xmlNoncharacters: [[UInt8]] = [[0xEF, 0xBF, 0xBE], [0xEF, 0xBF, 0xBF],
                                           [0xF0, 0x9F, 0xBF, 0xBE], [0xEF, 0xB7, 0x90]]
         let invalidTitles = ["", " ", " Bad", "Bad\nTitle", "Bad\u{202E}Title",
