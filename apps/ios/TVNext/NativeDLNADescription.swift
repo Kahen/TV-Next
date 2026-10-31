@@ -11,11 +11,20 @@ import FoundationXML
 enum NativeDLNADescription {
     static let deviceNamespace = "urn:schemas-upnp-org:device-1-0"
 
+    struct Details: Equatable {
+        let controlURL: URL
+        let friendlyName: String?
+    }
+
     static func location(_ text: String) throws -> URL {
         try NativeDLNA.rendererURL(text)
     }
 
     static func load(_ text: String) async throws -> URL {
+        try await loadDetails(text).controlURL
+    }
+
+    static func loadDetails(_ text: String) async throws -> Details {
         let approved = try location(text)
         var request = URLRequest(url: approved, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 8)
         request.httpMethod = "GET"
@@ -23,10 +32,14 @@ enum NativeDLNADescription {
         let (data, response) = try await NativeDLNABoundedTransport.load(request, maxBytes: NativeDLNA.maxResponseBytes)
         guard let http = response as? HTTPURLResponse else { throw NativeDLNAError.invalidDescription }
         guard http.statusCode == 200 else { throw NativeDLNAError.httpStatus(http.statusCode) }
-        return try parse(data, location: approved)
+        return try parseDetails(data, location: approved)
     }
 
     static func parse(_ data: Data, location: URL) throws -> URL {
+        try parseDetails(data, location: location).controlURL
+    }
+
+    static func parseDetails(_ data: Data, location: URL) throws -> Details {
         let approved = try self.location(location.absoluteString)
         guard !data.isEmpty, data.count <= NativeDLNA.maxResponseBytes,
               let body = String(data: data, encoding: .utf8),
@@ -41,7 +54,7 @@ enum NativeDLNADescription {
         parser.delegate = collector
         guard parser.parse(), !collector.invalid, collector.stack.isEmpty,
               let control = collector.control else { throw NativeDLNAError.invalidDescription }
-        return try resolve(control, from: approved)
+        return Details(controlURL: try resolve(control, from: approved), friendlyName: collector.friendlyName)
     }
 
     static func resolve(_ raw: String, from location: URL) throws -> URL {
@@ -65,7 +78,9 @@ private final class DescriptionCollector: NSObject, XMLParserDelegate {
     private let fields = ["serviceType", "controlURL"]
     private(set) var stack: [String] = []
     private(set) var control: String?
+    private(set) var friendlyName: String?
     private(set) var invalid = false
+    private var friendlyNameSeen = false
     private var serviceFields: [String: String] = [:]
     private var collecting: String?
     private var text = ""
@@ -80,11 +95,17 @@ private final class DescriptionCollector: NSObject, XMLParserDelegate {
         if collecting != nil { invalid = true }
         if stack.isEmpty {
             if name != "root" || !correctNamespace(namespaceURI) { invalid = true }
-        } else if ["device", "serviceList", "service", "serviceType", "controlURL"].contains(name),
+        } else if ["device", "serviceList", "service", "serviceType", "controlURL", "friendlyName"].contains(name),
                   !correctNamespace(namespaceURI) {
             invalid = true
         }
         stack.append(name)
+        if stack == ["root", "device", "friendlyName"] {
+            if friendlyNameSeen { invalid = true }
+            friendlyNameSeen = true
+            collecting = name
+            text = ""
+        }
         if isService(stack) { serviceFields = [:] }
         if fields.contains(name) && isService(Array(stack.dropLast())) {
             if serviceFields[name] != nil || collecting != nil { invalid = true }
@@ -95,7 +116,7 @@ private final class DescriptionCollector: NSObject, XMLParserDelegate {
 
     private func append(_ fragment: String) {
         guard let collecting else { return }
-        let limit = collecting == "controlURL" ? 256 : 128
+        let limit = collecting == "controlURL" ? 256 : (collecting == "friendlyName" ? 160 : 128)
         guard fragment.utf8.count <= limit, text.utf8.count <= limit - fragment.utf8.count else {
             invalid = true
             return
@@ -113,7 +134,20 @@ private final class DescriptionCollector: NSObject, XMLParserDelegate {
     func parser(_ parser: XMLParser, didEndElement name: String,
                 namespaceURI: String?, qualifiedName: String?) {
         guard stack.last == name else { invalid = true; return }
-        if collecting == name && isService(Array(stack.dropLast())) {
+        if collecting == name && stack == ["root", "device", "friendlyName"] {
+            let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            // Names are display-only; reject controls and Unicode bidi overrides.
+            let unsafe = value.unicodeScalars.contains { scalar in
+                let code = scalar.value
+                return CharacterSet.controlCharacters.contains(scalar) ||
+                    code == 0x200E || code == 0x200F ||
+                    (0x202A...0x202E).contains(code) || (0x2066...0x2069).contains(code)
+            }
+            if unsafe || value.count > 80 { invalid = true }
+            friendlyName = value.isEmpty ? nil : value
+            collecting = nil
+            text = ""
+        } else if collecting == name && isService(Array(stack.dropLast())) {
             serviceFields[name] = text.trimmingCharacters(in: .whitespacesAndNewlines)
             collecting = nil
             text = ""
