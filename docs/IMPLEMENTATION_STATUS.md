@@ -122,3 +122,7 @@ A native SwiftUI **继续播放** button is enabled only after an acknowledged p
 ## Native DLNA absolute time seek (P4, #110)
 
 A native SwiftUI HH:MM:SS field and explicit seek action extend the manually configured private-LAN AVTransport subset. Input is strictly ASCII and validated before network access; the action checks fresh renderer state and finite media duration and rejects targets beyond the reported duration. Owned fixture, positive/negative Swift smoke/XCTest, network and production iPhone/iPad XCUI are part of the PR; final-head full CI remains required. No SSDP, real renderer compatibility, SMB, physical device acceptance or signed distribution is implied.
+
+## Native SSDP response parser prerequisite (P4, #114)
+
+A pure Swift, non-networking parser now screens bounded SSDP M-SEARCH HTTPU response datagrams and sender-matched private IPv4 LOCATION candidates before any future UPnP device-description fetch. Adversarial Swift smoke/XCTest cases cover forged origin, duplicate headers, unsupported targets, malformed line endings, trailing bodies and size limits. This is not a multicast implementation or a user-visible discovery feature. Final-head iPhone/iPad simulator and aggregate CI must pass before accepting the parser increment. SSDP M-SEARCH transport, Apple multicast entitlement/provisioning, actual iPhone/iPad and renderer tests remain open under #114 and parent #5.
