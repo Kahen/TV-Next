@@ -149,14 +149,21 @@ final class LibraryUITests: XCTestCase {
         reveal(entry)
         XCTAssertTrue(entry.isEnabled)
         entry.tap()
-        // System Files picker; no credentials or test-only SMB server are supplied.
-        let english = app.buttons["Cancel"]
-        let chinese = app.buttons["取消"]
-        if english.waitForExistence(timeout: 10) { english.tap() }
-        else {
-            XCTAssertTrue(chinese.waitForExistence(timeout: 5), "System document picker did not open")
-            chinese.tap()
+        // UIDocumentPicker can be hosted by the app or by the Files process,
+        // depending on simulator OS. Require an actual dismiss control rather
+        // than merely checking that our import button remains visible.
+        let documents = XCUIApplication(bundleIdentifier: "com.apple.DocumentsApp")
+        let cancelButtons = [
+            app.buttons["Cancel"], app.buttons["取消"],
+            documents.buttons["Cancel"], documents.buttons["取消"]
+        ]
+        let opened = cancelButtons.first { $0.waitForExistence(timeout: 5) }
+        if opened == nil {
+            print("SMB picker app hierarchy: \\(app.debugDescription)")
+            print("SMB picker Files hierarchy: \\(documents.debugDescription)")
         }
+        XCTAssertNotNil(opened, "System document picker did not expose a Cancel control")
+        opened?.tap()
         XCTAssertTrue(entry.waitForExistence(timeout: 5))
     }
 
