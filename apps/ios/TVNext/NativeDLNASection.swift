@@ -7,6 +7,7 @@ struct NativeDLNASection: View {
     @State private var descriptionAddress = ""
     @State private var importedControlAddress: String?
     @State private var importedDeviceName: String?
+    @State private var importedModelName: String?
     @State private var rendererAddress = ""
     @State private var mediaAddress = ""
     @State private var seekTime = ""
@@ -32,6 +33,7 @@ struct NativeDLNASection: View {
                 .onChange(of: descriptionAddress) { _, _ in
                     importedControlAddress = nil
                     importedDeviceName = nil
+                    importedModelName = nil
                 }
             Button("从设备描述导入控制地址") { importDescription() }
                 .disabled(busy || (try? NativeDLNADescription.location(descriptionAddress)) == nil)
@@ -47,6 +49,11 @@ struct NativeDLNASection: View {
                         .font(.caption).foregroundStyle(.secondary)
                         .accessibilityIdentifier("dlna-imported-name")
                 }
+                if let importedModelName {
+                    Text("设备型号：\(importedModelName)")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .accessibilityIdentifier("dlna-imported-model")
+                }
             }
             TextField("http://192.168.1.20:1400/MediaRenderer/AVTransport/Control", text: $rendererAddress)
                 .textInputAutocapitalization(.never).autocorrectionDisabled()
@@ -57,6 +64,7 @@ struct NativeDLNASection: View {
                     if importedControlAddress != newValue {
                         importedControlAddress = nil
                         importedDeviceName = nil
+                        importedModelName = nil
                     }
                 }
             TextField("https://media.example/owned.mp4", text: $mediaAddress)
@@ -144,6 +152,7 @@ struct NativeDLNASection: View {
         let source = descriptionAddress
         importedControlAddress = nil
         importedDeviceName = nil
+        importedModelName = nil
         busy = true
         status = nil
         error = nil
@@ -163,6 +172,7 @@ struct NativeDLNASection: View {
                 rendererAddress = imported.controlURL.absoluteString
                 importedControlAddress = imported.controlURL.absoluteString
                 importedDeviceName = imported.friendlyName
+                importedModelName = imported.modelName
             } catch {
                 guard !Task.isCancelled else { return }
                 guard descriptionAddress == source else {
