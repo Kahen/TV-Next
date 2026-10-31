@@ -10,6 +10,18 @@ import FoundationNetworking
         let set = try NativeDLNA.request(.setURI, endpoint: endpoint, media: media)
         precondition(String(decoding: set.httpBody!, as: UTF8.self).contains("a=1&amp;b=2"))
         precondition(set.value(forHTTPHeaderField: "SOAPACTION") == "\"urn:schemas-upnp-org:service:AVTransport:1#SetAVTransportURI\"")
+        precondition(String(decoding: set.httpBody!, as: UTF8.self).contains("<CurrentURIMetaData></CurrentURIMetaData>"))
+        let withMetadata = try NativeDLNA.request(.setURI, endpoint: endpoint, media: media, metadataTitle: "Owned & <Demo>")
+        let withMetadataBody = String(decoding: withMetadata.httpBody!, as: UTF8.self)
+        precondition(withMetadataBody.contains("&lt;DIDL-Lite"))
+        precondition(withMetadataBody.contains("Owned &amp;amp; &amp;lt;Demo&amp;gt;"))
+        precondition(withMetadataBody.contains("a=1&amp;amp;b=2"))
+        for invalid in ["", " ", "Bad\nTitle", "Bad\u{202E}Title", String(repeating: "A", count: 81), String(repeating: "é", count: 81)] {
+            do { _ = try NativeDLNA.request(.setURI, endpoint: endpoint, media: media, metadataTitle: invalid); fatalError("Accepted unsafe DIDL title") }
+            catch NativeDLNAError.invalidMetadata { }
+        }
+        do { _ = try NativeDLNA.request(.play, endpoint: endpoint, metadataTitle: "Unexpected"); fatalError("Accepted metadata on Play") }
+        catch NativeDLNAError.invalidMetadata { }
         let seek = try NativeDLNA.request(.seek, endpoint: endpoint, seekSeconds: 57)
         precondition(seek.value(forHTTPHeaderField: "SOAPACTION") == "\"urn:schemas-upnp-org:service:AVTransport:1#Seek\"")
         precondition(String(decoding: seek.httpBody!, as: UTF8.self).contains("<Unit>REL_TIME</Unit><Target>00:00:57</Target>"))
