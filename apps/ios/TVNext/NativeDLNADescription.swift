@@ -136,8 +136,9 @@ private final class DescriptionCollector: NSObject, XMLParserDelegate {
         guard stack.last == name else { invalid = true; return }
         if collecting == name && stack == ["root", "device", "friendlyName"] {
             let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            // Check raw XML text before trimming: even leading/trailing controls are unsafe.
             // Names are display-only; reject controls and Unicode bidi overrides.
-            let unsafe = value.unicodeScalars.contains { scalar in
+            let unsafe = text.unicodeScalars.contains { scalar in
                 let code = scalar.value
                 return CharacterSet.controlCharacters.contains(scalar) ||
                     code == 0x200E || code == 0x200F ||
