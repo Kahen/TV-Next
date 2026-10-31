@@ -105,3 +105,7 @@ Explicit ±15-second native SwiftUI actions issue fresh GetTransportInfo and Get
 ## Native DLNA explicit absolute seek (P4, #110)
 
 Verify canonical ASCII HH:MM:SS (00:00:00 to 99:59:59), malformed/Unicode/negative and out-of-duration rejection, unknown-duration/STOPPED rejection, fresh state/position queries, and bounded REL_TIME SOAP. Require Swift smoke, owned localhost network, XCTest and production SwiftUI XCUI on iPhone/iPad plus final-head Web/API, PostgreSQL, NAS, Compose and Spider isolation success. Acknowledgement does not prove real renderer playback. No physical-device or Apple signing claim.
+
+### P4 SSDP response parser prerequisite (#114)
+
+Before merging the parser-only slice, require strict positive/negative datagram smoke, native XCTest on both iPhone/iPad simulators, and the complete final-head Web/API/PostgreSQL/Compose/NAS/Spider isolation gate. The parser must reject forged public/foreign LOCATION, ambiguous/duplicate headers, unsupported ST/USN, malformed HTTPU and overlong datagrams. This does **not** establish M-SEARCH transport, iOS multicast entitlement, real LAN discovery or device interoperability; do not close #114 or parent #5 from this subset.
