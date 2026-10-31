@@ -174,3 +174,7 @@ A user-entered private IPv4 HTTP UPnP device-description URL can be resolved to 
 ### P4 SSDP response-validation prerequisite (#114)
 
 The native iOS SSDP response parser is implemented as a separate bounded, non-networking prerequisite for eventual opt-in M-SEARCH discovery. It is not an automatic device scan and cannot satisfy the outstanding DLNA discovery checkbox. The actual multicast transport and physical-device validation require Apple's restricted multicast networking entitlement and provisioning. Parser XCTest/smoke and final-head CI evidence belong to its feature PR; parent #5 stays open.
+
+### P4 native DLNA renderer identity on manual import (#116)
+
+Enhance the existing user-entered UPnP description import to display a bounded optional `friendlyName` without new network requests, SSDP discovery or persistence. Strict namespace/path/duplicate/Unicode validation, synthetic HTTP/Swift/XCTest/XCUI regressions and final-head aggregate CI are required before closing this implementation task. P4 #5 and SSDP #114 remain open; hardware and signed release acceptance are separate.
