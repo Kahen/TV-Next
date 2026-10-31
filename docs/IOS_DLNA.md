@@ -88,7 +88,6 @@ After the user enters a private IPv4 UPnP device-description URL, the existing b
 
 The parser rejects duplicate/nested/foreign-namespace names, more than 160 UTF-8 bytes or 80 characters, XML control characters and Unicode bidi overrides. Owned localhost positive/negative descriptions, Swift smoke, XCTest and production iPhone/iPad XCUI verify this subset; the final PR HEAD must pass the full aggregate CI. This does not implement SSDP multicast discovery, verify actual TV identity, prove physical Apple-device behavior, authorize Spider plugins or permit signed distribution. P4 #5 and SSDP #114 remain open.
 
-
 ## Optional UPnP renderer modelName on explicit import (P4, #118)
 
 The user-initiated, bounded LAN device-description GET also accepts one optional direct `root/device/modelName` in the UPnP device namespace and displays `设备型号` beside the already validated control URL and optional friendly name. Missing or empty modelName is valid. The model name is display-only: it is never used as a renderer identity, permission, URL, authentication token or casting destination, and is not persisted or sent to the home service. Editing the source or control address clears it; stale asynchronous imports cannot overwrite a newer source.

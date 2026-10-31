@@ -135,6 +135,9 @@ A pure Swift, non-networking parser now screens bounded SSDP M-SEARCH HTTPU resp
 
 An explicit native DLNA device-description import now returns a bounded, display-only friendly name alongside the previously validated same-origin AVTransport control URL. Names are optional, not trusted as device identity, and neither persisted nor used as authorization. Malformed/duplicate/nested/foreign/oversized/control/bidi names are rejected; owned Swift smoke/XCTest/XCUI and loopback fixtures are required, with final-head full CI before merging. SSDP transport/entitlement, real renderer interoperability, SMB, Apple hardware acceptance and P6 release remain open.
 
+## Native WebDAV bounded last-modified display (P4, #119)
+
+The iPhone/iPad read-only Depth:1 PROPFIND now requests optional `DAV:getlastmodified` and displays validated RFC 1123 GMT timestamps in the SwiftUI listing. The parser accepts only direct DAV properties in successful propstat; duplicate, conflicting, nested, foreign, failed, malformed and oversized values become unknown rather than blocking file access. The existing 1 MiB XML, 200-entry, credential-scope and no-redirect limits remain unchanged. Owned fixture, Swift positive/negative smoke, network, XCTest and iPhone/iPad XCUI are part of the PR; final-head aggregate CI must pass before merge. No external provider, physical Apple device, SMB, independent security audit or release validation is claimed.
 
 ## Native UPnP optional renderer modelName (P4, #118)
 

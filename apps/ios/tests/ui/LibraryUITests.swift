@@ -190,6 +190,10 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["webdav-size-Owned.mp4"].waitForExistence(timeout: 5),
                       "Successful DAV:getcontentlength must appear beside the native file")
         XCTAssertFalse(app.staticTexts["webdav-size-Folder"].exists, "Directories must never display a file size")
+        XCTAssertTrue(app.staticTexts["webdav-modified-Owned.mp4"].waitForExistence(timeout: 5),
+                      "Valid DAV:getlastmodified must appear beside the native file")
+        XCTAssertFalse(app.staticTexts["webdav-modified-Folder"].exists,
+                       "Absent DAV:getlastmodified must not produce a fabricated timestamp")
         let sort = app.buttons["webdav-sort"]
         reveal(sort)
         XCTAssertTrue(sort.label.contains("升序"))
@@ -223,6 +227,8 @@ final class LibraryUITests: XCTestCase {
         reveal(disconnect)
         disconnect.tap()
         XCTAssertFalse(app.textFields["webdav-filter"].exists)
+        XCTAssertFalse(app.staticTexts["webdav-modified-Owned.mp4"].exists,
+                       "Disconnect must remove stale file metadata")
         XCTAssertFalse(sort.exists)
         XCTAssertFalse(refresh.exists)
     }

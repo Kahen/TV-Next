@@ -37,6 +37,39 @@ import Foundation
         precondition(items[0].url.absoluteString == "https://media.example/dav/Movies/Sub/")
         precondition(!NativeWebDAV.playable(items[0]) && NativeWebDAV.playable(items[1]))
 
+        // Only direct successful DAV:getlastmodified metadata is displayed.
+        let goodDate = "Mon, 01 Jan 2024 12:34:56 GMT"
+        precondition(NativeWebDAV.httpLastModified(goodDate) != nil)
+        for bad in ["", "Mon, 01 Jan 2024 12:34:56 PST", "Tue, 01 Jan 2024 12:34:56 GMT",
+                    "Mon, 01 Jan 2024 12:34:56 GMT\r\n", "2024-01-01T12:34:56Z",
+                    String(repeating: "A", count: 200)] {
+            precondition(NativeWebDAV.httpLastModified(bad) == nil, "Accepted unsafe DAV timestamp: \(bad)")
+        }
+        func modifiedRecord(_ name: String, _ properties: String, status: String = "HTTP/1.1 200 OK") -> String {
+            "<d:response><d:href>/dav/Movies/\(name)</d:href><d:propstat><d:prop><d:resourcetype/>\(properties)</d:prop><d:status>\(status)</d:status></d:propstat></d:response>"
+        }
+        let dateTag = "<d:getlastmodified>\(goodDate)</d:getlastmodified>"
+        let conflict = modifiedRecord("Conflict.mp4", dateTag).replacingOccurrences(
+            of: "</d:response>",
+            with: "<d:propstat><d:prop><d:getlastmodified>Tue, 02 Jan 2024 12:34:56 GMT</d:getlastmodified></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>")
+        let failedMetadata = modifiedRecord("Failed.mp4", "").replacingOccurrences(
+            of: "</d:response>",
+            with: "<d:propstat><d:prop>\(dateTag)</d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response>")
+        let modifiedXML = "<d:multistatus xmlns:d=\"DAV:\" xmlns:x=\"urn:foreign\">" +
+            modifiedRecord("Good.mp4", dateTag) +
+            failedMetadata +
+            modifiedRecord("Foreign.mp4", "<x:getlastmodified>\(goodDate)</x:getlastmodified>") +
+            modifiedRecord("Nested.mp4", "<d:getlastmodified><d:span>\(goodDate)</d:span></d:getlastmodified>") +
+            modifiedRecord("MixedNested.mp4", "<d:getlastmodified>\(goodDate)<x:fake/></d:getlastmodified>") +
+            modifiedRecord("Duplicate.mp4", dateTag + dateTag) +
+            modifiedRecord("Invalid.mp4", "<d:getlastmodified>not a date</d:getlastmodified>") +
+            conflict + "</d:multistatus>"
+        let dated = try NativeWebDAV.parse(Data(modifiedXML.utf8), root: root, folder: folder)
+        precondition(dated.count == 8)
+        precondition(dated.first(where: { $0.name == "Good.mp4" })?.lastModified == NativeWebDAV.httpLastModified(goodDate))
+        precondition(dated.filter { $0.name != "Good.mp4" }.allSatisfy { $0.lastModified == nil },
+                     "Failed, foreign, nested, duplicate and conflicting metadata must be ignored")
+
         // Sorting is local and deterministic; directories stay first in both orders.
         let sortCandidates = [
             NativeWebDAVItem(url: root.appendingPathComponent("Season10", isDirectory: true), name: "Season10", isDirectory: true),
