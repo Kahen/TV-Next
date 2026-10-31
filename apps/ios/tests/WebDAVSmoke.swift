@@ -60,11 +60,12 @@ import Foundation
             failedMetadata +
             modifiedRecord("Foreign.mp4", "<x:getlastmodified>\(goodDate)</x:getlastmodified>") +
             modifiedRecord("Nested.mp4", "<d:getlastmodified><d:span>\(goodDate)</d:span></d:getlastmodified>") +
+            modifiedRecord("MixedNested.mp4", "<d:getlastmodified>\(goodDate)<x:fake/></d:getlastmodified>") +
             modifiedRecord("Duplicate.mp4", dateTag + dateTag) +
             modifiedRecord("Invalid.mp4", "<d:getlastmodified>not a date</d:getlastmodified>") +
             conflict + "</d:multistatus>"
         let dated = try NativeWebDAV.parse(Data(modifiedXML.utf8), root: root, folder: folder)
-        precondition(dated.count == 7)
+        precondition(dated.count == 8)
         precondition(dated.first(where: { $0.name == "Good.mp4" })?.lastModified == NativeWebDAV.httpLastModified(goodDate))
         precondition(dated.filter { $0.name != "Good.mp4" }.allSatisfy { $0.lastModified == nil },
                      "Failed, foreign, nested, duplicate and conflicting metadata must be ignored")
