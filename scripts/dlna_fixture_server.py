@@ -24,7 +24,11 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(200, b'X' * 32769)
         if self.path in ('/device.xml', '/device-foreign.xml', '/device-duplicate.xml',
                          '/device-missing.xml', '/device-doctype.xml',
-                         '/device-name-duplicate.xml', '/device-name-unsafe.xml'):
+                         '/device-name-duplicate.xml', '/device-name-unsafe.xml',
+                         '/device-model-missing.xml', '/device-model-duplicate.xml',
+                         '/device-model-nested.xml', '/device-model-foreign.xml',
+                         '/device-model-unsafe.xml', '/device-model-oversize.xml',
+                         '/device-multiple-root.xml'):
             service = ('<service><serviceType>' + SERVICE + '</serviceType>'
                        '<controlURL>/upnp/control/AVTransport1</controlURL></service>')
             if self.path == '/device-foreign.xml':
@@ -39,9 +43,26 @@ class Handler(BaseHTTPRequestHandler):
                 name += '<friendlyName>Forged Renderer</friendlyName>'
             if self.path == '/device-name-unsafe.xml':
                 name = '<friendlyName>Forged\u202eName</friendlyName>'
+            model = '<modelName>TV-Next Test Model 1</modelName>'
+            if self.path == '/device-model-missing.xml':
+                model = ''
+            if self.path == '/device-model-duplicate.xml':
+                model += '<modelName>Forged Model</modelName>'
+            if self.path == '/device-model-nested.xml':
+                model = '<modelName>TV-Next<fake/> Model</modelName>'
+            if self.path == '/device-model-foreign.xml':
+                model = '<x:modelName xmlns:x="urn:foreign">Forged</x:modelName>'
+            if self.path == '/device-model-unsafe.xml':
+                model = '<modelName>Forged\u202eModel</modelName>'
+            if self.path == '/device-model-oversize.xml':
+                model = '<modelName>' + 'é' * 81 + '</modelName>'
             xml = ('<root xmlns="urn:schemas-upnp-org:device-1-0">'
                    '<URLBase>http://8.8.8.8:80/</URLBase>'
-                   '<device>' + name + '<serviceList>' + service + '</serviceList></device></root>')
+                   '<device>' + name + model + '<serviceList>' + service + '</serviceList></device></root>')
+            if self.path == '/device-multiple-root.xml':
+                xml = ('<root xmlns="urn:schemas-upnp-org:device-1-0">'
+                       '<device><friendlyName>First</friendlyName></device>'
+                       '<device>' + model + '<serviceList>' + service + '</serviceList></device></root>')
             if self.path == '/device-doctype.xml':
                 xml = '<!DOCTYPE root [<!ENTITY secret SYSTEM "file:///etc/passwd">]>' + xml
             return self.reply(200, xml.encode(), {'Content-Type': 'text/xml; charset=utf-8'})

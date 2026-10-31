@@ -182,3 +182,7 @@ Enhance the existing user-entered UPnP description import to display a bounded o
 ### P4 native WebDAV last-modified metadata (#119)
 
 - [ ] Request and display optional `DAV:getlastmodified` on iPhone/iPad WebDAV listings without a separate network request. Only strict, bounded RFC 1123 GMT values from successful direct DAV propstat are accepted; invalid/duplicate/conflicting/foreign/nested values are omitted. Require Swift positive/negative smoke, owned localhost network, XCTest/XCUI on both simulators and final-head full integration CI. This does not add SMB, offline downloads, external provider acceptance or signed distribution.
+
+### P4 native DLNA optional modelName (#118)
+
+- [ ] Display one bounded, direct UPnP device `modelName` after explicit LAN description import, without changing the control origin, making additional network requests or persisting device metadata. Require positive/negative Swift smoke, owned localhost network fixture, XCTest and production iPhone/iPad XCUI, plus final-HEAD Web/API and full integration CI. Real renderer and physical Apple-device compatibility, SSDP entitlement, SMB and signed distribution remain open.

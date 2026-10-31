@@ -14,10 +14,10 @@ import FoundationNetworking
         }
         let parsed = try NativeDLNADescription.parse(xml(service()), location: location)
         let unnamed = try NativeDLNADescription.parseDetails(xml(service()), location: location)
-        precondition(unnamed.friendlyName == nil)
-        let named = Data("<root xmlns=\"\(NativeDLNADescription.deviceNamespace)\"><device><friendlyName>客厅电视 TV-Next</friendlyName><serviceList>\(service())</serviceList></device></root>".utf8)
+        precondition(unnamed.friendlyName == nil && unnamed.modelName == nil)
+        let named = Data("<root xmlns=\"\(NativeDLNADescription.deviceNamespace)\"><device><friendlyName>客厅电视 TV-Next</friendlyName><modelName>TV-Next Model 1</modelName><serviceList>\(service())</serviceList></device></root>".utf8)
         let details = try NativeDLNADescription.parseDetails(named, location: location)
-        precondition(details.controlURL == parsed && details.friendlyName == "客厅电视 TV-Next")
+        precondition(details.controlURL == parsed && details.friendlyName == "客厅电视 TV-Next" && details.modelName == "TV-Next Model 1")
         precondition(parsed.absoluteString == "http://127.0.0.1:8768/upnp/control/AVTransport1")
         let ignored = service("urn:schemas-upnp-org:service:RenderingControl:1", "/other")
         let withOtherService = try NativeDLNADescription.parse(xml(ignored + service()), location: location)
@@ -35,7 +35,25 @@ import FoundationNetworking
         let nestedName = Data("<root xmlns=\"\(NativeDLNADescription.deviceNamespace)\"><device><friendlyName><fake>Forged</fake></friendlyName><serviceList>\(service())</serviceList></device></root>".utf8)
         let unsafeName = Data("<root xmlns=\"\(NativeDLNADescription.deviceNamespace)\"><device><friendlyName>Bad\u{202E}Name</friendlyName><serviceList>\(service())</serviceList></device></root>".utf8)
         let longName = Data("<root xmlns=\"\(NativeDLNADescription.deviceNamespace)\"><device><friendlyName>\(String(repeating: "A", count: 161))</friendlyName><serviceList>\(service())</serviceList></device></root>".utf8)
-        let invalid: [Data] = [duplicateName, nestedName, unsafeName, longName,
+        let modelOnly = Data("<root xmlns=\"\(NativeDLNADescription.deviceNamespace)\"><device><modelName>独立型号</modelName><serviceList>\(service())</serviceList></device></root>".utf8)
+        let modelOnlyDetails = try NativeDLNADescription.parseDetails(modelOnly, location: location)
+        precondition(modelOnlyDetails.modelName == "独立型号")
+        let boundaryModel = Data("<root xmlns=\"\(NativeDLNADescription.deviceNamespace)\"><device><modelName>\(String(repeating: "é", count: 80))</modelName><serviceList>\(service())</serviceList></device></root>".utf8)
+        let boundaryDetails = try NativeDLNADescription.parseDetails(boundaryModel, location: location)
+        precondition(boundaryDetails.modelName?.utf8.count == 160)
+        func withModel(_ model: String) -> Data {
+            Data("<root xmlns=\"\(NativeDLNADescription.deviceNamespace)\"><device>\(model)<serviceList>\(service())</serviceList></device></root>".utf8)
+        }
+        let invalidModels = [
+            "<modelName>One</modelName><modelName>Two</modelName>",
+            "<modelName>Model<fake/>Name</modelName>",
+            "<x:modelName xmlns:x=\"urn:foreign\">Forged</x:modelName>",
+            "<modelName>Bad\u{202E}Name</modelName>",
+            "<modelName>Bad\nName</modelName>",
+            "<modelName>\(String(repeating: "é", count: 81))</modelName>"
+        ].map(withModel)
+        let multipleDevices = Data("<root xmlns=\"\(NativeDLNADescription.deviceNamespace)\"><device><friendlyName>First</friendlyName></device><device><modelName>Second</modelName><serviceList>\(service())</serviceList></device></root>".utf8)
+        let invalid: [Data] = [duplicateName, nestedName, unsafeName, longName, multipleDevices] + invalidModels + [
             xml(""), xml(service() + service()),
             xml(service(NativeDLNA.service, "http://8.8.8.8:8768/upnp/control")),
             xml(service(NativeDLNA.service, "http://127.0.0.1:9999/upnp/control")),

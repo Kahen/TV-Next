@@ -125,3 +125,8 @@ Acceptance requires one bounded direct UPnP `root/device/friendlyName` displayed
 - [ ] Final-head Swift smoke/XCTest: accept valid RFC 1123 GMT; reject invalid weekday, timezone, control characters and overlong values. Read only direct DAV:getlastmodified inside successful propstat; ignore failed, foreign, nested, duplicate and conflicting metadata without dropping otherwise valid entries.
 - [ ] Owned localhost PROPFIND and production iPhone/iPad SwiftUI XCUI: show valid file timestamp, do not invent missing directory timestamp, and remove metadata on disconnect. Preserve 1 MiB XML, 200-entry, read-only, no-redirect and credential-scope constraints.
 - [ ] All final HEAD Web/API and 9-job aggregate CI checks must pass before merging and closing #119. Real WebDAV providers, hardware, security audit and Apple signing remain unverified.
+
+### P4 native DLNA optional modelName (#118)
+
+- [ ] Direct, successful UPnP `root/device/modelName` is optional and display-only. Missing/empty values must not block import. Reject duplicate, nested, foreign namespace, control/bidi and more than 160 UTF-8 bytes or 80 characters. Verify the same-origin AVTransport control URL is unchanged.
+- [ ] Owned localhost fixture, Swift positive/negative and network smoke, XCTest and production iPhone/iPad XCUI verify display, invalid-input rejection and source-edit cleanup. All final-HEAD Web/API 3/3 and aggregate 9/9 checks must pass before merging/closing #118. Physical devices, external providers, independent security audit, Spider corpus and signing remain separate.
