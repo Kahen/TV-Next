@@ -63,6 +63,41 @@ final class NativeDLNATests: XCTestCase {
         XCTAssertThrowsError(try NativeDLNA.mediaURL("https://media.example/video.mp4", replay: true))
     }
 
+    func testOptInDIDLLiteMetadataAndInvalidTitles() throws {
+        let endpoint = try NativeDLNA.rendererURL("http://127.0.0.1:8768/upnp/control/AVTransport1")
+        let media = try NativeDLNA.mediaURL("https://media.example/owned.mp4?a=1&b=2")
+        let empty = try NativeDLNA.request(.setURI, endpoint: endpoint, media: media)
+        XCTAssertTrue(String(decoding: empty.httpBody!, as: UTF8.self).contains("<CurrentURIMetaData></CurrentURIMetaData>"))
+        let didl = try NativeDLNA.didlMetadata(media: media, title: "Owned & <Demo>")
+        XCTAssertTrue(didl.contains("<dc:title>Owned &amp; &lt;Demo&gt;</dc:title>"))
+        XCTAssertTrue(didl.contains("http-get:*:video/*:*"))
+        XCTAssertTrue(didl.contains("owned.mp4?a=1&amp;b=2"))
+        let request = try NativeDLNA.request(.setURI, endpoint: endpoint, media: media, metadataTitle: "Owned & <Demo>")
+        let soap = String(decoding: request.httpBody!, as: UTF8.self)
+        XCTAssertTrue(soap.contains("&lt;DIDL-Lite"))
+        XCTAssertTrue(soap.contains("Owned &amp;amp; &amp;lt;Demo&amp;gt;"))
+        // Both the embedded DIDL document and its outer SOAP envelope must
+        // remain well-formed after escaping untrusted titles and URL queries.
+        XCTAssertTrue(XMLParser(data: Data(didl.utf8)).parse())
+        XCTAssertTrue(XMLParser(data: request.httpBody!).parse())
+        for unsafeMedia in ["file:///private/owned.mp4", "https://user:pass@media.example/owned.mp4"] {
+            XCTAssertThrowsError(try NativeDLNA.request(
+                .setURI, endpoint: endpoint, media: URL(string: unsafeMedia)!))
+            XCTAssertThrowsError(try NativeDLNA.request(
+                .setURI, endpoint: endpoint, media: URL(string: unsafeMedia)!,
+                metadataTitle: "Owned"))
+        }
+        let xmlNoncharacters: [[UInt8]] = [[0xEF, 0xBF, 0xBE], [0xEF, 0xBF, 0xBF],
+                                          [0xF0, 0x9F, 0xBF, 0xBE], [0xEF, 0xB7, 0x90]]
+        let invalidTitles = ["", " ", " Bad", "Bad\nTitle", "Bad\u{202E}Title",
+                             String(repeating: "A", count: 81), String(repeating: "é", count: 81)] +
+                            xmlNoncharacters.map { "Bad" + String(decoding: $0, as: UTF8.self) + "Title" }
+        for title in invalidTitles {
+            XCTAssertThrowsError(try NativeDLNA.didlMetadata(media: media, title: title))
+        }
+        XCTAssertThrowsError(try NativeDLNA.request(.play, endpoint: endpoint, metadataTitle: "Owned"))
+    }
+
     func testNamespacedResponseAndMalformedResponseRejection() throws {
         let endpoint = try NativeDLNA.rendererURL("http://127.0.0.1:8768/upnp/control/AVTransport1")
         let response = HTTPURLResponse(url: endpoint, statusCode: 200, httpVersion: nil, headerFields: nil)!

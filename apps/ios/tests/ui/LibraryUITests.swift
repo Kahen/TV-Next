@@ -226,6 +226,16 @@ final class LibraryUITests: XCTestCase {
         let disconnect = app.buttons["webdav-disconnect"]
         reveal(disconnect)
         disconnect.tap()
+        // SwiftUI removes the connected subtree on its next render pass.
+        // Observe the completed disconnect rather than asserting immediately
+        // after XCTest's tap returns (which can precede accessibility refresh).
+        let disconnected = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            !app.textFields["webdav-filter"].exists &&
+            !app.staticTexts["webdav-modified-Owned.mp4"].exists &&
+            !sort.exists && !refresh.exists
+        }, object: disconnect)
+        XCTAssertEqual(XCTWaiter.wait(for: [disconnected], timeout: 10), .completed,
+                       "Disconnect must clear the connected browser, sort, refresh and stale metadata")
         XCTAssertFalse(app.textFields["webdav-filter"].exists)
         XCTAssertFalse(app.staticTexts["webdav-modified-Owned.mp4"].exists,
                        "Disconnect must remove stale file metadata")
@@ -489,6 +499,7 @@ final class LibraryUITests: XCTestCase {
         jump("DLNA 投屏")
         enter(app.textFields["dlna-renderer-url"], "http://127.0.0.1:8768/upnp/control/AVTransport1")
         enter(app.textFields["dlna-media-url"], "https://media.example/owned.mp4?a=1&b=2")
+        enter(app.textFields["dlna-metadata-title"], "Owned Video")
         let cast = app.buttons["dlna-cast"]
         reveal(cast)
         XCTAssertTrue(cast.isEnabled)
