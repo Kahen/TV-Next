@@ -119,3 +119,9 @@ The SSDP-only parser must reject even a sender-matched `127.0.0.1` LOCATION; exp
 ### Native DLNA optional renderer friendlyName (#116)
 
 Acceptance requires one bounded direct UPnP `root/device/friendlyName` displayed only after successful explicit description import, while preserving the same-origin AVTransport control URL. Missing name remains valid; duplicate, nested, foreign-namespace, control/bidi and oversized names must fail closed. Owned localhost HTTP fixture, Swift positive/negative smoke and network test, XCTest and production SwiftUI XCUI on iPhone/iPad plus final-head 3-job Web/API and 9-job aggregate CI are mandatory before merging/closing #116. Real renderer identity, multicast discovery, physical iPhone/iPad, Spider legality/security review and signing remain unverified.
+
+
+### P4 native DLNA optional modelName (#118)
+
+- [ ] Direct, successful UPnP `root/device/modelName` is optional and display-only. Missing/empty values must not block import. Reject duplicate, nested, foreign namespace, control/bidi and more than 160 UTF-8 bytes or 80 characters. Verify the same-origin AVTransport control URL is unchanged.
+- [ ] Owned localhost fixture, Swift positive/negative and network smoke, XCTest and production iPhone/iPad XCUI verify display, invalid-input rejection and source-edit cleanup. All final-HEAD Web/API 3/3 and aggregate 9/9 checks must pass before merging/closing #118. Physical devices, external providers, independent security audit, Spider corpus and signing remain separate.

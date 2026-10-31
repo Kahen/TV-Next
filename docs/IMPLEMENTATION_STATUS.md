@@ -134,3 +134,8 @@ A pure Swift, non-networking parser now screens bounded SSDP M-SEARCH HTTPU resp
 ## Native optional UPnP renderer friendlyName (P4, #116)
 
 An explicit native DLNA device-description import now returns a bounded, display-only friendly name alongside the previously validated same-origin AVTransport control URL. Names are optional, not trusted as device identity, and neither persisted nor used as authorization. Malformed/duplicate/nested/foreign/oversized/control/bidi names are rejected; owned Swift smoke/XCTest/XCUI and loopback fixtures are required, with final-head full CI before merging. SSDP transport/entitlement, real renderer interoperability, SMB, Apple hardware acceptance and P6 release remain open.
+
+
+## Native UPnP optional renderer modelName (P4, #118)
+
+The explicit, user-entered LAN description import parses one bounded optional direct `root/device/modelName` and displays it in native SwiftUI beside the approved control URL and optional friendly name. Empty/missing is valid; duplicate, nested, foreign, control/bidi or oversized model names fail closed. Model data is display-only and never persisted or used for endpoint trust. Owned Python loopback, Swift parser/network smoke, XCTest and production iPhone/iPad XCUI are required; final-head full CI is pending before merge. This does not establish SSDP multicast discovery, SMB, physical Apple/TV interoperability, legal Spider corpus, independent security audit or signed release.

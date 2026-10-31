@@ -178,3 +178,8 @@ The native iOS SSDP response parser is implemented as a separate bounded, non-ne
 ### P4 native DLNA renderer identity on manual import (#116)
 
 Enhance the existing user-entered UPnP description import to display a bounded optional `friendlyName` without new network requests, SSDP discovery or persistence. Strict namespace/path/duplicate/Unicode validation, synthetic HTTP/Swift/XCTest/XCUI regressions and final-head aggregate CI are required before closing this implementation task. P4 #5 and SSDP #114 remain open; hardware and signed release acceptance are separate.
+
+
+### P4 native DLNA optional modelName (#118)
+
+- [ ] Display one bounded, direct UPnP device `modelName` after explicit LAN description import, without changing the control origin, making additional network requests or persisting device metadata. Require positive/negative Swift smoke, owned localhost network fixture, XCTest and production iPhone/iPad XCUI, plus final-HEAD Web/API and full integration CI. Real renderer and physical Apple-device compatibility, SSDP entitlement, SMB and signed distribution remain open.
