@@ -25,7 +25,13 @@ enum NativeSSDPResponse {
               datagram.allSatisfy({ $0 == 13 || $0 == 10 || (32...126).contains($0) }),
               let message = String(data: datagram, encoding: .ascii),
               message.hasSuffix("\r\n\r\n") else { throw ValidationError.malformed }
-        // No bodies, bare LF, header folding, or trailing bytes are accepted.
+        // Reject lone CR/LF as well as folded headers and trailing bodies.
+        let bytes = Array(datagram)
+        guard bytes.indices.allSatisfy({ i in
+            if bytes[i] == 13 { return i + 1 < bytes.count && bytes[i + 1] == 10 }
+            if bytes[i] == 10 { return i > 0 && bytes[i - 1] == 13 }
+            return true
+        }) else { throw ValidationError.malformed }
         let lines = message.components(separatedBy: "\r\n")
         guard lines.count >= 5, lines.suffix(2).allSatisfy({ $0.isEmpty }),
               lines[0] == "HTTP/1.1 200 OK" else { throw ValidationError.malformed }
