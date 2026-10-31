@@ -23,6 +23,7 @@ import Foundation
             packet() + Data("BODY".utf8),
             packet() + Data([0]),
             packet() + Data([9]),
+            packet() + Data("\rX-Forged: value".utf8),
             packet().dropLast(2) + Data("\r\nLOCATION: http://192.168.1.20:1400/evil\r\n\r\n".utf8),
             Data(repeating: 65, count: NativeSSDPResponse.maxDatagramBytes + 1),
             Data("HTTP/1.1 200 OK\r\nST: \(NativeSSDPResponse.mediaRenderer)\r\n USN: uuid:x\r\n\r\n".utf8)
