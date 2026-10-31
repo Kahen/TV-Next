@@ -21,3 +21,9 @@ Implementation issue: #124. Parent: #5. Do not close either without its respecti
 ## Simulator picker regression (2026-11-01)
 
 The initial PR CI completed Web/API and native XCTest successfully but failed the new iPhone and iPad XCUI picker assertion: neither `Cancel` nor `取消` was visible through the app-scoped query. The media `.fileImporter` is now attached to the local-media section instead of the root view shared by other file importers. The UI test checks both the app and the Files document-provider accessibility hosts and emits their accessibility hierarchies on failure. This is a presentation/test-discovery correction, **not** proof of SMB NAS access. Final-HEAD iPhone/iPad XCUI and aggregate CI remain mandatory before merge.
+
+### Follow-up after full CI 41231112970
+
+The relocation-only fix still failed on both simulators: the app hierarchy showed the import button, but no system picker; the Files process hierarchy was empty. This revision replaces the media-only SwiftUI `fileImporter` modifier with an explicit `UIDocumentPickerViewController` hosted in a SwiftUI sheet. The same system Files provider owns SMB authentication and file selection; the existing bounded `LocalMediaStager` handles the selected security-scoped URL. The app-owned sheet has an explicit Close button for deterministic cancellation, including when the simulator's Files accessibility tree is absent.
+
+XCUI now asserts the actual app-owned picker sheet opens, can be dismissed, and does not start playback on cancellation. It **does not** assert that the system Files process exposed a navigable SMB share or that the user can select a real NAS document; those remain physical-device acceptance gates. The final-HEAD complete iPhone/iPad XCTest/XCUI and Web/API/aggregate gates must succeed before merge.
