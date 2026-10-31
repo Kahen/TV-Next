@@ -166,3 +166,7 @@ The iPhone/iPad SwiftUI DLNA controls now offer explicit Play resume after an ac
 ### P4 native DLNA explicit absolute seek (#110)
 
 An iPhone/iPad HH:MM:SS input requests a bounded absolute AVTransport REL_TIME Seek after fresh state and finite-duration queries. Strict ASCII time parsing and rejection of out-of-duration targets avoid surprising playback positions. Owned Swift/loopback/XCTest/XCUI and final-head full CI are required before accepting this increment. No SSDP, real TV, SMB, device validation or signed distribution; parent #5 remains open.
+
+### P4 SSDP response-validation prerequisite (#114)
+
+The native iOS SSDP response parser is implemented as a separate bounded, non-networking prerequisite for eventual opt-in M-SEARCH discovery. It is not an automatic device scan and cannot satisfy the outstanding DLNA discovery checkbox. The actual multicast transport and physical-device validation require Apple's restricted multicast networking entitlement and provisioning. Parser XCTest/smoke and final-head CI evidence belong to its feature PR; parent #5 stays open.
