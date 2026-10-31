@@ -13,6 +13,9 @@ import Foundation
         precondition(valid.serviceType == NativeSSDPResponse.mediaRenderer)
         let transport = try NativeSSDPResponse.parse(packet(NativeSSDPResponse.avTransport), senderIPv4: "192.168.1.20")
         precondition(transport.serviceType == NativeSSDPResponse.avTransport)
+        // UPnP 1.1 requires empty EXT and dotted BOOTID/CONFIGID headers.
+        let standard = Data("HTTP/1.1 200 OK\r\nST: \(NativeSSDPResponse.mediaRenderer)\r\nUSN: uuid:owned-device-123::\(NativeSSDPResponse.mediaRenderer)\r\nLOCATION: http://192.168.1.20:1400/device.xml\r\nEXT:\r\nBOOTID.UPNP.ORG: 1\r\nCONFIGID.UPNP.ORG: 2\r\nSEARCHPORT.UPNP.ORG: 1900\r\n\r\n".utf8)
+        precondition(try NativeSSDPResponse.parse(standard, senderIPv4: "192.168.1.20") == valid)
         let bad = [
             packet("ssdp:all"), packet(NativeSSDPResponse.mediaRenderer, "http://8.8.8.8:1400/device.xml"),
             packet(NativeSSDPResponse.mediaRenderer, "http://192.168.1.21:1400/device.xml"),
