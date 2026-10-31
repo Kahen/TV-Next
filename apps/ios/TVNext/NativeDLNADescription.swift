@@ -83,6 +83,7 @@ private final class DescriptionCollector: NSObject, XMLParserDelegate {
     private(set) var modelName: String?
     private(set) var invalid = false
     private var identitySeen = Set<String>()
+    private var rootDeviceSeen = false
     private var serviceFields: [String: String] = [:]
     private var collecting: String?
     private var text = ""
@@ -102,6 +103,10 @@ private final class DescriptionCollector: NSObject, XMLParserDelegate {
             invalid = true
         }
         stack.append(name)
+        if stack == ["root", "device"] {
+            if rootDeviceSeen { invalid = true }
+            rootDeviceSeen = true
+        }
         if stack.count == 3 && stack[0] == "root" && stack[1] == "device" &&
             (name == "friendlyName" || name == "modelName") {
             if !identitySeen.insert(name).inserted { invalid = true }
