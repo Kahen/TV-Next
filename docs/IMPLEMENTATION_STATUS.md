@@ -152,3 +152,8 @@ This PR adds a user-entered optional title to native manual casting. Empty title
 ### Native Files-provider SMB import (#124; pending final HEAD gate)
 
 The existing Files document picker gains an explicit SMB-share entry and the local-media staging path gains NSFileCoordinator, cancellation propagation, bounded 1 MiB streaming, actual 2 GiB enforcement and partial-copy cleanup. This only imports files selected from an SMB share already connected through Apple's Files app; it does not implement native SMB directory browsing or direct remote playback. Synthetic tests and final-head iPhone/iPad CI must pass before merging; physical NAS/Apple devices remain unverified. Parent P4 #5 remains open.
+
+
+#### 2026-11-01 Files picker presentation follow-up (#124)
+
+The earlier local-section `fileImporter` relocation did not fix iPhone/iPad XCUI: full CI [41231112970](https://github.com/Kahen/TV-Next/actions/runs/41231112970) still failed 2 simulator jobs while Web/API and six other integration jobs passed. The media picker now uses an explicit SwiftUI sheet containing Apple's `UIDocumentPickerViewController`, with app-owned cancellation controls and unchanged security-scoped bounded staging. XCUI checks sheet presentation/dismissal and preservation of the unplayed state. It does not certify Files provider browsing, actual SMB hydration or NAS compatibility. Final-HEAD aggregate CI is required before #124 closes.
