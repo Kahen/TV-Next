@@ -207,13 +207,6 @@ struct ContentView: View {
                 importFile(result)
             }
             .fileImporter(
-                isPresented: $isShowingMediaPicker,
-                allowedContentTypes: [.item],
-                allowsMultipleSelection: false
-            ) { result in
-                Task { await importLocalMedia(result) }
-            }
-            .fileImporter(
                 isPresented: $isShowingCaptionPicker,
                 allowedContentTypes: [.item],
                 allowsMultipleSelection: false
@@ -616,6 +609,16 @@ struct ContentView: View {
                 }
             }
             .padding(.top, 8)
+        }
+        // Attach the media picker to the visible local-media section, not to
+        // the root view shared by the playlist/caption/danmaku importers.
+        // Independent presentation hosts avoid competing fileImporter modifiers.
+        .fileImporter(
+            isPresented: $isShowingMediaPicker,
+            allowedContentTypes: [.item],
+            allowsMultipleSelection: false
+        ) { result in
+            Task { await importLocalMedia(result) }
         }
     }
 
