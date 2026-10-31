@@ -13,7 +13,8 @@ import FoundationNetworking
             "<service><serviceType>\(type)</serviceType><controlURL>\(control)</controlURL></service>"
         }
         let parsed = try NativeDLNADescription.parse(xml(service()), location: location)
-        precondition(try NativeDLNADescription.parseDetails(xml(service()), location: location).friendlyName == nil)
+        let unnamed = try NativeDLNADescription.parseDetails(xml(service()), location: location)
+        precondition(unnamed.friendlyName == nil)
         let named = Data("<root xmlns=\"\(NativeDLNADescription.deviceNamespace)\"><device><friendlyName>客厅电视 TV-Next</friendlyName><serviceList>\(service())</serviceList></device></root>".utf8)
         let details = try NativeDLNADescription.parseDetails(named, location: location)
         precondition(details.controlURL == parsed && details.friendlyName == "客厅电视 TV-Next")
