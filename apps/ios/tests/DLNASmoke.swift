@@ -16,7 +16,9 @@ import FoundationNetworking
         precondition(withMetadataBody.contains("&lt;DIDL-Lite"))
         precondition(withMetadataBody.contains("Owned &amp;amp; &amp;lt;Demo&amp;gt;"))
         precondition(withMetadataBody.contains("a=1&amp;amp;b=2"))
-        for invalid in ["", " ", "Bad\nTitle", "Bad\u{202E}Title", String(repeating: "A", count: 81), String(repeating: "é", count: 81), "Bad\u{FFFE}Title", "Bad\u{FFFF}Title", "Bad\u{1FFFE}Title", "Bad\u{FDD0}Title"] {
+        let xmlNoncharacters: [[UInt8]] = [[0xEF, 0xBF, 0xBE], [0xEF, 0xBF, 0xBF], [0xF0, 0x9F, 0xBF, 0xBE], [0xEF, 0xB7, 0x90]]
+        let invalidTitles = ["", " ", "Bad\nTitle", "Bad\u{202E}Title", String(repeating: "A", count: 81), String(repeating: "é", count: 81)] + xmlNoncharacters.map { "Bad" + String(decoding: $0, as: UTF8.self) + "Title" }
+        for invalid in invalidTitles {
             do { _ = try NativeDLNA.request(.setURI, endpoint: endpoint, media: media, metadataTitle: invalid); fatalError("Accepted unsafe DIDL title") }
             catch NativeDLNAError.invalidMetadata { }
         }
