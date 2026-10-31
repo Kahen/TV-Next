@@ -77,8 +77,8 @@ final class NativeDLNATests: XCTestCase {
         XCTAssertTrue(soap.contains("&lt;DIDL-Lite"))
         XCTAssertTrue(soap.contains("Owned &amp;amp; &amp;lt;Demo&amp;gt;"))
         for title in ["", " ", " Bad", "Bad\nTitle", "Bad\u{202E}Title",
-                      String(repeating: "A", count: 81), String(repeating: "é", count: 81),
-                      "Bad\u{FFFE}Title", "Bad\u{FFFF}Title", "Bad\u{1FFFE}Title", "Bad\u{FDD0}Title"] {
+                      String(repeating: "A", count: 81), String(repeating: "é", count: 81)] +
+                      [[UInt8]([0xEF, 0xBF, 0xBE]), [0xEF, 0xBF, 0xBF], [0xF0, 0x9F, 0xBF, 0xBE], [0xEF, 0xB7, 0x90]].map { "Bad" + String(decoding: $0, as: UTF8.self) + "Title" } {
             XCTAssertThrowsError(try NativeDLNA.didlMetadata(media: media, title: title))
         }
         XCTAssertThrowsError(try NativeDLNA.request(.play, endpoint: endpoint, metadataTitle: "Owned"))
