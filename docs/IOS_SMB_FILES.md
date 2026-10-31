@@ -17,3 +17,7 @@ This is a **read-only, user-selected file import**, not a built-in SMB client or
 - Linux Swift smoke covers chunked copy, rejection and cancellation; macOS CI adds the same smoke, XCTest and production iPhone/iPad XCUI. A synthetic local file is not a real SMB share. Physical iPhone/iPad and actual NAS SMB verification remain open under P4 #5.
 
 Implementation issue: #124. Parent: #5. Do not close either without its respective acceptance evidence.
+
+## Simulator picker regression (2026-11-01)
+
+The initial PR CI completed Web/API and native XCTest successfully but failed the new iPhone and iPad XCUI picker assertion: neither `Cancel` nor `取消` was visible through the app-scoped query. The media `.fileImporter` is now attached to the local-media section instead of the root view shared by other file importers. The UI test checks both the app and the Files document-provider accessibility hosts and emits their accessibility hierarchies on failure. This is a presentation/test-discovery correction, **not** proof of SMB NAS access. Final-HEAD iPhone/iPad XCUI and aggregate CI remain mandatory before merge.
