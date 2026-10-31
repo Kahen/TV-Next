@@ -1,6 +1,7 @@
 import SwiftUI
 import AVKit
 import UniformTypeIdentifiers
+import UIKit
 
 private enum LibraryView: String, CaseIterable, Identifiable {
     case channels = "全部频道"
@@ -610,15 +611,29 @@ struct ContentView: View {
             }
             .padding(.top, 8)
         }
-        // Attach the media picker to the visible local-media section, not to
-        // the root view shared by the playlist/caption/danmaku importers.
-        // Independent presentation hosts avoid competing fileImporter modifiers.
-        .fileImporter(
-            isPresented: $isShowingMediaPicker,
-            allowedContentTypes: [.item],
-            allowsMultipleSelection: false
-        ) { result in
-            Task { await importLocalMedia(result) }
+        // The simulator did not present SwiftUI's fileImporter when several
+        // independent importers shared this NavigationStack. Use an explicit
+        // UIDocumentPicker inside an ordinary sheet so Files/SMB providers
+        // remain system-owned, without introducing an SMB protocol client.
+        .sheet(isPresented: $isShowingMediaPicker) {
+            VStack(spacing: 0) {
+                HStack {
+                    Text("选择本地媒体")
+                        .font(.headline)
+                    Spacer()
+                    Button("关闭") { isShowingMediaPicker = false }
+                        .accessibilityIdentifier("smb-picker-dismiss")
+                }
+                .padding()
+                NativeMediaDocumentPicker(
+                    onPick: { result in
+                        isShowingMediaPicker = false
+                        Task { await importLocalMedia(result) }
+                    },
+                    onCancel: { isShowingMediaPicker = false }
+                )
+            }
+            .presentationDetents([.large])
         }
     }
 
@@ -873,6 +888,39 @@ struct ContentView: View {
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+}
+
+
+private struct NativeMediaDocumentPicker: UIViewControllerRepresentable {
+    let onPick: (Result<[URL], Error>) -> Void
+    let onCancel: () -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
+
+    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
+        // Open in place: LocalMediaStager obtains the scoped URL and stages a
+        // bounded local copy before AVPlayer ever reads the provider resource.
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.item], asCopy: false)
+        picker.allowsMultipleSelection = false
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ controller: UIDocumentPickerViewController, context: Context) {}
+
+    final class Coordinator: NSObject, UIDocumentPickerDelegate {
+        let parent: NativeMediaDocumentPicker
+
+        init(parent: NativeMediaDocumentPicker) { self.parent = parent }
+
+        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+            parent.onPick(.success(urls))
+        }
+
+        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+            parent.onCancel()
         }
     }
 }
