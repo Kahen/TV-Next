@@ -107,6 +107,11 @@ jobs:
           curl --fail --silent http://127.0.0.1:8768/health -o /dev/null
           swiftc -warnings-as-errors TVNext/NativeDLNA.swift TVNext/NativeDLNAStatus.swift TVNext/NativeDLNAPosition.swift TVNext/NativeDLNASeek.swift tests/DLNANetworkSmoke.swift -o /tmp/tvnext-dlna-network-tests
           /tmp/tvnext-dlna-network-tests
+      - name: Validate bounded native SSDP response candidates (no multicast)
+        working-directory: apps/ios
+        run: |
+          swiftc -warnings-as-errors TVNext/NativeDLNA.swift TVNext/NativeDLNAStatus.swift TVNext/NativeDLNAPosition.swift TVNext/NativeDLNASeek.swift TVNext/NativeSSDPResponse.swift tests/SSDPResponseSmoke.swift -o /tmp/tvnext-ssdp-response-tests
+          /tmp/tvnext-ssdp-response-tests
       - name: Verify manual intro/outro marker bounds and local persistence
         working-directory: apps/ios
         run: |
