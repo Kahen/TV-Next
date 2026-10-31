@@ -16,7 +16,7 @@ import FoundationNetworking
         precondition(withMetadataBody.contains("&lt;DIDL-Lite"))
         precondition(withMetadataBody.contains("Owned &amp;amp; &amp;lt;Demo&amp;gt;"))
         precondition(withMetadataBody.contains("a=1&amp;amp;b=2"))
-        for invalid in ["", " ", "Bad\nTitle", "Bad\u{202E}Title", String(repeating: "A", count: 81), String(repeating: "é", count: 81)] {
+        for invalid in ["", " ", "Bad\nTitle", "Bad\u{202E}Title", String(repeating: "A", count: 81), String(repeating: "é", count: 81), "Bad\u{FFFE}Title", "Bad\u{FFFF}Title", "Bad\u{1FFFE}Title", "Bad\u{FDD0}Title"] {
             do { _ = try NativeDLNA.request(.setURI, endpoint: endpoint, media: media, metadataTitle: invalid); fatalError("Accepted unsafe DIDL title") }
             catch NativeDLNAError.invalidMetadata { }
         }
