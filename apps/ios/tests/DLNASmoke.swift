@@ -76,6 +76,12 @@ import FoundationNetworking
         for invalid in ["file:///tmp/a.mp4", "javascript:alert(1)", "https://user:pw@media.example/owned.mp4", "https://media.example/video.mp4#fragment"] {
             do { _ = try NativeDLNA.mediaURL(invalid); fatalError("accepted unsafe media \(invalid)") }
             catch NativeDLNAError.invalidMedia { }
+            if let untrusted = URL(string: invalid) {
+                do { _ = try NativeDLNA.request(.setURI, endpoint: endpoint, media: untrusted); fatalError("SOAP builder accepted unsafe media") }
+                catch NativeDLNAError.invalidMedia { }
+                do { _ = try NativeDLNA.request(.setURI, endpoint: endpoint, media: untrusted, metadataTitle: "Owned"); fatalError("DIDL builder accepted unsafe media") }
+                catch NativeDLNAError.invalidMedia { }
+            }
         }
         do { _ = try NativeDLNA.mediaURL("https://media.example/a.mp4", hasHeaders: true); fatalError("accepted headers") }
         catch NativeDLNAError.unsupportedMedia { }
