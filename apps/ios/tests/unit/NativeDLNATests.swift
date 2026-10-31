@@ -238,6 +238,31 @@ final class NativeDLNATests: XCTestCase {
     }
 
 
+    func testImportedUPnPFriendlyNameIsBoundedAndNeverChangesControlOrigin() throws {
+        let source = try NativeDLNADescription.location("http://127.0.0.1:8768/device.xml")
+        let namespace = NativeDLNADescription.deviceNamespace
+        func description(_ name: String) -> Data {
+            Data("<root xmlns=\"\(namespace)\"><device>\(name)<serviceList><service><serviceType>\(NativeDLNA.service)</serviceType><controlURL>/upnp/control/AVTransport1</controlURL></service></serviceList></device></root>".utf8)
+        }
+        let named = try NativeDLNADescription.parseDetails(
+            description("<friendlyName>客厅电视 TV-Next</friendlyName>"), location: source)
+        XCTAssertEqual(named.friendlyName, "客厅电视 TV-Next")
+        XCTAssertEqual(named.controlURL.absoluteString, "http://127.0.0.1:8768/upnp/control/AVTransport1")
+        XCTAssertNil(try NativeDLNADescription.parseDetails(description(""), location: source).friendlyName)
+        let invalid = [
+            "<friendlyName>One</friendlyName><friendlyName>Two</friendlyName>",
+            "<friendlyName><child>Fake</child></friendlyName>",
+            "<x:friendlyName xmlns:x=\"urn:foreign\">Forged</x:friendlyName>",
+            "<friendlyName>Bad\u{202E}Name</friendlyName>",
+            "<friendlyName>Bad\nName</friendlyName>",
+            "<friendlyName>\(String(repeating: "A", count: 161))</friendlyName>"
+        ]
+        for value in invalid {
+            XCTAssertThrowsError(try NativeDLNADescription.parseDetails(description(value), location: source),
+                                 "Accepted unsafe friendlyName")
+        }
+    }
+
     func testDeviceDescriptionParserRejectsAmbiguousAndForeignControlURLs() throws {
         let source = try NativeDLNADescription.location("http://127.0.0.1:8768/device.xml")
         func xml(_ services: String) -> Data {
