@@ -178,3 +178,7 @@ The native iOS SSDP response parser is implemented as a separate bounded, non-ne
 ### P4 native DLNA renderer identity on manual import (#116)
 
 Enhance the existing user-entered UPnP description import to display a bounded optional `friendlyName` without new network requests, SSDP discovery or persistence. Strict namespace/path/duplicate/Unicode validation, synthetic HTTP/Swift/XCTest/XCUI regressions and final-head aggregate CI are required before closing this implementation task. P4 #5 and SSDP #114 remain open; hardware and signed release acceptance are separate.
+
+### P4 native WebDAV last-modified metadata (#119)
+
+- [ ] Request and display optional `DAV:getlastmodified` on iPhone/iPad WebDAV listings without a separate network request. Only strict, bounded RFC 1123 GMT values from successful direct DAV propstat are accepted; invalid/duplicate/conflicting/foreign/nested values are omitted. Require Swift positive/negative smoke, owned localhost network, XCTest/XCUI on both simulators and final-head full integration CI. This does not add SMB, offline downloads, external provider acceptance or signed distribution.

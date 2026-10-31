@@ -94,6 +94,11 @@ struct NativeWebDAVSection: View {
                                     .font(.caption).foregroundStyle(.secondary)
                                     .accessibilityIdentifier("webdav-size-\(entry.name)")
                             }
+                            if let modified = entry.lastModified {
+                                Text(modified, format: .dateTime.year().month().day().hour().minute())
+                                    .font(.caption2).foregroundStyle(.secondary)
+                                    .accessibilityIdentifier("webdav-modified-\(entry.name)")
+                            }
                         }
                     }
                     if visible.isEmpty && !busy { Text("目录为空，或当前筛选没有匹配项。").font(.caption) }
