@@ -617,14 +617,10 @@ struct ContentView: View {
         // remain system-owned, without introducing an SMB protocol client.
         .sheet(isPresented: $isShowingMediaPicker) {
             VStack(spacing: 0) {
-                HStack {
-                    Text("选择本地媒体")
-                        .font(.headline)
-                    Spacer()
-                    Button("关闭") { isShowingMediaPicker = false }
-                        .accessibilityIdentifier("smb-picker-dismiss")
-                }
-                .padding()
+                Text("选择本地媒体")
+                    .font(.headline)
+                    .padding(.top, 12)
+                    .padding(.bottom, 4)
                 NativeMediaDocumentPicker(
                     onPick: { result in
                         isShowingMediaPicker = false
@@ -632,6 +628,19 @@ struct ContentView: View {
                     },
                     onCancel: { isShowingMediaPicker = false }
                 )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            // Keep the app-owned cancel action below the UIKit picker rather
+            // than in the top status-bar region. On CI simulators the picker
+            // can occlude a header button even while AX reports it as present.
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                Button("关闭文件选择器") { isShowingMediaPicker = false }
+                    .accessibilityIdentifier("smb-picker-dismiss")
+                    .buttonStyle(.borderedProminent)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(.regularMaterial)
             }
             .presentationDetents([.large])
         }
