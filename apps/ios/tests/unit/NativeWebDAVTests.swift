@@ -168,7 +168,7 @@ final class NativeWebDAVTests: XCTestCase {
         let good = "Mon, 01 Jan 2024 12:34:56 GMT"
         XCTAssertNotNil(NativeWebDAV.httpLastModified(good))
         for bad in ["", "Tue, 01 Jan 2024 12:34:56 GMT", "Mon, 01 Jan 2024 12:34:56 PST",
-                    "Mon, 01 Jan 2024 12:34:56 GMT\\n", "2024-01-01T12:34:56Z",
+                    "Mon, 01 Jan 2024 12:34:56 GMT\n", "2024-01-01T12:34:56Z",
                     String(repeating: "X", count: 200)] {
             XCTAssertNil(NativeWebDAV.httpLastModified(bad))
         }
