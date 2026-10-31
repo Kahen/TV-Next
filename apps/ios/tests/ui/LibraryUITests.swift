@@ -597,7 +597,8 @@ final class LibraryUITests: XCTestCase {
         reveal(description)
         description.tap()
         description.typeText("x")
-        XCTAssertFalse(importedName.exists)
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"), object: importedName)], timeout: 5), .completed)
     }
 
     func testDLNARejectsForeignDeviceDescriptionWithoutChangingRenderer() {
