@@ -230,8 +230,8 @@ final class LibraryUITests: XCTestCase {
         // Observe the completed disconnect rather than asserting immediately
         // after XCTest's tap returns (which can precede accessibility refresh).
         let disconnected = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            !app.textFields["webdav-filter"].exists &&
-            !app.staticTexts["webdav-modified-Owned.mp4"].exists &&
+            !self.app.textFields["webdav-filter"].exists &&
+            !self.app.staticTexts["webdav-modified-Owned.mp4"].exists &&
             !sort.exists && !refresh.exists
         }, object: disconnect)
         XCTAssertEqual(XCTWaiter.wait(for: [disconnected], timeout: 10), .completed,
