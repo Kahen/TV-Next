@@ -36,9 +36,11 @@ import FoundationNetworking
         let unsafeName = Data("<root xmlns=\"\(NativeDLNADescription.deviceNamespace)\"><device><friendlyName>Bad\u{202E}Name</friendlyName><serviceList>\(service())</serviceList></device></root>".utf8)
         let longName = Data("<root xmlns=\"\(NativeDLNADescription.deviceNamespace)\"><device><friendlyName>\(String(repeating: "A", count: 161))</friendlyName><serviceList>\(service())</serviceList></device></root>".utf8)
         let modelOnly = Data("<root xmlns=\"\(NativeDLNADescription.deviceNamespace)\"><device><modelName>独立型号</modelName><serviceList>\(service())</serviceList></device></root>".utf8)
-        precondition(try NativeDLNADescription.parseDetails(modelOnly, location: location).modelName == "独立型号")
+        let modelOnlyDetails = try NativeDLNADescription.parseDetails(modelOnly, location: location)
+        precondition(modelOnlyDetails.modelName == "独立型号")
         let boundaryModel = Data("<root xmlns=\"\(NativeDLNADescription.deviceNamespace)\"><device><modelName>\(String(repeating: "é", count: 80))</modelName><serviceList>\(service())</serviceList></device></root>".utf8)
-        precondition(try NativeDLNADescription.parseDetails(boundaryModel, location: location).modelName?.utf8.count == 160)
+        let boundaryDetails = try NativeDLNADescription.parseDetails(boundaryModel, location: location)
+        precondition(boundaryDetails.modelName?.utf8.count == 160)
         func withModel(_ model: String) -> Data {
             Data("<root xmlns=\"\(NativeDLNADescription.deviceNamespace)\"><device>\(model)<serviceList>\(service())</serviceList></device></root>".utf8)
         }
