@@ -5,6 +5,7 @@ import SwiftUI
 struct NativeDLNASection: View {
     @ObservedObject var library: MediaLibraryStore
     @State private var descriptionAddress = ""
+    @State private var importedControlAddress: String?
     @State private var rendererAddress = ""
     @State private var mediaAddress = ""
     @State private var seekTime = ""
@@ -32,11 +33,19 @@ struct NativeDLNASection: View {
                 .accessibilityIdentifier("dlna-import-description")
             Text("仅请求你明确填写的私有 IPv4 设备描述地址，不进行局域网扫描；只接受同设备同端口的 AVTransport:1 控制地址。")
                 .font(.caption).foregroundStyle(.secondary)
+            if let importedControlAddress, importedControlAddress == rendererAddress {
+                Text("已导入控制地址：\(importedControlAddress)")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("dlna-imported-control")
+            }
             TextField("http://192.168.1.20:1400/MediaRenderer/AVTransport/Control", text: $rendererAddress)
                 .textInputAutocapitalization(.never).autocorrectionDisabled()
                 .keyboardType(.URL).textContentType(.URL)
                 .accessibilityIdentifier("dlna-renderer-url")
-                .onChange(of: rendererAddress) { _, _ in reset() }
+                .onChange(of: rendererAddress) { _, newValue in
+                    reset()
+                    if importedControlAddress != newValue { importedControlAddress = nil }
+                }
             TextField("https://media.example/owned.mp4", text: $mediaAddress)
                 .textInputAutocapitalization(.never).autocorrectionDisabled()
                 .keyboardType(.URL).textContentType(.URL)
@@ -120,6 +129,7 @@ struct NativeDLNASection: View {
     private func importDescription() {
         guard !busy, (try? NativeDLNADescription.location(descriptionAddress)) != nil else { return }
         let source = descriptionAddress
+        importedControlAddress = nil
         busy = true
         status = nil
         error = nil
@@ -132,6 +142,7 @@ struct NativeDLNASection: View {
                 task = nil
                 busy = false
                 rendererAddress = imported.absoluteString
+                importedControlAddress = imported.absoluteString
             } catch {
                 guard !Task.isCancelled else { return }
                 self.error = error.localizedDescription
