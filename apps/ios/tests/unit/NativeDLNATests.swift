@@ -76,9 +76,12 @@ final class NativeDLNATests: XCTestCase {
         let soap = String(decoding: request.httpBody!, as: UTF8.self)
         XCTAssertTrue(soap.contains("&lt;DIDL-Lite"))
         XCTAssertTrue(soap.contains("Owned &amp;amp; &amp;lt;Demo&amp;gt;"))
-        for title in ["", " ", " Bad", "Bad\nTitle", "Bad\u{202E}Title",
-                      String(repeating: "A", count: 81), String(repeating: "é", count: 81)] +
-                      [[UInt8]([0xEF, 0xBF, 0xBE]), [0xEF, 0xBF, 0xBF], [0xF0, 0x9F, 0xBF, 0xBE], [0xEF, 0xB7, 0x90]].map { "Bad" + String(decoding: $0, as: UTF8.self) + "Title" } {
+        let xmlNoncharacters: [[UInt8]] = [[0xEF, 0xBF, 0xBE], [0xEF, 0xBF, 0xBF],
+                                          [0xF0, 0x9F, 0xBF, 0xBE], [0xEF, 0xB7, 0x90]]
+        let invalidTitles = ["", " ", " Bad", "Bad\nTitle", "Bad\u{202E}Title",
+                             String(repeating: "A", count: 81), String(repeating: "é", count: 81)] +
+                            xmlNoncharacters.map { "Bad" + String(decoding: $0, as: UTF8.self) + "Title" }
+        for title in invalidTitles {
             XCTAssertThrowsError(try NativeDLNA.didlMetadata(media: media, title: title))
         }
         XCTAssertThrowsError(try NativeDLNA.request(.play, endpoint: endpoint, metadataTitle: "Owned"))
