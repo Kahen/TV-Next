@@ -119,3 +119,9 @@ The SSDP-only parser must reject even a sender-matched `127.0.0.1` LOCATION; exp
 ### Native DLNA optional renderer friendlyName (#116)
 
 Acceptance requires one bounded direct UPnP `root/device/friendlyName` displayed only after successful explicit description import, while preserving the same-origin AVTransport control URL. Missing name remains valid; duplicate, nested, foreign-namespace, control/bidi and oversized names must fail closed. Owned localhost HTTP fixture, Swift positive/negative smoke and network test, XCTest and production SwiftUI XCUI on iPhone/iPad plus final-head 3-job Web/API and 9-job aggregate CI are mandatory before merging/closing #116. Real renderer identity, multicast discovery, physical iPhone/iPad, Spider legality/security review and signing remain unverified.
+
+### P4 native WebDAV last-modified metadata (#119)
+
+- [ ] Final-head Swift smoke/XCTest: accept valid RFC 1123 GMT; reject invalid weekday, timezone, control characters and overlong values. Read only direct DAV:getlastmodified inside successful propstat; ignore failed, foreign, nested, duplicate and conflicting metadata without dropping otherwise valid entries.
+- [ ] Owned localhost PROPFIND and production iPhone/iPad SwiftUI XCUI: show valid file timestamp, do not invent missing directory timestamp, and remove metadata on disconnect. Preserve 1 MiB XML, 200-entry, read-only, no-redirect and credential-scope constraints.
+- [ ] All final HEAD Web/API and 9-job aggregate CI checks must pass before merging and closing #119. Real WebDAV providers, hardware, security audit and Apple signing remain unverified.
