@@ -7,6 +7,9 @@ import Foundation
         do { entries = try await NativeWebDAV.list(root: root, folder: root, username: "", password: "") }
         catch { fatalError("Initial WebDAV listing failed: \(error)") }
         precondition(entries.map(\.name) == ["Folder", "Owned.mp4"])
+        precondition(entries[1].lastModified == NativeWebDAV.httpLastModified("Mon, 01 Jan 2024 12:34:56 GMT"),
+                     "Localhost DAV:getlastmodified did not survive bounded PROPFIND")
+        precondition(entries[0].lastModified == nil, "Missing directory timestamp must stay absent")
         let nested = entries[0].url
         precondition(nested.absoluteString == "http://127.0.0.1:8767/dav/Folder/", "Collection href acquired an extra slash")
         let nestedEntries = try await NativeWebDAV.list(root: root, folder: nested, username: "", password: "")
