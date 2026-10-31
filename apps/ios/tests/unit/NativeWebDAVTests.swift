@@ -178,12 +178,13 @@ final class NativeWebDAVTests: XCTestCase {
           <d:response><d:href>/dav/Movies/Failed.mp4</d:href><d:propstat><d:prop><d:resourcetype/></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><d:getlastmodified>Mon, 01 Jan 2024 12:34:56 GMT</d:getlastmodified></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response>
           <d:response><d:href>/dav/Movies/Foreign.mp4</d:href><d:propstat><d:prop><d:resourcetype/><x:getlastmodified>Mon, 01 Jan 2024 12:34:56 GMT</x:getlastmodified></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
           <d:response><d:href>/dav/Movies/Nested.mp4</d:href><d:propstat><d:prop><d:resourcetype/><d:getlastmodified><d:span>Mon, 01 Jan 2024 12:34:56 GMT</d:span></d:getlastmodified></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+          <d:response><d:href>/dav/Movies/MixedNested.mp4</d:href><d:propstat><d:prop><d:resourcetype/><d:getlastmodified>Mon, 01 Jan 2024 12:34:56 GMT<x:fake/></d:getlastmodified></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
           <d:response><d:href>/dav/Movies/Duplicate.mp4</d:href><d:propstat><d:prop><d:resourcetype/><d:getlastmodified>Mon, 01 Jan 2024 12:34:56 GMT</d:getlastmodified><d:getlastmodified>Mon, 01 Jan 2024 12:34:56 GMT</d:getlastmodified></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
           <d:response><d:href>/dav/Movies/Conflict.mp4</d:href><d:propstat><d:prop><d:resourcetype/><d:getlastmodified>Mon, 01 Jan 2024 12:34:56 GMT</d:getlastmodified></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><d:getlastmodified>Tue, 02 Jan 2024 12:34:56 GMT</d:getlastmodified></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
         </d:multistatus>
         """
         let entries = try NativeWebDAV.parse(Data(xml.utf8), root: root, folder: folder)
-        XCTAssertEqual(entries.count, 6)
+        XCTAssertEqual(entries.count, 7)
         XCTAssertEqual(entries.first(where: { $0.name == "Good.mp4" })?.lastModified,
                        NativeWebDAV.httpLastModified(good))
         XCTAssertTrue(entries.filter { $0.name != "Good.mp4" }.allSatisfy { $0.lastModified == nil })
