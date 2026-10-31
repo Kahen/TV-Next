@@ -1,5 +1,6 @@
 """Owned loopback SOAP fixture positive/negative HTTP tests."""
 import http.client
+from html import escape
 import threading
 import unittest
 from http.server import ThreadingHTTPServer
@@ -19,10 +20,10 @@ class DLNAFixtureTests(unittest.TestCase):
         cls.server.server_close()
         cls.thread.join(timeout=3)
 
-    def post(self, path, action='Play', media=None, target=None):
+    def post(self, path, action='Play', media=None, target=None, metadata=''):
         arguments = '<InstanceID>0</InstanceID>'
         if action == 'SetAVTransportURI':
-            arguments += f'<CurrentURI>{media}</CurrentURI><CurrentURIMetaData></CurrentURIMetaData>'
+            arguments += f'<CurrentURI>{media}</CurrentURI><CurrentURIMetaData>{escape(metadata)}</CurrentURIMetaData>'
         if action == 'Play':
             arguments += '<Speed>1</Speed>'
         if action == 'Seek':
@@ -68,6 +69,24 @@ class DLNAFixtureTests(unittest.TestCase):
                                      'https://media.example/owned.mp4?a=1&amp;b=2')
             self.assertEqual(status, 200)
             self.assertIn((action + 'Response').encode(), body)
+
+    def test_opt_in_didl_lite_metadata(self):
+        didl = ('<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" '
+                'xmlns:dc="http://purl.org/dc/elements/1.1/" '
+                'xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/">'
+                '<item id="0" parentID="-1" restricted="1">'
+                '<dc:title>Owned &amp; &lt;Demo&gt;</dc:title>'
+                '<upnp:class>object.item.videoItem</upnp:class>'
+                '<res protocolInfo="http-get:*:video/*:*">'
+                'https://media.example/owned.mp4?a=1&amp;b=2</res>'
+                '</item></DIDL-Lite>')
+        media = 'https://media.example/owned.mp4?a=1&amp;b=2'
+        self.assertEqual(self.post('/upnp/control/AVTransport1', 'SetAVTransportURI',
+                                   media, metadata=didl)[0], 200)
+        for invalid in ('<bad/>', didl.replace('Owned &amp; &lt;Demo&gt;', 'Forged'),
+                        didl.replace('http-get:*:video/*:*', 'http-get:*:application/x-executable:*')):
+            self.assertEqual(self.post('/upnp/control/AVTransport1', 'SetAVTransportURI',
+                                       media, metadata=invalid)[0], 400)
 
     def test_transport_state_tracks_commands(self):
         self.assertEqual(self.post('/upnp/control/AVTransport1', 'SetAVTransportURI',
