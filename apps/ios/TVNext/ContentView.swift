@@ -576,6 +576,16 @@ struct ContentView: View {
                 }
                 .buttonStyle(.bordered)
                 .disabled(isLoadingMedia)
+                Button {
+                    isShowingMediaPicker = true
+                } label: {
+                    Label(isLoadingMedia ? "正在导入…" : "从文件 App / SMB 共享选择媒体", systemImage: "externaldrive")
+                }
+                .buttonStyle(.bordered)
+                .disabled(isLoadingMedia)
+                .accessibilityIdentifier("smb-files-import")
+                Text("先在 iOS「文件」App 中通过「连接服务器」加入 SMB 共享，再在系统选择器中选取媒体。文件会复制到本机临时缓存；不保存 SMB 凭据，也不直接通过 SMB 流式播放。")
+                    .font(.caption).foregroundStyle(.secondary)
                 HStack {
                     Button {
                         isShowingCaptionPicker = true

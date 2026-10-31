@@ -143,6 +143,23 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["TVBox / FongMi 原版订阅"].waitForExistence(timeout: 5))
     }
 
+    func testFilesSMBImportEntryOpensSystemDocumentPicker() {
+        jump("本机文件与字幕")
+        let entry = app.buttons["smb-files-import"]
+        reveal(entry)
+        XCTAssertTrue(entry.isEnabled)
+        entry.tap()
+        // System Files picker; no credentials or test-only SMB server are supplied.
+        let english = app.buttons["Cancel"]
+        let chinese = app.buttons["取消"]
+        if english.waitForExistence(timeout: 10) { english.tap() }
+        else {
+            XCTAssertTrue(chinese.waitForExistence(timeout: 5), "System document picker did not open")
+            chinese.tap()
+        }
+        XCTAssertTrue(entry.waitForExistence(timeout: 5))
+    }
+
     func testNativeWebDAVFormRejectsUnsafeURLWithoutNetworking() {
         jump("WebDAV 文件")
         let connect = app.buttons["webdav-connect"]

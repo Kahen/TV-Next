@@ -147,3 +147,8 @@ The explicit, user-entered LAN description import parses one bounded optional di
 ## Native opt-in DLNA DIDL-Lite metadata (P4, #122)
 
 This PR adds a user-entered optional title to native manual casting. Empty title preserves the existing empty CurrentURIMetaData; a bounded, validated title generates a FongMi-inspired DIDL-Lite videoItem with the same direct media URL and generic video protocolInfo. It does not serialize provider headers, persist the title, or add any network destination. Positive/negative Swift smoke, owned localhost SOAP fixture and production iPhone/iPad XCTest/XCUI are required, followed by final-head aggregate CI. Physical TV/Apple device compatibility, SSDP entitlement, SMB, security audit and signed release remain unverified.
+
+
+### Native Files-provider SMB import (#124; pending final HEAD gate)
+
+The existing Files document picker gains an explicit SMB-share entry and the local-media staging path gains NSFileCoordinator, cancellation propagation, bounded 1 MiB streaming, actual 2 GiB enforcement and partial-copy cleanup. This only imports files selected from an SMB share already connected through Apple's Files app; it does not implement native SMB directory browsing or direct remote playback. Synthetic tests and final-head iPhone/iPad CI must pass before merging; physical NAS/Apple devices remain unverified. Parent P4 #5 remains open.

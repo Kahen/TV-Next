@@ -191,3 +191,8 @@ Enhance the existing user-entered UPnP description import to display a bounded o
 ### P4 native manual DLNA DIDL-Lite metadata (#122)
 
 - [ ] Add opt-in bounded title-based DIDL-Lite for manual SetAVTransportURI, preserving empty metadata by default. Require Swift smoke, owned loopback SOAP/XML positive/negative tests, XCTest/XCUI on both simulators and final-head integration CI. Physical renderer and Apple-device compatibility remain separate.
+
+
+## P4 iOS Files-provider SMB import (#124)
+
+A user-authorized SMB share mounted in Apple's Files app can be selected through the existing native document picker. NSFileCoordinator and security-scoped access stage a supported media file to a temporary app cache using a streaming 2 GiB limit and partial-file cleanup. This is **not** a native SMB client, remote directory browser or seek-over-SMB playback. See [IOS_SMB_FILES.md](IOS_SMB_FILES.md). Physical SMB/NAS compatibility and final-head CI remain unverified; P4 #5 stays open.

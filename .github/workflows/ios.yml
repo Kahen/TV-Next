@@ -60,6 +60,11 @@ jobs:
         run: |
           swiftc TVNext/MediaRelayAddress.swift tests/MediaRelaySmoke.swift -o /tmp/tvnext-relay-tests
           /tmp/tvnext-relay-tests
+      - name: Verify read-only Files SMB staging bounds (no live SMB)
+        working-directory: apps/ios
+        run: |
+          swiftc -warnings-as-errors TVNext/LocalMediaStager.swift tests/SMBFilesSmoke.swift -o /tmp/tvnext-smb-files-tests
+          /tmp/tvnext-smb-files-tests
       - name: Verify bounded native WebDAV XML and URL security
         working-directory: apps/ios
         run: |

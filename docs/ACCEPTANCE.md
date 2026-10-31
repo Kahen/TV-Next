@@ -137,3 +137,8 @@ Acceptance requires one bounded direct UPnP `root/device/friendlyName` displayed
 
 
 - [ ] Verify optional title generates namespace-correct, SOAP-escaped videoItem metadata without headers or new destinations; default empty metadata is unchanged. Reject controls/bidi, empty/oversized titles, malformed DIDL and metadata on non-SetURI actions. Require owned loopback network, Swift smoke, XCTest/XCUI for iPhone/iPad and final-HEAD Web/API + complete integration gate. Physical-device acceptance remains open.
+
+
+## Native Files-provider SMB media import (#124)
+
+Required before merging: Linux/macOS Swift smoke (multi-chunk copy, empty/oversized/unsupported/cancelled), iPhone/iPad XCTest and production SwiftUI XCUI using the real system Files picker, unsigned simulator builds and final-head Web/API + full integration gate. No third-party SMB server or credentials in CI. Real iPhone/iPad NAS SMB authentication, provider hydration and playback are **not** established by local fixture tests; track under P4 #5. No direct SMB browser/streaming claim. See [IOS_SMB_FILES.md](IOS_SMB_FILES.md).
