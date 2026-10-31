@@ -133,5 +133,7 @@ Acceptance requires one bounded direct UPnP `root/device/friendlyName` displayed
 
 
 ### P4 native manual DLNA DIDL-Lite metadata (#122)
+- CI regression note (2026-10-31): final-head integration at `b2ceccc4` failed only the iPhone XCUI WebDAV disconnect assertion (`LibraryUITests.swift:229`); iPad and seven other integration jobs succeeded. The WebDAV test now waits for the *entire* disconnected subtree (filter, metadata, sort and refresh) to disappear after tapping, while retaining each negative assertion. This is a UI synchronization correction, not proof of a production WebDAV fix. Re-run **all** final-head checks before merging #123.
+
 
 - [ ] Verify optional title generates namespace-correct, SOAP-escaped videoItem metadata without headers or new destinations; default empty metadata is unchanged. Reject controls/bidi, empty/oversized titles, malformed DIDL and metadata on non-SetURI actions. Require owned loopback network, Swift smoke, XCTest/XCUI for iPhone/iPad and final-HEAD Web/API + complete integration gate. Physical-device acceptance remains open.
