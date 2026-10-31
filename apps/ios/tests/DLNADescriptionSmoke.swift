@@ -52,7 +52,8 @@ import FoundationNetworking
             "<modelName>Bad\nName</modelName>",
             "<modelName>\(String(repeating: "é", count: 81))</modelName>"
         ].map(withModel)
-        let invalid: [Data] = [duplicateName, nestedName, unsafeName, longName] + invalidModels + [
+        let multipleDevices = Data("<root xmlns=\"\(NativeDLNADescription.deviceNamespace)\"><device><friendlyName>First</friendlyName></device><device><modelName>Second</modelName><serviceList>\(service())</serviceList></device></root>".utf8)
+        let invalid: [Data] = [duplicateName, nestedName, unsafeName, longName, multipleDevices] + invalidModels + [
             xml(""), xml(service() + service()),
             xml(service(NativeDLNA.service, "http://8.8.8.8:8768/upnp/control")),
             xml(service(NativeDLNA.service, "http://127.0.0.1:9999/upnp/control")),

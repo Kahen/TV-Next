@@ -278,6 +278,9 @@ final class NativeDLNATests: XCTestCase {
         let boundary = try NativeDLNADescription.parseDetails(
             xml("<modelName>\(String(repeating: "é", count: 80))</modelName>"), location: source)
         XCTAssertEqual(boundary.modelName?.utf8.count, 160)
+        let twoDevices = Data("<root xmlns=\"\(ns)\"><device><friendlyName>First</friendlyName></device><device><modelName>Second</modelName><serviceList><service><serviceType>\(NativeDLNA.service)</serviceType><controlURL>/upnp/control/AVTransport1</controlURL></service></serviceList></device></root>".utf8)
+        XCTAssertThrowsError(try NativeDLNADescription.parseDetails(twoDevices, location: source),
+                             "A name from one root device must not be paired with another device's control URL")
         for bad in [
             "<modelName>One</modelName><modelName>Two</modelName>",
             "<modelName>TV<child/>Next</modelName>",
