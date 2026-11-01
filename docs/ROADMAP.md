@@ -245,3 +245,8 @@ Native SwiftUI adds a user-initiated retry for only the failed FongMi search sit
 ### P2 native cross-provider result provenance (#146)
 
 Search result labels now use the eligible provider snapshot actually selected for search (first eligible key wins, at most 16), not an earlier hidden/unsupported duplicate key in the raw subscription. Swift positive/negative/cap tests and owned iPhone/iPad XCUI fixture exercise the change. This is a UI attribution correction, not cryptographic provider authentication, real provider corpus validation or P2 completion.
+
+
+### P2 native cross-site completed-empty feedback (#148)
+
+Native iPhone/iPad cross-site search now has an explicit post-completion zero-result message, distinguishing success from partial or total provider failure and preserving failed-only retry. A synthetic two-provider zero-hit fixture and Swift/XCTest/XCUI cover state transitions and reload clearing. This is not real-provider verification, expanded Spider support or P2 completion; final-head CI and physical-device acceptance remain separate.
