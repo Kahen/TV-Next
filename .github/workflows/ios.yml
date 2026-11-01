@@ -126,6 +126,11 @@ jobs:
         run: |
           swiftc -warnings-as-errors TVNext/NativeDLNA.swift TVNext/NativeDLNAStatus.swift TVNext/NativeDLNAPosition.swift TVNext/NativeDLNASeek.swift TVNext/NativeSSDPResponse.swift tests/SSDPResponseSmoke.swift -o /tmp/tvnext-ssdp-response-tests
           /tmp/tvnext-ssdp-response-tests
+      - name: Verify SSDP candidate preflight and bounded UPnP description promotion
+        working-directory: apps/ios
+        run: |
+          swiftc -warnings-as-errors TVNext/NativeDLNA.swift TVNext/NativeDLNAStatus.swift TVNext/NativeDLNAPosition.swift TVNext/NativeDLNASeek.swift TVNext/NativeDLNADescription.swift TVNext/NativeSSDPResponse.swift TVNext/NativeSSDPResolver.swift tests/SSDPResolverSmoke.swift -o /tmp/tvnext-ssdp-resolver-tests
+          /tmp/tvnext-ssdp-resolver-tests
       - name: Verify bounded native SSDP M-SEARCH UDP transport (owned fixture, no multicast)
         working-directory: apps/ios
         run: |

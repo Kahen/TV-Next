@@ -183,3 +183,11 @@ Require positive UTF-16LE and UTF-16BE BOM fixtures through CaptionParser and Lo
 ### P4 native UPnP root UDN / SSDP identity gate (#138)
 
 Require Swift smoke and XCTest for valid case-insensitive USN/UDN match, missing/mismatched/duplicate/foreign/nested/oversized/malformed UDN, and same-origin AVTransport control resolution. The owned localhost XML fixture must expose a display-only UDN and iPhone/iPad XCUI must verify its visibility and clearing on source change. Require final HEAD Web/API 3/3 and full iPhone/iPad, PostgreSQL, NAS, Compose and Spider isolation gate before merge. This is not a live SSDP scan, trusted device authentication, entitlement approval or physical playback evidence.
+
+
+## P4 iOS SSDP candidate-to-description resolver (#140)
+
+- [ ] Reject public/loopback/encoded-path/unsupported ST/invalid USN candidates **before** network I/O.
+- [ ] Use only the existing 8-second, 32-KiB, no-redirect/no-cookie/no-proxy UPnP description GET; require matching root UDN and same-origin AVTransport control URL after I/O.
+- [ ] Pass positive/negative Swift smoke, native iPhone/iPad XCTest/XCUI, Web/API, PostgreSQL, Compose, NAS and Spider-isolation gates at the final PR HEAD; merge and close #140 only after these pass.
+- [ ] Record real multicast entitlement, physical iPhone/iPad and renderer interoperability separately under #114/#5. No automatic cast or signed distribution claim.

@@ -227,3 +227,8 @@ BOM-marked UTF-16LE/BE text subtitle decoding for user-selected Files/SMB SRT/VT
 ### P4 iOS UPnP root UDN / SSDP identity binding (#138)
 
 The manual native DLNA description import displays a bounded optional root UDN. A pure candidate-promotion check requires the SSDP USN UUID to match the fetched root UDN and preserves the existing private IPv4 same-origin AVTransport policy. Manual import remains usable without UDN. This is an offline/security prerequisite, **not** a shipping automatic SSDP UI, cryptographic authentication, Apple multicast entitlement, real-device verification or P4 completion. See [IOS_SSDP_DISCOVERY.md](IOS_SSDP_DISCOVERY.md).
+
+
+### P4 native SSDP candidate-to-description resolution (#140)
+
+- [ ] On final-HEAD automated acceptance, the dormant iOS resolver validates SSDP candidate metadata before requesting its private-IPv4 LOCATION, fetches through the existing bounded UPnP description transport and requires root UDN/SSDP USN identity plus same-origin AVTransport control. No multicast UI or automatic casting is enabled. Require Swift positive/negative smoke, iPhone/iPad XCTest/XCUI and full aggregate CI. Apple multicast entitlement, real device/renderer validation and parent #114/#5 remain open.
