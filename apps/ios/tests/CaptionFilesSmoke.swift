@@ -69,6 +69,10 @@ struct CaptionFilesSmoke {
             fatalError("Pre-cancelled import accepted")
         } catch is CancellationError {}
 
+        precondition(LocalCaptionReader.isUserCancellation(CocoaError(.userCancelled)))
+        precondition(LocalCaptionReader.isUserCancellation(CancellationError()))
+        precondition(!LocalCaptionReader.isUserCancellation(CocoaError(.fileReadNoPermission)))
+        precondition(!LocalCaptionReader.isUserCancellation(URLError(.notConnectedToInternet)))
         precondition(!fm.fileExists(atPath: root.appendingPathComponent("copied.srt").path))
         print("Coordinated Files subtitle bounds, supported formats, invalid encoding and cancellation passed")
     }
