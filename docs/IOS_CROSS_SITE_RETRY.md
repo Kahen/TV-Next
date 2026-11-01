@@ -6,7 +6,7 @@ Status: P2 implementation slice #144; **not** real-provider or physical-device a
 
 After a FongMi subscription has been loaded, a native iPhone/iPad user can search all eligible sites. The existing search coordinator caps requests to 16 distinct providers, at most four concurrently (two for Android-host-capable configurations), two pages per site, 40 entries per page and 600 visible results.
 
-If one or more providers fail, the results from successful providers stay visible. The failure message exposes **重试失败站点**. The retry uses the original submitted keyword, not subsequent text-field edits, and sends requests only to failed provider **keys**. Provider display names are not routing identifiers and may collide.
+If one or more providers fail, the results from successful providers stay visible. The failure message exposes **重试失败站点**. The retry uses the original submitted keyword, not subsequent text-field edits, and sends requests only to failed provider **keys**. Provider display names are not routing identifiers and may collide. Failed keys are resolved against the already eligible, visible, supported provider list rather than the raw subscription, so an earlier hidden/unsupported duplicate key cannot shadow the provider that was searched.
 
 A recovered provider replaces its previous partial page, deduplicated by media ID within that provider, and results are reordered by the original provider order. A provider that fails again keeps its prior partial hits. The retry control disappears when no failed keys remain. New subscription loads, browsing, site detail changes, server/session changes and view disappearance clear the previous search context; generation and task cancellation prevent stale callbacks from changing results.
 
