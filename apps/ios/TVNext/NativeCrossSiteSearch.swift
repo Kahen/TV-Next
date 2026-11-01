@@ -46,6 +46,16 @@ enum NativeCrossSiteSearch {
         return Array(sources.map(\.key).filter { seen.insert($0).inserted }.prefix(maxSites))
     }
 
+    /// Select only previously failed provider keys from the caller's already
+    /// authorized/visible site list. Do not resolve a key against an unfiltered
+    /// subscription: an earlier hidden or unsupported duplicate may otherwise
+    /// shadow the eligible site that actually participated in the search.
+    static func failedOnlySources(_ eligible: [NativeSearchSource], failedKeys: [String]) -> [NativeSearchSource] {
+        let requested = Set(failedKeys)
+        var seen = Set<String>()
+        return eligible.filter { requested.contains($0.key) && seen.insert($0.key).inserted }
+    }
+
     /// Reconcile a failed-site retry with the last visible search. Successful
     /// providers are never re-fetched or discarded; a recovered provider
     /// atomically replaces its old partial page. A provider that fails again
