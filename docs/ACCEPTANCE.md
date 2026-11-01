@@ -154,3 +154,10 @@ Full CI [41231112970](https://github.com/Kahen/TV-Next/actions/runs/41231112970)
 - [ ] Cancel, app background and library clear invalidate the current generation, cancel the worker and prevent stale completion from launching playback; partial files are deleted. Provider coordination may not be immediately interruptible.
 - [ ] Positive, negative and boundary Swift smoke/XCTest verify 1 MiB chunk updates, final count, pre-cancel and mid-copy cancellation cleanup. Production iPhone/iPad XCUI checks picker cancellation leaves progress absent and no media selected.
 - [ ] Final HEAD Web/API and 9-job aggregate CI (including iPhone/iPad XCTest/XCUI) succeed before merging and closing #126. Actual NAS SMB, physical-device interaction, security audit and signing remain separate.
+
+
+### P4 Files/SMB abandoned staging cleanup (#128)
+
+- [ ] App cold-start reclaims only its generated UUID+supported-extension regular files from the private staging cache, never while an active import/player may use them.
+- [ ] Positive and adversarial Swift smoke/XCTest: orphan cleanup, unrelated files, unsupported extensions, directory/symlink/redirected-root preservation and repeat-run idempotency.
+- [ ] Final HEAD iPhone/iPad unsigned simulator XCTest/XCUI, Web/API 3/3 and full cross-platform 9/9 pass before merge/close. This does not verify physical SMB, NAS compatibility, independent audit, signing or release.
