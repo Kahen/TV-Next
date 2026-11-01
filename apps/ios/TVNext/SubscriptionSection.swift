@@ -176,7 +176,7 @@ struct SubscriptionSection: View {
         crossSiteSourceOrder = selected.map(\.key)
         // Bind displayed provenance to the actual eligible providers, not
         // an earlier hidden/unsupported duplicate in the raw subscription.
-        crossSiteSourceNames = Dictionary(uniqueKeysWithValues: selected.map { ($0.key, $0.name) })
+        crossSiteSourceNames = NativeCrossSiteSearch.selectedSourceNames(selected)
         run { api, id in
             let result = try await NativeCrossSiteSearch.search(sources: sources, concurrency: document.sites.contains { $0.type == 3 && $0.supported } ? 2 : 4, fetch: { source, number in
                 var r = NativeSiteRequest()
