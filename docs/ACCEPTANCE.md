@@ -179,3 +179,7 @@ Require exact-cap/over-cap, empty, invalid encoding, unsupported extension, dire
 ### Native UTF-16 Files/SMB subtitle code acceptance (#136)
 
 Require positive UTF-16LE and UTF-16BE BOM fixtures through CaptionParser and LocalCaptionReader, plus negative BOM-only, odd-length, malformed surrogate, unsupported charset and oversize tests. Verify final PR HEAD on iPhone/iPad XCTest/XCUI and full integration. The 1 MiB limit is on raw bytes, not decoded characters. Physical iPhone/iPad and SMB provider hydration remain a separate unverified acceptance gate; no signed artifact is authorized.
+
+### P4 native UPnP root UDN / SSDP identity gate (#138)
+
+Require Swift smoke and XCTest for valid case-insensitive USN/UDN match, missing/mismatched/duplicate/foreign/nested/oversized/malformed UDN, and same-origin AVTransport control resolution. The owned localhost XML fixture must expose a display-only UDN and iPhone/iPad XCUI must verify its visibility and clearing on source change. Require final HEAD Web/API 3/3 and full iPhone/iPad, PostgreSQL, NAS, Compose and Spider isolation gate before merge. This is not a live SSDP scan, trusted device authentication, entitlement approval or physical playback evidence.

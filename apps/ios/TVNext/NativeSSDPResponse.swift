@@ -20,6 +20,18 @@ enum NativeSSDPResponse {
     static let maxDatagramBytes = 4096
     private static let maxHeaders = 24
 
+    /// Fail closed when a discovered response and the fetched root-device UDN
+    /// disagree. This does not authorize SOAP or perform any network request.
+    static func matchesDescriptionUDN(_ candidate: Candidate, udn: String?) -> Bool {
+        guard let udn, !udn.isEmpty,
+              candidate.serviceType == mediaRenderer || candidate.serviceType == avTransport else { return false }
+        let suffix = "::" + candidate.serviceType
+        guard candidate.uniqueServiceName.hasSuffix(suffix) else { return false }
+        let identity = String(candidate.uniqueServiceName.dropLast(suffix.count))
+        guard identity.hasPrefix("uuid:"), identity.count > 5 else { return false }
+        return identity.lowercased() == udn.lowercased()
+    }
+
     static func parse(_ datagram: Data, senderIPv4: String) throws -> Candidate {
         guard !datagram.isEmpty, datagram.count <= maxDatagramBytes,
               datagram.allSatisfy({ $0 == 13 || $0 == 10 || (32...126).contains($0) }),

@@ -273,6 +273,33 @@ final class NativeDLNATests: XCTestCase {
     }
 
 
+
+    func testDiscoveredUPnPIdentityRequiresMatchingRootUDN() throws {
+        let location = try NativeDLNADescription.location("http://192.168.1.20:1400/device.xml")
+        let target = NativeSSDPResponse.mediaRenderer
+        let candidate = NativeSSDPResponse.Candidate(
+            location: location, serviceType: target,
+            uniqueServiceName: "uuid:living-room::" + target)
+        func document(_ identity: String) -> Data {
+            Data("<root xmlns=\"\(NativeDLNADescription.deviceNamespace)\"><device>\(identity)<serviceList><service><serviceType>\(NativeDLNA.service)</serviceType><controlURL>/upnp/control/AVTransport1</controlURL></service></serviceList></device></root>".utf8)
+        }
+        let approved = try NativeDLNADescription.verifyDiscovered(
+            document("<UDN>uuid:Living-Room</UDN>"), candidate: candidate)
+        XCTAssertEqual(approved.deviceUDN, "uuid:Living-Room")
+        XCTAssertEqual(approved.controlURL.host, location.host)
+        for identity in ["", "<UDN>uuid:other</UDN>", "<UDN>uuid:one</UDN><UDN>uuid:two</UDN>",
+                         "<UDN>uuid:bad value</UDN>", "<x:UDN xmlns:x=\"urn:foreign\">uuid:living-room</x:UDN>"] {
+            XCTAssertThrowsError(try NativeDLNADescription.verifyDiscovered(
+                document(identity), candidate: candidate)) { error in
+                guard case NativeDLNAError.invalidDescription = error else {
+                    return XCTFail("Unexpected identity failure: \(error)")
+                }
+            }
+        }
+        XCTAssertNil(try NativeDLNADescription.parseDetails(document(""), location: location).deviceUDN)
+        XCTAssertFalse(NativeSSDPResponse.matchesDescriptionUDN(candidate, udn: nil))
+    }
+
     func testImportedUPnPFriendlyNameIsBoundedAndNeverChangesControlOrigin() throws {
         let source = try NativeDLNADescription.location("http://127.0.0.1:8768/device.xml")
         let namespace = NativeDLNADescription.deviceNamespace

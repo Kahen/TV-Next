@@ -8,6 +8,7 @@ struct NativeDLNASection: View {
     @State private var importedControlAddress: String?
     @State private var importedDeviceName: String?
     @State private var importedModelName: String?
+    @State private var importedDeviceUDN: String?
     @State private var rendererAddress = ""
     @State private var mediaAddress = ""
     @State private var metadataTitle = ""
@@ -35,6 +36,7 @@ struct NativeDLNASection: View {
                     importedControlAddress = nil
                     importedDeviceName = nil
                     importedModelName = nil
+                    importedDeviceUDN = nil
                 }
             Button("从设备描述导入控制地址") { importDescription() }
                 .disabled(busy || (try? NativeDLNADescription.location(descriptionAddress)) == nil)
@@ -54,6 +56,11 @@ struct NativeDLNASection: View {
                     Text("设备型号：\(importedModelName)")
                         .font(.caption).foregroundStyle(.secondary)
                         .accessibilityIdentifier("dlna-imported-model")
+                }
+                if let importedDeviceUDN {
+                    Text("设备标识：\(importedDeviceUDN)")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .accessibilityIdentifier("dlna-imported-udn")
                 }
             }
             TextField("http://192.168.1.20:1400/MediaRenderer/AVTransport/Control", text: $rendererAddress)
@@ -160,6 +167,7 @@ struct NativeDLNASection: View {
         importedControlAddress = nil
         importedDeviceName = nil
         importedModelName = nil
+        importedDeviceUDN = nil
         busy = true
         status = nil
         error = nil
@@ -180,6 +188,7 @@ struct NativeDLNASection: View {
                 importedControlAddress = imported.controlURL.absoluteString
                 importedDeviceName = imported.friendlyName
                 importedModelName = imported.modelName
+                importedDeviceUDN = imported.deviceUDN
             } catch {
                 guard !Task.isCancelled else { return }
                 guard descriptionAddress == source else {

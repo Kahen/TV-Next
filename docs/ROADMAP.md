@@ -223,3 +223,7 @@ The native SRT/VTT/ASS/SSA picker now uses a cancellable background, security-sc
 ### 2026-11-01 native subtitle encoding increment (#136)
 
 BOM-marked UTF-16LE/BE text subtitle decoding for user-selected Files/SMB SRT/VTT/ASS/SSA is tracked in #136. UTF-8 remains supported, with the existing 1 MiB raw-byte limit and cancellation; BOM-less/legacy encoding detection and real iPhone/iPad SMB provider validation remain outside this code slice. Final-head simulator/full integration evidence is required before completion; parent P4 #5 stays open.
+
+### P4 iOS UPnP root UDN / SSDP identity binding (#138)
+
+The manual native DLNA description import displays a bounded optional root UDN. A pure candidate-promotion check requires the SSDP USN UUID to match the fetched root UDN and preserves the existing private IPv4 same-origin AVTransport policy. Manual import remains usable without UDN. This is an offline/security prerequisite, **not** a shipping automatic SSDP UI, cryptographic authentication, Apple multicast entitlement, real-device verification or P4 completion. See [IOS_SSDP_DISCOVERY.md](IOS_SSDP_DISCOVERY.md).

@@ -184,3 +184,7 @@ The native external subtitle picker now delegates to a detached, cancellable, se
 ## Native Files subtitle UTF-16 increment (#136, 2026-11-01)
 
 Adds explicitly BOM-marked UTF-16LE/BE subtitle text decoding to the existing native Files/SMB SRT/VTT/ASS/SSA path; UTF-8 behavior, 1 MiB raw-byte cap, cancellable coordinated reads and text-only parsing remain unchanged. Invalid BOM-only, odd-length and unpaired-surrogate sequences are rejected. Swift smoke/XCTest and final-head iPhone/iPad/full integration results must be attached to PR #137 before the subtask is closed. Legacy GBK/GB18030 and real NAS/iPhone/iPad remain unverified; P4/P6 parents stay open.
+
+### P4 iOS root-device UDN identity binding (#138, 2026-11-01)
+
+Manual native UPnP device-description import now parses and displays an optional bounded `uuid:` root UDN. A pure discovery-candidate validation helper binds the SSDP USN UUID to that UDN and rejects missing/mismatched identity while retaining strict same-IP/port AVTransport control URL validation. Manual imports without UDN remain compatible. Positive/negative Swift smoke, XCTest, owned localhost XML and iPhone/iPad XCUI plus final-head integration are required for this subtask. Apple multicast entitlement, real renderer/iPhone/iPad interoperability, authentication of the device identity and parent #114/#5 remain open.
