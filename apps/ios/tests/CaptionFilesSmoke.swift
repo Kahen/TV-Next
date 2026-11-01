@@ -19,7 +19,8 @@ struct CaptionFilesSmoke {
         var exactly = header
         exactly.append(Data(repeating: 32, count: LocalCaptionReader.maxBytes - header.count))
         try exactly.write(to: boundary)
-        precondition((try await LocalCaptionReader.load(boundary)).count == 1)
+        let boundaryCues = try await LocalCaptionReader.load(boundary)
+        precondition(boundaryCues.count == 1)
 
         let oversized = root.appendingPathComponent("large.srt")
         try sample.write(to: oversized)
