@@ -41,3 +41,10 @@ The Files/SMB media staging view now reports **bytes actually copied** from the 
 An explicit **取消媒体导入** action cancels the active Swift Task and its detached chunk-copy worker, clears the visible progress and invalidates stale callbacks. Entering the background or clearing the library also cancels. The worker checks cancellation before every 1 MiB read, deletes partial files and refuses to start AVPlayer on stale or cancelled completion. File-provider coordination may block and cannot be guaranteed to stop immediately.
 
 Synthetic Swift smoke and XCTest assert exact chunk progress (1 MiB, 2 MiB, final bytes), a pre-cancelled task, deterministic cancellation after the first chunk, cleanup of partial files and absence of media history. Production iPhone/iPad XCUI checks that cancelling the document picker never starts copy progress. Real Files/SMB transfer, in-progress cancel interaction and NAS interoperability require separate physical-device acceptance; no native SMB protocol or signed release is claimed. Final HEAD full CI is required before closing #126.
+
+
+## Cold-launch orphan cache reclamation (#128)
+
+Files/SMB imports are intentionally session-only: the staged copy is not restored after a process restart. A force quit or crash during/after staging could leave an app-owned copy (up to 2 GiB) in `Caches/TVNextImported`. On a **new application process launch only**, TV-Next now removes abandoned **regular files with UUID basenames and one of the supported media extensions** from that private staging directory. It does not delete other names, unsupported extensions, subdirectories, symlinks or redirected cache roots. This is deliberately not a periodic cleanup while a player or import might be using a file.
+
+Swift smoke/XCTest include positive, unrelated-file, unsupported-extension, directory, symlink, redirected-root and idempotency cases. The cleanup does not change Files provider authentication, media decoding, actual SMB hydration, or physical NAS compatibility. Final-head simulator and full integration CI are required before closing #128.

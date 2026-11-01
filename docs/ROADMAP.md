@@ -200,3 +200,8 @@ A user-authorized SMB share mounted in Apple's Files app can be selected through
 ### P4 native Files-provider import cancellation and progress (#126)
 
 A bounded native iPhone/iPad import UI reports actual copied bytes from user-selected Files documents and exposes explicit cancellation. The app cancels and invalidates the worker on user action, backgrounding or library clear, and drops stale results. Synthetic 1 MiB chunk/cancellation/cleanup tests and final-head iPhone/iPad simulator CI are required. Files still owns SMB credentials and hydration; no direct SMB client, real NAS acceptance or Apple-signed release is implied. Parent P4 #5 remains open.
+
+
+### P4 iOS Files staging orphan reclamation (#128)
+
+Cold app startup reclaims session-only media copies abandoned by a crash or force quit, limited to app-generated UUID-named regular media files in its private staging cache. It does not remove active-session media, user files, symlinks or folders. Swift smoke/XCTest and final-head iPhone/iPad/full CI are required; real SMB/NAS/device compatibility remains open under P4 #5.

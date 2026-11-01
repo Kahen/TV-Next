@@ -106,6 +106,32 @@ enum LocalMediaStager {
         return destination
     }
 
+    /// Cold-launch maintenance only. Staged Files documents are never restored
+    /// across app restarts; a crash can otherwise strand a large private copy.
+    /// Do not invoke this while an import or local playback is active.
+    @discardableResult
+    static func purgeAbandonedImports(in directory: URL? = nil) -> Int {
+        let fm = FileManager.default
+        let cache = directory ?? fm.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("TVNextImported", isDirectory: true)
+        // Never traverse a redirected cache root or delete arbitrary user files.
+        guard let root = try? cache.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]),
+              root.isDirectory == true, root.isSymbolicLink != true,
+              let entries = try? fm.contentsOfDirectory(
+                at: cache, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey],
+                options: [.skipsHiddenFiles]
+              ) else { return 0 }
+        var removed = 0
+        for entry in entries {
+            guard extensions.contains(entry.pathExtension.lowercased()),
+                  UUID(uuidString: entry.deletingPathExtension().lastPathComponent) != nil,
+                  let kind = try? entry.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]),
+                  kind.isRegularFile == true, kind.isSymbolicLink != true else { continue }
+            if (try? fm.removeItem(at: entry)) != nil { removed += 1 }
+        }
+        return removed
+    }
+
     static func discard(_ file: URL?) {
         guard let file, file.isFileURL else { return }
         let directory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]

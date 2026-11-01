@@ -65,6 +65,30 @@ private final class CopyProgressLog: @unchecked Sendable {
         }
         do { _ = try await cancelled.value; fatalError("cancelled accepted") }
         catch is CancellationError {}
-        print("Files SMB staging: progress, positive, empty, oversized, unsupported, mid-copy/preflight cancellation and cleanup passed")
+        // A terminated app must not strand large app-owned cache files.
+        // Unrelated names, unsupported formats, directories and symlinks survive.
+        let scratch = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try fm.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: scratch) }
+        let abandoned = scratch.appendingPathComponent(UUID().uuidString).appendingPathExtension("mp4")
+        let another = scratch.appendingPathComponent(UUID().uuidString).appendingPathExtension("m4a")
+        let unrelated = scratch.appendingPathComponent("keep.mp4")
+        let unsupported = scratch.appendingPathComponent(UUID().uuidString).appendingPathExtension("txt")
+        let nested = scratch.appendingPathComponent(UUID().uuidString).appendingPathExtension("mov")
+        let symlink = scratch.appendingPathComponent(UUID().uuidString).appendingPathExtension("aac")
+        for file in [abandoned, another, unrelated, unsupported] { try Data([1]).write(to: file) }
+        try fm.createDirectory(at: nested, withIntermediateDirectories: false)
+        try fm.createSymbolicLink(at: symlink, withDestinationURL: unrelated)
+        precondition(LocalMediaStager.purgeAbandonedImports(in: scratch) == 2)
+        precondition(!fm.fileExists(atPath: abandoned.path) && !fm.fileExists(atPath: another.path))
+        for file in [unrelated, unsupported, nested, symlink] {
+            precondition(fm.fileExists(atPath: file.path))
+        }
+        precondition(LocalMediaStager.purgeAbandonedImports(in: scratch) == 0)
+        let redirected = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try fm.createSymbolicLink(at: redirected, withDestinationURL: scratch)
+        defer { try? fm.removeItem(at: redirected) }
+        precondition(LocalMediaStager.purgeAbandonedImports(in: redirected) == 0)
+        print("Files SMB staging: progress, positive, empty, oversized, unsupported, mid-copy/preflight cancellation and cleanup, orphan reclamation passed")
     }
 }
