@@ -161,3 +161,8 @@ The earlier local-section `fileImporter` relocation did not fix iPhone/iPad XCUI
 ## Native Files/SMB cancelable media staging (#126)
 
 Following the Files-provider bounded import in #125, the native SwiftUI view exposes copied-byte progress and an explicit cancel action while an import is active. The detached coordinated read receives cancellation through its parent Task, and generation checks prevent late callbacks or successful-but-cancelled copies from triggering playback. Synthetic Swift smoke/XCTest cover positive progress, preflight and mid-copy cancellation and partial-file cleanup; production XCUI covers the no-import state after picker dismissal. Final-head simulator/aggregate CI is required. This does not establish actual NAS SMB interoperability, immediate interruption of NSFileCoordinator, physical-device compatibility, independent security review or signed distribution.
+
+
+## Native Files/SMB cold-start cache reclamation (#128)
+
+User-selected Files documents are staged into a private app cache and never persisted as resumable media. After an unexpected process exit, a prior staged file could remain. App initialization now removes only UUID-named, supported-extension regular files from that dedicated directory; it excludes other files, directories, symlinks and redirected cache roots, and never runs during an active session. Synthetic positive/negative Swift smoke and XCTest cover the cleanup contract. Final-head CI and actual iPhone/iPad/NAS validation remain separate; this is not native SMB directory access, streaming or signed distribution.
