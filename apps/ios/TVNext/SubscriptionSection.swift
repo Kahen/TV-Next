@@ -171,7 +171,7 @@ struct SubscriptionSection: View {
             return
         }
         crossSiteSearchKeyword = keyword
-        crossSiteSourceOrder = Array(sources.map(\.key).prefix(NativeCrossSiteSearch.maxSites))
+        crossSiteSourceOrder = NativeCrossSiteSearch.selectedSourceKeys(sources)
         run { api, id in
             let result = try await NativeCrossSiteSearch.search(sources: sources, concurrency: document.sites.contains { $0.type == 3 && $0.supported } ? 2 : 4, fetch: { source, number in
                 var r = NativeSiteRequest()
