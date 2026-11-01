@@ -21,6 +21,23 @@ final class CrossSiteRetryTests: XCTestCase {
         XCTAssertEqual(result.items.map(\.siteKey), ["third"])
     }
 
+    func testFailedOnlySelectionUsesEligibleSitesAndDeduplicatesKeys() {
+        // The caller has already filtered hidden/unsupported subscription sites.
+        // A hidden duplicate may precede the eligible entry in the raw document,
+        // but must never shadow the eligible provider during retry.
+        let eligible = [
+            NativeSearchSource(key: "a", name: "Healthy"),
+            NativeSearchSource(key: "b", name: "Eligible B"),
+            NativeSearchSource(key: "b", name: "Duplicate B")
+        ]
+        let selected = NativeCrossSiteSearch.failedOnlySources(
+            eligible, failedKeys: ["b", "missing", "b"])
+        XCTAssertEqual(selected.map(\.key), ["b"])
+        XCTAssertEqual(selected.map(\.name), ["Eligible B"])
+        XCTAssertTrue(NativeCrossSiteSearch.failedOnlySources(
+            eligible, failedKeys: ["missing"]).isEmpty)
+    }
+
     func testRecoveredSiteReplacesPartialPageWithoutDiscardingOtherSites() {
         let original = [
             NativeSearchHit(siteKey: "a", item: Item(id: "a-old")),
