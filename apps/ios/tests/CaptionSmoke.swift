@@ -46,6 +46,21 @@ struct CaptionSmoke {
             fatalError("BOM-less UTF-16 was accepted")
         } catch CaptionError.invalidEncoding {}
 
+        // Legacy Simplified Chinese bytes are never guessed in Unicode mode.
+        let gb18030 = Data("1\n00:00:01,000 --> 00:00:02,000\n".utf8) +
+            Data([0xD6, 0xD0, 0xCE, 0xC4]) + Data("\n".utf8)
+        do {
+            _ = try CaptionParser.parse(gb18030)
+            fatalError("Implicit GB18030 fallback accepted")
+        } catch CaptionError.invalidEncoding {}
+        precondition(try CaptionParser.parse(gb18030, encoding: .gb18030).first?.text == "中文")
+        for invalid in [Data([0x81]), Data([0xFF]), Data([0xFF, 0xFE, 0x31, 0x00]), utf8BOM] {
+            do {
+                _ = try CaptionParser.parse(invalid, encoding: .gb18030)
+                fatalError("Malformed or BOM-marked GB18030 input accepted")
+            } catch CaptionError.invalidEncoding {}
+        }
+
         let vtt = """
         WEBVTT
 

@@ -143,6 +143,23 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["TVBox / FongMi 原版订阅"].waitForExistence(timeout: 5))
     }
 
+    func testCaptionEncodingIsExplicitAndDoesNotStartImport() {
+        jump("本机文件与字幕")
+        let mode = app.staticTexts["caption-encoding-mode"]
+        reveal(mode)
+        XCTAssertEqual(mode.label, "字幕编码：Unicode（默认）")
+        let picker = app.descendants(matching: .any)["caption-import-encoding"]
+        reveal(picker)
+        picker.tap()
+        let legacy = app.buttons["GB18030（手动）"]
+        XCTAssertTrue(legacy.waitForExistence(timeout: 5))
+        legacy.tap()
+        reveal(mode)
+        XCTAssertEqual(mode.label, "字幕编码：GB18030（手动）")
+        XCTAssertTrue(app.buttons["caption-files-import"].exists)
+        XCTAssertFalse(app.staticTexts["caption-import-progress"].exists)
+    }
+
     func testFilesSMBImportEntryOpensSystemDocumentPicker() {
         jump("本机文件与字幕")
         let entry = app.buttons["smb-files-import"]

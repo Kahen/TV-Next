@@ -27,6 +27,22 @@ final class NativeCaptionTests: XCTestCase {
         }
     }
 
+    func testExplicitGB18030ChineseCaptionsAndMalformedBytes() throws {
+        let data = Data("1\n00:00:01,000 --> 00:00:02,000\n".utf8) +
+            Data([0xD6, 0xD0, 0xCE, 0xC4]) + Data("\n".utf8)
+        XCTAssertThrowsError(try CaptionParser.parse(data))
+        XCTAssertEqual(try CaptionParser.parse(data, encoding: .gb18030),
+                       [CaptionCue(start: 1, end: 2, text: "中文")])
+        for malformed in [Data([0x81]), Data([0xFF]), Data([0xFF, 0xFE, 0x31, 0x00]),
+                          Data([0xEF, 0xBB, 0xBF]) + data] {
+            XCTAssertThrowsError(try CaptionParser.parse(malformed, encoding: .gb18030)) { error in
+                guard case CaptionError.invalidEncoding = error else {
+                    return XCTFail("Expected strict legacy decode failure: \(error)")
+                }
+            }
+        }
+    }
+
     func testOverlappingVTTDoesNotDropTheSecondLanguage() throws {
         let text = """
         WEBVTT

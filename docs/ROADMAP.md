@@ -232,3 +232,8 @@ The manual native DLNA description import displays a bounded optional root UDN. 
 ### P4 native SSDP candidate-to-description resolution (#140)
 
 - [ ] On final-HEAD automated acceptance, the dormant iOS resolver validates SSDP candidate metadata before requesting its private-IPv4 LOCATION, fetches through the existing bounded UPnP description transport and requires root UDN/SSDP USN identity plus same-origin AVTransport control. No multicast UI or automatic casting is enabled. Require Swift positive/negative smoke, iPhone/iPad XCTest/XCUI and full aggregate CI. Apple multicast entitlement, real device/renderer validation and parent #114/#5 remain open.
+
+
+## P4 native iOS explicit GB18030 subtitle import (#142)
+
+The user may explicitly select GB18030 for a **local Files/SMB SRT/VTT/ASS/SSA** import. Default decoding remains strict UTF-8 or BOM-marked UTF-16LE/BE; no legacy encoding sniffing or persisted charset is added. The choice is captured when import starts, while the existing coordinated 1 MiB read, cancellation, old-cue-on-error behavior and private Files Provider credentials remain unchanged. Malformed GB18030 and BOM-marked input in legacy mode are rejected. Remote subscription captions are unaffected. Swift smoke, XCTest and production iPhone/iPad XCUI plus final-HEAD Web/API and full integration CI are required; physical SMB/provider behavior, Apple signing and P4 parent #5 remain unverified.
