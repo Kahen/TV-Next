@@ -181,6 +181,7 @@ struct ContentView: View {
                     remoteDanmakuRequest = UUID()
                     remoteDanmakuTask?.cancel()
                     cancelMediaImport()
+                    cancelCaptionImport()
                     library.setApplicationBackground(true)
                     remote.configure(nil, server: serverURL)
                 } else if phase == .active {
@@ -683,6 +684,8 @@ struct ContentView: View {
     @MainActor
     private func loadRemoteCaption(_ source: NativePlaybackResource) {
         guard let server = URL(string: serverURL), library.current?.url == remoteResourceKey else { return }
+        // A newer subscription choice supersedes an in-flight Files/SMB read.
+        cancelCaptionImport()
         let generation = library.playbackGeneration
         let mediaURL = library.current?.url
         remoteCaptions.load(source, api: TVNextAPI(server: server), isCurrent: {
@@ -940,8 +943,19 @@ struct ContentView: View {
 
     @MainActor
     private func beginCaptionImport(_ result: Result<[URL], Error>) {
-        // Dismissing the system picker is not an import failure.
-        guard case .success(let urls) = result, let source = urls.first else { return }
+        // Only a genuine user dismissal is silent. Provider errors must be
+        // shown rather than mistaken for a cancelled picker.
+        let source: URL
+        switch result {
+        case .success(let urls):
+            guard let selected = urls.first else { return }
+            source = selected
+        case .failure(let error):
+            if !LocalCaptionReader.isUserCancellation(error) {
+                errorMessage = error.localizedDescription
+            }
+            return
+        }
         cancelCaptionImport()
         let generation = UUID()
         captionImportGeneration = generation
