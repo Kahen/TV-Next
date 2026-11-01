@@ -4,7 +4,7 @@
 
 In **本机文件与字幕**, select **导入 SRT / VTT / ASS / SSA 字幕**. The system Files picker can open a provider document, including a user-authorized SMB share connected through the iOS Files app. TV-Next reads the selected subtitle in the background and applies parsed cues to the current AVPlayer overlay. The selected provider path, SMB credentials and caption contents are not stored in the media library, synced or uploaded. This is not a native SMB client or a guarantee of provider compatibility.
 
-The import button is disabled while the read is in progress. **取消字幕导入** cancels the worker and invalidates its completion; changing playback, clearing the library, removing captions or leaving the view also invalidates the read. A failed or cancelled import retains the existing cues rather than replacing them with partial data. Only a successful, still-current result replaces captions and resets the offset.
+The import button is disabled while the read is in progress. **取消字幕导入** cancels the worker and invalidates its completion; changing playback, selecting a newer subscription subtitle, clearing the library, removing captions, backgrounding the app or leaving the view also invalidates the read. A failed or cancelled import retains the existing cues rather than replacing them with partial data. Only actual user cancellation is silent; Files picker/provider errors are shown to the user. Only a successful, still-current result replaces captions and resets the offset.
 
 ## Safety and resource limits
 
@@ -16,6 +16,6 @@ The import button is disabled while the read is in progress. **取消字幕导�
 
 ## Automated and physical acceptance
 
-Positive and negative Swift smoke/XCTest cover SRT/VTT, exact byte limit, oversized sparse files, empty/invalid-encoding input, unsupported extensions, directories and pre-cancellation. Production SwiftUI XCUI checks the native entry's idle state on both iPhone and iPad simulators; the full final-HEAD integration gate also runs Web/API, PostgreSQL, Compose, NAS and Spider isolation.
+Positive and negative Swift smoke/XCTest cover SRT/VTT, exact byte limit, oversized sparse files, empty/invalid-encoding input, unsupported extensions, directories, pre-cancellation and picker cancellation versus provider errors. Production SwiftUI XCUI checks the native entry's idle state on both iPhone and iPad simulators; the full final-HEAD integration gate also runs Web/API, PostgreSQL, Compose, NAS and Spider isolation.
 
 **Simulator and local file fixtures do not prove an actual SMB File Provider works on a physical iPhone/iPad.** Verify authentication, provider hydration, cancellation, errors and playback overlay against a permitted NAS share on both device families as a separate physical acceptance item. Parent P4 #5 and P6 #7 remain open. No Apple signing, TestFlight, IPA or release is implied.
