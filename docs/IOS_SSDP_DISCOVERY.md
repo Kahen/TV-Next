@@ -20,3 +20,9 @@ Reference: FongMi/TV's mobile DLNACast.java uses Android jUPnP discovery. This S
 The SSDPDiscoverySmoke.swift and NativeSSDPDiscoveryTests.swift checks verify exact fixed requests, CRLF framing, disallowed ST injection, URL deduplication and the 32-candidate cap. An owned loopback UDP fixture captures both requests, replies with a loopback LOCATION and an oversized packet, and confirms neither becomes a LAN candidate. scanLoopbackFixture exists only under DEBUG; release code has no alternate network destination. The full CI runs the fixture and both iPhone/iPad simulator XCTest/XCUI, plus Web/API, PostgreSQL, Compose, NAS and Spider isolation.
 
 Simulator/loopback acceptance does **not** establish that the multicast request reaches a TV, that iOS allows it without an entitlement, or that a physical TV supports AVTransport. No Apple distribution credentials are held by this implementation. Keep parent #114 and P4 #5 open until the physical, entitlement and UI criteria are independently met.
+
+## Root-device identity binding prerequisite (#138)
+
+The user-initiated manual UPnP XML importer now extracts a bounded optional root-device `UDN` (ASCII `uuid:` token) and displays it read-only. Missing UDN remains accepted for manual import. Duplicate, foreign-namespace, nested, whitespace/control and oversized UDN values are rejected. A separate `verifyDiscovered` pure validation gate compares a candidate's SSDP `USN` UUID to the root-device UDN (case-insensitively) and rejects mismatches or missing identities before any future candidate can be promoted. The existing same-IP/port AVTransport URL restriction remains in force.
+
+This does **not** enable multicast discovery, automatically fetch descriptions, trust device identity cryptographically, send SOAP, persist LAN identities, or demonstrate real iPhone/iPad entitlement and renderer compatibility. The identity is a self-asserted device identifier, not authentication.
