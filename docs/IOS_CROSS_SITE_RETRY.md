@@ -24,3 +24,9 @@ No subscription content, provider credentials or search results are persisted by
 ## Exclusions
 
 This does not expand FongMi provider protocol support or make type-3 Android Spider/JAR/JS/Python execution safe. The fixture is entirely synthetic; it is not a lawful external-provider compatibility corpus. Real provider latency/authentication, real iPhone/iPad networking, Apple distribution signing, security audit and P2/P3/P6 milestone acceptance remain unverified. Never bundle unapproved streaming sources or remote code.
+
+## Eligible provider provenance regression (#146)
+
+The result label is bound to a snapshot of the **actually eligible, selected** provider keys and names, not the first matching key in the unfiltered subscription. Hidden or unsupported entries that reuse a later visible provider key cannot masquerade as the displayed source. The snapshot follows the same first-eligible-key and 16-provider cap as search and retry; it is cleared when search context resets and is not persisted.
+
+Synthetic regression: Swift smoke and XCTest check duplicate eligible keys, unknown keys and the 16-provider boundary. The owned loopback fixture now returns a hidden `b` ("Hidden Spoof") before visible `a`/`b` (both "Mirror"). Production iPhone/iPad XCUI asserts the recovered `B result · Mirror` label and rejects the hidden name. Final-head aggregate CI is required before merging; this does not prove provider authenticity, real-device compatibility or independent security review.
