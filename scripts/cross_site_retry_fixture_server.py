@@ -69,6 +69,10 @@ class Handler(BaseHTTPRequestHandler):
             _queries.append({"siteKey": key, "query": keyword})
         if key == "b" and count == 1:
             return self.respond(503, {"error": "synthetic transient failure"})
+        # Fail closed if SwiftUI re-queries a healthy site or retries using
+        # an edited draft instead of the original submitted keyword.
+        if (key == "a" and count > 1) or (key == "b" and count > 1 and keyword != "original"):
+            return self.respond(409, {"error": "unexpected retry scope or keyword"})
         return self.respond(200, {
             "categories": [], "filters": {}, "total": 1,
             "page": 1, "hasMore": False,
