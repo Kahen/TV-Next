@@ -205,3 +205,8 @@ Verify an owned localhost FongMi-compatible API fixture with two equal display n
 ### P2 iOS cross-site provenance acceptance (#146)
 
 Final HEAD must pass Swift smoke/XCTest for duplicate eligible keys, unknown keys and the 16-site boundary, plus production iPhone/iPad XCUI against an owned localhost subscription where a hidden duplicate precedes the eligible provider. Both Web/API and full integration (iOS, PostgreSQL, NAS, Compose, Spider isolation) must pass. A displayed provider name is not authentication of remote content, and physical-device/real-provider evidence remains open.
+
+
+### P2 native cross-site completed-empty state (#148)
+
+Require Swift smoke/XCTest to distinguish zero-hit success, partial failure, all-failed and nonempty/not-started cases; owned localhost Python fixture returning HTTP 200 with zero items from both providers; production iPhone/iPad XCUI verifying the explicit no-match message, no false retry button and reset on subscription reload. Final HEAD Web/API, PostgreSQL, NAS, Compose, Spider isolation and both iOS simulator gates must pass. This does not establish real provider, real iPhone/iPad, independent security or signing acceptance.
