@@ -194,10 +194,10 @@ struct SubscriptionSection: View {
     private func retryFailedSites() {
         guard let document, let keyword = crossSiteSearchKeyword,
               !crossSiteFailedKeys.isEmpty else { return }
-        let sources = crossSiteFailedKeys.compactMap { key in
-            document.sites.first(where: { $0.key == key })
-        }.filter { $0.searchable && !$0.hidden && $0.supported && ($0.type != 3 || session != nil) }
-            .map { NativeSearchSource(key: $0.key, name: $0.name) }
+        let eligible = document.sites.filter {
+            $0.searchable && !$0.hidden && $0.supported && ($0.type != 3 || session != nil)
+        }.map { NativeSearchSource(key: $0.key, name: $0.name) }
+        let sources = NativeCrossSiteSearch.failedOnlySources(eligible, failedKeys: crossSiteFailedKeys)
         guard !sources.isEmpty else { return }
         let sourceOrder = crossSiteSourceOrder
         run { api, id in
