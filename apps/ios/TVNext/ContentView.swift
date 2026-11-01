@@ -41,6 +41,9 @@ struct ContentView: View {
     @State private var isShowingMediaPicker = false
     @State private var isShowingCaptionPicker = false
     @State private var isLoadingMedia = false
+    @State private var mediaImportTask: Task<Void, Never>?
+    @State private var stagedMediaBytes: Int64 = 0
+    @State private var stagedMediaTotal: Int64?
     @State private var captionFileName: String?
     @State private var captionOffsetSeconds: Double = 0
     @State private var isShowingExporter = false
@@ -174,8 +177,7 @@ struct ContentView: View {
                     remoteCaptions.cancel()
                     remoteDanmakuRequest = UUID()
                     remoteDanmakuTask?.cancel()
-                    mediaGeneration = UUID()
-                    isLoadingMedia = false
+                    cancelMediaImport()
                     library.setApplicationBackground(true)
                     remote.configure(nil, server: serverURL)
                 } else if phase == .active {
@@ -228,9 +230,8 @@ struct ContentView: View {
                 Button("删除本地媒体库", role: .destructive) {
                     isShowingClearConfirmation = false
                     importGeneration = UUID()
-                    mediaGeneration = UUID()
+                    cancelMediaImport()
                     isLoading = false
-                    isLoadingMedia = false
                     library.clear()
                     playlistText = ""
                     search = ""
@@ -578,6 +579,21 @@ struct ContentView: View {
                 .buttonStyle(.bordered)
                 .disabled(isLoadingMedia)
                 .accessibilityIdentifier("smb-files-import")
+                if isLoadingMedia {
+                    VStack(alignment: .leading, spacing: 6) {
+                        if let total = stagedMediaTotal, total > 0 {
+                            ProgressView(value: Double(min(stagedMediaBytes, total)), total: Double(total))
+                        } else {
+                            ProgressView()
+                        }
+                        Text("已复制 " + ByteCountFormatter.string(fromByteCount: stagedMediaBytes, countStyle: .file))
+                            .font(.caption)
+                            .accessibilityIdentifier("smb-import-progress")
+                        Button("取消媒体导入") { cancelMediaImport() }
+                            .buttonStyle(.bordered)
+                            .accessibilityIdentifier("cancel-smb-import")
+                    }
+                }
                 Text("先在 iOS「文件」App 中通过「连接服务器」加入 SMB 共享，再在系统选择器中选取媒体。文件会复制到本机临时缓存；不保存 SMB 凭据，也不直接通过 SMB 流式播放。")
                     .font(.caption).foregroundStyle(.secondary)
                 HStack {
@@ -624,7 +640,7 @@ struct ContentView: View {
                 NativeMediaDocumentPicker(
                     onPick: { result in
                         isShowingMediaPicker = false
-                        Task { await importLocalMedia(result) }
+                        beginMediaImport(result)
                     },
                     onCancel: { isShowingMediaPicker = false }
                 )
@@ -843,18 +859,52 @@ struct ContentView: View {
     }
 
     @MainActor
-    private func importLocalMedia(_ result: Result<[URL], Error>) async {
+    private func cancelMediaImport() {
+        // Invalidate queued progress/completion before cancelling the detached
+        // coordinator/copy worker. It may finish after the UI has moved on.
+        mediaGeneration = UUID()
+        mediaImportTask?.cancel()
+        mediaImportTask = nil
+        isLoadingMedia = false
+        stagedMediaBytes = 0
+        stagedMediaTotal = nil
+    }
+
+    @MainActor
+    private func beginMediaImport(_ result: Result<[URL], Error>) {
+        cancelMediaImport()
         let generation = UUID()
         mediaGeneration = generation
         isLoadingMedia = true
-        defer { if mediaGeneration == generation { isLoadingMedia = false } }
+        mediaImportTask = Task { await importLocalMedia(result, generation: generation) }
+    }
+
+    @MainActor
+    private func importLocalMedia(_ result: Result<[URL], Error>, generation: UUID) async {
+        defer {
+            if mediaGeneration == generation {
+                isLoadingMedia = false
+                mediaImportTask = nil
+            }
+        }
         do {
             guard let source = try result.get().first else { return }
-            let localFile = try await LocalMediaStager.stage(source)
-            guard mediaGeneration == generation else { LocalMediaStager.discard(localFile); return }
+            let localFile = try await LocalMediaStager.stage(source) { copied, total in
+                Task { @MainActor in
+                    guard mediaGeneration == generation, isLoadingMedia else { return }
+                    stagedMediaBytes = copied
+                    stagedMediaTotal = total
+                }
+            }
+            guard mediaGeneration == generation, !Task.isCancelled else {
+                LocalMediaStager.discard(localFile)
+                return
+            }
             library.playLocalFile(localFile, name: source.lastPathComponent)
             captionFileName = nil
             errorMessage = nil
+        } catch is CancellationError {
+            // User cancellation is not a playback error.
         } catch {
             if mediaGeneration == generation { errorMessage = error.localizedDescription }
         }
