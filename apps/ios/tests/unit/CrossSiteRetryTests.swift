@@ -56,6 +56,18 @@ final class CrossSiteRetryTests: XCTestCase {
         XCTAssertNil(NativeCrossSiteSearch.selectedSourceNames(oversized)["16"])
     }
 
+    func testExplicitEmptyStateDistinguishesNoMatchesFromProviderFailures() {
+        XCTAssertEqual(NativeCrossSiteSearch.emptyState(resultCount: 0, failedCount: 0, selectedCount: 2),
+                       "未找到匹配结果。")
+        XCTAssertEqual(NativeCrossSiteSearch.emptyState(resultCount: 0, failedCount: 1, selectedCount: 2),
+                       "尚无匹配结果，部分站点搜索失败，可重试。")
+        XCTAssertEqual(NativeCrossSiteSearch.emptyState(resultCount: 0, failedCount: 2, selectedCount: 2),
+                       "所有站点搜索失败，请重试失败站点。")
+        XCTAssertNil(NativeCrossSiteSearch.emptyState(resultCount: 1, failedCount: 2, selectedCount: 2))
+        XCTAssertNil(NativeCrossSiteSearch.emptyState(resultCount: 0, failedCount: 0, selectedCount: 0))
+        XCTAssertNil(NativeCrossSiteSearch.emptyState(resultCount: 0, failedCount: -1, selectedCount: 2))
+    }
+
     func testRecoveredSiteReplacesPartialPageWithoutDiscardingOtherSites() {
         let original = [
             NativeSearchHit(siteKey: "a", item: Item(id: "a-old")),
