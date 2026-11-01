@@ -623,6 +623,30 @@ final class MediaLibraryTests: XCTestCase {
         catch is CancellationError { }
     }
 
+    func testColdLaunchFilesStagingCleanupIsScopedAndIdempotent() throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try fm.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: root) }
+        let abandoned = root.appendingPathComponent(UUID().uuidString + ".mp4")
+        let other = root.appendingPathComponent("user-notes.mp4")
+        let unsupported = root.appendingPathComponent(UUID().uuidString + ".txt")
+        let link = root.appendingPathComponent(UUID().uuidString + ".mov")
+        let folder = root.appendingPathComponent(UUID().uuidString + ".m4a", isDirectory: true)
+        for url in [abandoned, other, unsupported] { try Data([1, 2, 3]).write(to: url) }
+        try fm.createDirectory(at: folder, withIntermediateDirectories: false)
+        try fm.createSymbolicLink(at: link, withDestinationURL: other)
+        XCTAssertEqual(LocalMediaStager.purgeAbandonedImports(in: root), 1)
+        XCTAssertFalse(fm.fileExists(atPath: abandoned.path))
+        for url in [other, unsupported, link, folder] { XCTAssertTrue(fm.fileExists(atPath: url.path)) }
+        XCTAssertEqual(LocalMediaStager.purgeAbandonedImports(in: root), 0)
+        let redirected = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try fm.createSymbolicLink(at: redirected, withDestinationURL: root)
+        defer { try? fm.removeItem(at: redirected) }
+        XCTAssertEqual(LocalMediaStager.purgeAbandonedImports(in: redirected), 0)
+        XCTAssertTrue(fm.fileExists(atPath: other.path))
+    }
+
     func testFilesProviderProgressAndPartialCopyCancellationCleanup() async throws {
         let fm = FileManager.default
         let source = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".mp4")
