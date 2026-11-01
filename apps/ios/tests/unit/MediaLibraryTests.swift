@@ -590,6 +590,24 @@ final class MediaLibraryTests: XCTestCase {
         do { _ = try await LocalMediaStager.stage(empty.deletingPathExtension().appendingPathExtension("mkv")); XCTFail("Accepted unsupported format") }
         catch { XCTAssertTrue(error is LocalMediaError) }
     }
+    func testFilesProviderStagingStreamsMultipleChunksAndHonorsCancellation() async throws {
+        let source = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString).appendingPathExtension("mp4")
+        let contents = Data(repeating: 0xAB, count: 2_500_000)
+        try contents.write(to: source)
+        defer { try? FileManager.default.removeItem(at: source) }
+        let staged = try await LocalMediaStager.stage(source)
+        defer { LocalMediaStager.discard(staged) }
+        XCTAssertEqual(try Data(contentsOf: staged), contents)
+        XCTAssertTrue(store.recent.isEmpty, "Staging a Files/SMB document must not persist media history")
+        let cancelled = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return try await LocalMediaStager.stage(source)
+        }
+        do { _ = try await cancelled.value; XCTFail("Accepted a cancelled import") }
+        catch is CancellationError { }
+    }
+
     func testRetryTargetsFailedRelaySelectionRatherThanPreviousMedia() async throws {
         var requests: [String] = []
         let relayStore = MediaLibraryStore(defaults: defaults, createRelay: { _, request in
