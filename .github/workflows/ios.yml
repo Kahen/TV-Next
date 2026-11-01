@@ -121,6 +121,317 @@ jobs:
         run: |
           swiftc -warnings-as-errors TVNext/NativeDLNA.swift TVNext/NativeDLNAStatus.swift TVNext/NativeDLNAPosition.swift TVNext/NativeDLNASeek.swift TVNext/NativeSSDPResponse.swift tests/SSDPResponseSmoke.swift -o /tmp/tvnext-ssdp-response-tests
           /tmp/tvnext-ssdp-response-tests
+      - name: Verify bounded native SSDP M-SEARCH UDP transport (owned fixture, no multicast)
+        working-directory: apps/ios
+        run: |
+          set -euo pipefail
+          python3 ../../scripts/ssdp_fixture_server.py /tmp/tvnext-ssdp-fixture.json > /tmp/tvnext-ssdp-fixture.log 2>&1 &
+          ssdp_pid=$!
+          trap 'kill "$ssdp_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if grep -q '^ready
+        working-directory: apps/ios
+        run: |
+          swiftc -warnings-as-errors TVNext/NativeIntroOutroMarkers.swift tests/IntroOutroSmoke.swift -o /tmp/tvnext-intro-outro-tests
+          /tmp/tvnext-intro-outro-tests
+      - name: Validate original filter contract with shared JVM fixture
+        working-directory: apps/ios
+        run: |
+          swiftc TVNext/SubscriptionFilters.swift tests/FilterSmoke.swift -o /tmp/tvnext-filter-tests
+          /tmp/tvnext-filter-tests
+      - name: Verify native bounded cross-provider search
+        working-directory: apps/ios
+        run: |
+          swiftc -warnings-as-errors TVNext/NativeCrossSiteSearch.swift TVNext/NativeSiteBrowsingContext.swift tests/CrossSiteSearchSmoke.swift -o /tmp/tvnext-cross-site-tests
+          /tmp/tvnext-cross-site-tests
+      - name: Validate native FongMi action web subset against shared fixture
+        working-directory: apps/ios
+        run: |
+          swiftc TVNext/SubscriptionAction.swift tests/ActionSmoke.swift -o /tmp/tvnext-action-tests
+          /tmp/tvnext-action-tests
+      - name: Validate native live replay shared contract
+        working-directory: apps/ios
+        run: |
+          swiftc -warnings-as-errors TVNext/TVNextAPI.swift TVNext/M3UParser.swift tests/LiveReplaySmoke.swift -o /tmp/tvnext-live-replay-tests
+          /tmp/tvnext-live-replay-tests
+      - name: Generate Xcode project
+        working-directory: apps/ios
+        run: xcodegen generate
+      - name: Build for iOS Simulator (unsigned)
+        working-directory: apps/ios
+        run: xcodebuild -project TVNext.xcodeproj -scheme TVNext -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+      - name: Install synthetic media fixture tool
+        run: brew install ffmpeg
+      # Large Dynamic Type UI tests import/clear/relaunch real app state; on macOS CI iPad
+      # this can exceed 180s although assertions pass. Retain a hard 300s per-test cap.
+      - name: Exercise native store and production SwiftUI on iPhone and iPad
+        working-directory: apps/ios
+        env:
+          TV_NEXT_SIMULATOR_FAMILY: ${{ matrix.family }}
+        run: |
+          set -euo pipefail
+          python3 ../../scripts/browser_media_fixture.py > /tmp/tvnext-native-fixture.log 2>&1 &
+          fixture_pid=$!
+          trap 'kill "$fixture_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..90}; do
+            if curl --fail --silent http://127.0.0.1:8765/fixture.mp4 -o tests/unit/Fixtures/fixture.mp4; then break; fi
+            sleep 1
+          done
+          test -s tests/unit/Fixtures/fixture.mp4
+          # AVFoundation exposes selectable audio options reliably when the HLS
+          # master declares EXT-X-MEDIA renditions. All segments are synthetic.
+          mkdir -p /tmp/tvnext-audio-hls
+          ffmpeg -nostdin -hide_banner -loglevel error -y \
+            -f lavfi -i 'color=c=black:s=320x180:r=15:d=4' \
+            -f lavfi -i 'sine=frequency=440:duration=4' \
+            -f lavfi -i 'sine=frequency=880:duration=4' \
+            -map 0:v -map 1:a -map 2:a -c:v libx264 -pix_fmt yuv420p -c:a aac -t 4 \
+            -f hls -hls_segment_type fmp4 -hls_time 2 -hls_playlist_type vod \
+            -var_stream_map 'a:0,agroup:aud,default:yes,language:eng a:1,agroup:aud,default:no,language:jpn v:0,agroup:aud' \
+            -master_pl_name master.m3u8 \
+            -hls_segment_filename '/tmp/tvnext-audio-hls/stream_%v_%03d.m4s' \
+            '/tmp/tvnext-audio-hls/stream_%v.m3u8'
+          grep -q 'EXT-X-MEDIA:TYPE=AUDIO' /tmp/tvnext-audio-hls/master.m3u8
+          # Append a local WebVTT HLS rendition to the synthetic master.
+          # This tests AVFoundation's native legible media-selection group, not
+          # FongMi Android subtitle renderers or external ASS/SSA styling.
+          python3 - <<'PYTHON'
+          from pathlib import Path
+          root = Path('/tmp/tvnext-audio-hls')
+          master = root / 'master.m3u8'
+          lines = master.read_text().splitlines()
+          assert any(line.startswith('#EXT-X-STREAM-INF:') for line in lines)
+          lines = [line + ',SUBTITLES="subs"' if line.startswith('#EXT-X-STREAM-INF:') else line for line in lines]
+          lines.insert(1, '#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="Synthetic English",LANGUAGE="en",DEFAULT=NO,AUTOSELECT=YES,FORCED=NO,URI="subs.m3u8"')
+          master.write_text('\n'.join(lines) + '\n')
+          (root / 'subs.m3u8').write_text('#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:4\n#EXT-X-PLAYLIST-TYPE:VOD\n#EXT-X-MEDIA-SEQUENCE:0\n#EXTINF:4.000,\ncaptions.vtt\n#EXT-X-ENDLIST\n')
+          (root / 'captions.vtt').write_text('WEBVTT\nX-TIMESTAMP-MAP=LOCAL:00:00:00.000,MPEGTS:0\n\n00:00:00.000 --> 00:00:03.500\nSynthetic subtitles\n')
+          PYTHON
+          grep -q 'EXT-X-MEDIA:TYPE=SUBTITLES' /tmp/tvnext-audio-hls/master.m3u8
+          python3 -m http.server 8766 --bind 127.0.0.1 --directory /tmp/tvnext-audio-hls > /tmp/tvnext-audio-server.log 2>&1 &
+          audio_pid=$!
+          # The production SwiftUI WebDAV browser is exercised against the same
+          # localhost-only RFC 4918 fixture used by the Swift network smoke.
+          python3 ../../scripts/webdav_fixture_server.py > /tmp/tvnext-webdav-ui-fixture.log 2>&1 &
+          webdav_pid=$!
+          # Real SwiftUI DLNA buttons exercise the same owned SOAP fixture.
+          python3 ../../scripts/dlna_fixture_server.py > /tmp/tvnext-dlna-ui-fixture.log 2>&1 &
+          dlna_pid=$!
+          trap 'kill "$fixture_pid" "$audio_pid" "$webdav_pid" "$dlna_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8768/health -o /dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:8768/health -o /dev/null
+          for attempt in {1..30}; do
+            if curl --silent http://127.0.0.1:8767/dav/ -o /dev/null; then break; fi
+            sleep 1
+          done
+          curl --silent http://127.0.0.1:8767/dav/ -o /dev/null
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8766/master.m3u8 -o /dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:8766/master.m3u8 -o /dev/null
+          # Regenerate now that the owned synthetic resource exists.
+          xcodegen generate
+          xcrun simctl list devices available --json > /tmp/tvnext-simulators.json
+          python3 - <<'PYTHON'
+          import json, os
+          from pathlib import Path
+          devices = [d for group in json.loads(Path('/tmp/tvnext-simulators.json').read_text())['devices'].values() for d in group if d.get('isAvailable')]
+          selected = []
+          for family in (os.environ['TV_NEXT_SIMULATOR_FAMILY'],):
+              match = next((d for d in devices if d['name'].startswith(family)), None)
+              if match is None:
+                  raise SystemExit(f'No available {family} simulator: refuse to skip UI acceptance')
+              selected.append(match['udid'])
+          Path('/tmp/tvnext-destinations.txt').write_text('\n'.join(selected) + '\n')
+          PYTHON
+          # Keychain integration tests need a simulator-local ad-hoc identity. No Apple
+          # team, provisioning profile, device IPA or distribution signing is used.
+          index=0
+          while IFS= read -r device; do
+            index=$((index + 1))
+            xcrun simctl boot "$device" || true
+            xcrun simctl bootstatus "$device" -b
+            xcrun simctl ui "$device" appearance light
+            xcodebuild -project TVNext.xcodeproj -scheme TVNext -configuration Debug \
+              -destination "platform=iOS Simulator,id=$device" \
+              -test-timeouts-enabled YES -default-test-execution-time-allowance 300 -maximum-test-execution-time-allowance 300 \
+              -parallel-testing-enabled NO -maximum-concurrent-test-simulator-destinations 1 \
+              -resultBundlePath "native-$index.xcresult" CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual test
+            xcrun simctl shutdown "$device"
+          done < /tmp/tvnext-destinations.txt
+      - name: Retain native test results and fixture diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: native-${{ matrix.family }}-simulator-acceptance
+          path: |
+            apps/ios/*.xcresult
+            /tmp/tvnext-native-fixture.log
+          retention-days: 14
+ /tmp/tvnext-ssdp-fixture.log; then break; fi
+            sleep 0.1
+          done
+          grep -q '^ready
+        working-directory: apps/ios
+        run: |
+          swiftc -warnings-as-errors TVNext/NativeIntroOutroMarkers.swift tests/IntroOutroSmoke.swift -o /tmp/tvnext-intro-outro-tests
+          /tmp/tvnext-intro-outro-tests
+      - name: Validate original filter contract with shared JVM fixture
+        working-directory: apps/ios
+        run: |
+          swiftc TVNext/SubscriptionFilters.swift tests/FilterSmoke.swift -o /tmp/tvnext-filter-tests
+          /tmp/tvnext-filter-tests
+      - name: Verify native bounded cross-provider search
+        working-directory: apps/ios
+        run: |
+          swiftc -warnings-as-errors TVNext/NativeCrossSiteSearch.swift TVNext/NativeSiteBrowsingContext.swift tests/CrossSiteSearchSmoke.swift -o /tmp/tvnext-cross-site-tests
+          /tmp/tvnext-cross-site-tests
+      - name: Validate native FongMi action web subset against shared fixture
+        working-directory: apps/ios
+        run: |
+          swiftc TVNext/SubscriptionAction.swift tests/ActionSmoke.swift -o /tmp/tvnext-action-tests
+          /tmp/tvnext-action-tests
+      - name: Validate native live replay shared contract
+        working-directory: apps/ios
+        run: |
+          swiftc -warnings-as-errors TVNext/TVNextAPI.swift TVNext/M3UParser.swift tests/LiveReplaySmoke.swift -o /tmp/tvnext-live-replay-tests
+          /tmp/tvnext-live-replay-tests
+      - name: Generate Xcode project
+        working-directory: apps/ios
+        run: xcodegen generate
+      - name: Build for iOS Simulator (unsigned)
+        working-directory: apps/ios
+        run: xcodebuild -project TVNext.xcodeproj -scheme TVNext -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+      - name: Install synthetic media fixture tool
+        run: brew install ffmpeg
+      # Large Dynamic Type UI tests import/clear/relaunch real app state; on macOS CI iPad
+      # this can exceed 180s although assertions pass. Retain a hard 300s per-test cap.
+      - name: Exercise native store and production SwiftUI on iPhone and iPad
+        working-directory: apps/ios
+        env:
+          TV_NEXT_SIMULATOR_FAMILY: ${{ matrix.family }}
+        run: |
+          set -euo pipefail
+          python3 ../../scripts/browser_media_fixture.py > /tmp/tvnext-native-fixture.log 2>&1 &
+          fixture_pid=$!
+          trap 'kill "$fixture_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..90}; do
+            if curl --fail --silent http://127.0.0.1:8765/fixture.mp4 -o tests/unit/Fixtures/fixture.mp4; then break; fi
+            sleep 1
+          done
+          test -s tests/unit/Fixtures/fixture.mp4
+          # AVFoundation exposes selectable audio options reliably when the HLS
+          # master declares EXT-X-MEDIA renditions. All segments are synthetic.
+          mkdir -p /tmp/tvnext-audio-hls
+          ffmpeg -nostdin -hide_banner -loglevel error -y \
+            -f lavfi -i 'color=c=black:s=320x180:r=15:d=4' \
+            -f lavfi -i 'sine=frequency=440:duration=4' \
+            -f lavfi -i 'sine=frequency=880:duration=4' \
+            -map 0:v -map 1:a -map 2:a -c:v libx264 -pix_fmt yuv420p -c:a aac -t 4 \
+            -f hls -hls_segment_type fmp4 -hls_time 2 -hls_playlist_type vod \
+            -var_stream_map 'a:0,agroup:aud,default:yes,language:eng a:1,agroup:aud,default:no,language:jpn v:0,agroup:aud' \
+            -master_pl_name master.m3u8 \
+            -hls_segment_filename '/tmp/tvnext-audio-hls/stream_%v_%03d.m4s' \
+            '/tmp/tvnext-audio-hls/stream_%v.m3u8'
+          grep -q 'EXT-X-MEDIA:TYPE=AUDIO' /tmp/tvnext-audio-hls/master.m3u8
+          # Append a local WebVTT HLS rendition to the synthetic master.
+          # This tests AVFoundation's native legible media-selection group, not
+          # FongMi Android subtitle renderers or external ASS/SSA styling.
+          python3 - <<'PYTHON'
+          from pathlib import Path
+          root = Path('/tmp/tvnext-audio-hls')
+          master = root / 'master.m3u8'
+          lines = master.read_text().splitlines()
+          assert any(line.startswith('#EXT-X-STREAM-INF:') for line in lines)
+          lines = [line + ',SUBTITLES="subs"' if line.startswith('#EXT-X-STREAM-INF:') else line for line in lines]
+          lines.insert(1, '#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="Synthetic English",LANGUAGE="en",DEFAULT=NO,AUTOSELECT=YES,FORCED=NO,URI="subs.m3u8"')
+          master.write_text('\n'.join(lines) + '\n')
+          (root / 'subs.m3u8').write_text('#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:4\n#EXT-X-PLAYLIST-TYPE:VOD\n#EXT-X-MEDIA-SEQUENCE:0\n#EXTINF:4.000,\ncaptions.vtt\n#EXT-X-ENDLIST\n')
+          (root / 'captions.vtt').write_text('WEBVTT\nX-TIMESTAMP-MAP=LOCAL:00:00:00.000,MPEGTS:0\n\n00:00:00.000 --> 00:00:03.500\nSynthetic subtitles\n')
+          PYTHON
+          grep -q 'EXT-X-MEDIA:TYPE=SUBTITLES' /tmp/tvnext-audio-hls/master.m3u8
+          python3 -m http.server 8766 --bind 127.0.0.1 --directory /tmp/tvnext-audio-hls > /tmp/tvnext-audio-server.log 2>&1 &
+          audio_pid=$!
+          # The production SwiftUI WebDAV browser is exercised against the same
+          # localhost-only RFC 4918 fixture used by the Swift network smoke.
+          python3 ../../scripts/webdav_fixture_server.py > /tmp/tvnext-webdav-ui-fixture.log 2>&1 &
+          webdav_pid=$!
+          # Real SwiftUI DLNA buttons exercise the same owned SOAP fixture.
+          python3 ../../scripts/dlna_fixture_server.py > /tmp/tvnext-dlna-ui-fixture.log 2>&1 &
+          dlna_pid=$!
+          trap 'kill "$fixture_pid" "$audio_pid" "$webdav_pid" "$dlna_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8768/health -o /dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:8768/health -o /dev/null
+          for attempt in {1..30}; do
+            if curl --silent http://127.0.0.1:8767/dav/ -o /dev/null; then break; fi
+            sleep 1
+          done
+          curl --silent http://127.0.0.1:8767/dav/ -o /dev/null
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8766/master.m3u8 -o /dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:8766/master.m3u8 -o /dev/null
+          # Regenerate now that the owned synthetic resource exists.
+          xcodegen generate
+          xcrun simctl list devices available --json > /tmp/tvnext-simulators.json
+          python3 - <<'PYTHON'
+          import json, os
+          from pathlib import Path
+          devices = [d for group in json.loads(Path('/tmp/tvnext-simulators.json').read_text())['devices'].values() for d in group if d.get('isAvailable')]
+          selected = []
+          for family in (os.environ['TV_NEXT_SIMULATOR_FAMILY'],):
+              match = next((d for d in devices if d['name'].startswith(family)), None)
+              if match is None:
+                  raise SystemExit(f'No available {family} simulator: refuse to skip UI acceptance')
+              selected.append(match['udid'])
+          Path('/tmp/tvnext-destinations.txt').write_text('\n'.join(selected) + '\n')
+          PYTHON
+          # Keychain integration tests need a simulator-local ad-hoc identity. No Apple
+          # team, provisioning profile, device IPA or distribution signing is used.
+          index=0
+          while IFS= read -r device; do
+            index=$((index + 1))
+            xcrun simctl boot "$device" || true
+            xcrun simctl bootstatus "$device" -b
+            xcrun simctl ui "$device" appearance light
+            xcodebuild -project TVNext.xcodeproj -scheme TVNext -configuration Debug \
+              -destination "platform=iOS Simulator,id=$device" \
+              -test-timeouts-enabled YES -default-test-execution-time-allowance 300 -maximum-test-execution-time-allowance 300 \
+              -parallel-testing-enabled NO -maximum-concurrent-test-simulator-destinations 1 \
+              -resultBundlePath "native-$index.xcresult" CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual test
+            xcrun simctl shutdown "$device"
+          done < /tmp/tvnext-destinations.txt
+      - name: Retain native test results and fixture diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: native-${{ matrix.family }}-simulator-acceptance
+          path: |
+            apps/ios/*.xcresult
+            /tmp/tvnext-native-fixture.log
+          retention-days: 14
+ /tmp/tvnext-ssdp-fixture.log
+          swiftc -DDEBUG -warnings-as-errors TVNext/NativeDLNA.swift TVNext/NativeDLNAStatus.swift TVNext/NativeDLNAPosition.swift TVNext/NativeDLNASeek.swift TVNext/NativeSSDPResponse.swift TVNext/NativeSSDPDiscovery.swift tests/SSDPDiscoverySmoke.swift -o /tmp/tvnext-ssdp-discovery-tests
+          /tmp/tvnext-ssdp-discovery-tests
+          wait "$ssdp_pid"
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          fixture = json.loads(Path('/tmp/tvnext-ssdp-fixture.json').read_text())
+          assert fixture['requests'] == 2
+          assert set(fixture['targets']) == {
+              'urn:schemas-upnp-org:device:MediaRenderer:1',
+              'urn:schemas-upnp-org:service:AVTransport:1',
+          }
+          PY
       - name: Verify manual intro/outro marker bounds and local persistence
         working-directory: apps/ios
         run: |
