@@ -652,6 +652,9 @@ final class LibraryUITests: XCTestCase {
         let importedModel = app.staticTexts["dlna-imported-model"]
         XCTAssertTrue(importedModel.waitForExistence(timeout: 5))
         XCTAssertEqual(importedModel.label, "设备型号：TV-Next Test Model 1")
+        let importedUDN = app.staticTexts["dlna-imported-udn"]
+        XCTAssertTrue(importedUDN.waitForExistence(timeout: 5))
+        XCTAssertEqual(importedUDN.label, "设备标识：uuid:tvnext-fixture")
         reveal(renderer)
         XCTAssertEqual(renderer.value as? String, expected,
                        "Native UI did not populate the same-origin AVTransport control URL")
@@ -668,6 +671,7 @@ final class LibraryUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "exists == false"), object: importedName)], timeout: 5), .completed)
         XCTAssertFalse(importedModel.exists, "Changing the source must clear the prior renderer model")
+        XCTAssertFalse(importedUDN.exists, "Changing the source must clear the prior renderer identity")
     }
 
     func testDLNARejectsForeignDeviceDescriptionWithoutChangingRenderer() {
@@ -684,6 +688,7 @@ final class LibraryUITests: XCTestCase {
         XCTAssertFalse(app.buttons["dlna-query-state"].isEnabled)
         XCTAssertFalse(app.staticTexts["dlna-imported-name"].exists)
         XCTAssertFalse(app.staticTexts["dlna-imported-model"].exists)
+        XCTAssertFalse(app.staticTexts["dlna-imported-udn"].exists)
     }
 
 }
