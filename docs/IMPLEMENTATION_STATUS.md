@@ -171,3 +171,8 @@ User-selected Files documents are staged into a private app cache and never pers
 ## Native Files/SMB storage preflight (P4, #130)
 
 The iOS staged-copy path now checks the cache volume's reported free capacity before allocating a local media copy, reserving 64 MiB after any known source length. Unknown File Provider lengths require the reserve only; missing capacity metadata does not block an otherwise permitted import. Out-of-space errors during actual writes map to a localized storage warning, while partial copies are removed. Swift smoke/XCTest cover exact boundaries, large values and error mapping. This is a conservative preflight, not a guaranteed space reservation or real iPhone/NAS validation; final-head simulator and aggregate CI are required.
+
+
+### P4 iOS SSDP UDP M-SEARCH transport (#132)
+
+The new NativeSSDPDiscovery actor provides a dormant opt-in fixed-multicast M-SEARCH implementation with two bounded targets, TTL 1, a 3-second deadline, cancellation, a 10-second cooldown, 64-packet/4096-byte receive bounds and 32 deduplicated candidate locations. It reuses the existing strict private IPv4 sender-matched response parser. A DEBUG-only owned loopback UDP fixture tests transport behavior. The production SwiftUI DLNA page remains manual because Apple multicast entitlement, signed profile and real iPhone/iPad permission are **not** established. Final-head simulator and full CI are required for subtask closure; parent #114 remains open. See [IOS_SSDP_DISCOVERY.md](IOS_SSDP_DISCOVERY.md).

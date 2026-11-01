@@ -210,3 +210,8 @@ Cold app startup reclaims session-only media copies abandoned by a crash or forc
 ### P4 iOS Files/SMB local storage safety (#130)
 
 Native Files-provider media staging now includes a 64 MiB cache-volume free-space reserve preflight for known/unknown source lengths and user-visible disk-full write errors, while retaining the 2 GiB actual-byte limit and partial-copy cleanup. It does not add native SMB browsing/streaming or prove physical NAS behavior. Final-head XCTest/XCUI and full cross-platform integration remain the code acceptance gate; real-device validation remains separate.
+
+
+### P4 iOS SSDP bounded UDP transport (#132)
+
+A fixed-target, user-initiated native SSDP M-SEARCH UDP transport is implemented as a **dormant service** behind the Apple multicast-entitlement gate. It sends two fixed targets with TTL 1, 3-second deadline, 10-second cooldown and strict response caps; existing private-IPv4 same-sender LOCATION validation is reused. Owned loopback UDP fixture and simulator XCTest/CI are required. **No automatic discovery UI or physical multicast functionality is claimed.** See [IOS_SSDP_DISCOVERY.md](IOS_SSDP_DISCOVERY.md). Parent #114 and P4 #5 remain open.

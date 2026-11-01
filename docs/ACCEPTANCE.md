@@ -166,3 +166,8 @@ Full CI [41231112970](https://github.com/Kahen/TV-Next/actions/runs/41231112970)
 ### P4 iOS Files/SMB storage preflight (#130)
 
 For the final PR HEAD, require Swift smoke/XCTest positive and negative reserve-boundary tests (known and unknown file size), overflow-safe arithmetic, Cocoa/POSIX disk-full error normalization without masking unrelated failures, and existing copy/cancel/partial-cleanup regressions. Require unsigned iPhone/iPad simulator build, XCTest/XCUI and complete Web/API/PostgreSQL/NAS/Compose/Spider isolation gate before merge. No real low-storage device, actual NAS or signed IPA claim.
+
+
+### P4 iOS bounded SSDP M-SEARCH transport acceptance (#132)
+
+Require exact fixed-target request positive/negative Swift smoke/XCTest, disallowed ST/header injection, deduplication and candidate bounds, an owned UDP loopback fixture proving both outbound M-SEARCH packets and rejection of loopback/oversized replies, and final HEAD unsigned iPhone/iPad simulator XCTest/XCUI with full Web/API/PostgreSQL/NAS/Compose/Spider isolation CI. This is **transport-only**: the production UI remains manual until Apple multicast entitlement and real-device local-network verification. Do not close #114 or P4 #5, and do not claim a signed IPA, physical SSDP discovery, real renderer interoperability or an independent security audit. See [IOS_SSDP_DISCOVERY.md](IOS_SSDP_DISCOVERY.md).
