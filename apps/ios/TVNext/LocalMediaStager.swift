@@ -24,10 +24,10 @@ enum LocalMediaStager {
     static let maxBytes: Int64 = 2_147_483_648
     private static let chunkBytes = 1_048_576
 
-    static func stage(_ source: URL) async throws -> URL {
+    static func stage(_ source: URL, onProgress: (@Sendable (Int64, Int64?) -> Void)? = nil) async throws -> URL {
         try Task<Never, Never>.checkCancellation()
         let worker = Task.detached(priority: .userInitiated) {
-            try copyFile(source)
+            try copyFile(source, onProgress: onProgress)
         }
         return try await withTaskCancellationHandler {
             try await worker.value
@@ -36,7 +36,7 @@ enum LocalMediaStager {
         }
     }
 
-    private static func copyFile(_ source: URL) throws -> URL {
+    private static func copyFile(_ source: URL, onProgress: (@Sendable (Int64, Int64?) -> Void)?) throws -> URL {
         guard source.isFileURL, extensions.contains(source.pathExtension.lowercased()) else {
             throw LocalMediaError.unsupportedFormat
         }
@@ -51,17 +51,17 @@ enum LocalMediaStager {
         var coordinationError: NSError?
         var staged: Result<URL, Error>?
         coordinator.coordinate(readingItemAt: source, options: [], error: &coordinationError) { coordinated in
-            staged = Result { try streamCopy(coordinated, extension: source.pathExtension.lowercased()) }
+            staged = Result { try streamCopy(coordinated, extension: source.pathExtension.lowercased(), onProgress: onProgress) }
         }
         if let coordinationError { throw coordinationError }
         guard let staged else { throw LocalMediaError.unavailableFile }
         return try staged.get()
         #else
-        return try streamCopy(source, extension: source.pathExtension.lowercased())
+        return try streamCopy(source, extension: source.pathExtension.lowercased(), onProgress: onProgress)
         #endif
     }
 
-    private static func streamCopy(_ source: URL, extension ext: String) throws -> URL {
+    private static func streamCopy(_ source: URL, extension ext: String, onProgress: (@Sendable (Int64, Int64?) -> Void)?) throws -> URL {
         let fileManager = FileManager.default
         let attrs = try fileManager.attributesOfItem(atPath: source.path)
         guard (attrs[.type] as? FileAttributeType) == .typeRegular else {
@@ -85,6 +85,8 @@ enum LocalMediaStager {
         defer { try? input.close() }
         let output = try FileHandle(forWritingTo: destination)
         defer { try? output.close() }
+        let expected = (attrs[.size] as? NSNumber)?.int64Value
+        let knownTotal = expected.flatMap { $0 > 0 && $0 <= maxBytes ? $0 : nil }
         var total: Int64 = 0
         while true {
             try Task<Never, Never>.checkCancellation()
@@ -93,6 +95,9 @@ enum LocalMediaStager {
             guard Int64(bytes.count) <= maxBytes - total else { throw LocalMediaError.oversizedFile }
             try output.write(contentsOf: bytes)
             total += Int64(bytes.count)
+            // Only report bytes actually copied. File Provider sizes may be
+            // absent or stale; never report a percentage above 100%.
+            onProgress?(total, knownTotal.flatMap { total <= $0 ? $0 : nil })
         }
         guard total > 0 else { throw LocalMediaError.emptyFile }
         try Task<Never, Never>.checkCancellation()
