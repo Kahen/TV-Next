@@ -19,6 +19,47 @@ import FoundationNetworking
         let details = try NativeDLNADescription.parseDetails(named, location: location)
         precondition(details.controlURL == parsed && details.friendlyName == "客厅电视 TV-Next" && details.modelName == "TV-Next Model 1")
         precondition(parsed.absoluteString == "http://127.0.0.1:8768/upnp/control/AVTransport1")
+
+        // Discovery promotion must bind the SSDP USN to the root-device UDN.
+        // The manually typed description URL remains compatible without UDN.
+        let discoveredLocation = URL(string: "http://192.168.1.20:1400/device.xml")!
+        let target = NativeSSDPResponse.mediaRenderer
+        let candidate = NativeSSDPResponse.Candidate(
+            location: discoveredLocation, serviceType: target,
+            uniqueServiceName: "uuid:owned-device::" + target)
+        func identityXML(_ fields: String) -> Data {
+            Data("<root xmlns=\"\(NativeDLNADescription.deviceNamespace)\"><device>\(fields)<serviceList>\(service())</serviceList></device></root>".utf8)
+        }
+        let identity = identityXML("<UDN>uuid:Owned-Device</UDN>")
+        let approved = try NativeDLNADescription.verifyDiscovered(identity, candidate: candidate)
+        precondition(approved.deviceUDN == "uuid:Owned-Device")
+        precondition(approved.controlURL.absoluteString == "http://192.168.1.20:1400/upnp/control/AVTransport1")
+        precondition(NativeSSDPResponse.matchesDescriptionUDN(candidate, udn: approved.deviceUDN))
+        for body in [identityXML(""), identityXML("<UDN>uuid:another-device</UDN>")] {
+            do {
+                _ = try NativeDLNADescription.verifyDiscovered(body, candidate: candidate)
+                fatalError("Accepted missing/mismatched SSDP device identity")
+            } catch NativeDLNAError.invalidDescription {}
+        }
+        let wrongTarget = NativeSSDPResponse.Candidate(
+            location: discoveredLocation, serviceType: "ssdp:all",
+            uniqueServiceName: "uuid:owned-device::ssdp:all")
+        precondition(!NativeSSDPResponse.matchesDescriptionUDN(wrongTarget, udn: "uuid:owned-device"))
+        let malformedIdentities = [
+            "<UDN/>", "<UDN>uuid:</UDN>", "<UDN>uuid:bad identity</UDN>",
+            "<UDN>uuid:bad\\nidentity</UDN>", "<UDN>uuid:bad\\u{202E}id</UDN>",
+            "<UDN>uuid:one</UDN><UDN>uuid:two</UDN>",
+            "<UDN><child>uuid:owned-device</child></UDN>",
+            "<x:UDN xmlns:x=\"urn:foreign\">uuid:owned-device</x:UDN>",
+            "<UDN>uuid:\(String(repeating: "A", count: 124))</UDN>"
+        ]
+        for field in malformedIdentities {
+            do {
+                _ = try NativeDLNADescription.parseDetails(identityXML(field), location: discoveredLocation)
+                fatalError("Accepted malformed root UDN")
+            } catch NativeDLNAError.invalidDescription {}
+        }
+
         let ignored = service("urn:schemas-upnp-org:service:RenderingControl:1", "/other")
         let withOtherService = try NativeDLNADescription.parse(xml(ignored + service()), location: location)
         precondition(withOtherService == parsed)
