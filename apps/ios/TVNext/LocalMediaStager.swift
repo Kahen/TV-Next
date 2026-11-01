@@ -1,6 +1,6 @@
 import Foundation
 
-enum LocalMediaError: LocalizedError {
+enum LocalMediaError: LocalizedError, Equatable {
     case unsupportedFormat
     case emptyFile
     case oversizedFile
@@ -47,16 +47,20 @@ enum LocalMediaStager {
         }
     }
 
+    static func normalizedWriteError(_ error: Error) -> Error {
+        let ns = error as NSError
+        if (ns.domain == NSCocoaErrorDomain && ns.code == NSFileWriteOutOfSpaceError) ||
+            (ns.domain == NSPOSIXErrorDomain && ns.code == 28) {
+            return LocalMediaError.insufficientStorage
+        }
+        return error
+    }
+
     private static func writeChunk(_ bytes: Data, to output: FileHandle) throws {
         do {
             try output.write(contentsOf: bytes)
         } catch {
-            let ns = error as NSError
-            if (ns.domain == NSCocoaErrorDomain && ns.code == NSFileWriteOutOfSpaceError) ||
-                (ns.domain == NSPOSIXErrorDomain && ns.code == 28) {
-                throw LocalMediaError.insufficientStorage
-            }
-            throw error
+            throw normalizedWriteError(error)
         }
     }
 
