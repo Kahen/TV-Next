@@ -237,3 +237,7 @@ The manual native DLNA description import displays a bounded optional root UDN. 
 ## P4 native iOS explicit GB18030 subtitle import (#142)
 
 The user may explicitly select GB18030 for a **local Files/SMB SRT/VTT/ASS/SSA** import. Default decoding remains strict UTF-8 or BOM-marked UTF-16LE/BE; no legacy encoding sniffing or persisted charset is added. The choice is captured when import starts, while the existing coordinated 1 MiB read, cancellation, old-cue-on-error behavior and private Files Provider credentials remain unchanged. Malformed GB18030 and BOM-marked input in legacy mode are rejected. Remote subscription captions are unaffected. Swift smoke, XCTest and production iPhone/iPad XCUI plus final-HEAD Web/API and full integration CI are required; physical SMB/provider behavior, Apple signing and P4 parent #5 remain unverified.
+
+## 2026-11-02 P2 native cross-provider failure recovery (#144)
+
+Native SwiftUI adds a user-initiated retry for only the failed FongMi search site keys. It preserves already successful provider hits, the originally submitted query and provider order; recovered providers atomically replace any prior partial page without duplicates. Repeated failures retain the last partial hits. The existing 16-site, four-concurrent, two-page and 600-result bounds remain. See [IOS_CROSS_SITE_RETRY.md](IOS_CROSS_SITE_RETRY.md). This is not additional type-3 Spider execution, a permitted real-provider corpus or P2 completion; final-head CI and physical-provider acceptance remain separate.

@@ -196,3 +196,8 @@ Require Swift smoke and XCTest for valid case-insensitive USN/UDN match, missing
 ## P4 native iOS explicit GB18030 subtitle import (#142)
 
 The user may explicitly select GB18030 for a **local Files/SMB SRT/VTT/ASS/SSA** import. Default decoding remains strict UTF-8 or BOM-marked UTF-16LE/BE; no legacy encoding sniffing or persisted charset is added. The choice is captured when import starts, while the existing coordinated 1 MiB read, cancellation, old-cue-on-error behavior and private Files Provider credentials remain unchanged. Malformed GB18030 and BOM-marked input in legacy mode are rejected. Remote subscription captions are unaffected. Swift smoke, XCTest and production iPhone/iPad XCUI plus final-HEAD Web/API and full integration CI are required; physical SMB/provider behavior, Apple signing and P4 parent #5 remain unverified.
+
+
+### P2 native failed-site cross-provider retry (#144)
+
+Verify an owned localhost FongMi-compatible API fixture with two equal display names and distinct site keys: initial search returns A and fails B, the retry requests B only using the **original** keyword despite edits to the search field, A remains visible, B appears once and the retry control disappears. Positive/negative Swift smoke and XCTest cover failed keys, repeated failures, partial-result preservation, deterministic order, duplicate identities, unrequested keys, the 600-result cap and cancellation. Run the production SwiftUI XCUI on both iPhone/iPad simulators and final-head Web/API/PostgreSQL/Compose/NAS/Spider isolation integration before merging. No real provider, physical Apple-device, Apple signing, authorized Spider corpus or P2/P6 completion claim. See [IOS_CROSS_SITE_RETRY.md](IOS_CROSS_SITE_RETRY.md).

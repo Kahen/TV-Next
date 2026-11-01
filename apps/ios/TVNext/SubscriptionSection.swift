@@ -21,6 +21,9 @@ struct SubscriptionSection: View {
     @State private var detail: NativeMediaDetail?
     @State private var crossSiteResults: [NativeSearchHit<NativeMediaItem>] = []
     @State private var crossSiteFailures: [String] = []
+    @State private var crossSiteFailedKeys: [String] = []
+    @State private var crossSiteSearchKeyword: String?
+    @State private var crossSiteSourceOrder: [String] = []
     @State private var crossSiteWarnings: [String] = []
     @State private var line = 0
     @State private var error: String?
@@ -60,8 +63,12 @@ struct SubscriptionSection: View {
                 if let document { documentView(document) }
                 if let page { pageView(page) }
                 if !crossSiteFailures.isEmpty {
-                    Text("以下站点未返回结果：" + crossSiteFailures.joined(separator: "、"))
+                    Text("以下站点未完成搜索：" + crossSiteFailures.joined(separator: "、"))
                         .font(.caption).foregroundStyle(.orange)
+                    Button("重试失败站点（\(crossSiteFailedKeys.count)）") { retryFailedSites() }
+                        .buttonStyle(.bordered)
+                        .disabled(busy || crossSiteFailedKeys.isEmpty)
+                        .accessibilityIdentifier("retry-failed-cross-site-search")
                 }
                 ForEach(crossSiteWarnings, id: \.self) { Text($0).font(.caption).foregroundStyle(.secondary) }
                 if !crossSiteResults.isEmpty {
@@ -100,7 +107,8 @@ struct SubscriptionSection: View {
         }
     }
     private func clearCrossSiteSearch() {
-        crossSiteResults = []; crossSiteFailures = []; crossSiteWarnings = []
+        crossSiteResults = []; crossSiteFailures = []; crossSiteFailedKeys = []
+        crossSiteSearchKeyword = nil; crossSiteSourceOrder = []; crossSiteWarnings = []
     }
     private func switchDetailSite(_ key: String) {
         var scope = NativeSiteBrowsingContext(
@@ -158,6 +166,12 @@ struct SubscriptionSection: View {
         let sources = document.sites.filter { $0.searchable && !$0.hidden && $0.supported && ($0.type != 3 || session != nil) }
             .map { NativeSearchSource(key: $0.key, name: $0.name) }
         clearCrossSiteSearch(); page = nil; detail = nil
+        guard !sources.isEmpty else {
+            crossSiteWarnings = ["当前订阅没有可搜索的已授权站点。"]
+            return
+        }
+        crossSiteSearchKeyword = keyword
+        crossSiteSourceOrder = NativeCrossSiteSearch.selectedSourceKeys(sources)
         run { api, id in
             let result = try await NativeCrossSiteSearch.search(sources: sources, concurrency: document.sites.contains { $0.type == 3 && $0.supported } ? 2 : 4, fetch: { source, number in
                 var r = NativeSiteRequest()
@@ -169,7 +183,48 @@ struct SubscriptionSection: View {
             guard generation == id, !Task.isCancelled else { return }
             crossSiteResults = result.items
             crossSiteFailures = result.failed
+            crossSiteFailedKeys = result.failedKeys
             crossSiteWarnings = result.warnings
+        }
+    }
+
+    /// Retry only failed provider keys, using the original submitted keyword
+    /// even if the text field has since changed. Never reuse a display name
+    /// for routing: multiple providers may share the same visible name.
+    private func retryFailedSites() {
+        guard let document, let keyword = crossSiteSearchKeyword,
+              !crossSiteFailedKeys.isEmpty else { return }
+        let eligible = document.sites.filter {
+            $0.searchable && !$0.hidden && $0.supported && ($0.type != 3 || session != nil)
+        }.map { NativeSearchSource(key: $0.key, name: $0.name) }
+        let sources = NativeCrossSiteSearch.failedOnlySources(eligible, failedKeys: crossSiteFailedKeys)
+        guard !sources.isEmpty else { return }
+        let sourceOrder = crossSiteSourceOrder
+        run { api, id in
+            let retry = try await NativeCrossSiteSearch.search(
+                sources: sources,
+                concurrency: sources.contains { key in document.sites.contains { $0.key == key.key && $0.type == 3 } } ? 2 : 4,
+                fetch: { source, number in
+                    var r = NativeSiteRequest()
+                    r.content = document.content; r.url = document.url
+                    r.siteKey = source.key; r.query = keyword; r.page = number
+                    let response: NativeMediaPage = try await api.request("subscriptions/search", body: r)
+                    return NativeSearchPage(items: response.items, hasMore: response.hasMore)
+                },
+                identity: { $0.id }
+            )
+            guard generation == id, !Task.isCancelled else { return }
+            let recovered = Set(sources.map(\.key)).subtracting(retry.failedKeys)
+            crossSiteResults = NativeCrossSiteSearch.mergeRetry(
+                previous: crossSiteResults, refreshed: retry.items,
+                recoveredKeys: recovered, sourceOrder: sourceOrder,
+                identity: { $0.id }
+            )
+            crossSiteFailures = retry.failed
+            crossSiteFailedKeys = retry.failedKeys
+            for warning in retry.warnings where !crossSiteWarnings.contains(warning) {
+                crossSiteWarnings.append(warning)
+            }
         }
     }
     private func loadLive(_ index: Int) {

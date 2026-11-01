@@ -160,6 +160,7 @@ jobs:
       - name: Verify native bounded cross-provider search
         working-directory: apps/ios
         run: |
+          python3 -m unittest discover -s ../../scripts -p 'test_cross_site_retry_fixture_server.py'
           swiftc -warnings-as-errors TVNext/NativeCrossSiteSearch.swift TVNext/NativeSiteBrowsingContext.swift tests/CrossSiteSearchSmoke.swift -o /tmp/tvnext-cross-site-tests
           /tmp/tvnext-cross-site-tests
       - name: Validate native FongMi action web subset against shared fixture
@@ -235,7 +236,16 @@ jobs:
           # Real SwiftUI DLNA buttons exercise the same owned SOAP fixture.
           python3 ../../scripts/dlna_fixture_server.py > /tmp/tvnext-dlna-ui-fixture.log 2>&1 &
           dlna_pid=$!
-          trap 'kill "$fixture_pid" "$audio_pid" "$webdav_pid" "$dlna_pid" 2>/dev/null || true' EXIT
+          # The production subscription view uses a localhost-only FongMi
+          # fixture with a deliberately failing provider and no real sources.
+          python3 ../../scripts/cross_site_retry_fixture_server.py > /tmp/tvnext-cross-site-ui-fixture.log 2>&1 &
+          cross_pid=$!
+          trap 'kill "$fixture_pid" "$audio_pid" "$webdav_pid" "$dlna_pid" "$cross_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8769/health -o /dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:8769/health -o /dev/null
           for attempt in {1..30}; do
             if curl --fail --silent http://127.0.0.1:8768/health -o /dev/null; then break; fi
             sleep 1
@@ -289,4 +299,5 @@ jobs:
           path: |
             apps/ios/*.xcresult
             /tmp/tvnext-native-fixture.log
+            /tmp/tvnext-cross-site-ui-fixture.log
           retention-days: 14
