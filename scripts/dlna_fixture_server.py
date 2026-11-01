@@ -43,6 +43,7 @@ class Handler(BaseHTTPRequestHandler):
                 name += '<friendlyName>Forged Renderer</friendlyName>'
             if self.path == '/device-name-unsafe.xml':
                 name = '<friendlyName>Forged\u202eName</friendlyName>'
+            udn = '<UDN>uuid:tvnext-fixture</UDN>'
             model = '<modelName>TV-Next Test Model 1</modelName>'
             if self.path == '/device-model-missing.xml':
                 model = ''
@@ -58,7 +59,7 @@ class Handler(BaseHTTPRequestHandler):
                 model = '<modelName>' + 'é' * 81 + '</modelName>'
             xml = ('<root xmlns="urn:schemas-upnp-org:device-1-0">'
                    '<URLBase>http://8.8.8.8:80/</URLBase>'
-                   '<device>' + name + model + '<serviceList>' + service + '</serviceList></device></root>')
+                   '<device>' + name + model + udn + '<serviceList>' + service + '</serviceList></device></root>')
             if self.path == '/device-multiple-root.xml':
                 xml = ('<root xmlns="urn:schemas-upnp-org:device-1-0">'
                        '<device><friendlyName>First</friendlyName></device>'
