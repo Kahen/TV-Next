@@ -21,9 +21,8 @@ final class LocalCaptionReaderTests: XCTestCase {
 
             let vtt = root.appendingPathComponent("caption.vtt")
             try Data("WEBVTT\n\n00:00:03.000 --> 00:00:04.000\nProvider\n".utf8).write(to: vtt)
-            XCTAssertEqual(try await LocalCaptionReader.load(vtt), [
-                CaptionCue(start: 3, end: 4, text: "Provider")
-            ])
+            let vttCues = try await LocalCaptionReader.load(vtt)
+            XCTAssertEqual(vttCues, [CaptionCue(start: 3, end: 4, text: "Provider")])
         }
     }
 
