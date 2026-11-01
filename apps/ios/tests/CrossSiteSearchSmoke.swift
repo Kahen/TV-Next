@@ -74,6 +74,15 @@ private actor RequestCounter {
         precondition(scope.siteKey == "B" && scope.category == nil && scope.mode == "home")
         precondition(scope.filterCatalog.isEmpty && scope.filters.isEmpty && scope.appliedFilters.isEmpty)
         precondition(!scope.switchToDetailSite("B"))
+        // Duplicate subscription keys must not shift the 16-site boundary:
+        // search and retry ordering must select the same unique providers.
+        let repeatedSources = [
+            NativeSearchSource(key: "a", name: "A"),
+            NativeSearchSource(key: "a", name: "Duplicate A"),
+            NativeSearchSource(key: "b", name: "B")
+        ]
+        precondition(NativeCrossSiteSearch.selectedSourceKeys(repeatedSources) == ["a", "b"])
+
         // A retry is routed by provider key, not display name. Failed page-2
         // providers retain their partial results until a successful retry.
         let sameNames = [
