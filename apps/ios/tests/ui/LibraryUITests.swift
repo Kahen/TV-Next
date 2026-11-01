@@ -166,21 +166,23 @@ final class LibraryUITests: XCTestCase {
         reveal(search)
         search.tap()
         let healthy = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "A result")).firstMatch
-        XCTAssertTrue(healthy.waitForExistence(timeout: 15))
         XCTAssertTrue(retry.waitForExistence(timeout: 15), "Partial failure must expose retry")
+        reveal(healthy)
+        XCTAssertTrue(healthy.exists, "Successful site results must survive partial failure")
         // Change the draft after search. The retry must use the captured
         // keyword, not the current TextField content.
         enter(query, "-changed")
         reveal(retry)
         retry.tap()
         let recovered = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "B result")).firstMatch
-        XCTAssertTrue(recovered.waitForExistence(timeout: 15))
-        XCTAssertTrue(healthy.exists, "Retry discarded an already successful provider")
         let dismissed = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "exists == false"), object: retry
         )
-        XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 5), .completed,
+        XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 15), .completed,
                        "Retry should disappear after all failed providers recover")
+        reveal(recovered)
+        XCTAssertTrue(recovered.exists, "Recovered provider result is missing")
+        XCTAssertTrue(healthy.exists, "Retry discarded an already successful provider")
     }
 
     func testCaptionEncodingIsExplicitAndDoesNotStartImport() {
