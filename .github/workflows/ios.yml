@@ -117,9 +117,9 @@ jobs:
           curl --fail --silent http://127.0.0.1:8768/health -o /dev/null
           swiftc -warnings-as-errors TVNext/NativeDLNA.swift TVNext/NativeDLNAStatus.swift TVNext/NativeDLNAPosition.swift TVNext/NativeDLNASeek.swift tests/DLNANetworkSmoke.swift -o /tmp/tvnext-dlna-network-tests
           /tmp/tvnext-dlna-network-tests
-          swiftc -warnings-as-errors TVNext/NativeDLNA.swift TVNext/NativeDLNAStatus.swift TVNext/NativeDLNAPosition.swift TVNext/NativeDLNASeek.swift TVNext/NativeDLNADescription.swift tests/DLNADescriptionSmoke.swift -o /tmp/tvnext-dlna-description-tests
+          swiftc -warnings-as-errors TVNext/NativeDLNA.swift TVNext/NativeDLNAStatus.swift TVNext/NativeDLNAPosition.swift TVNext/NativeDLNASeek.swift TVNext/NativeDLNADescription.swift TVNext/NativeSSDPResponse.swift tests/DLNADescriptionSmoke.swift -o /tmp/tvnext-dlna-description-tests
           /tmp/tvnext-dlna-description-tests
-          swiftc -warnings-as-errors TVNext/NativeDLNA.swift TVNext/NativeDLNAStatus.swift TVNext/NativeDLNAPosition.swift TVNext/NativeDLNASeek.swift TVNext/NativeDLNADescription.swift tests/DLNADescriptionNetworkSmoke.swift -o /tmp/tvnext-dlna-description-network-tests
+          swiftc -warnings-as-errors TVNext/NativeDLNA.swift TVNext/NativeDLNAStatus.swift TVNext/NativeDLNAPosition.swift TVNext/NativeDLNASeek.swift TVNext/NativeDLNADescription.swift TVNext/NativeSSDPResponse.swift tests/DLNADescriptionNetworkSmoke.swift -o /tmp/tvnext-dlna-description-network-tests
           /tmp/tvnext-dlna-description-network-tests
       - name: Validate bounded native SSDP response candidates (no multicast)
         working-directory: apps/ios
