@@ -39,6 +39,13 @@ enum NativeCrossSiteSearch {
     static let maxItemsPerPage = 40
     static let maxResults = 600
 
+    /// Match the coordinator's first-unique-provider selection, including
+    /// subscriptions that repeat a key before the 16-site boundary.
+    static func selectedSourceKeys(_ sources: [NativeSearchSource]) -> [String] {
+        var seen = Set<String>()
+        return Array(sources.map(\.key).filter { seen.insert($0).inserted }.prefix(maxSites))
+    }
+
     /// Reconcile a failed-site retry with the last visible search. Successful
     /// providers are never re-fetched or discarded; a recovered provider
     /// atomically replaces its old partial page. A provider that fails again
