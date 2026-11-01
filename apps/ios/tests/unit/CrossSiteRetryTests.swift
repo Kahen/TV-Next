@@ -38,6 +38,24 @@ final class CrossSiteRetryTests: XCTestCase {
             eligible, failedKeys: ["missing"]).isEmpty)
     }
 
+    func testProviderDisplaySnapshotIgnoresRawHiddenDuplicateAndUnknownKeys() {
+        // The caller has removed hidden/unsupported sites before building
+        // this snapshot; the raw subscription's first key match is unsafe.
+        let eligible = [
+            NativeSearchSource(key: "a", name: "Mirror"),
+            NativeSearchSource(key: "b", name: "Visible B"),
+            NativeSearchSource(key: "b", name: "Duplicate B")
+        ]
+        let names = NativeCrossSiteSearch.selectedSourceNames(eligible)
+        XCTAssertEqual(names, ["a": "Mirror", "b": "Visible B"])
+        XCTAssertNil(names["not-searched"])
+        let oversized = (0..<20).map {
+            NativeSearchSource(key: String($0), name: "Site \($0)")
+        }
+        XCTAssertEqual(NativeCrossSiteSearch.selectedSourceNames(oversized).count, 16)
+        XCTAssertNil(NativeCrossSiteSearch.selectedSourceNames(oversized)["16"])
+    }
+
     func testRecoveredSiteReplacesPartialPageWithoutDiscardingOtherSites() {
         let original = [
             NativeSearchHit(siteKey: "a", item: Item(id: "a-old")),

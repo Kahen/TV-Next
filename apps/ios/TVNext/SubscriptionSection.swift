@@ -24,6 +24,7 @@ struct SubscriptionSection: View {
     @State private var crossSiteFailedKeys: [String] = []
     @State private var crossSiteSearchKeyword: String?
     @State private var crossSiteSourceOrder: [String] = []
+    @State private var crossSiteSourceNames: [String: String] = [:]
     @State private var crossSiteWarnings: [String] = []
     @State private var line = 0
     @State private var error: String?
@@ -76,7 +77,7 @@ struct SubscriptionSection: View {
                         Text("跨站搜索结果").font(.headline)
                         ForEach(crossSiteResults.indices, id: \.self) { index in
                             let hit = crossSiteResults[index]
-                            Button(hit.item.name + " · " + (document?.sites.first(where: { $0.key == hit.siteKey })?.name ?? hit.siteKey)) {
+                            Button(hit.item.name + " · " + (crossSiteSourceNames[hit.siteKey] ?? hit.siteKey)) {
                                 inspect(hit.item, from: hit.siteKey)
                             }.disabled(busy).padding(.vertical, 4)
                         }
@@ -108,7 +109,7 @@ struct SubscriptionSection: View {
     }
     private func clearCrossSiteSearch() {
         crossSiteResults = []; crossSiteFailures = []; crossSiteFailedKeys = []
-        crossSiteSearchKeyword = nil; crossSiteSourceOrder = []; crossSiteWarnings = []
+        crossSiteSearchKeyword = nil; crossSiteSourceOrder = []; crossSiteSourceNames = [:]; crossSiteWarnings = []
     }
     private func switchDetailSite(_ key: String) {
         var scope = NativeSiteBrowsingContext(
@@ -171,7 +172,11 @@ struct SubscriptionSection: View {
             return
         }
         crossSiteSearchKeyword = keyword
-        crossSiteSourceOrder = NativeCrossSiteSearch.selectedSourceKeys(sources)
+        let selected = NativeCrossSiteSearch.selectedSources(sources)
+        crossSiteSourceOrder = selected.map(\.key)
+        // Bind displayed provenance to the actual eligible providers, not
+        // an earlier hidden/unsupported duplicate in the raw subscription.
+        crossSiteSourceNames = NativeCrossSiteSearch.selectedSourceNames(selected)
         run { api, id in
             let result = try await NativeCrossSiteSearch.search(sources: sources, concurrency: document.sites.contains { $0.type == 3 && $0.supported } ? 2 : 4, fetch: { source, number in
                 var r = NativeSiteRequest()

@@ -241,3 +241,7 @@ The user may explicitly select GB18030 for a **local Files/SMB SRT/VTT/ASS/SSA**
 ## 2026-11-02 P2 native cross-provider failure recovery (#144)
 
 Native SwiftUI adds a user-initiated retry for only the failed FongMi search site keys. It preserves already successful provider hits, the originally submitted query and provider order; recovered providers atomically replace any prior partial page without duplicates. Repeated failures retain the last partial hits. The existing 16-site, four-concurrent, two-page and 600-result bounds remain. See [IOS_CROSS_SITE_RETRY.md](IOS_CROSS_SITE_RETRY.md). This is not additional type-3 Spider execution, a permitted real-provider corpus or P2 completion; final-head CI and physical-provider acceptance remain separate.
+
+### P2 native cross-provider result provenance (#146)
+
+Search result labels now use the eligible provider snapshot actually selected for search (first eligible key wins, at most 16), not an earlier hidden/unsupported duplicate key in the raw subscription. Swift positive/negative/cap tests and owned iPhone/iPad XCUI fixture exercise the change. This is a UI attribution correction, not cryptographic provider authentication, real provider corpus validation or P2 completion.

@@ -36,7 +36,11 @@ class CrossSiteRetryFixtureTests(unittest.TestCase):
     def test_success_failure_retry_and_original_query(self):
         self.get("/fixture/reset")
         document = self.post("/api/v1/subscriptions/load", {"content": "fixture", "url": ""})
-        self.assertEqual([site["key"] for site in document["sites"]], ["a", "b"])
+        self.assertEqual([site["key"] for site in document["sites"]], ["b", "a", "b"])
+        self.assertTrue(document["sites"][0]["hidden"])
+        self.assertEqual(document["sites"][0]["name"], "Hidden Spoof")
+        self.assertEqual([site["name"] for site in document["sites"] if not site["hidden"]],
+                         ["Mirror", "Mirror"])
         a = self.post("/api/v1/subscriptions/search", {"siteKey": "a", "query": "original"})
         self.assertEqual(a["items"][0]["id"], "a-id")
         with self.assertRaises(HTTPError) as error:

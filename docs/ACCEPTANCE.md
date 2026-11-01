@@ -201,3 +201,7 @@ The user may explicitly select GB18030 for a **local Files/SMB SRT/VTT/ASS/SSA**
 ### P2 native failed-site cross-provider retry (#144)
 
 Verify an owned localhost FongMi-compatible API fixture with two equal display names and distinct site keys: initial search returns A and fails B, the retry requests B only using the **original** keyword despite edits to the search field, A remains visible, B appears once and the retry control disappears. Positive/negative Swift smoke and XCTest cover failed keys, repeated failures, partial-result preservation, deterministic order, duplicate identities, unrequested keys, the 600-result cap and cancellation. Run the production SwiftUI XCUI on both iPhone/iPad simulators and final-head Web/API/PostgreSQL/Compose/NAS/Spider isolation integration before merging. No real provider, physical Apple-device, Apple signing, authorized Spider corpus or P2/P6 completion claim. See [IOS_CROSS_SITE_RETRY.md](IOS_CROSS_SITE_RETRY.md).
+
+### P2 iOS cross-site provenance acceptance (#146)
+
+Final HEAD must pass Swift smoke/XCTest for duplicate eligible keys, unknown keys and the 16-site boundary, plus production iPhone/iPad XCUI against an owned localhost subscription where a hidden duplicate precedes the eligible provider. Both Web/API and full integration (iOS, PostgreSQL, NAS, Compose, Spider isolation) must pass. A displayed provider name is not authentication of remote content, and physical-device/real-provider evidence remains open.
