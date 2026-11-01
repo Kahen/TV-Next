@@ -16,10 +16,10 @@ enum LocalCaptionReader {
         return ns.domain == NSCocoaErrorDomain && ns.code == CocoaError.userCancelled.rawValue
     }
 
-    static func load(_ source: URL) async throws -> [CaptionCue] {
+    static func load(_ source: URL, encoding: CaptionTextEncoding = .unicode) async throws -> [CaptionCue] {
         try Task<Never, Never>.checkCancellation()
         let worker = Task.detached(priority: .userInitiated) {
-            try readAndParse(source)
+            try readAndParse(source, encoding: encoding)
         }
         return try await withTaskCancellationHandler {
             try await worker.value
@@ -28,7 +28,7 @@ enum LocalCaptionReader {
         }
     }
 
-    private static func readAndParse(_ source: URL) throws -> [CaptionCue] {
+    private static func readAndParse(_ source: URL, encoding: CaptionTextEncoding) throws -> [CaptionCue] {
         guard source.isFileURL, supportedExtensions.contains(source.pathExtension.lowercased()) else {
             throw CaptionError.invalidTimeline
         }
@@ -42,17 +42,17 @@ enum LocalCaptionReader {
         var coordinationError: NSError?
         var result: Result<[CaptionCue], Error>?
         coordinator.coordinate(readingItemAt: source, options: [], error: &coordinationError) { url in
-            result = Result { try readBounded(url) }
+            result = Result { try readBounded(url, encoding: encoding) }
         }
         if let coordinationError { throw coordinationError }
         guard let result else { throw CaptionError.unavailableFile }
         return try result.get()
         #else
-        return try readBounded(source)
+        return try readBounded(source, encoding: encoding)
         #endif
     }
 
-    private static func readBounded(_ url: URL) throws -> [CaptionCue] {
+    private static func readBounded(_ url: URL, encoding: CaptionTextEncoding) throws -> [CaptionCue] {
         let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
         guard (attributes[.type] as? FileAttributeType) == .typeRegular else {
             throw CaptionError.invalidTimeline
@@ -77,6 +77,6 @@ enum LocalCaptionReader {
             data.append(chunk)
         }
         try Task<Never, Never>.checkCancellation()
-        return try CaptionParser.parse(data)
+        return try CaptionParser.parse(data, encoding: encoding)
     }
 }

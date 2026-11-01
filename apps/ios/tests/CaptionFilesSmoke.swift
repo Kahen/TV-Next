@@ -22,6 +22,16 @@ struct CaptionFilesSmoke {
         let utf16Cues = try await LocalCaptionReader.load(utf16)
         precondition(utf16Cues.count == 1 && utf16Cues[0].text == "中文文件")
 
+        let legacy = root.appendingPathComponent("owned-gb18030.srt")
+        try (Data("1\n00:00:01,000 --> 00:00:03,000\n".utf8) +
+             Data([0xD6, 0xD0, 0xCE, 0xC4]) + Data("\n".utf8)).write(to: legacy)
+        do {
+            _ = try await LocalCaptionReader.load(legacy)
+            fatalError("Implicit legacy encoding accepted")
+        } catch CaptionError.invalidEncoding {}
+        let legacyCues = try await LocalCaptionReader.load(legacy, encoding: .gb18030)
+        precondition(legacyCues.first?.text == "中文")
+
         let boundary = root.appendingPathComponent("boundary.vtt")
         let header = Data("WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nVisible\n".utf8)
         var exactly = header

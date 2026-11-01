@@ -47,6 +47,7 @@ struct ContentView: View {
     @State private var stagedMediaBytes: Int64 = 0
     @State private var stagedMediaTotal: Int64?
     @State private var captionFileName: String?
+    @State private var captionImportEncoding: CaptionTextEncoding = .unicode
     @State private var captionOffsetSeconds: Double = 0
     @State private var isShowingExporter = false
     @State private var exportDocument: M3UExportDocument?
@@ -622,6 +623,18 @@ struct ContentView: View {
                         }.buttonStyle(.bordered)
                     }
                 }
+                Picker("字幕文件编码", selection: $captionImportEncoding) {
+                    Text("Unicode（默认）").tag(CaptionTextEncoding.unicode)
+                    Text("GB18030（手动）").tag(CaptionTextEncoding.gb18030)
+                }
+                .pickerStyle(.menu)
+                .disabled(isLoadingCaption)
+                .accessibilityIdentifier("caption-import-encoding")
+                Text("字幕编码：" + (captionImportEncoding == .gb18030 ? "GB18030（手动）" : "Unicode（默认）"))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("caption-encoding-mode")
+                Text("仅在确定字幕使用 GBK/GB18030 时手动选择；不会自动猜测或保存编码。")
+                    .font(.caption).foregroundStyle(.secondary)
                 if isLoadingCaption {
                     ProgressView("正在从文件 App 读取字幕…")
                         .accessibilityIdentifier("caption-import-progress")
@@ -960,11 +973,12 @@ struct ContentView: View {
         let generation = UUID()
         captionImportGeneration = generation
         isLoadingCaption = true
-        captionImportTask = Task { await importCaption(source, generation: generation) }
+        let encoding = captionImportEncoding
+        captionImportTask = Task { await importCaption(source, encoding: encoding, generation: generation) }
     }
 
     @MainActor
-    private func importCaption(_ source: URL, generation: UUID) async {
+    private func importCaption(_ source: URL, encoding: CaptionTextEncoding, generation: UUID) async {
         defer {
             if captionImportGeneration == generation {
                 isLoadingCaption = false
@@ -972,7 +986,7 @@ struct ContentView: View {
             }
         }
         do {
-            let cues = try await LocalCaptionReader.load(source)
+            let cues = try await LocalCaptionReader.load(source, encoding: encoding)
             guard !Task.isCancelled, captionImportGeneration == generation else { return }
             remoteCaptions.cancel()
             library.setCaptions(cues)

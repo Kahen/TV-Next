@@ -38,6 +38,27 @@ final class LocalCaptionReaderTests: XCTestCase {
         }
     }
 
+    func testExplicitGB18030FileImportPreservesDefaultUnicodeMode() async throws {
+        try await withFolder { root in
+            let source = root.appendingPathComponent("legacy.srt")
+            let data = Data("1\n00:00:01,000 --> 00:00:02,000\n".utf8) +
+                Data([0xD6, 0xD0, 0xCE, 0xC4]) + Data("\n".utf8)
+            try data.write(to: source)
+            do {
+                _ = try await LocalCaptionReader.load(source)
+                XCTFail("Legacy bytes must not be auto-detected")
+            } catch CaptionError.invalidEncoding {}
+            let cues = try await LocalCaptionReader.load(source, encoding: .gb18030)
+            XCTAssertEqual(cues, [CaptionCue(start: 1, end: 2, text: "中文")])
+            let malformed = root.appendingPathComponent("malformed.srt")
+            try Data([0x81]).write(to: malformed)
+            do {
+                _ = try await LocalCaptionReader.load(malformed, encoding: .gb18030)
+                XCTFail("Malformed GB18030 was accepted")
+            } catch CaptionError.invalidEncoding {}
+        }
+    }
+
     func testEmptyOversizedAndUnsupportedFilesFailClosed() async throws {
         try await withFolder { root in
             let empty = root.appendingPathComponent("empty.srt")

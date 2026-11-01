@@ -1,4 +1,11 @@
 import Foundation
+import CoreFoundation
+
+/// Explicit local-file charset choice. Never infer legacy encodings from arbitrary bytes.
+enum CaptionTextEncoding: String, Sendable {
+    case unicode
+    case gb18030
+}
 
 struct CaptionCue: Equatable {
     let start: TimeInterval
@@ -17,7 +24,7 @@ enum CaptionError: LocalizedError {
         switch self {
         case .empty: return "字幕文件为空。"
         case .tooLarge: return "字幕文件超过 1 MiB。"
-        case .invalidEncoding: return "字幕须为 UTF-8 或带 BOM 的 UTF-16LE/BE 编码（SRT、WebVTT、ASS/SSA）。"
+        case .invalidEncoding: return "字幕编码无效：默认支持 UTF-8 / 带 BOM 的 UTF-16；旧字幕请在导入前手动选择 GB18030。"
         case .invalidTimeline: return "未识别有效的字幕时间轴；仅支持基础 SRT / WebVTT / ASS / SSA 文本字幕。"
         case .unavailableFile: return "无法读取文件 App 或 SMB 共享中的字幕；请检查共享连接与文件权限。"
         }
@@ -32,15 +39,23 @@ enum CaptionParser {
     )
     private static let tags = try! NSRegularExpression(pattern: #"<[^>]*>"#)
 
-    static func parse(_ data: Data) throws -> [CaptionCue] {
+    static func parse(_ data: Data, encoding: CaptionTextEncoding = .unicode) throws -> [CaptionCue] {
         guard !data.isEmpty else { throw CaptionError.empty }
         guard data.count <= 1_048_576 else { throw CaptionError.tooLarge }
-        // Decode only explicitly BOM-marked UTF-16. Never guess a legacy
-        // charset or interpret arbitrary binary as a subtitle document.
+        // Unicode is the default. GB18030 is opt-in for a user-selected local
+        // file only; never guess a legacy charset or reinterpret BOM input.
         let littleEndian = data.starts(with: [0xFF, 0xFE])
         let bigEndian = data.starts(with: [0xFE, 0xFF])
         let decoded: String?
-        if littleEndian || bigEndian {
+        if encoding == .gb18030 {
+            guard !littleEndian, !bigEndian, !data.starts(with: [0xEF, 0xBB, 0xBF]) else {
+                throw CaptionError.invalidEncoding
+            }
+            // CoreFoundation's GB18030-2000 identifier is 0x0632. Resolve
+            // the corresponding NSStringEncoding instead of guessing bytes.
+            let nsEncoding = CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(0x0632))
+            decoded = String(data: data, encoding: String.Encoding(rawValue: nsEncoding))
+        } else if littleEndian || bigEndian {
             guard data.count > 2, data.count.isMultiple(of: 2) else {
                 throw CaptionError.invalidEncoding
             }

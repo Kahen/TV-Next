@@ -191,3 +191,8 @@ Require Swift smoke and XCTest for valid case-insensitive USN/UDN match, missing
 - [ ] Use only the existing 8-second, 32-KiB, no-redirect/no-cookie/no-proxy UPnP description GET; require matching root UDN and same-origin AVTransport control URL after I/O.
 - [ ] Pass positive/negative Swift smoke, native iPhone/iPad XCTest/XCUI, Web/API, PostgreSQL, Compose, NAS and Spider-isolation gates at the final PR HEAD; merge and close #140 only after these pass.
 - [ ] Record real multicast entitlement, physical iPhone/iPad and renderer interoperability separately under #114/#5. No automatic cast or signed distribution claim.
+
+
+## P4 native iOS explicit GB18030 subtitle import (#142)
+
+The user may explicitly select GB18030 for a **local Files/SMB SRT/VTT/ASS/SSA** import. Default decoding remains strict UTF-8 or BOM-marked UTF-16LE/BE; no legacy encoding sniffing or persisted charset is added. The choice is captured when import starts, while the existing coordinated 1 MiB read, cancellation, old-cue-on-error behavior and private Files Provider credentials remain unchanged. Malformed GB18030 and BOM-marked input in legacy mode are rejected. Remote subscription captions are unaffected. Swift smoke, XCTest and production iPhone/iPad XCUI plus final-HEAD Web/API and full integration CI are required; physical SMB/provider behavior, Apple signing and P4 parent #5 remain unverified.
