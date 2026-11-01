@@ -41,9 +41,13 @@ enum NativeCrossSiteSearch {
 
     /// Match the coordinator's first-unique-provider selection, including
     /// subscriptions that repeat a key before the 16-site boundary.
-    static func selectedSourceKeys(_ sources: [NativeSearchSource]) -> [String] {
+    static func selectedSources(_ sources: [NativeSearchSource]) -> [NativeSearchSource] {
         var seen = Set<String>()
-        return Array(sources.map(\.key).filter { seen.insert($0).inserted }.prefix(maxSites))
+        return Array(sources.filter { seen.insert($0.key).inserted }.prefix(maxSites))
+    }
+
+    static func selectedSourceKeys(_ sources: [NativeSearchSource]) -> [String] {
+        selectedSources(sources).map(\.key)
     }
 
     /// Select only previously failed provider keys from the caller's already
@@ -98,7 +102,7 @@ enum NativeCrossSiteSearch {
         try Task.checkCancellation()
         var seenSources = Set<String>()
         let eligible = sources.filter { seenSources.insert($0.key).inserted }
-        let selected = Array(eligible.prefix(maxSites))
+        let selected = selectedSources(eligible)
         var grouped = Array(repeating: [NativeSearchHit<Item>](), count: selected.count)
         var failures = Set<Int>()
         var truncated = Set<Int>()
