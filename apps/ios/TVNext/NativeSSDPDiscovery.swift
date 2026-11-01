@@ -35,7 +35,7 @@ actor NativeSSDPDiscovery {
     static let maxCandidates = 32
 
     private var scanning = false
-    private var lastStartedAt = Date.distantPast
+    private var lastStartedAt: TimeInterval = -.greatestFiniteMagnitude
 
     /// Only these two fixed targets are emitted, with a single request per target.
     static func request(for target: String) -> Data? {
@@ -64,11 +64,12 @@ actor NativeSSDPDiscovery {
     /// No background scan, persisted address, or automatic renderer control.
     func discover() async throws -> [NativeSSDPResponse.Candidate] {
         guard !scanning else { throw DiscoveryError.busy }
-        guard Date().timeIntervalSince(lastStartedAt) >= Self.cooldownSeconds else {
+        let now = ProcessInfo.processInfo.systemUptime
+        guard now - lastStartedAt >= Self.cooldownSeconds else {
             throw DiscoveryError.rateLimited
         }
         scanning = true
-        lastStartedAt = Date()
+        lastStartedAt = now
         defer { scanning = false }
         let worker = Task.detached(priority: .userInitiated) {
             try Self.scan(destination: Self.multicastAddress, port: Self.multicastPort,
@@ -144,14 +145,14 @@ actor NativeSSDPDiscovery {
             guard written == packet.count else { throw DiscoveryError.networkUnavailable }
         }
 
-        let deadline = Date().addingTimeInterval(min(max(duration, 0.1), maxDurationSeconds))
+        let deadline = ProcessInfo.processInfo.systemUptime + min(max(duration, 0.1), maxDurationSeconds)
         var candidates: [NativeSSDPResponse.Candidate] = []
         var seen = Set<String>()
         var received = 0
-        while Date() < deadline && received < maxPackets && candidates.count < maxCandidates {
+        while ProcessInfo.processInfo.systemUptime < deadline && received < maxPackets && candidates.count < maxCandidates {
             try Task<Never, Never>.checkCancellation()
             var pfd = pollfd(fd: fd, events: Int16(POLLIN), revents: 0)
-            let remaining = Int(deadline.timeIntervalSinceNow * 1000)
+            let remaining = Int((deadline - ProcessInfo.processInfo.systemUptime) * 1000)
             let ready = poll(&pfd, 1, Int32(max(1, min(100, remaining))))
             if ready == 0 { continue }
             if ready < 0 {
