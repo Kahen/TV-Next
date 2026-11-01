@@ -183,6 +183,14 @@ final class LibraryUITests: XCTestCase {
         reveal(recovered)
         XCTAssertTrue(recovered.exists, "Recovered provider result is missing")
         XCTAssertTrue(healthy.exists, "Retry discarded an already successful provider")
+        // The raw subscription has a hidden B entry before the eligible B.
+        // Provenance must identify the actual searched provider, not the
+        // hidden first key match; both eligible providers share "Mirror".
+        XCTAssertEqual(recovered.label, "B result · Mirror")
+        XCTAssertEqual(healthy.label, "A result · Mirror")
+        XCTAssertFalse(app.buttons.matching(
+            NSPredicate(format: "label CONTAINS %@", "Hidden Spoof")
+        ).firstMatch.exists)
     }
 
     func testCaptionEncodingIsExplicitAndDoesNotStartImport() {
