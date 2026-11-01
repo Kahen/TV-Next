@@ -147,3 +147,10 @@ Required before merging: Linux/macOS Swift smoke (multi-chunk copy, empty/oversi
 #### 2026-11-01 picker presentation regression
 
 Full CI [41231112970](https://github.com/Kahen/TV-Next/actions/runs/41231112970) failed on iPhone and iPad at `testFilesSMBImportEntryOpensSystemDocumentPicker`: the simulator exposed neither the SwiftUI `fileImporter` cancel control nor a Files process accessibility hierarchy. A new UIKit `UIDocumentPickerViewController` is hosted by an explicit SwiftUI sheet, with deterministic close and cancellation assertions. The XCUI sheet assertion proves app presentation and no playback on cancellation, **not** that a real SMB document can be browsed or hydrated. Do not merge until the replacement final-HEAD 9/9 integration gate and Web/API 3/3 pass; physical NAS verification remains open.
+
+### P4 native Files/SMB cancelable staging progress (#126)
+
+- [ ] Production iOS shows a cancel action only while staging user-selected Files-provider media; reports actual copied bytes and optional bounded file-size progress, never synthetic SMB network throughput.
+- [ ] Cancel, app background and library clear invalidate the current generation, cancel the worker and prevent stale completion from launching playback; partial files are deleted. Provider coordination may not be immediately interruptible.
+- [ ] Positive, negative and boundary Swift smoke/XCTest verify 1 MiB chunk updates, final count, pre-cancel and mid-copy cancellation cleanup. Production iPhone/iPad XCUI checks picker cancellation leaves progress absent and no media selected.
+- [ ] Final HEAD Web/API and 9-job aggregate CI (including iPhone/iPad XCTest/XCUI) succeed before merging and closing #126. Actual NAS SMB, physical-device interaction, security audit and signing remain separate.
