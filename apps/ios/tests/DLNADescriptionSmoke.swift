@@ -47,7 +47,7 @@ import FoundationNetworking
         precondition(!NativeSSDPResponse.matchesDescriptionUDN(wrongTarget, udn: "uuid:owned-device"))
         let malformedIdentities = [
             "<UDN/>", "<UDN>uuid:</UDN>", "<UDN>uuid:bad identity</UDN>",
-            "<UDN>uuid:bad\\nidentity</UDN>", "<UDN>uuid:bad\\u{202E}id</UDN>",
+            "<UDN>uuid:bad\nidentity</UDN>", "<UDN>uuid:bad\u{202E}id</UDN>",
             "<UDN>uuid:one</UDN><UDN>uuid:two</UDN>",
             "<UDN><child>uuid:owned-device</child></UDN>",
             "<x:UDN xmlns:x=\"urn:foreign\">uuid:owned-device</x:UDN>",
