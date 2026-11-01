@@ -44,7 +44,7 @@ struct CaptionSmoke {
         do {
             _ = try CaptionParser.parse(multilingual.data(using: .utf16LittleEndian)!)
             fatalError("BOM-less UTF-16 was accepted")
-        } catch CaptionError.invalidTimeline {}
+        } catch CaptionError.invalidEncoding {}
 
         let vtt = """
         WEBVTT
