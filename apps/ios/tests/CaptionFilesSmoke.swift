@@ -14,6 +14,14 @@ struct CaptionFilesSmoke {
         precondition(cues.count == 1 && cues[0].text == "SMB subtitle")
         precondition(cues[0].start == 1 && cues[0].end == 3)
 
+        let utf16 = root.appendingPathComponent("owned-utf16.ssa")
+        let ass = "[Events]\nFormat: Start, End, Text\nDialogue: 0:00:01.00,0:00:03.00,中文文件\n"
+        var utf16Bytes = Data([0xFE, 0xFF])
+        utf16Bytes.append(ass.data(using: .utf16BigEndian)!)
+        try utf16Bytes.write(to: utf16)
+        let utf16Cues = try await LocalCaptionReader.load(utf16)
+        precondition(utf16Cues.count == 1 && utf16Cues[0].text == "中文文件")
+
         let boundary = root.appendingPathComponent("boundary.vtt")
         let header = Data("WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nVisible\n".utf8)
         var exactly = header
