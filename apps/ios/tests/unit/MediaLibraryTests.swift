@@ -623,6 +623,29 @@ final class MediaLibraryTests: XCTestCase {
         catch is CancellationError { }
     }
 
+    func testFilesStagingCapacityReserveAndDiskFullErrors() {
+        let reserve = LocalMediaStager.freeSpaceReserveBytes
+        XCTAssertFalse(LocalMediaStager.hasCapacity(availableBytes: reserve - 1, expectedBytes: nil))
+        XCTAssertTrue(LocalMediaStager.hasCapacity(availableBytes: reserve, expectedBytes: nil))
+        XCTAssertFalse(LocalMediaStager.hasCapacity(availableBytes: reserve, expectedBytes: 1))
+        XCTAssertTrue(LocalMediaStager.hasCapacity(availableBytes: reserve + 2_500_000, expectedBytes: 2_500_000))
+        XCTAssertFalse(LocalMediaStager.hasCapacity(availableBytes: reserve + 2_500_000, expectedBytes: 2_500_001))
+        XCTAssertTrue(LocalMediaStager.hasCapacity(availableBytes: Int64.max, expectedBytes: Int64.max - reserve))
+        XCTAssertFalse(LocalMediaStager.hasCapacity(availableBytes: Int64.max, expectedBytes: Int64.max))
+
+        for diskFull in [
+            NSError(domain: NSCocoaErrorDomain, code: NSFileWriteOutOfSpaceError),
+            NSError(domain: NSPOSIXErrorDomain, code: 28)
+        ] {
+            XCTAssertEqual(LocalMediaStager.normalizedWriteError(diskFull) as? LocalMediaError,
+                           .insufficientStorage)
+        }
+        let unrelated = NSError(domain: "TVNextSynthetic", code: 17)
+        let mapped = LocalMediaStager.normalizedWriteError(unrelated) as NSError
+        XCTAssertEqual(mapped.domain, unrelated.domain)
+        XCTAssertEqual(mapped.code, unrelated.code)
+    }
+
     func testColdLaunchFilesStagingCleanupIsScopedAndIdempotent() throws {
         let fm = FileManager.default
         let root = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
