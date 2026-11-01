@@ -188,3 +188,8 @@ Adds explicitly BOM-marked UTF-16LE/BE subtitle text decoding to the existing na
 ### P4 iOS root-device UDN identity binding (#138, 2026-11-01)
 
 Manual native UPnP device-description import now parses and displays an optional bounded `uuid:` root UDN. A pure discovery-candidate validation helper binds the SSDP USN UUID to that UDN and rejects missing/mismatched identity while retaining strict same-IP/port AVTransport control URL validation. Manual imports without UDN remain compatible. Positive/negative Swift smoke, XCTest, owned localhost XML and iPhone/iPad XCUI plus final-head integration are required for this subtask. Apple multicast entitlement, real renderer/iPhone/iPad interoperability, authentication of the device identity and parent #114/#5 remain open.
+
+
+## Native SSDP candidate-to-description resolution (P4, #140)
+
+A dormant Swift resolver now preflights previously parsed SSDP candidates before requesting any LOCATION, then uses the existing bounded private-LAN UPnP GET and checks root-device UDN against SSDP USN and AVTransport control origin. Owned positive/negative smoke and XCTest cover unsafe metadata, mismatched identity/control origin, and cancellation. This is not a user-facing multicast scanner, cryptographic device authentication, automatic casting or proof of physical interoperability. The code slice is pending final-HEAD aggregate iPhone/iPad and cross-platform CI; #114 and P4 #5 remain open. No Apple signing or Release.
