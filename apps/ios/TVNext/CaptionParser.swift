@@ -11,6 +11,7 @@ enum CaptionError: LocalizedError {
     case tooLarge
     case invalidEncoding
     case invalidTimeline
+    case unavailableFile
 
     var errorDescription: String? {
         switch self {
@@ -18,6 +19,7 @@ enum CaptionError: LocalizedError {
         case .tooLarge: return "字幕文件超过 1 MiB。"
         case .invalidEncoding: return "字幕必须是 UTF-8 编码的 SRT、WebVTT 或 ASS/SSA。"
         case .invalidTimeline: return "未识别有效的字幕时间轴；仅支持基础 SRT / WebVTT / ASS / SSA 文本字幕。"
+        case .unavailableFile: return "无法读取文件 App 或 SMB 共享中的字幕；请检查共享连接与文件权限。"
         }
     }
 }
