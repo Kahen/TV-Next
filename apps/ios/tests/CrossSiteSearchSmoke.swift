@@ -82,6 +82,20 @@ private actor RequestCounter {
             NativeSearchSource(key: "b", name: "B")
         ]
         precondition(NativeCrossSiteSearch.selectedSourceKeys(repeatedSources) == ["a", "b"])
+        // The UI filters hidden/unsupported subscription entries *before*
+        // resolving failed keys. A hidden first occurrence of "b" must not
+        // shadow a later eligible "b"; duplicate eligible keys are requested once.
+        let eligibleForRetry = [
+            NativeSearchSource(key: "a", name: "Visible A"),
+            NativeSearchSource(key: "b", name: "Visible B"),
+            NativeSearchSource(key: "b", name: "Duplicate B")
+        ]
+        let failedOnly = NativeCrossSiteSearch.failedOnlySources(
+            eligibleForRetry, failedKeys: ["b", "missing", "b"])
+        precondition(failedOnly.map(\.key) == ["b"])
+        precondition(failedOnly.map(\.name) == ["Visible B"])
+        precondition(NativeCrossSiteSearch.failedOnlySources(
+            eligibleForRetry, failedKeys: ["unknown"]).isEmpty)
 
         // A retry is routed by provider key, not display name. Failed page-2
         // providers retain their partial results until a successful retry.
