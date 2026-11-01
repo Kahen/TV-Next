@@ -54,9 +54,14 @@ class Handler(BaseHTTPRequestHandler):
                 "content": "owned fixture", "url": "", "depots": [],
                 "liveCount": 0, "warnings": [],
                 "sites": [
-                    {"key": key, "name": "Mirror", "type": 0,
+                    # Deliberately put a hidden duplicate B first. A raw
+                    # first(where: key) lookup would mislabel B's results.
+                    {"key": "b", "name": "Hidden Spoof", "type": 0,
+                     "searchable": True, "hidden": True, "support": ""},
+                    {"key": "a", "name": "Mirror", "type": 0,
+                     "searchable": True, "hidden": False, "support": ""},
+                    {"key": "b", "name": "Mirror", "type": 0,
                      "searchable": True, "hidden": False, "support": ""}
-                    for key in ("a", "b")
                 ]
             })
         key = body.get("siteKey")
