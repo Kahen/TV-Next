@@ -5,6 +5,7 @@ enum LocalMediaError: LocalizedError {
     case emptyFile
     case oversizedFile
     case unavailableFile
+    case insufficientStorage
 
     var errorDescription: String? {
         switch self {
@@ -12,6 +13,7 @@ enum LocalMediaError: LocalizedError {
         case .emptyFile: return "无法播放空文件。"
         case .oversizedFile: return "本地文件超过当前 2 GiB 导入上限。"
         case .unavailableFile: return "无法读取文件提供方中的媒体；请检查共享连接与文件权限。"
+        case .insufficientStorage: return "设备可用存储空间不足，无法导入媒体；请释放本机空间后重试。"
         }
     }
 }
@@ -23,6 +25,40 @@ enum LocalMediaStager {
     private static let extensions: Set<String> = ["mp4", "m4v", "mov", "mp3", "m4a", "aac"]
     static let maxBytes: Int64 = 2_147_483_648
     private static let chunkBytes = 1_048_576
+    // Preserve headroom for iOS and other apps. This is a conservative
+    // preflight, not a guarantee that the volume cannot fill during a copy.
+    static let freeSpaceReserveBytes: Int64 = 64 * 1_048_576
+
+    static func hasCapacity(availableBytes: Int64, expectedBytes: Int64?) -> Bool {
+        guard availableBytes >= freeSpaceReserveBytes else { return false }
+        guard let expectedBytes, expectedBytes > 0 else { return true }
+        // Subtract first to avoid overflow on provider-supplied sizes.
+        return expectedBytes <= availableBytes - freeSpaceReserveBytes
+    }
+
+    private static func preflightSpace(in cache: URL, expectedBytes: Int64?) throws {
+        // Some Files providers cannot report a file size. A missing volume
+        // capacity is not a reason to reject a potentially valid import;
+        // actual writes still enforce the limit and clean up on failure.
+        guard let attributes = try? FileManager.default.attributesOfFileSystem(forPath: cache.path),
+              let free = (attributes[.systemFreeSize] as? NSNumber)?.int64Value else { return }
+        guard hasCapacity(availableBytes: free, expectedBytes: expectedBytes) else {
+            throw LocalMediaError.insufficientStorage
+        }
+    }
+
+    private static func writeChunk(_ bytes: Data, to output: FileHandle) throws {
+        do {
+            try output.write(contentsOf: bytes)
+        } catch {
+            let ns = error as NSError
+            if (ns.domain == NSCocoaErrorDomain && ns.code == NSFileWriteOutOfSpaceError) ||
+                (ns.domain == NSPOSIXErrorDomain && ns.code == 28) {
+                throw LocalMediaError.insufficientStorage
+            }
+            throw error
+        }
+    }
 
     static func stage(_ source: URL, onProgress: (@Sendable (Int64, Int64?) -> Void)? = nil) async throws -> URL {
         try Task<Never, Never>.checkCancellation()
@@ -75,6 +111,8 @@ enum LocalMediaStager {
         let cache = fileManager.urls(for: .cachesDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("TVNextImported", isDirectory: true)
         try fileManager.createDirectory(at: cache, withIntermediateDirectories: true)
+        try preflightSpace(in: cache, expectedBytes: (attrs[.size] as? NSNumber)?.int64Value)
+        try Task<Never, Never>.checkCancellation()
         let destination = cache.appendingPathComponent(UUID().uuidString).appendingPathExtension(ext)
         guard fileManager.createFile(atPath: destination.path, contents: nil) else {
             throw LocalMediaError.unavailableFile
@@ -93,7 +131,7 @@ enum LocalMediaStager {
             let bytes = try input.read(upToCount: chunkBytes) ?? Data()
             if bytes.isEmpty { break }
             guard Int64(bytes.count) <= maxBytes - total else { throw LocalMediaError.oversizedFile }
-            try output.write(contentsOf: bytes)
+            try writeChunk(bytes, to: output)
             total += Int64(bytes.count)
             // Only report bytes actually copied. File Provider sizes may be
             // absent or stale; never report a percentage above 100%.
