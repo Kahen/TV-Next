@@ -82,6 +82,22 @@ private actor RequestCounter {
             NativeSearchSource(key: "b", name: "B")
         ]
         precondition(NativeCrossSiteSearch.selectedSourceKeys(repeatedSources) == ["a", "b"])
+        // The UI must render provenance from the eligible searched sites,
+        // never the first raw-subscription entry with a matching key.
+        let eligibleNames = [
+            NativeSearchSource(key: "a", name: "Visible A"),
+            NativeSearchSource(key: "b", name: "Visible B"),
+            NativeSearchSource(key: "b", name: "Duplicate Eligible B")
+        ]
+        let names = NativeCrossSiteSearch.selectedSourceNames(eligibleNames)
+        precondition(names == ["a": "Visible A", "b": "Visible B"])
+        precondition(names["unknown"] == nil)
+        let limitedNames = NativeCrossSiteSearch.selectedSourceNames(
+            (0..<20).map { NativeSearchSource(key: String($0), name: "Visible \($0)") }
+        )
+        precondition(limitedNames.count == 16 && limitedNames["15"] == "Visible 15")
+        precondition(limitedNames["16"] == nil)
+        precondition(NativeCrossSiteSearch.selectedSources(repeatedSources).map(\.name) == ["A", "B"])
         // The UI filters hidden/unsupported subscription entries *before*
         // resolving failed keys. A hidden first occurrence of "b" must not
         // shadow a later eligible "b"; duplicate eligible keys are requested once.
