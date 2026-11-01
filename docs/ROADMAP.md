@@ -205,3 +205,8 @@ A bounded native iPhone/iPad import UI reports actual copied bytes from user-sel
 ### P4 iOS Files staging orphan reclamation (#128)
 
 Cold app startup reclaims session-only media copies abandoned by a crash or force quit, limited to app-generated UUID-named regular media files in its private staging cache. It does not remove active-session media, user files, symlinks or folders. Swift smoke/XCTest and final-head iPhone/iPad/full CI are required; real SMB/NAS/device compatibility remains open under P4 #5.
+
+
+### P4 iOS Files/SMB local storage safety (#130)
+
+Native Files-provider media staging now includes a 64 MiB cache-volume free-space reserve preflight for known/unknown source lengths and user-visible disk-full write errors, while retaining the 2 GiB actual-byte limit and partial-copy cleanup. It does not add native SMB browsing/streaming or prove physical NAS behavior. Final-head XCTest/XCUI and full cross-platform integration remain the code acceptance gate; real-device validation remains separate.

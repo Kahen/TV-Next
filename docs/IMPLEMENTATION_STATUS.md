@@ -166,3 +166,8 @@ Following the Files-provider bounded import in #125, the native SwiftUI view exp
 ## Native Files/SMB cold-start cache reclamation (#128)
 
 User-selected Files documents are staged into a private app cache and never persisted as resumable media. After an unexpected process exit, a prior staged file could remain. App initialization now removes only UUID-named, supported-extension regular files from that dedicated directory; it excludes other files, directories, symlinks and redirected cache roots, and never runs during an active session. Synthetic positive/negative Swift smoke and XCTest cover the cleanup contract. Final-head CI and actual iPhone/iPad/NAS validation remain separate; this is not native SMB directory access, streaming or signed distribution.
+
+
+## Native Files/SMB storage preflight (P4, #130)
+
+The iOS staged-copy path now checks the cache volume's reported free capacity before allocating a local media copy, reserving 64 MiB after any known source length. Unknown File Provider lengths require the reserve only; missing capacity metadata does not block an otherwise permitted import. Out-of-space errors during actual writes map to a localized storage warning, while partial copies are removed. Swift smoke/XCTest cover exact boundaries, large values and error mapping. This is a conservative preflight, not a guaranteed space reservation or real iPhone/NAS validation; final-head simulator and aggregate CI are required.

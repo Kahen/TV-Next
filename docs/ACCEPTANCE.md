@@ -161,3 +161,8 @@ Full CI [41231112970](https://github.com/Kahen/TV-Next/actions/runs/41231112970)
 - [ ] App cold-start reclaims only its generated UUID+supported-extension regular files from the private staging cache, never while an active import/player may use them.
 - [ ] Positive and adversarial Swift smoke/XCTest: orphan cleanup, unrelated files, unsupported extensions, directory/symlink/redirected-root preservation and repeat-run idempotency.
 - [ ] Final HEAD iPhone/iPad unsigned simulator XCTest/XCUI, Web/API 3/3 and full cross-platform 9/9 pass before merge/close. This does not verify physical SMB, NAS compatibility, independent audit, signing or release.
+
+
+### P4 iOS Files/SMB storage preflight (#130)
+
+For the final PR HEAD, require Swift smoke/XCTest positive and negative reserve-boundary tests (known and unknown file size), overflow-safe arithmetic, Cocoa/POSIX disk-full error normalization without masking unrelated failures, and existing copy/cancel/partial-cleanup regressions. Require unsigned iPhone/iPad simulator build, XCTest/XCUI and complete Web/API/PostgreSQL/NAS/Compose/Spider isolation gate before merge. No real low-storage device, actual NAS or signed IPA claim.

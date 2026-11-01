@@ -89,6 +89,23 @@ private final class CopyProgressLog: @unchecked Sendable {
         try fm.createSymbolicLink(at: redirected, withDestinationURL: scratch)
         defer { try? fm.removeItem(at: redirected) }
         precondition(LocalMediaStager.purgeAbandonedImports(in: redirected) == 0)
-        print("Files SMB staging: progress, positive, empty, oversized, unsupported, mid-copy/preflight cancellation and cleanup, orphan reclamation passed")
+        // Exact reserve boundary, unknown provider size, overflow-safe large
+        // values and disk-full error translation. No actual disk exhaustion.
+        let reserve = LocalMediaStager.freeSpaceReserveBytes
+        precondition(!LocalMediaStager.hasCapacity(availableBytes: reserve - 1, expectedBytes: nil))
+        precondition(LocalMediaStager.hasCapacity(availableBytes: reserve, expectedBytes: nil))
+        precondition(!LocalMediaStager.hasCapacity(availableBytes: reserve, expectedBytes: 1))
+        precondition(LocalMediaStager.hasCapacity(availableBytes: reserve + 5, expectedBytes: 5))
+        precondition(!LocalMediaStager.hasCapacity(availableBytes: reserve + 5, expectedBytes: 6))
+        precondition(LocalMediaStager.hasCapacity(availableBytes: Int64.max, expectedBytes: Int64.max - reserve))
+        precondition(!LocalMediaStager.hasCapacity(availableBytes: Int64.max, expectedBytes: Int64.max))
+        let cocoaFull = NSError(domain: NSCocoaErrorDomain, code: NSFileWriteOutOfSpaceError)
+        let posixFull = NSError(domain: NSPOSIXErrorDomain, code: 28)
+        precondition((LocalMediaStager.normalizedWriteError(cocoaFull) as? LocalMediaError) == .insufficientStorage)
+        precondition((LocalMediaStager.normalizedWriteError(posixFull) as? LocalMediaError) == .insufficientStorage)
+        let unrelatedError = NSError(domain: "TVNextSynthetic", code: 17)
+        let preserved = LocalMediaStager.normalizedWriteError(unrelatedError) as NSError
+        precondition(preserved.domain == "TVNextSynthetic" && preserved.code == 17)
+        print("Files SMB staging: progress, positive, empty, oversized, unsupported, cancellation, orphan cleanup and storage capacity/error boundaries passed")
     }
 }
