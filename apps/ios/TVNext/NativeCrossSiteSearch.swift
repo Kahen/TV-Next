@@ -20,6 +20,8 @@ struct NativeSearchHit<Item> {
 struct NativeSearchResult<Item> {
     let items: [NativeSearchHit<Item>]
     let failed: [String]
+    /// Stable provider keys, never display names (which may collide).
+    let failedKeys: [String]
     let warnings: [String]
 }
 
@@ -36,6 +38,39 @@ enum NativeCrossSiteSearch {
     static let maxPages = 2
     static let maxItemsPerPage = 40
     static let maxResults = 600
+
+    /// Reconcile a failed-site retry with the last visible search. Successful
+    /// providers are never re-fetched or discarded; a recovered provider
+    /// atomically replaces its old partial page. A provider that fails again
+    /// retains its previous partial hits instead of showing a mixed snapshot.
+    /// Rebuild in original provider order, with per-provider identity dedupe.
+    static func mergeRetry<Item>(
+        previous: [NativeSearchHit<Item>],
+        refreshed: [NativeSearchHit<Item>],
+        recoveredKeys: Set<String>,
+        sourceOrder: [String],
+        identity: (Item) -> String?
+    ) -> [NativeSearchHit<Item>] {
+        let permitted = Set(sourceOrder.prefix(maxSites))
+        var grouped: [String: [NativeSearchHit<Item>]] = [:]
+        for hit in previous where permitted.contains(hit.siteKey) && !recoveredKeys.contains(hit.siteKey) {
+            grouped[hit.siteKey, default: []].append(hit)
+        }
+        for hit in refreshed where permitted.contains(hit.siteKey) && recoveredKeys.contains(hit.siteKey) {
+            grouped[hit.siteKey, default: []].append(hit)
+        }
+        var merged: [NativeSearchHit<Item>] = []
+        var visited = Set<String>()
+        for key in sourceOrder.prefix(maxSites) where visited.insert(key).inserted {
+            var seen = Set<String>()
+            for hit in grouped[key] ?? [] {
+                guard let id = identity(hit.item), !id.isEmpty, seen.insert(id).inserted else { continue }
+                merged.append(hit)
+                if merged.count == maxResults { return merged }
+            }
+        }
+        return merged
+    }
 
     static func search<Item>(
         sources: [NativeSearchSource],
@@ -94,6 +129,7 @@ enum NativeCrossSiteSearch {
         if all.count > maxResults { warnings.append("仅显示前 \(maxResults) 条结果。") }
         return NativeSearchResult(items: Array(all.prefix(maxResults)),
                                   failed: selected.enumerated().compactMap { failures.contains($0.offset) ? $0.element.name : nil },
+                                  failedKeys: selected.enumerated().compactMap { failures.contains($0.offset) ? $0.element.key : nil },
                                   warnings: warnings)
     }
 }
