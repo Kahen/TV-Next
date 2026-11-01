@@ -61,6 +61,13 @@ final class LocalCaptionReaderTests: XCTestCase {
         }
     }
 
+    func testOnlyActualPickerCancellationIsSilent() {
+        XCTAssertTrue(LocalCaptionReader.isUserCancellation(CocoaError(.userCancelled)))
+        XCTAssertTrue(LocalCaptionReader.isUserCancellation(CancellationError()))
+        XCTAssertFalse(LocalCaptionReader.isUserCancellation(CocoaError(.fileReadNoPermission)))
+        XCTAssertFalse(LocalCaptionReader.isUserCancellation(URLError(.notConnectedToInternet)))
+    }
+
     func testInvalidEncodingAndPreCancellationDoNotProduceCues() async throws {
         try await withFolder { root in
             let invalid = root.appendingPathComponent("bad.ssa")
