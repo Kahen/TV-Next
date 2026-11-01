@@ -192,7 +192,7 @@ Manual native UPnP device-description import now parses and displays an optional
 
 ## Native SSDP candidate-to-description resolution (P4, #140)
 
-A dormant Swift resolver now preflights previously parsed SSDP candidates before requesting any LOCATION, then uses the existing bounded private-LAN UPnP GET and checks root-device UDN against SSDP USN and AVTransport control origin. Owned positive/negative smoke and XCTest cover unsafe metadata, mismatched identity/control origin, and cancellation. This is not a user-facing multicast scanner, cryptographic device authentication, automatic casting or proof of physical interoperability. The code slice is pending final-HEAD aggregate iPhone/iPad and cross-platform CI; #114 and P4 #5 remain open. No Apple signing or Release.
+A dormant Swift resolver now preflights previously parsed SSDP candidates before requesting any LOCATION, then uses the existing bounded private-LAN UPnP GET and checks root-device UDN against SSDP USN and AVTransport control origin. Owned positive/negative smoke and XCTest cover unsafe metadata, mismatched identity/control origin, and cancellation. This is not a user-facing multicast scanner, cryptographic device authentication, automatic casting or proof of physical interoperability. Final HEAD `b5244f37` passed [Web/API](https://github.com/Kahen/TV-Next/actions/runs/41317811679) and [full integration](https://github.com/Kahen/TV-Next/actions/runs/41317811712), including iPhone/iPad XCTest/XCUI; PR #141 merged and #140 closed. #114 and P4 #5 remain open. No Apple signing or Release.
 
 
 ## P4 native iOS explicit GB18030 subtitle import (#142)

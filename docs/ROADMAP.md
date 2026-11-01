@@ -231,7 +231,7 @@ The manual native DLNA description import displays a bounded optional root UDN. 
 
 ### P4 native SSDP candidate-to-description resolution (#140)
 
-- [ ] On final-HEAD automated acceptance, the dormant iOS resolver validates SSDP candidate metadata before requesting its private-IPv4 LOCATION, fetches through the existing bounded UPnP description transport and requires root UDN/SSDP USN identity plus same-origin AVTransport control. No multicast UI or automatic casting is enabled. Require Swift positive/negative smoke, iPhone/iPad XCTest/XCUI and full aggregate CI. Apple multicast entitlement, real device/renderer validation and parent #114/#5 remain open.
+- [x] On final-HEAD automated acceptance, the dormant iOS resolver validates SSDP candidate metadata before requesting its private-IPv4 LOCATION, fetches through the existing bounded UPnP description transport and requires root UDN/SSDP USN identity plus same-origin AVTransport control. No multicast UI or automatic casting is enabled. Require Swift positive/negative smoke, iPhone/iPad XCTest/XCUI and full aggregate CI. Apple multicast entitlement, real device/renderer validation and parent #114/#5 remain open.
 
 
 ## P4 native iOS explicit GB18030 subtitle import (#142)

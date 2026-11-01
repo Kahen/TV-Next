@@ -53,7 +53,8 @@ struct CaptionSmoke {
             _ = try CaptionParser.parse(gb18030)
             fatalError("Implicit GB18030 fallback accepted")
         } catch CaptionError.invalidEncoding {}
-        precondition(try CaptionParser.parse(gb18030, encoding: .gb18030).first?.text == "中文")
+        let gbCues = try CaptionParser.parse(gb18030, encoding: .gb18030)
+        precondition(gbCues.first?.text == "中文")
         for invalid in [Data([0x81]), Data([0xFF]), Data([0xFF, 0xFE, 0x31, 0x00]), utf8BOM] {
             do {
                 _ = try CaptionParser.parse(invalid, encoding: .gb18030)
