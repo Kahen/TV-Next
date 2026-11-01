@@ -175,3 +175,7 @@ Require exact fixed-target request positive/negative Swift smoke/XCTest, disallo
 ### P4 coordinated native Files/SMB subtitle acceptance (#134)
 
 Require exact-cap/over-cap, empty, invalid encoding, unsupported extension, directory and pre-cancel Swift smoke/XCTest. Verify the production caption picker entry is idle in both iPhone/iPad XCUI, and require final-HEAD Web/API 3/3 plus full cross-platform 9/9, mergeability and no unresolved review threads. Tests use owned local files, not a real NAS; real Files Provider hydration and physical iPhone/iPad playback remain independent. A cancelled/stale read must not overwrite existing captions. See [IOS_CAPTION_FILES.md](IOS_CAPTION_FILES.md).
+
+### Native UTF-16 Files/SMB subtitle code acceptance (#136)
+
+Require positive UTF-16LE and UTF-16BE BOM fixtures through CaptionParser and LocalCaptionReader, plus negative BOM-only, odd-length, malformed surrogate, unsupported charset and oversize tests. Verify final PR HEAD on iPhone/iPad XCTest/XCUI and full integration. The 1 MiB limit is on raw bytes, not decoded characters. Physical iPhone/iPad and SMB provider hydration remain a separate unverified acceptance gate; no signed artifact is authorized.
