@@ -10,7 +10,7 @@ The import button is disabled while the read is in progress. **取消字幕导�
 
 - Only user-selected **file:** URLs with SRT/VTT/ASS/SSA extensions are eligible. Directories and other formats are rejected; no scripts, plugins or remote URLs execute.
 - A detached worker obtains security-scoped access and, on Apple platforms, performs a coordinated read using NSFileCoordinator. No blocking Files hydration is performed on the main SwiftUI actor.
-- The reader checks the provider's declared length when available, then reads in 64 KiB chunks with a strict **1,048,576-byte** actual-data cap (including an extra-byte check at the limit). Invalid UTF-8, empty files and invalid timelines are rejected by the existing CaptionParser.
+- The reader checks the provider's declared length when available, then reads in 64 KiB chunks with a strict **1,048,576-byte** actual-data cap (including an extra-byte check at the limit). UTF-8 (with or without BOM) and explicitly BOM-marked UTF-16LE/UTF-16BE are supported. BOM-only, odd-byte, malformed-surrogate, empty, unsupported legacy encoding and invalid-timeline inputs are rejected by CaptionParser; BOM-less UTF-16 is not guessed.
 - Cancellation is checked between reads and before parsing; NSFileCoordinator itself may not stop immediately while a provider is hydrating, but stale completion cannot change playback state. The worker does not create persistent temporary files.
 - The existing text-only parser strips markup and does not support styled ASS positioning, WebVTT layout or DRM/codec conversion.
 
@@ -19,3 +19,7 @@ The import button is disabled while the read is in progress. **取消字幕导�
 Positive and negative Swift smoke/XCTest cover SRT/VTT, exact byte limit, oversized sparse files, empty/invalid-encoding input, unsupported extensions, directories, pre-cancellation and picker cancellation versus provider errors. Production SwiftUI XCUI checks the native entry's idle state on both iPhone and iPad simulators; the full final-HEAD integration gate also runs Web/API, PostgreSQL, Compose, NAS and Spider isolation.
 
 **Simulator and local file fixtures do not prove an actual SMB File Provider works on a physical iPhone/iPad.** Verify authentication, provider hydration, cancellation, errors and playback overlay against a permitted NAS share on both device families as a separate physical acceptance item. Parent P4 #5 and P6 #7 remain open. No Apple signing, TestFlight, IPA or release is implied.
+
+## UTF-16 subtitle compatibility increment (#136)
+
+The same bounded Files/SMB import path now decodes explicitly BOM-marked UTF-16LE and UTF-16BE SRT/VTT/ASS/SSA as text, including Chinese subtitles. This is a parser change only; it does not increase the 1 MiB raw-byte limit, add GBK/GB18030 heuristics, change File Provider hydration, or imply real NAS verification. Swift smoke, Files smoke, XCTest and the full iPhone/iPad simulator gate must pass on the final PR head before merge.
