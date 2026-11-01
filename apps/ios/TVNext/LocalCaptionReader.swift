@@ -8,6 +8,14 @@ enum LocalCaptionReader {
     private static let chunkBytes = 65_536
     private static let supportedExtensions: Set<String> = ["srt", "vtt", "ass", "ssa"]
 
+    /// The system picker can report a user dismissal as a Cocoa error.
+    /// A File Provider failure is not equivalent to a user cancellation.
+    static func isUserCancellation(_ error: Error) -> Bool {
+        if error is CancellationError { return true }
+        let ns = error as NSError
+        return ns.domain == NSCocoaErrorDomain && ns.code == CocoaError.userCancelled.rawValue
+    }
+
     static func load(_ source: URL) async throws -> [CaptionCue] {
         try Task<Never, Never>.checkCancellation()
         let worker = Task.detached(priority: .userInitiated) {
