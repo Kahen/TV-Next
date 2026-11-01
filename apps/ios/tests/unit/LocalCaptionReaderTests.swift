@@ -26,6 +26,18 @@ final class LocalCaptionReaderTests: XCTestCase {
         }
     }
 
+    func testBOMMarkedUTF16FileProviderSubtitle() async throws {
+        try await withFolder { root in
+            let source = root.appendingPathComponent("subtitle.srt")
+            let text = "1\n00:00:01,000 --> 00:00:03,000\nNAS 中文字幕\n"
+            var bytes = Data([0xFF, 0xFE])
+            bytes.append(try XCTUnwrap(text.data(using: .utf16LittleEndian)))
+            try bytes.write(to: source)
+            let cues = try await LocalCaptionReader.load(source)
+            XCTAssertEqual(cues, [CaptionCue(start: 1, end: 3, text: "NAS 中文字幕")])
+        }
+    }
+
     func testEmptyOversizedAndUnsupportedFilesFailClosed() async throws {
         try await withFolder { root in
             let empty = root.appendingPathComponent("empty.srt")

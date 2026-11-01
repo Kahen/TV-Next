@@ -180,3 +180,7 @@ The new NativeSSDPDiscovery actor provides a dormant opt-in fixed-multicast M-SE
 ## Native Files/SMB caption reader (#134, 2026-11-01)
 
 The native external subtitle picker now delegates to a detached, cancellable, security-scoped and NSFileCoordinator-backed SRT/VTT/ASS/SSA reader. It enforces a 1 MiB actual byte cap even when a provider's size is stale, preserves prior cues on failure/cancel, and prevents stale completion after playback/library changes. Swift smoke/XCTest, native XCUI and aggregate CI must pass on the final PR HEAD before merging. This does not implement direct SMB browsing/streaming, styled ASS, real NAS interoperability, independent security audit or signed distribution. See [IOS_CAPTION_FILES.md](IOS_CAPTION_FILES.md).
+
+## Native Files subtitle UTF-16 increment (#136, 2026-11-01)
+
+Adds explicitly BOM-marked UTF-16LE/BE subtitle text decoding to the existing native Files/SMB SRT/VTT/ASS/SSA path; UTF-8 behavior, 1 MiB raw-byte cap, cancellable coordinated reads and text-only parsing remain unchanged. Invalid BOM-only, odd-length and unpaired-surrogate sequences are rejected. Swift smoke/XCTest and final-head iPhone/iPad/full integration results must be attached to PR #137 before the subtask is closed. Legacy GBK/GB18030 and real NAS/iPhone/iPad remain unverified; P4/P6 parents stay open.

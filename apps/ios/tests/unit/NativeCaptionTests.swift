@@ -3,6 +3,30 @@ import XCTest
 @testable import TVNext
 
 final class NativeCaptionTests: XCTestCase {
+    func testBOMMarkedUTF16BothEndiannessesAndMalformedSurrogates() throws {
+        let srt = "1\n00:00:01,000 --> 00:00:02,000\n中文字幕\n"
+        for (bom, encoding) in [([UInt8]([0xFF, 0xFE]), String.Encoding.utf16LittleEndian),
+                                ([UInt8]([0xFE, 0xFF]), String.Encoding.utf16BigEndian)] {
+            var data = Data(bom)
+            data.append(try XCTUnwrap(srt.data(using: encoding)))
+            XCTAssertEqual(try CaptionParser.parse(data).first?.text, "中文字幕")
+        }
+        for invalid in [Data([0xFF, 0xFE]), Data([0xFF, 0xFE, 0x31]),
+                        Data([0xFF, 0xFE, 0x00, 0xD8]),
+                        Data([0xFE, 0xFF, 0xDC, 0x00])] {
+            XCTAssertThrowsError(try CaptionParser.parse(invalid)) { error in
+                guard case CaptionError.invalidEncoding = error else {
+                    return XCTFail("Unexpected error: \(error)")
+                }
+            }
+        }
+        XCTAssertThrowsError(try CaptionParser.parse(Data([0xD6, 0xD0]))) { error in
+            guard case CaptionError.invalidEncoding = error else {
+                return XCTFail("Legacy charset should remain unsupported: \(error)")
+            }
+        }
+    }
+
     func testOverlappingVTTDoesNotDropTheSecondLanguage() throws {
         let text = """
         WEBVTT

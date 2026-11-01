@@ -219,3 +219,7 @@ A fixed-target, user-initiated native SSDP M-SEARCH UDP transport is implemented
 ### P4 iOS Files/SMB subtitle import (#134, 2026-11-01)
 
 The native SRT/VTT/ASS/SSA picker now uses a cancellable background, security-scoped NSFileCoordinator reader with an actual 1 MiB cap instead of synchronous Data(contentsOf:) on the UI actor. Positive/negative Swift tests, iPhone/iPad XCTest/XCUI and final-HEAD integration are required before closing the subtask. Real SMB File Provider and physical-device acceptance remain open. See [IOS_CAPTION_FILES.md](IOS_CAPTION_FILES.md). Parent #5 remains open.
+
+### 2026-11-01 native subtitle encoding increment (#136)
+
+BOM-marked UTF-16LE/BE text subtitle decoding for user-selected Files/SMB SRT/VTT/ASS/SSA is tracked in #136. UTF-8 remains supported, with the existing 1 MiB raw-byte limit and cancellation; BOM-less/legacy encoding detection and real iPhone/iPad SMB provider validation remain outside this code slice. Final-head simulator/full integration evidence is required before completion; parent P4 #5 stays open.

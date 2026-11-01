@@ -17,7 +17,7 @@ enum CaptionError: LocalizedError {
         switch self {
         case .empty: return "字幕文件为空。"
         case .tooLarge: return "字幕文件超过 1 MiB。"
-        case .invalidEncoding: return "字幕必须是 UTF-8 编码的 SRT、WebVTT 或 ASS/SSA。"
+        case .invalidEncoding: return "字幕须为 UTF-8 或带 BOM 的 UTF-16LE/BE 编码（SRT、WebVTT、ASS/SSA）。"
         case .invalidTimeline: return "未识别有效的字幕时间轴；仅支持基础 SRT / WebVTT / ASS / SSA 文本字幕。"
         case .unavailableFile: return "无法读取文件 App 或 SMB 共享中的字幕；请检查共享连接与文件权限。"
         }
@@ -35,7 +35,39 @@ enum CaptionParser {
     static func parse(_ data: Data) throws -> [CaptionCue] {
         guard !data.isEmpty else { throw CaptionError.empty }
         guard data.count <= 1_048_576 else { throw CaptionError.tooLarge }
-        guard var input = String(data: data, encoding: .utf8) else { throw CaptionError.invalidEncoding }
+        // Decode only explicitly BOM-marked UTF-16. Never guess a legacy
+        // charset or interpret arbitrary binary as a subtitle document.
+        let littleEndian = data.starts(with: [0xFF, 0xFE])
+        let bigEndian = data.starts(with: [0xFE, 0xFF])
+        let decoded: String?
+        if littleEndian || bigEndian {
+            guard data.count > 2, data.count.isMultiple(of: 2) else {
+                throw CaptionError.invalidEncoding
+            }
+            // Foundation may replace malformed UTF-16 on some platforms.
+            // Validate surrogate pairing ourselves to fail closed everywhere.
+            var expectsLowSurrogate = false
+            for offset in stride(from: 2, to: data.count, by: 2) {
+                let first = UInt16(data[offset])
+                let second = UInt16(data[offset + 1])
+                let unit = littleEndian ? first | (second << 8) : (first << 8) | second
+                if expectsLowSurrogate {
+                    guard (0xDC00...0xDFFF).contains(unit) else {
+                        throw CaptionError.invalidEncoding
+                    }
+                    expectsLowSurrogate = false
+                } else if (0xD800...0xDBFF).contains(unit) {
+                    expectsLowSurrogate = true
+                } else if (0xDC00...0xDFFF).contains(unit) {
+                    throw CaptionError.invalidEncoding
+                }
+            }
+            guard !expectsLowSurrogate else { throw CaptionError.invalidEncoding }
+            decoded = String(data: data, encoding: .utf16)
+        } else {
+            decoded = String(data: data, encoding: .utf8)
+        }
+        guard var input = decoded else { throw CaptionError.invalidEncoding }
 
         input = input.replacingOccurrences(of: "\u{FEFF}", with: "")
             .replacingOccurrences(of: "\r\n", with: "\n")
