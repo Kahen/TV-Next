@@ -18,6 +18,33 @@ struct CaptionSmoke {
         precondition(srtCues[0].text == "Hello world")
         precondition(srtCues[1].start == 60.5)
 
+        // Real-world Files/SMB SRT files may be UTF-16LE or UTF-16BE.
+        // Both must use an explicit BOM; legacy encoding guessing is forbidden.
+        let multilingual = "1\n00:00:01,000 --> 00:00:02,000\n中文 UTF-16\n"
+        for (bom, encoding) in [([UInt8]([0xFF, 0xFE]), String.Encoding.utf16LittleEndian),
+                                ([UInt8]([0xFE, 0xFF]), String.Encoding.utf16BigEndian)] {
+            var bytes = Data(bom)
+            bytes.append(multilingual.data(using: encoding)!)
+            let cues = try CaptionParser.parse(bytes)
+            precondition(cues.count == 1 && cues[0].text == "中文 UTF-16")
+        }
+        let utf8BOM = Data([0xEF, 0xBB, 0xBF]) + Data(multilingual.utf8)
+        precondition(try CaptionParser.parse(utf8BOM).first?.text == "中文 UTF-16")
+        for malformed in [Data([0xFF, 0xFE]), Data([0xFF, 0xFE, 0x31]),
+                          Data([0xFE, 0xFF, 0xD8, 0x00]),
+                          Data([0xFF, 0xFE, 0x00, 0xDC]),
+                          Data([0xFF, 0xFE, 0x00, 0xD8, 0x31, 0x00]),
+                          Data([0xD6, 0xD0])] {
+            do {
+                _ = try CaptionParser.parse(malformed)
+                fatalError("Malformed or unsupported encoding accepted")
+            } catch CaptionError.invalidEncoding {}
+        }
+        do {
+            _ = try CaptionParser.parse(multilingual.data(using: .utf16LittleEndian)!)
+            fatalError("BOM-less UTF-16 was accepted")
+        } catch CaptionError.invalidTimeline {}
+
         let vtt = """
         WEBVTT
 
