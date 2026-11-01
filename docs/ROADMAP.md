@@ -215,3 +215,7 @@ Native Files-provider media staging now includes a 64 MiB cache-volume free-spac
 ### P4 iOS SSDP bounded UDP transport (#132)
 
 A fixed-target, user-initiated native SSDP M-SEARCH UDP transport is implemented as a **dormant service** behind the Apple multicast-entitlement gate. It sends two fixed targets with TTL 1, 3-second deadline, 10-second cooldown and strict response caps; existing private-IPv4 same-sender LOCATION validation is reused. Owned loopback UDP fixture and simulator XCTest/CI are required. **No automatic discovery UI or physical multicast functionality is claimed.** See [IOS_SSDP_DISCOVERY.md](IOS_SSDP_DISCOVERY.md). Parent #114 and P4 #5 remain open.
+
+### P4 iOS Files/SMB subtitle import (#134, 2026-11-01)
+
+The native SRT/VTT/ASS/SSA picker now uses a cancellable background, security-scoped NSFileCoordinator reader with an actual 1 MiB cap instead of synchronous Data(contentsOf:) on the UI actor. Positive/negative Swift tests, iPhone/iPad XCTest/XCUI and final-HEAD integration are required before closing the subtask. Real SMB File Provider and physical-device acceptance remain open. See [IOS_CAPTION_FILES.md](IOS_CAPTION_FILES.md). Parent #5 remains open.

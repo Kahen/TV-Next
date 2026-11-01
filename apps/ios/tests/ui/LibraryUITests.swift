@@ -179,6 +179,18 @@ final class LibraryUITests: XCTestCase {
                       "Cancelling the Files picker must not start playback")
     }
 
+    func testFilesSubtitleImportEntryStartsIdleAndPreservesPlayback() {
+        jump("本机文件与字幕")
+        let entry = app.buttons["caption-files-import"]
+        reveal(entry)
+        XCTAssertTrue(entry.exists)
+        XCTAssertTrue(entry.isEnabled)
+        XCTAssertFalse(app.buttons["cancel-caption-import"].exists,
+                       "No subtitle read may be active before a file is chosen")
+        XCTAssertFalse(app.descendants(matching: .any)["caption-import-progress"].exists)
+        XCTAssertTrue(app.staticTexts["current-media"].label.contains("尚未选择媒体"))
+    }
+
     func testNativeWebDAVFormRejectsUnsafeURLWithoutNetworking() {
         jump("WebDAV 文件")
         let connect = app.buttons["webdav-connect"]

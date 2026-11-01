@@ -42,6 +42,8 @@ struct ContentView: View {
     @State private var isShowingCaptionPicker = false
     @State private var isLoadingMedia = false
     @State private var mediaImportTask: Task<Void, Never>?
+    @State private var captionImportTask: Task<Void, Never>?
+    @State private var isLoadingCaption = false
     @State private var stagedMediaBytes: Int64 = 0
     @State private var stagedMediaTotal: Int64?
     @State private var captionFileName: String?
@@ -53,6 +55,7 @@ struct ContentView: View {
     @State private var isLoading = false
     @State private var importGeneration = UUID()
     @State private var mediaGeneration = UUID()
+    @State private var captionImportGeneration = UUID()
 
     private var visibleChannels: [TVChannel] {
         let entries: [TVChannel]
@@ -178,6 +181,7 @@ struct ContentView: View {
                     remoteDanmakuRequest = UUID()
                     remoteDanmakuTask?.cancel()
                     cancelMediaImport()
+                    cancelCaptionImport()
                     library.setApplicationBackground(true)
                     remote.configure(nil, server: serverURL)
                 } else if phase == .active {
@@ -214,7 +218,7 @@ struct ContentView: View {
                 allowedContentTypes: [.item],
                 allowsMultipleSelection: false
             ) { result in
-                importCaption(result)
+                beginCaptionImport(result)
             }
             .fileExporter(
                 isPresented: $isShowingExporter,
@@ -231,6 +235,7 @@ struct ContentView: View {
                     isShowingClearConfirmation = false
                     importGeneration = UUID()
                     cancelMediaImport()
+                    cancelCaptionImport()
                     isLoading = false
                     library.clear()
                     playlistText = ""
@@ -253,6 +258,7 @@ struct ContentView: View {
                 } catch { errorMessage = error.localizedDescription }
             }
             .onChange(of: library.playbackGeneration) { _, generation in
+                cancelCaptionImport()
                 remoteCaptions.cancel()
                 remoteDanmakuRequest = UUID()
                 remoteDanmakuTask?.cancel()
@@ -269,6 +275,7 @@ struct ContentView: View {
                 // Presenting fullscreen keeps the same selected item and overlay state.
                 guard !showingFullscreen else { return }
                 remote.configure(nil,server:serverURL)
+                cancelCaptionImport()
                 library.suspendPlayback()
                 remoteCaptions.cancel()
                 remoteDanmakuTask?.cancel()
@@ -603,8 +610,11 @@ struct ContentView: View {
                         Label("导入 SRT / VTT / ASS / SSA 字幕", systemImage: "captions.bubble")
                     }
                     .buttonStyle(.bordered)
+                    .disabled(isLoadingCaption)
+                    .accessibilityIdentifier("caption-files-import")
                     if captionFileName != nil {
                         Button("移除字幕") {
+                            cancelCaptionImport()
                             remoteCaptions.cancel()
                             library.clearCaptions()
                             captionFileName = nil
@@ -612,6 +622,15 @@ struct ContentView: View {
                         }.buttonStyle(.bordered)
                     }
                 }
+                if isLoadingCaption {
+                    ProgressView("正在从文件 App 读取字幕…")
+                        .accessibilityIdentifier("caption-import-progress")
+                    Button("取消字幕导入") { cancelCaptionImport() }
+                        .buttonStyle(.bordered)
+                        .accessibilityIdentifier("cancel-caption-import")
+                }
+                Text("文件 App 的 SMB 字幕会在后台协调读取；最大 1 MiB，不保存共享凭据。")
+                    .font(.caption).foregroundStyle(.secondary)
                 if let captionFileName {
                     Text("字幕：" + captionFileName)
                         .font(.caption).foregroundStyle(.secondary)
@@ -665,6 +684,8 @@ struct ContentView: View {
     @MainActor
     private func loadRemoteCaption(_ source: NativePlaybackResource) {
         guard let server = URL(string: serverURL), library.current?.url == remoteResourceKey else { return }
+        // A newer subscription choice supersedes an in-flight Files/SMB read.
+        cancelCaptionImport()
         let generation = library.playbackGeneration
         let mediaURL = library.current?.url
         remoteCaptions.load(source, api: TVNextAPI(server: server), isCurrent: {
@@ -910,26 +931,58 @@ struct ContentView: View {
         }
     }
 
-    private func importCaption(_ result: Result<[URL], Error>) {
-        remoteCaptions.cancel()
+    @MainActor
+    private func cancelCaptionImport() {
+        // Invalidate completion before cancelling a potentially blocked
+        // File Provider coordinator. Previous subtitles remain unchanged.
+        captionImportGeneration = UUID()
+        captionImportTask?.cancel()
+        captionImportTask = nil
+        isLoadingCaption = false
+    }
+
+    @MainActor
+    private func beginCaptionImport(_ result: Result<[URL], Error>) {
+        // Only a genuine user dismissal is silent. Provider errors must be
+        // shown rather than mistaken for a cancelled picker.
+        let source: URL
+        switch result {
+        case .success(let urls):
+            guard let selected = urls.first else { return }
+            source = selected
+        case .failure(let error):
+            if !LocalCaptionReader.isUserCancellation(error) {
+                errorMessage = error.localizedDescription
+            }
+            return
+        }
+        cancelCaptionImport()
+        let generation = UUID()
+        captionImportGeneration = generation
+        isLoadingCaption = true
+        captionImportTask = Task { await importCaption(source, generation: generation) }
+    }
+
+    @MainActor
+    private func importCaption(_ source: URL, generation: UUID) async {
+        defer {
+            if captionImportGeneration == generation {
+                isLoadingCaption = false
+                captionImportTask = nil
+            }
+        }
         do {
-            guard let url = try result.get().first else { return }
-            guard ["srt", "vtt", "ass", "ssa"].contains(url.pathExtension.lowercased()) else {
-                throw CaptionError.invalidTimeline
-            }
-            let permission = url.startAccessingSecurityScopedResource()
-            defer { if permission { url.stopAccessingSecurityScopedResource() } }
-            let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
-            if let size = attributes[.size] as? NSNumber, size.int64Value > 1_048_576 {
-                throw CaptionError.tooLarge
-            }
-            let cues = try CaptionParser.parse(Data(contentsOf: url))
+            let cues = try await LocalCaptionReader.load(source)
+            guard !Task.isCancelled, captionImportGeneration == generation else { return }
+            remoteCaptions.cancel()
             library.setCaptions(cues)
             captionOffsetSeconds = 0
-            captionFileName = url.lastPathComponent
+            captionFileName = source.lastPathComponent
             errorMessage = nil
+        } catch is CancellationError {
+            // A cancelled or superseded read must not replace existing cues.
         } catch {
-            errorMessage = error.localizedDescription
+            if captionImportGeneration == generation { errorMessage = error.localizedDescription }
         }
     }
 

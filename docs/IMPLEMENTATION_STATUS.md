@@ -176,3 +176,7 @@ The iOS staged-copy path now checks the cache volume's reported free capacity be
 ### P4 iOS SSDP UDP M-SEARCH transport (#132)
 
 The new NativeSSDPDiscovery actor provides a dormant opt-in fixed-multicast M-SEARCH implementation with two bounded targets, TTL 1, a 3-second deadline, cancellation, a 10-second cooldown, 64-packet/4096-byte receive bounds and 32 deduplicated candidate locations. It reuses the existing strict private IPv4 sender-matched response parser. A DEBUG-only owned loopback UDP fixture tests transport behavior. The production SwiftUI DLNA page remains manual because Apple multicast entitlement, signed profile and real iPhone/iPad permission are **not** established. Final-head simulator and full CI are required for subtask closure; parent #114 remains open. See [IOS_SSDP_DISCOVERY.md](IOS_SSDP_DISCOVERY.md).
+
+## Native Files/SMB caption reader (#134, 2026-11-01)
+
+The native external subtitle picker now delegates to a detached, cancellable, security-scoped and NSFileCoordinator-backed SRT/VTT/ASS/SSA reader. It enforces a 1 MiB actual byte cap even when a provider's size is stale, preserves prior cues on failure/cancel, and prevents stale completion after playback/library changes. Swift smoke/XCTest, native XCUI and aggregate CI must pass on the final PR HEAD before merging. This does not implement direct SMB browsing/streaming, styled ASS, real NAS interoperability, independent security audit or signed distribution. See [IOS_CAPTION_FILES.md](IOS_CAPTION_FILES.md).

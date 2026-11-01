@@ -40,6 +40,11 @@ jobs:
         run: |
           swiftc TVNext/CaptionParser.swift tests/CaptionSmoke.swift -o /tmp/tvnext-caption-tests
           /tmp/tvnext-caption-tests
+      - name: Verify coordinated bounded Files/SMB subtitle reads (synthetic local fixture)
+        working-directory: apps/ios
+        run: |
+          swiftc -warnings-as-errors TVNext/CaptionParser.swift TVNext/LocalCaptionReader.swift tests/CaptionFilesSmoke.swift -o /tmp/tvnext-caption-files-tests
+          /tmp/tvnext-caption-files-tests
       - name: Run native danmaku compatibility tests
         working-directory: apps/ios
         run: |

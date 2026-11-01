@@ -171,3 +171,7 @@ For the final PR HEAD, require Swift smoke/XCTest positive and negative reserve-
 ### P4 iOS bounded SSDP M-SEARCH transport acceptance (#132)
 
 Require exact fixed-target request positive/negative Swift smoke/XCTest, disallowed ST/header injection, deduplication and candidate bounds, an owned UDP loopback fixture proving both outbound M-SEARCH packets and rejection of loopback/oversized replies, and final HEAD unsigned iPhone/iPad simulator XCTest/XCUI with full Web/API/PostgreSQL/NAS/Compose/Spider isolation CI. This is **transport-only**: the production UI remains manual until Apple multicast entitlement and real-device local-network verification. Do not close #114 or P4 #5, and do not claim a signed IPA, physical SSDP discovery, real renderer interoperability or an independent security audit. See [IOS_SSDP_DISCOVERY.md](IOS_SSDP_DISCOVERY.md).
+
+### P4 coordinated native Files/SMB subtitle acceptance (#134)
+
+Require exact-cap/over-cap, empty, invalid encoding, unsupported extension, directory and pre-cancel Swift smoke/XCTest. Verify the production caption picker entry is idle in both iPhone/iPad XCUI, and require final-HEAD Web/API 3/3 plus full cross-platform 9/9, mergeability and no unresolved review threads. Tests use owned local files, not a real NAS; real Files Provider hydration and physical iPhone/iPad playback remain independent. A cancelled/stale read must not overwrite existing captions. See [IOS_CAPTION_FILES.md](IOS_CAPTION_FILES.md).
