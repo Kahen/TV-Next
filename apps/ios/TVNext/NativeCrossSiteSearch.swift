@@ -46,6 +46,16 @@ enum NativeCrossSiteSearch {
         return Array(sources.filter { seen.insert($0.key).inserted }.prefix(maxSites))
     }
 
+    /// Explicit completion feedback: no matches is different from transport failure.
+    /// Never show an empty state while a search is pending or before any site ran;
+    /// the caller owns the completion flag and the original selected-site count.
+    static func emptyState(resultCount: Int, failedCount: Int, selectedCount: Int) -> String? {
+        guard selectedCount > 0, resultCount == 0, failedCount >= 0 else { return nil }
+        if failedCount >= selectedCount { return "所有站点搜索失败，请重试失败站点。" }
+        if failedCount > 0 { return "尚无匹配结果，部分站点搜索失败，可重试。" }
+        return "未找到匹配结果。"
+    }
+
     static func selectedSourceKeys(_ sources: [NativeSearchSource]) -> [String] {
         selectedSources(sources).map(\.key)
     }
