@@ -143,6 +143,46 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["TVBox / FongMi 原版订阅"].waitForExistence(timeout: 5))
     }
 
+    func testCrossSiteRetryOnlyFailedProviderPreservesOriginalQuery() {
+        // The owned localhost fixture deliberately gives two providers the
+        // same display name. Provider B fails once; provider A must never be
+        // requested again. B's retry rejects an edited query.
+        app.terminate()
+        app.launchArguments += ["-tv-next-api-url", "http://127.0.0.1:8769"]
+        app.launch()
+        jump("TVBox 订阅")
+        let retry = app.buttons["retry-failed-cross-site-search"]
+        XCTAssertFalse(retry.exists, "Retry must not appear before a failed search")
+        let editor = app.textViews["订阅配置内容"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        enter(editor, "{\"sites\":[]}")
+        let load = app.buttons["加载订阅"]
+        reveal(load)
+        load.tap()
+        let query = app.textFields["搜索当前站点"]
+        XCTAssertTrue(query.waitForExistence(timeout: 10))
+        enter(query, "original")
+        let search = app.buttons["跨站搜索"]
+        reveal(search)
+        search.tap()
+        let healthy = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "A result")).firstMatch
+        XCTAssertTrue(healthy.waitForExistence(timeout: 15))
+        XCTAssertTrue(retry.waitForExistence(timeout: 15), "Partial failure must expose retry")
+        // Change the draft after search. The retry must use the captured
+        // keyword, not the current TextField content.
+        enter(query, "-changed")
+        reveal(retry)
+        retry.tap()
+        let recovered = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "B result")).firstMatch
+        XCTAssertTrue(recovered.waitForExistence(timeout: 15))
+        XCTAssertTrue(healthy.exists, "Retry discarded an already successful provider")
+        let dismissed = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"), object: retry
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 5), .completed,
+                       "Retry should disappear after all failed providers recover")
+    }
+
     func testCaptionEncodingIsExplicitAndDoesNotStartImport() {
         jump("本机文件与字幕")
         let mode = app.staticTexts["caption-encoding-mode"]
