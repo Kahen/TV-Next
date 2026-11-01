@@ -50,6 +50,10 @@ enum NativeCrossSiteSearch {
         selectedSources(sources).map(\.key)
     }
 
+    static func selectedSourceNames(_ sources: [NativeSearchSource]) -> [String: String] {
+        Dictionary(uniqueKeysWithValues: selectedSources(sources).map { ($0.key, $0.name) })
+    }
+
     /// Select only previously failed provider keys from the caller's already
     /// authorized/visible site list. Do not resolve a key against an unfiltered
     /// subscription: an earlier hidden or unsupported duplicate may otherwise
