@@ -5,6 +5,21 @@ import CryptoKit
 import MediaPlayer
 @testable import TVNext
 
+private final class StagingProgressRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var samples: [(Int64, Int64?)] = []
+    func record(_ copied: Int64, _ total: Int64?) {
+        lock.lock()
+        samples.append((copied, total))
+        lock.unlock()
+    }
+    var snapshot: [(Int64, Int64?)] {
+        lock.lock()
+        defer { lock.unlock() }
+        return samples
+    }
+}
+
 @MainActor
 final class MediaLibraryTests: XCTestCase {
     private var suite = ""
@@ -606,6 +621,36 @@ final class MediaLibraryTests: XCTestCase {
         }
         do { _ = try await cancelled.value; XCTFail("Accepted a cancelled import") }
         catch is CancellationError { }
+    }
+
+    func testFilesProviderProgressAndPartialCopyCancellationCleanup() async throws {
+        let fm = FileManager.default
+        let source = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".mp4")
+        let contents = Data(repeating: 0xA5, count: 2_500_000)
+        try contents.write(to: source)
+        defer { try? fm.removeItem(at: source) }
+        let recorder = StagingProgressRecorder()
+        let staged = try await LocalMediaStager.stage(source) { copied, total in
+            recorder.record(copied, total)
+        }
+        XCTAssertEqual(recorder.snapshot.map { $0.0 }, [1_048_576, 2_097_152, 2_500_000])
+        XCTAssertTrue(recorder.snapshot.allSatisfy { $0.1 == 2_500_000 })
+        XCTAssertEqual(try Data(contentsOf: staged), contents)
+        LocalMediaStager.discard(staged)
+
+        let cache = fm.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("TVNextImported", isDirectory: true)
+        let before = Set((try? fm.contentsOfDirectory(atPath: cache.path)) ?? [])
+        do {
+            _ = try await LocalMediaStager.stage(source) { copied, _ in
+                if copied >= 1_048_576 { withUnsafeCurrentTask { $0?.cancel() } }
+            }
+            XCTFail("Cancelled partial staging unexpectedly completed")
+        } catch is CancellationError {
+            // The next chunk must observe cancellation and delete the partial file.
+        }
+        XCTAssertEqual(Set((try? fm.contentsOfDirectory(atPath: cache.path)) ?? []), before)
+        XCTAssertTrue(store.recent.isEmpty, "Cancelled Files imports must not persist history")
     }
 
     func testRetryTargetsFailedRelaySelectionRatherThanPreviousMedia() async throws {

@@ -196,3 +196,7 @@ Enhance the existing user-entered UPnP description import to display a bounded o
 ## P4 iOS Files-provider SMB import (#124)
 
 A user-authorized SMB share mounted in Apple's Files app can be selected through the existing native document picker. NSFileCoordinator and security-scoped access stage a supported media file to a temporary app cache using a streaming 2 GiB limit and partial-file cleanup. This is **not** a native SMB client, remote directory browser or seek-over-SMB playback. See [IOS_SMB_FILES.md](IOS_SMB_FILES.md). Physical SMB/NAS compatibility and final-head CI remain unverified; P4 #5 stays open.
+
+### P4 native Files-provider import cancellation and progress (#126)
+
+A bounded native iPhone/iPad import UI reports actual copied bytes from user-selected Files documents and exposes explicit cancellation. The app cancels and invalidates the worker on user action, backgrounding or library clear, and drops stale results. Synthetic 1 MiB chunk/cancellation/cleanup tests and final-head iPhone/iPad simulator CI are required. Files still owns SMB credentials and hydration; no direct SMB client, real NAS acceptance or Apple-signed release is implied. Parent P4 #5 remains open.

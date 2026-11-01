@@ -148,6 +148,8 @@ final class LibraryUITests: XCTestCase {
         let entry = app.buttons["smb-files-import"]
         reveal(entry)
         XCTAssertTrue(entry.isEnabled)
+        XCTAssertFalse(app.buttons["cancel-smb-import"].exists, "Idle Files import must not expose cancellation")
+        XCTAssertFalse(app.staticTexts["smb-import-progress"].exists)
         XCTAssertTrue(app.staticTexts["current-media"].label.contains("尚未选择媒体"))
         entry.tap()
 
@@ -170,6 +172,9 @@ final class LibraryUITests: XCTestCase {
         )
         XCTAssertEqual(XCTWaiter.wait(for: [closed], timeout: 5), .completed)
         XCTAssertTrue(entry.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["cancel-smb-import"].exists,
+                       "Picker cancellation must not begin a media copy")
+        XCTAssertFalse(app.staticTexts["smb-import-progress"].exists)
         XCTAssertTrue(app.staticTexts["current-media"].label.contains("尚未选择媒体"),
                       "Cancelling the Files picker must not start playback")
     }
