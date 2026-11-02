@@ -254,3 +254,7 @@ Native iPhone/iPad cross-site search now has an explicit post-completion zero-re
 ### P4 native subtitle preference stale-choice correction (#150)
 
 A nonpersistable explicit AVPlayer subtitle choice now evicts an older saved choice for that title instead of allowing stale restoration. Valid exact track identity and supported Off remain persistent; current playback selection is unaffected. See [NATIVE_EMBEDDED_SUBTITLES.md](NATIVE_EMBEDDED_SUBTITLES.md). Final-head simulator and integration CI are required; P4 parent #5 remains open.
+
+### Native audio/subtitle hidden-option identity collision (#152, 2026-11-02)
+
+AVFoundation may report more than the 16 tracks exposed in the native menu. Previously an invisible duplicate could make a saved visible audio/subtitle name-language identity ambiguous while the restore logic still selected it. The new Foundation-only policy scans the entire option group, restoring only a unique exact identity within the 16 visible choices; later duplicates and unique hidden-only choices leave the system selection untouched. Positive/negative/16–17 boundary Swift smoke, XCTest for both track kinds, final-head iPhone/iPad unsigned simulator build/XCTest/XCUI and Web/API/PostgreSQL/Compose/NAS/Spider isolation are required before merging #152. This does not establish physical media compatibility, external-provider parity, security audit or signed distribution. Parent P4 #5 remains open.
