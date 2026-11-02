@@ -6,6 +6,44 @@ final class CrossSiteRetryTests: XCTestCase {
         let id: String
     }
 
+    func testRecoveredRetryReconcilesWarningsByProviderKey() {
+        let initial = NativeSearchWarningState(
+            omittedSiteCount: 3, pageLimitKeys: ["a", "b"],
+            clippedPageKeys: ["b", "c"], globalResultCapReached: true
+        )
+        let retry = NativeSearchWarningState(
+            omittedSiteCount: 0, pageLimitKeys: ["b"],
+            clippedPageKeys: [], globalResultCapReached: false
+        )
+        let merged = initial.replacingRecoveredProviders(with: retry, recoveredKeys: ["b"])
+        XCTAssertEqual(merged.pageLimitKeys, ["a", "b"])
+        XCTAssertEqual(merged.clippedPageKeys, ["c"])
+        XCTAssertEqual(merged.omittedSiteCount, 3)
+        XCTAssertTrue(merged.globalResultCapReached)
+        XCTAssertEqual(merged.messages.count, 4)
+        XCTAssertEqual(merged.messages[2], "1 个站点单页超过 40 条，仅保留每页前 40 条。")
+        // A failed-again provider retains its old partial hits and warnings.
+        XCTAssertEqual(initial.replacingRecoveredProviders(with: .empty, recoveredKeys: []).messages,
+                       initial.messages)
+        let clear = initial.replacingRecoveredProviders(with: .empty, recoveredKeys: ["b"])
+        XCTAssertEqual(clear.clippedPageKeys, ["c"])
+        XCTAssertEqual(clear.pageLimitKeys, ["a"])
+    }
+
+    func testDistinctClippedProvidersAreCountedByKey() {
+        let original = NativeSearchWarningState(
+            omittedSiteCount: 0, pageLimitKeys: [],
+            clippedPageKeys: ["a"], globalResultCapReached: false
+        )
+        let retried = NativeSearchWarningState(
+            omittedSiteCount: 0, pageLimitKeys: [],
+            clippedPageKeys: ["b"], globalResultCapReached: false
+        )
+        let combined = original.replacingRecoveredProviders(with: retried, recoveredKeys: ["b"])
+        XCTAssertEqual(combined.clippedPageKeys, ["a", "b"])
+        XCTAssertEqual(combined.messages, ["2 个站点单页超过 40 条，仅保留每页前 40 条。"])
+    }
+
     func testFailureKeysAreDistinctFromDuplicateDisplayNames() async throws {
         let sources = [
             NativeSearchSource(key: "first", name: "Mirror"),

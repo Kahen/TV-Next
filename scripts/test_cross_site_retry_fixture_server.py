@@ -77,6 +77,26 @@ class CrossSiteRetryFixtureTests(unittest.TestCase):
         self.assertFalse(second["hasMore"])
         self.assertEqual(self.get("/fixture/state")["counts"], {"a": 1, "b": 1})
 
+    def test_retry_warning_fixture_replaces_clipped_partial_page(self):
+        self.get("/fixture/reset")
+        a = self.post("/api/v1/subscriptions/search",
+                      {"siteKey": "a", "query": "retry-warning", "page": 1})
+        self.assertEqual(a["items"][0]["id"], "a-stable")
+        partial = self.post("/api/v1/subscriptions/search",
+                            {"siteKey": "b", "query": "retry-warning", "page": 1})
+        self.assertEqual(len(partial["items"]), 41)
+        self.assertTrue(partial["hasMore"])
+        with self.assertRaises(HTTPError) as error:
+            self.post("/api/v1/subscriptions/search",
+                      {"siteKey": "b", "query": "retry-warning", "page": 2})
+        self.assertEqual(error.exception.code, 503)
+        recovered = self.post("/api/v1/subscriptions/search",
+                              {"siteKey": "b", "query": "retry-warning", "page": 1})
+        self.assertEqual(len(recovered["items"]), 40)
+        self.assertFalse(recovered["hasMore"])
+        self.assertEqual(recovered["items"][0]["id"], "new-0")
+        self.assertEqual(self.get("/fixture/state")["counts"], {"a": 1, "b": 3})
+
     def test_reject_unknown_and_oversized(self):
         self.get("/fixture/reset")
         with self.assertRaises(HTTPError) as error:

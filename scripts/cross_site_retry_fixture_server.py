@@ -90,6 +90,36 @@ class Handler(BaseHTTPRequestHandler):
                 "categories": [], "filters": {}, "total": len(items),
                 "page": 1, "hasMore": False, "items": items
             })
+        # B's first page is clipped, page 2 fails, then a failed-only retry
+        # returns an exact 40-item terminal page. A is never retried.
+        if keyword == "retry-warning":
+            page = body.get("page", 1)
+            if key == "a":
+                return self.respond(200, {
+                    "categories": [], "filters": {}, "total": 1,
+                    "page": 1, "hasMore": False,
+                    "items": [{"id": "a-stable", "name": "Healthy",
+                               "remarks": None, "folder": False, "action": None}]
+                })
+            if key == "b" and count == 1 and page == 1:
+                items = [{"id": f"old-{i}", "name": f"Old {i}",
+                          "remarks": None, "folder": False, "action": None}
+                         for i in range(41)]
+                return self.respond(200, {
+                    "categories": [], "filters": {}, "total": 41,
+                    "page": 1, "hasMore": True, "items": items
+                })
+            if key == "b" and count == 2 and page == 2:
+                return self.respond(503, {"error": "synthetic page-2 failure"})
+            if key == "b" and count == 3 and page == 1:
+                items = [{"id": f"new-{i}", "name": f"New {i}",
+                          "remarks": None, "folder": False, "action": None}
+                         for i in range(40)]
+                return self.respond(200, {
+                    "categories": [], "filters": {}, "total": 40,
+                    "page": 1, "hasMore": False, "items": items
+                })
+            return self.respond(409, {"error": "unexpected retry page or provider"})
         if key == "b" and count == 1:
             return self.respond(503, {"error": "synthetic transient failure"})
         # Fail closed if SwiftUI re-queries a healthy site or retries using

@@ -26,6 +26,7 @@ struct SubscriptionSection: View {
     @State private var crossSiteSourceOrder: [String] = []
     @State private var crossSiteSourceNames: [String: String] = [:]
     @State private var crossSiteWarnings: [String] = []
+    @State private var crossSiteWarningState = NativeSearchWarningState.empty
     @State private var crossSiteCompleted = false
     @State private var line = 0
     @State private var error: String?
@@ -121,7 +122,7 @@ struct SubscriptionSection: View {
     }
     private func clearCrossSiteSearch() {
         crossSiteResults = []; crossSiteFailures = []; crossSiteFailedKeys = []
-        crossSiteSearchKeyword = nil; crossSiteSourceOrder = []; crossSiteSourceNames = [:]; crossSiteWarnings = []; crossSiteCompleted = false
+        crossSiteSearchKeyword = nil; crossSiteSourceOrder = []; crossSiteSourceNames = [:]; crossSiteWarnings = []; crossSiteWarningState = .empty; crossSiteCompleted = false
     }
     private func switchDetailSite(_ key: String) {
         var scope = NativeSiteBrowsingContext(
@@ -201,6 +202,7 @@ struct SubscriptionSection: View {
             crossSiteResults = result.items
             crossSiteFailures = result.failed
             crossSiteFailedKeys = result.failedKeys
+            crossSiteWarningState = result.warningState
             crossSiteWarnings = result.warnings
             crossSiteCompleted = true
         }
@@ -241,9 +243,10 @@ struct SubscriptionSection: View {
             crossSiteFailures = retry.failed
             crossSiteFailedKeys = retry.failedKeys
             crossSiteCompleted = true
-            for warning in retry.warnings where !crossSiteWarnings.contains(warning) {
-                crossSiteWarnings.append(warning)
-            }
+            crossSiteWarningState = crossSiteWarningState.replacingRecoveredProviders(
+                with: retry.warningState, recoveredKeys: recovered
+            )
+            crossSiteWarnings = crossSiteWarningState.messages
         }
     }
     private func loadLive(_ index: Int) {

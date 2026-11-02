@@ -226,3 +226,8 @@ Require positive/negative XCTest on owned HLS: save audio and subtitle Off, forg
 ### P2 iOS oversized cross-site page warning (#156)
 
 Accept only when 40-item terminal pages have no clipping warning, 41-item terminal pages show the exact first-40 omission warning without claiming more pages, and a second page with `hasMore=true` separately reports the page-count cap. Check partial failures, preserved hits, no exception leakage, and unchanged 16-site/4-concurrent/2-page/600-result limits. Required evidence: Swift smoke, XCTest, owned Python fixture, production iPhone/iPad XCUI and all final-HEAD Web/API/PostgreSQL/Compose/NAS/Spider isolation checks. Do not equate these fixtures with authorized external provider or physical Apple-device acceptance.
+
+
+### P2 iOS failed-provider retry warning provenance (#158, 2026-11-02)
+
+Verify that a failed provider's 41-item first page and failed second page show clipping, and a successful 40-item retry clears the obsolete warning while replacing only that provider's partial hits. Repeated failure must preserve both old hits and old warning state. Independent healthy provider warnings, 16-site/2-page limits, 600-result conservative cap and failure-key identity remain unchanged. Required: Swift positive/negative/boundary smoke, XCTest, localhost Python fixture, production iPhone/iPad XCUI and final-HEAD aggregate Web/API/PostgreSQL/Compose/NAS/Spider isolation gate. No physical-device, lawful provider corpus, security audit or signing claim.

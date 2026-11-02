@@ -228,3 +228,8 @@ Native SwiftUI audio and embedded-subtitle menus now expose a future-playback-on
 ## Native cross-site oversized-page warning (P2, #156)
 
 Native iOS now reports when a provider returns more than the allowed 40 entries in a single response, even if it sets `hasMore=false`. This warning is independent of the existing second-page `hasMore` warning. Results stay capped and provider-scoped, and failed second pages preserve clipping visibility without leaking upstream errors. Swift positive/negative/boundary smoke, XCTest, owned Python fixture and production SwiftUI XCUI cover this implementation slice; final-head full integration and real-device/provider acceptance remain separate. Parent P2 #3 stays open.
+
+
+## Native cross-site retry warning reconciliation (P2, #158)
+
+The original retry UI appended warning strings, so a recovered provider could leave obsolete clipping/page-limit warnings after its partial results were replaced. Structured per-provider-key warning provenance now follows the same recovered-only replacement policy as search results. Failed-again providers retain their previous warning state; healthy providers and the initial site cap are untouched. The global 600-result warning remains conservatively sticky after retry because discarded overflow cannot be recomputed without re-fetching healthy sites. Owned Swift, Python and iPhone/iPad XCUI regressions require final-HEAD aggregate CI before merge. Parent P2 #3, external provider/device acceptance and P3/P6 gates remain open.
