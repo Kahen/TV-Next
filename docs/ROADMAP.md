@@ -250,3 +250,7 @@ Search result labels now use the eligible provider snapshot actually selected fo
 ### P2 native cross-site completed-empty feedback (#148)
 
 Native iPhone/iPad cross-site search now has an explicit post-completion zero-result message, distinguishing success from partial or total provider failure and preserving failed-only retry. A synthetic two-provider zero-hit fixture and Swift/XCTest/XCUI cover state transitions and reload clearing. This is not real-provider verification, expanded Spider support or P2 completion; final-head CI and physical-device acceptance remain separate.
+
+### P4 native subtitle preference stale-choice correction (#150)
+
+A nonpersistable explicit AVPlayer subtitle choice now evicts an older saved choice for that title instead of allowing stale restoration. Valid exact track identity and supported Off remain persistent; current playback selection is unaffected. See [NATIVE_EMBEDDED_SUBTITLES.md](NATIVE_EMBEDDED_SUBTITLES.md). Final-head simulator and integration CI are required; P4 parent #5 remains open.

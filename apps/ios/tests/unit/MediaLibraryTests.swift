@@ -495,6 +495,37 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertNil(MediaLibraryStore.persistableSubtitleDisplayName(String(repeating: "x", count: 81)))
     }
 
+    func testUnpersistableExplicitSubtitleChoiceClearsStalePerTitlePreference() throws {
+        let mediaURL = "http://127.0.0.1:8766/master.m3u8"
+        let key = "tv-next-native-subtitle-preferences-v1"
+        store.play(channel("Owned subtitle fixture", url: mediaURL))
+        func entries() throws -> [[String: Any]] {
+            let bytes = try XCTUnwrap(defaults.data(forKey: key))
+            XCTAssertLessThanOrEqual(bytes.count, 64_000)
+            XCTAssertFalse(String(decoding: bytes, as: UTF8.self).contains(mediaURL))
+            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: bytes) as? [String: Any])
+            return try XCTUnwrap(json["entries"] as? [[String: Any]])
+        }
+
+        store.rememberSubtitlePreferenceIdentity(displayName: "English", languageTag: "en", isOff: false)
+        XCTAssertEqual(try entries().count, 1)
+        XCTAssertEqual(try entries().first?["displayName"] as? String, "English")
+        store.rememberSubtitlePreferenceIdentity(
+            displayName: String(repeating: "x", count: 81), languageTag: "en", isOff: false)
+        XCTAssertTrue(try entries().isEmpty, "Long explicit selection must evict stale saved track")
+
+        store.rememberSubtitlePreferenceIdentity(displayName: "English", languageTag: "en", isOff: false)
+        store.rememberSubtitlePreferenceIdentity(
+            displayName: "English", languageTag: String(repeating: "z", count: 65), isOff: false)
+        XCTAssertTrue(try entries().isEmpty, "Invalid language tag must evict stale saved track")
+
+        store.rememberSubtitlePreferenceIdentity(displayName: nil, languageTag: nil, isOff: true)
+        XCTAssertEqual(try entries().count, 1)
+        XCTAssertEqual(try entries().first?["isOff"] as? Bool, true)
+        store.rememberSubtitlePreferenceIdentity(displayName: "", languageTag: nil, isOff: false)
+        XCTAssertTrue(try entries().isEmpty, "Invalid track must also clear previously saved Off")
+    }
+
     func testCorruptedOrUnmatchedSubtitlePreferencesDoNotOverrideSystemSelection() async throws {
         let key = "tv-next-native-subtitle-preferences-v1"
         let mediaURL = "http://127.0.0.1:8766/master.m3u8"
