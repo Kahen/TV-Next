@@ -144,6 +144,26 @@ final class MediaLibraryStore: ObservableObject {
         defaults.set(data, forKey: audioPreferenceStorageKey)
         audioPreferences = updated
     }
+    /// A saved selection belongs to this exact remote VOD URL digest only.
+    /// Forgetting it changes the next playback, not the installed AVPlayerItem.
+    var hasSavedAudioPreferenceForCurrentMedia: Bool {
+        guard let key = mediaPreferenceKey() else { return false }
+        return audioPreferences.contains { $0.urlDigest == key }
+    }
+
+    @discardableResult
+    func forgetCurrentAudioPreference() -> Bool {
+        guard let key = mediaPreferenceKey(),
+              audioPreferences.contains(where: { $0.urlDigest == key }) else { return false }
+        let updated = audioPreferences.filter { $0.urlDigest != key }
+        let snapshot = NativeAudioPreferenceSnapshot(version: 2, entries: updated)
+        guard let data = try? JSONEncoder().encode(snapshot), data.count <= 64_000 else { return false }
+        objectWillChange.send()
+        defaults.set(data, forKey: audioPreferenceStorageKey)
+        audioPreferences = updated
+        return true
+    }
+
     @Published private(set) var subtitleTracks: [NativeSubtitleTrack] = []
     @Published private(set) var selectedSubtitleTrack: Int?
     @Published private(set) var canDisableEmbeddedSubtitles = false
@@ -207,6 +227,26 @@ final class MediaLibraryStore: ObservableObject {
         guard let data = try? JSONEncoder().encode(snapshot), data.count <= 64_000 else { return }
         defaults.set(data, forKey: subtitlePreferenceStorageKey)
         subtitlePreferences = updated
+    }
+
+    var hasSavedSubtitlePreferenceForCurrentMedia: Bool {
+        guard let key = mediaPreferenceKey() else { return false }
+        return subtitlePreferences.contains { $0.urlDigest == key }
+    }
+
+    /// Forget a saved track or explicit Off for this title only. Neither
+    /// current AVPlayer selection nor any other title's preference changes.
+    @discardableResult
+    func forgetCurrentSubtitlePreference() -> Bool {
+        guard let key = mediaPreferenceKey(),
+              subtitlePreferences.contains(where: { $0.urlDigest == key }) else { return false }
+        let updated = subtitlePreferences.filter { $0.urlDigest != key }
+        let snapshot = NativeSubtitlePreferenceSnapshot(version: 1, entries: updated)
+        guard let data = try? JSONEncoder().encode(snapshot), data.count <= 64_000 else { return false }
+        objectWillChange.send()
+        defaults.set(data, forKey: subtitlePreferenceStorageKey)
+        subtitlePreferences = updated
+        return true
     }
 
     /// Only the installed item may receive a legible-track selection.
