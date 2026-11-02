@@ -189,7 +189,7 @@ final class LibraryUITests: XCTestCase {
         jump("TVBox 订阅")
         let editor = app.textViews["订阅配置内容"]
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
-        enter(editor, "{\\"sites\\":[]}")
+        enter(editor, "{\"sites\":[]}")
         let load = app.buttons["加载订阅"]
         reveal(load)
         load.tap()
