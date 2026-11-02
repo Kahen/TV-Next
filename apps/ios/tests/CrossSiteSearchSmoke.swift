@@ -176,6 +176,49 @@ private actor RequestCounter {
         precondition(cappedRetry.first?.item.id == "a-old")
         precondition(cappedRetry.last?.item.id == "598")
 
+        // A provider returning 41 entries with hasMore=false still silently
+        // loses its 41st entry unless the per-page clip is reported.
+        let clippedTerminal = try await NativeCrossSiteSearch.search(
+            sources: [NativeSearchSource(key: "oversized", name: "Oversized")],
+            fetch: { _, _ in
+                NativeSearchPage(items: (0..<41).map { Item(id: String($0)) }, hasMore: false)
+            }, identity: { $0.id }
+        )
+        precondition(clippedTerminal.items.count == 40)
+        precondition(clippedTerminal.items.last?.item.id == "39")
+        precondition(clippedTerminal.failedKeys.isEmpty)
+        precondition(clippedTerminal.warnings == ["1 个站点单页超过 40 条，仅保留每页前 40 条。"])
+
+        let exactBoundary = try await NativeCrossSiteSearch.search(
+            sources: [NativeSearchSource(key: "exact", name: "Exact")],
+            fetch: { _, _ in
+                NativeSearchPage(items: (0..<40).map { Item(id: String($0)) }, hasMore: false)
+            }, identity: { $0.id }
+        )
+        precondition(exactBoundary.items.count == 40 && exactBoundary.warnings.isEmpty)
+
+        let clippedAndMore = try await NativeCrossSiteSearch.search(
+            sources: [NativeSearchSource(key: "both", name: "Both")],
+            fetch: { _, page in
+                NativeSearchPage(items: (0..<41).map { Item(id: "\\(page)-\\($0)") }, hasMore: true)
+            }, identity: { $0.id }
+        )
+        precondition(clippedAndMore.items.count == 80)
+        precondition(clippedAndMore.warnings.count == 2)
+        precondition(clippedAndMore.warnings.contains { $0.contains("仍有更多结果") })
+        precondition(clippedAndMore.warnings.contains { $0.contains("单页超过 40") })
+
+        let clippedThenFailed = try await NativeCrossSiteSearch.search(
+            sources: [NativeSearchSource(key: "partial", name: "Partial")],
+            fetch: { _, page in
+                if page == 2 { throw NSError(domain: "private", code: 1) }
+                return NativeSearchPage(items: (0..<41).map { Item(id: String($0)) }, hasMore: true)
+            }, identity: { $0.id }
+        )
+        precondition(clippedThenFailed.items.count == 40)
+        precondition(clippedThenFailed.failedKeys == ["partial"])
+        precondition(clippedThenFailed.warnings == ["1 个站点单页超过 40 条，仅保留每页前 40 条。"])
+
         print("Native cross-provider search: ordering, concurrency, bounds, failed-key retries, stable partial results and cancellation passed")
     }
 }
