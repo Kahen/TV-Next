@@ -110,14 +110,19 @@ enum NativeCrossSiteSearch {
         Dictionary(uniqueKeysWithValues: selectedSources(sources).map { ($0.key, $0.name) })
     }
 
-    /// Select only previously failed provider keys from the caller's already
-    /// authorized/visible site list. Do not resolve a key against an unfiltered
-    /// subscription: an earlier hidden or unsupported duplicate may otherwise
-    /// shadow the eligible site that actually participated in the search.
-    static func failedOnlySources(_ eligible: [NativeSearchSource], failedKeys: [String]) -> [NativeSearchSource] {
-        let requested = Set(failedKeys)
-        var seen = Set<String>()
-        return eligible.filter { requested.contains($0.key) && seen.insert($0.key).inserted }
+    /// Retry only keys that actually participated in the original bounded
+    /// search. Resolve against the currently authorized/visible list, never
+    /// the raw subscription (where a hidden duplicate could shadow a site).
+    /// Apply the same first-16-unique boundary as the initial search before
+    /// filtering failed keys: a stale/foreign key must not expand fan-out.
+    static func failedOnlySources(
+        _ eligible: [NativeSearchSource],
+        failedKeys: [String],
+        searchedKeys: [String]
+    ) -> [NativeSearchSource] {
+        let originallySearched = Set(searchedKeys.prefix(maxSites))
+        let requested = Set(failedKeys).intersection(originallySearched)
+        return selectedSources(eligible).filter { requested.contains($0.key) }
     }
 
     /// Reconcile a failed-site retry with the last visible search. Successful

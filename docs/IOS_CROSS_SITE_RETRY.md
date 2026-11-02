@@ -49,3 +49,10 @@ The original 16-unique-site, 4-concurrent, 2-page/site, 40-item/page and 600-vis
 Warnings for page-count and per-page clipping are tracked by the stable selected provider **key**, not by deduplicating Chinese message strings. When retry succeeds, that provider's previous partial results and its old warning state are both replaced. When retry fails again, retained old partial results keep their old warning state. Healthy providers are not queried or cleared, and two distinct clipped providers are counted as two. The original site-cap warning remains; a previously reached global 600-result cap is conservatively retained because discarded overflow cannot be reconstructed without requerying healthy providers. New searches reset warning state.
 
 Swift smoke/XCTest, a localhost page-1-clipped/page-2-failed/retry-success fixture, Python unit tests and production iPhone/iPad XCUI cover the change. This is not an authorized external provider corpus, physical-device acceptance, security audit or release evidence.
+
+
+## Retry boundary and original selection snapshot (#168)
+
+Failed-only retry is now restricted to the **originally searched provider keys** and to the first 16 distinct entries of the current authorized/visible list. A stale or foreign failure key, including an eligible 17th provider, cannot cause a new search request. A newly inserted eligible site cannot enter a retry simply because the current list shifted; a displaced old site also fails closed. Duplicate keys retain the first eligible provider identity. The original submitted keyword, healthy-site results and existing partial-failure reconciliation are unchanged.
+
+Swift smoke and XCTest exercise 16/17 boundaries, changed eligible lists, duplicate keys, stale keys and actual retry request counts. Existing production SwiftUI iPhone/iPad XCUI, unsigned simulator build and full cross-platform gate remain required on final HEAD. These are synthetic checks, not physical-device or real-provider acceptance.

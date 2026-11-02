@@ -115,11 +115,39 @@ private actor RequestCounter {
             NativeSearchSource(key: "b", name: "Duplicate B")
         ]
         let failedOnly = NativeCrossSiteSearch.failedOnlySources(
-            eligibleForRetry, failedKeys: ["b", "missing", "b"])
+            eligibleForRetry, failedKeys: ["b", "missing", "b"], searchedKeys: ["a", "b"])
         precondition(failedOnly.map(\.key) == ["b"])
         precondition(failedOnly.map(\.name) == ["Visible B"])
         precondition(NativeCrossSiteSearch.failedOnlySources(
-            eligibleForRetry, failedKeys: ["unknown"]).isEmpty)
+            eligibleForRetry, failedKeys: ["unknown"], searchedKeys: ["a", "b"]).isEmpty)
+
+        // The original search selected only the first 16 distinct sites.
+        // A foreign/stale failure key, including site 17, cannot widen retry.
+        let oversizedEligible = (0..<18).map {
+            NativeSearchSource(key: String($0), name: "Site \($0)")
+        }
+        let boundedRetry = NativeCrossSiteSearch.failedOnlySources(
+            oversizedEligible, failedKeys: ["16", "15", "0", "unknown"],
+            searchedKeys: NativeCrossSiteSearch.selectedSourceKeys(oversizedEligible))
+        precondition(boundedRetry.map(\.key) == ["0", "15"])
+        precondition(NativeCrossSiteSearch.failedOnlySources(
+            oversizedEligible, failedKeys: ["0", "1", "16"],
+            searchedKeys: ["1"]).map(\.key) == ["1"])
+        // Inserting a new eligible site must not accidentally select a
+        // previously unsearched site or resurrect a displaced provider.
+        let changedEligible = [NativeSearchSource(key: "new", name: "New")] + oversizedEligible
+        precondition(NativeCrossSiteSearch.failedOnlySources(
+            changedEligible, failedKeys: ["15", "new", "16"],
+            searchedKeys: NativeCrossSiteSearch.selectedSourceKeys(oversizedEligible)).isEmpty)
+        let retryCounter = RequestCounter()
+        let boundedResult = try await NativeCrossSiteSearch.search(sources: boundedRetry, fetch: { source, _ in
+            await retryCounter.begin(source.key)
+            await retryCounter.end()
+            return NativeSearchPage(items: [Item(id: source.key)], hasMore: false)
+        }, identity: { $0.id })
+        let (_, retriedKeys) = await retryCounter.snapshot()
+        precondition(Set(retriedKeys) == Set(["0", "15"]))
+        precondition(boundedResult.items.map(\.siteKey) == ["0", "15"])
 
         // A retry is routed by provider key, not display name. Failed page-2
         // providers retain their partial results until a successful retry.

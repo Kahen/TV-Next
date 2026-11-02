@@ -69,11 +69,37 @@ final class CrossSiteRetryTests: XCTestCase {
             NativeSearchSource(key: "b", name: "Duplicate B")
         ]
         let selected = NativeCrossSiteSearch.failedOnlySources(
-            eligible, failedKeys: ["b", "missing", "b"])
+            eligible, failedKeys: ["b", "missing", "b"], searchedKeys: ["a", "b"])
         XCTAssertEqual(selected.map(\.key), ["b"])
         XCTAssertEqual(selected.map(\.name), ["Eligible B"])
         XCTAssertTrue(NativeCrossSiteSearch.failedOnlySources(
-            eligible, failedKeys: ["missing"]).isEmpty)
+            eligible, failedKeys: ["missing"], searchedKeys: ["a", "b"]).isEmpty)
+    }
+
+    func testRetryCannotExpandBeyondOriginalSixteenUniqueSites() {
+        let eligible = (0..<18).map { NativeSearchSource(key: String($0), name: "Site \($0)") }
+        let initial = NativeCrossSiteSearch.selectedSourceKeys(eligible)
+        XCTAssertEqual(initial.count, 16)
+        let retry = NativeCrossSiteSearch.failedOnlySources(
+            eligible, failedKeys: ["16", "15", "0", "unknown"], searchedKeys: initial)
+        XCTAssertEqual(retry.map(\.key), ["0", "15"])
+        XCTAssertEqual(NativeCrossSiteSearch.failedOnlySources(
+            eligible, failedKeys: ["0", "1", "16"], searchedKeys: ["1"]).map(\.key), ["1"])
+
+        // A new first site displaces the former last selected site. Neither
+        // that displaced site nor the new one was eligible for this retry.
+        let changed = [NativeSearchSource(key: "new", name: "New")] + eligible
+        XCTAssertTrue(NativeCrossSiteSearch.failedOnlySources(
+            changed, failedKeys: ["15", "new", "16"], searchedKeys: initial).isEmpty)
+
+        // Duplicate keys before the boundary count only once; preserve the
+        // first eligible provider, never its later display-name duplicate.
+        let duplicated = [eligible[0], NativeSearchSource(key: "0", name: "Spoof")] + eligible.dropFirst()
+        let selected = NativeCrossSiteSearch.failedOnlySources(
+            Array(duplicated), failedKeys: ["0", "15", "16"],
+            searchedKeys: NativeCrossSiteSearch.selectedSourceKeys(Array(duplicated)))
+        XCTAssertEqual(selected.map(\.key), ["0", "15"])
+        XCTAssertEqual(selected.first?.name, "Site 0")
     }
 
     func testProviderDisplaySnapshotIgnoresRawHiddenDuplicateAndUnknownKeys() {
