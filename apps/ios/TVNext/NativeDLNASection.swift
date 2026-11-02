@@ -276,8 +276,10 @@ struct NativeDLNASection: View {
                 if action == .stop { castStarted = false; paused = false; status = "已发送停止命令" }
             } catch {
                 guard !Task.isCancelled else { return }
-                castStarted = false
-                paused = false
+                let next = NativeDLNAControlSnapshot(castStarted: castStarted, paused: paused)
+                    .afterFailure(action)
+                castStarted = next.castStarted
+                paused = next.paused
                 self.error = error.localizedDescription
             }
             if !Task.isCancelled { busy = false }
