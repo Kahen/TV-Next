@@ -50,6 +50,11 @@ jobs:
         run: |
           swiftc -warnings-as-errors TVNext/NativeSubtitlePreferencePolicy.swift tests/SubtitlePreferenceSmoke.swift -o /tmp/tvnext-subtitle-preference-tests
           /tmp/tvnext-subtitle-preference-tests
+      - name: Reject hidden AVFoundation audio/subtitle identity collisions
+        working-directory: apps/ios
+        run: |
+          swiftc -warnings-as-errors TVNext/NativeTrackPreferencePolicy.swift tests/TrackPreferenceSmoke.swift -o /tmp/tvnext-track-preference-tests
+          /tmp/tvnext-track-preference-tests
       - name: Run native danmaku compatibility tests
         working-directory: apps/ios
         run: |
