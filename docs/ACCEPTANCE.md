@@ -239,3 +239,7 @@ A failed GetTransportInfo/GetPositionInfo does not prove the last acknowledged c
 ## Native DLNA failed Seek control invalidation (P4, #162)
 
 A rejected relative or absolute Seek no longer leaves previously acknowledged Pause/Stop/Resume UI controls enabled. Both SwiftUI paths reuse the mutating-command fail-closed policy, preserve entered endpoints and surface the error. Owned Python SOAP fixture, Swift smoke/XCTest and production iPhone/iPad XCUI are required with the final-HEAD Web/API/PostgreSQL/Compose/NAS/Spider aggregate gate. This is not physical TV/Apple compatibility, multicast permission, Spider authorization, security audit or signed release evidence. See [IOS_DLNA.md](IOS_DLNA.md).
+
+## Native iOS DLNA current-media autofill eligibility (P4, #166)
+
+The “使用当前播放地址” control now uses the same bounded direct HTTP(S) media-URL validator as the actual DLNA cast path for both enablement and tap handling. Empty, file/local, credentialed, malformed/oversized, custom-header and replay media cannot silently enable a no-op autofill. A valid explicitly imported direct URL remains eligible. Foundation-only Swift positive/negative smoke and XCTest plus production SwiftUI iPhone/iPad XCUI against an owned M3U fixture cover the behavior. This is UI safety/feedback, not new renderer discovery, external-provider compatibility or physical TV acceptance; final-head full CI is required before merge.

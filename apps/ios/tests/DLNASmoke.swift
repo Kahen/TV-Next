@@ -7,6 +7,13 @@ import FoundationNetworking
     static func main() throws {
         let endpoint = try NativeDLNA.rendererURL("http://127.0.0.1:8768/upnp/control/AVTransport1")
         let media = try NativeDLNA.mediaURL("https://media.example/video.mp4?a=1&b=2")
+        precondition(NativeDLNA.canUseCurrentMedia(media.absoluteString, hasHeaders: false, replay: false))
+        precondition(!NativeDLNA.canUseCurrentMedia(media.absoluteString, hasHeaders: true, replay: false))
+        precondition(!NativeDLNA.canUseCurrentMedia(media.absoluteString, hasHeaders: false, replay: true))
+        for invalid in ["", "file:///private/owned.mp4", "https://user:pass@media.example/owned.mp4",
+                        "javascript:alert(1)", String(repeating: "a", count: 4097)] {
+            precondition(!NativeDLNA.canUseCurrentMedia(invalid, hasHeaders: false, replay: false))
+        }
         let set = try NativeDLNA.request(.setURI, endpoint: endpoint, media: media)
         precondition(String(decoding: set.httpBody!, as: UTF8.self).contains("a=1&amp;b=2"))
         precondition(set.value(forHTTPHeaderField: "SOAPACTION") == "\"urn:schemas-upnp-org:service:AVTransport:1#SetAVTransportURI\"")

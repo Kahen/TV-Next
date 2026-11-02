@@ -755,6 +755,24 @@ final class LibraryUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["dlna-status"].exists)
     }
 
+    func testDLNACurrentPlaybackAutofillOnlyForDirectMedia() {
+        jump("DLNA 投屏")
+        let useCurrent = app.buttons["dlna-use-current"]
+        reveal(useCurrent)
+        XCTAssertFalse(useCurrent.isEnabled, "No current media must not enable DLNA autofill")
+        importPlaylist("#EXTM3U\n#EXTINF:-1,Owned Direct\nhttp://127.0.0.1:8765/fixture.mp4")
+        jump("媒体库")
+        let owned = app.buttons["channel-Owned Direct"]
+        reveal(owned)
+        owned.tap()
+        jump("DLNA 投屏")
+        reveal(useCurrent)
+        XCTAssertTrue(useCurrent.isEnabled, "Direct owned HTTP media should allow DLNA autofill")
+        useCurrent.tap()
+        XCTAssertEqual(app.textFields["dlna-media-url"].value as? String,
+                       "http://127.0.0.1:8765/fixture.mp4")
+    }
+
     func testManualDLNACastPauseStopAgainstOwnedLoopbackFixture() {
         jump("DLNA 投屏")
         enter(app.textFields["dlna-renderer-url"], "http://127.0.0.1:8768/upnp/control/AVTransport1")

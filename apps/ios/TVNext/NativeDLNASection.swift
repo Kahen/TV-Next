@@ -22,6 +22,12 @@ struct NativeDLNASection: View {
 
     private var endpoint: URL? { try? NativeDLNA.rendererURL(rendererAddress) }
     private var media: URL? { try? NativeDLNA.mediaURL(mediaAddress) }
+    private var currentMediaEligible: Bool {
+        guard let current = library.current else { return false }
+        return NativeDLNA.canUseCurrentMedia(current.url,
+            hasHeaders: !(current.headers ?? [:]).isEmpty || current.headersRequired == true,
+            replay: current.replay != nil)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -86,15 +92,10 @@ struct NativeDLNASection: View {
             Text("可选：仅向手动指定的电视发送标题与媒体 URL；不传请求头、不持久化。留空保持空元数据兼容模式。")
                 .font(.caption).foregroundStyle(.secondary)
             Button("使用当前播放地址") {
-                guard let current = library.current,
-                      (current.headers ?? [:]).isEmpty,
-                      current.headersRequired != true, current.replay == nil,
-                      (try? NativeDLNA.mediaURL(current.url)) != nil else { return }
+                guard currentMediaEligible, let current = library.current else { return }
                 mediaAddress = current.url
             }
-            .disabled(busy || library.current == nil ||
-                      !(library.current?.headers ?? [:]).isEmpty ||
-                      library.current?.headersRequired == true || library.current?.replay != nil)
+            .disabled(busy || !currentMediaEligible)
             .accessibilityIdentifier("dlna-use-current")
             HStack(spacing: 12) {
                 Button("投屏播放") { run(.setURI) }
