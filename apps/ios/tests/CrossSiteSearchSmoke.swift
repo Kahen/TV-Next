@@ -139,13 +139,13 @@ private actor RequestCounter {
         precondition(NativeCrossSiteSearch.failedOnlySources(
             changedEligible, failedKeys: ["15", "new", "16"],
             searchedKeys: NativeCrossSiteSearch.selectedSourceKeys(oversizedEligible)).isEmpty)
-        let retryCounter = RequestCounter()
+        let boundaryCounter = RequestCounter()
         let boundedResult = try await NativeCrossSiteSearch.search(sources: boundedRetry, fetch: { source, _ in
-            await retryCounter.begin(source.key)
-            await retryCounter.end()
+            await boundaryCounter.begin(source.key)
+            await boundaryCounter.end()
             return NativeSearchPage(items: [Item(id: source.key)], hasMore: false)
         }, identity: { $0.id })
-        let (_, retriedKeys) = await retryCounter.snapshot()
+        let (_, retriedKeys) = await boundaryCounter.snapshot()
         precondition(Set(retriedKeys) == Set(["0", "15"]))
         precondition(boundedResult.items.map(\.siteKey) == ["0", "15"])
 
