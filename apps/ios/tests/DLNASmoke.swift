@@ -139,6 +139,15 @@ import FoundationNetworking
             let afterWrite = NativeDLNAControlSnapshot(castStarted: true, paused: true).afterFailure(action)
             precondition(!afterWrite.castStarted && !afterWrite.paused)
         }
+        for snapshot in [
+            NativeDLNAControlSnapshot(castStarted: false, paused: false),
+            NativeDLNAControlSnapshot(castStarted: true, paused: false),
+            NativeDLNAControlSnapshot(castStarted: true, paused: true)
+        ] {
+            let cleared = snapshot.afterLeavingScreen()
+            precondition(!cleared.castStarted && !cleared.paused)
+            precondition(cleared.afterLeavingScreen() == cleared)
+        }
         print("Native manual DLNA SOAP and private endpoint contract passed")
     }
 }

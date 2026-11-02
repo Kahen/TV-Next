@@ -147,6 +147,15 @@ struct NativeDLNASection: View {
             task?.cancel()
             task = nil
             busy = false
+            // A renderer may continue playing, but a later visit must not
+            // reuse unverified Stop/Pause/Resume state from this UI session.
+            let cleared = NativeDLNAControlSnapshot(castStarted: castStarted, paused: paused)
+                .afterLeavingScreen()
+            castStarted = cleared.castStarted
+            paused = cleared.paused
+            seekTime = ""
+            status = nil
+            error = nil
         }
     }
 

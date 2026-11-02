@@ -44,6 +44,12 @@ struct NativeDLNAControlSnapshot: Equatable {
     let castStarted: Bool
     let paused: Bool
 
+    /// Leaving the manual-control screen does not acknowledge remote playback.
+    /// Drop UI-only command affordances until the user explicitly reconnects.
+    func afterLeavingScreen() -> Self {
+        Self(castStarted: false, paused: false)
+    }
+
     func afterFailure(_ action: NativeDLNAAction) -> Self {
         switch action {
         case .getTransportInfo, .getPositionInfo:
