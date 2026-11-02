@@ -572,6 +572,45 @@ final class LibraryUITests: XCTestCase {
         XCTAssertFalse(channel.exists)
     }
 
+    func testNativeHlsTrackMenusCanForgetRememberedChoicesWithoutStoppingPlayback() {
+        jump("快速播放")
+        enter(app.textFields["manual-url"], "http://127.0.0.1:8766/master.m3u8")
+        reveal(app.buttons["play-url"])
+        app.buttons["play-url"].tap()
+        jump("播放器")
+
+        let audioMenu = app.buttons["audio-track-menu"]
+        XCTAssertTrue(audioMenu.waitForExistence(timeout: 20), "Owned HLS audio tracks did not load")
+        reveal(audioMenu)
+        audioMenu.tap()
+        let secondAudio = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "音轨 2")).firstMatch
+        XCTAssertTrue(secondAudio.waitForExistence(timeout: 5))
+        secondAudio.tap()
+        reveal(audioMenu)
+        audioMenu.tap()
+        let forgetAudio = app.buttons["forget-audio-track-preference"]
+        XCTAssertTrue(forgetAudio.waitForExistence(timeout: 5))
+        forgetAudio.tap()
+
+        let subtitleMenu = app.buttons["embedded-subtitle-menu"]
+        XCTAssertTrue(subtitleMenu.waitForExistence(timeout: 20), "Owned HLS subtitles did not load")
+        reveal(subtitleMenu)
+        subtitleMenu.tap()
+        let off = app.buttons["关闭内嵌字幕"]
+        XCTAssertTrue(off.waitForExistence(timeout: 5))
+        off.tap()
+        reveal(subtitleMenu)
+        subtitleMenu.tap()
+        let forgetSubtitle = app.buttons["forget-subtitle-track-preference"]
+        XCTAssertTrue(forgetSubtitle.waitForExistence(timeout: 5))
+        forgetSubtitle.tap()
+
+        XCTAssertFalse(app.staticTexts["playback-error"].exists,
+                       "Forgetting future preferences must not interrupt the installed AVPlayerItem")
+        XCTAssertTrue(audioMenu.exists)
+        XCTAssertTrue(subtitleMenu.exists)
+    }
+
     func testPlaybackErrorRetryFullscreenRotationAndBackgroundReturn() {
         jump("快速播放")
         enter(app.textFields["manual-url"], "file:///not-allowed.mp4")

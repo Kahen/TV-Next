@@ -482,6 +482,13 @@ struct ContentView: View {
                                 }
                             }
                         }
+                        if library.hasSavedAudioPreferenceForCurrentMedia {
+                            Divider()
+                            Button("忘记本片音轨记忆（下次播放）") {
+                                _ = library.forgetCurrentAudioPreference()
+                            }
+                            .accessibilityIdentifier("forget-audio-track-preference")
+                        }
                     } label: {
                         Label("音轨：" + (library.audioTracks.first(where: {
                             $0.id == library.selectedAudioTrack
@@ -512,6 +519,13 @@ struct ContentView: View {
                                     Text(track.title)
                                 }
                             }
+                        }
+                        if library.hasSavedSubtitlePreferenceForCurrentMedia {
+                            Divider()
+                            Button("忘记本片字幕记忆（下次播放）") {
+                                _ = library.forgetCurrentSubtitlePreference()
+                            }
+                            .accessibilityIdentifier("forget-subtitle-track-preference")
                         }
                     } label: {
                         Label("内嵌字幕：" + (library.subtitleTracks.first(where: {

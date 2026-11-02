@@ -17,3 +17,9 @@ These checks do **not** establish physical Apple codec compatibility, audio qual
 ## Hidden option identity collision regression (#152)
 
 A saved exact audio identity is now checked against **all** options in the AVFoundation audible group, rather than only the first 16 displayed choices. A matching 17th-or-later option is not selectable, and a later duplicate invalidates an otherwise visible match. The first-16 UI cap, current default selection on ambiguity, exact identity, digest-only persistence and per-item cancellation remain unchanged. Foundation-only Swift smoke, native XCTest and final-head iPhone/iPad simulator plus complete integration CI provide code evidence; physical codec/provider compatibility remains open.
+
+## Forget a saved audio selection for one title (#154)
+
+The native audio menu now shows **忘记本片音轨记忆（下次播放）** only when the current remote, non-replay media URL has a stored audio choice. It deletes only that URL's SHA-256-keyed entry from the existing bounded version-2 UserDefaults snapshot. The currently installed AVPlayerItem, explicitly selected audio rendition, playback position, other titles and subtitle preferences remain unchanged. On the next playback, AVFoundation's system selection is used unless the user explicitly chooses a track again. The action is unavailable for local files, replay sessions, missing media and titles without a stored choice. This is not a live switch to the system-default track.
+
+Owned synthetic HLS XCTest verifies actual selection and persistence, negative/no-op cases, current-item preservation and digest-only storage; production SwiftUI XCUI exercises the menu on iPhone/iPad simulators. Final-head complete integration CI is required before merging. Real codecs/providers/devices and signed distribution remain unverified.

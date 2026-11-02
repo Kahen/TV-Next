@@ -21,3 +21,9 @@ Pure Swift positive/negative/80-81/64-65 boundary smoke and owned HLS XCTest ver
 ## Hidden option identity collision regression (#152)
 
 The native menu remains capped at 16 selectable entries, but matching a saved subtitle identity against only those 16 could incorrectly select a visible rendition if an otherwise identical 17th or later AVFoundation option existed. Restore now checks the **entire** reported group for uniqueness and permits only a uniquely matched index below 16. Missing, duplicated or out-of-menu matches preserve AVFoundation's current choice. Explicit Off and local persistence semantics are unchanged. The Foundation-only Swift smoke and iPhone/iPad XCTest cover unique 16th, hidden-only 17th, duplicate 17th, exact-language and malformed identity cases; the existing owned HLS fixture still exercises the production selection path. Final-head CI is required before merging. Real providers and physical hardware are not verified.
+
+## Forget a saved subtitle or Off choice for one title (#154)
+
+The native embedded-subtitle menu now offers **忘记本片字幕记忆（下次播放）** when a current remote non-replay title has a saved track or explicit Off. Forgetting removes only its digest-keyed local preference, not the current subtitle selection/Off, imported SRT/VTT/ASS overlay, playback progress or other titles. A later AVPlayerItem may use AVFoundation's automatic subtitle choice again. This is intentionally distinct from the existing **关闭内嵌字幕** action, which changes current playback and persists Off. No raw media URLs or headers are stored.
+
+XCTest covers saved track/Off, independent audio/subtitle removal, other-title preservation, no-op/local-media cases and future-item behavior; owned HLS SwiftUI XCUI runs on both simulator families. Final-head full CI, physical devices, external providers and security/signing acceptance remain separate.
