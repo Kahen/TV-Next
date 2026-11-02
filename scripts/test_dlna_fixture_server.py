@@ -140,6 +140,19 @@ class DLNAFixtureTests(unittest.TestCase):
         self.assertEqual(self.post('/upnp/control/AVTransport1', 'SetAVTransportURI', 'file:///private/a')[0], 400)
         self.assertEqual(self.post('/unknown')[0], 404)
 
+    def test_readonly_query_failure_does_not_stop_owned_cast(self):
+        endpoint = '/upnp/control/AVTransport1/fail-readonly'
+        self.assertEqual(self.post(endpoint, 'SetAVTransportURI',
+                                   'https://media.example/owned.mp4?a=1&amp;b=2')[0], 200)
+        self.assertEqual(self.post(endpoint, 'Play')[0], 200)
+        for action in ('GetTransportInfo', 'GetPositionInfo'):
+            status, body = self.post(endpoint, action)
+            self.assertEqual(status, 503)
+            self.assertIn(b'owned read-only failure', body)
+        self.assertEqual(self.post(endpoint, 'Pause')[0], 200)
+        self.assertEqual(self.post(endpoint, 'Stop')[0], 200)
+        self.assertEqual(self.post('/unknown', 'GetTransportInfo')[0], 404)
+
     def test_redirect_fault_and_oversize(self):
         self.assertEqual(self.post('/redirect')[0], 302)
         self.assertEqual(self.post('/fault')[0], 500)
