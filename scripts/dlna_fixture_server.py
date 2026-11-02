@@ -140,6 +140,10 @@ class Handler(BaseHTTPRequestHandler):
                 assert getattr(self.server, 'transport_state', 'STOPPED') in ('PLAYING', 'PAUSED_PLAYBACK')
         except (AssertionError, ValueError, KeyError, IndexError, ET.ParseError):
             return self.reply(400, b'invalid SOAP')
+        # Deterministic read-only failure: cast/pause/stop still acknowledge.
+        # A 503 status query must not be interpreted as a stopped renderer.
+        if self.path.endswith('/fail-readonly') and action in ('GetTransportInfo', 'GetPositionInfo'):
+            return self.reply(503, b'owned read-only failure')
         if action == 'SetAVTransportURI':
             self.server.transport_state = 'STOPPED'
             self.server.position_seconds = 0
