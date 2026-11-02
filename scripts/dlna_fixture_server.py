@@ -93,7 +93,8 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == '/fault':
             return self.reply(500, b'<s:Fault>owned failure</s:Fault>')
         if self.path not in ('/upnp/control/AVTransport1',
-                             '/upnp/control/AVTransport1/fail-readonly'):
+                             '/upnp/control/AVTransport1/fail-readonly',
+                             '/upnp/control/AVTransport1/fail-seek'):
             return self.reply(404, b'not found')
         try:
             size = int(self.headers.get('Content-Length', '0'))
@@ -144,6 +145,8 @@ class Handler(BaseHTTPRequestHandler):
         # A 503 status query must not be interpreted as a stopped renderer.
         if self.path.endswith('/fail-readonly') and action in ('GetTransportInfo', 'GetPositionInfo'):
             return self.reply(503, b'owned read-only failure')
+        if self.path.endswith('/fail-seek') and action == 'Seek':
+            return self.reply(503, b'owned seek failure')
         if action == 'SetAVTransportURI':
             self.server.transport_state = 'STOPPED'
             self.server.position_seconds = 0

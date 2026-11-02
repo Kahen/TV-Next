@@ -4,6 +4,8 @@ import SwiftUI
 /// Nothing entered here is persisted or sent to the TV-Next home server.
 struct NativeDLNASection: View {
     @ObservedObject var library: MediaLibraryStore
+    let navigationRequest: UUID
+    let navigationDestination: String?
     @State private var descriptionAddress = ""
     @State private var importedControlAddress: String?
     @State private var importedDeviceName: String?
@@ -143,20 +145,26 @@ struct NativeDLNASection: View {
             Text("仅支持手动填写的私有 IPv4 HTTP 控制端点（含端口）；投屏 URL 必须由电视直接获取。")
                 .font(.caption).foregroundStyle(.secondary)
         }
-        .onDisappear {
-            task?.cancel()
-            task = nil
-            busy = false
-            // A renderer may continue playing, but a later visit must not
-            // reuse unverified Stop/Pause/Resume state from this UI session.
-            let cleared = NativeDLNAControlSnapshot(castStarted: castStarted, paused: paused)
-                .afterLeavingScreen()
-            castStarted = cleared.castStarted
-            paused = cleared.paused
-            seekTime = ""
-            status = nil
-            error = nil
+        // Toolbar navigation scrolls a persistent VStack; onDisappear alone
+        // does not fire when moving to another section.
+        .onChange(of: navigationRequest) { _, _ in
+            if navigationDestination != "dlna" { clearForNavigation() }
         }
+        .onDisappear { clearForNavigation() }
+    }
+
+    private func clearForNavigation() {
+        task?.cancel()
+        task = nil
+        busy = false
+        // This is UI state only; never send an implicit Stop to the renderer.
+        let cleared = NativeDLNAControlSnapshot(castStarted: castStarted, paused: paused)
+            .afterLeavingScreen()
+        castStarted = cleared.castStarted
+        paused = cleared.paused
+        seekTime = ""
+        status = nil
+        error = nil
     }
 
     private func reset() {
@@ -168,6 +176,15 @@ struct NativeDLNASection: View {
         seekTime = ""
         status = nil
         error = nil
+    }
+
+    /// A failed Seek is a mutating-command failure, not a verified playback state.
+    private func invalidateSeekControls(after failure: Error) {
+        let next = NativeDLNAControlSnapshot(castStarted: castStarted, paused: paused)
+            .afterFailure(.seek)
+        castStarted = next.castStarted
+        paused = next.paused
+        error = failure.localizedDescription
     }
 
     private func importDescription() {
@@ -226,7 +243,7 @@ struct NativeDLNASection: View {
                 status = "已请求跳转至：" + (try NativeDLNASeek.target(target))
             } catch {
                 guard !Task.isCancelled else { return }
-                self.error = error.localizedDescription
+                invalidateSeekControls(after: error)
             }
             if !Task.isCancelled { busy = false }
         }
@@ -244,7 +261,7 @@ struct NativeDLNASection: View {
                 status = "已请求跳转至：" + (try NativeDLNASeek.target(target))
             } catch {
                 guard !Task.isCancelled else { return }
-                self.error = error.localizedDescription
+                invalidateSeekControls(after: error)
             }
             if !Task.isCancelled { busy = false }
         }

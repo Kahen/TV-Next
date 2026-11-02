@@ -56,6 +56,35 @@ final class NativeDLNATests: XCTestCase {
         try await NativeDLNA.send(.stop, endpoint: endpoint)
     }
 
+    func testFailedSeekInvalidatesEveryPreviouslyAcknowledgedControlSnapshot() {
+        for started in [false, true] {
+            for paused in [false, true] {
+                let result = NativeDLNAControlSnapshot(castStarted: started, paused: paused)
+                    .afterFailure(.seek)
+                XCTAssertFalse(result.castStarted)
+                XCTAssertFalse(result.paused)
+            }
+        }
+    }
+
+    func testOwnedLoopbackRejectedRelativeAndAbsoluteSeek() async throws {
+        let endpoint = try NativeDLNA.rendererURL(
+            "http://127.0.0.1:8768/upnp/control/AVTransport1/fail-seek")
+        let media = try NativeDLNA.mediaURL("https://media.example/owned.mp4?a=1&b=2")
+        try await NativeDLNA.cast(endpoint: endpoint, media: media)
+        do {
+            _ = try await NativeDLNA.seekRelative(endpoint: endpoint, deltaSeconds: 15)
+            XCTFail("Rejected relative Seek was accepted")
+        } catch NativeDLNAError.httpStatus(let code) { XCTAssertEqual(code, 503) }
+        do {
+            _ = try await NativeDLNA.seekAbsolute(endpoint: endpoint, targetText: "00:01:30")
+            XCTFail("Rejected absolute Seek was accepted")
+        } catch NativeDLNAError.httpStatus(let code) { XCTAssertEqual(code, 503) }
+        let position = try await NativeDLNA.queryPosition(endpoint: endpoint)
+        XCTAssertEqual(position.seconds, 42)
+        try await NativeDLNA.send(.stop, endpoint: endpoint)
+    }
+
     func testAbsoluteSeekStrictTimeAndDuration() throws {
         XCTAssertEqual(try NativeDLNASeek.parseAbsolute("00:01:30"), 90)
         XCTAssertEqual(try NativeDLNASeek.parseAbsolute("99:59:59"), NativeDLNASeek.maxSeconds)
