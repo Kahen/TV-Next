@@ -75,6 +75,24 @@ import FoundationNetworking
         let start = Date()
         do { try await NativeDLNA.send(.play, endpoint: slow); fatalError("Accepted slow response") }
         catch { precondition(Date().timeIntervalSince(start) < 11, "Response deadline exceeded") }
+        let seekFailureEndpoint = try NativeDLNA.rendererURL(
+            "http://127.0.0.1:8768/upnp/control/AVTransport1/fail-seek")
+        try await NativeDLNA.cast(endpoint: seekFailureEndpoint, media: media)
+        for attempt in 0..<2 {
+            do {
+                if attempt == 0 {
+                    _ = try await NativeDLNA.seekRelative(endpoint: seekFailureEndpoint, deltaSeconds: 15)
+                } else {
+                    _ = try await NativeDLNA.seekAbsolute(endpoint: seekFailureEndpoint, targetText: "00:01:30")
+                }
+                fatalError("Accepted rejected Seek")
+            } catch NativeDLNAError.httpStatus(let code) {
+                precondition(code == 503)
+            }
+            let after = try await NativeDLNA.queryPosition(endpoint: seekFailureEndpoint)
+            precondition(after.seconds == 42, "Rejected Seek must not mutate owned fixture position")
+        }
+        try await NativeDLNA.send(.stop, endpoint: seekFailureEndpoint)
         print("Native manual DLNA loopback SOAP/redirect/size-cap/cancellation/deadline integration passed")
     }
 }
