@@ -372,6 +372,102 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertNil(defaults.data(forKey: "tv-next-native-audio-preferences-v1"))
     }
 
+    func testForgettingAudioAndSubtitlePreferencesLeavesCurrentAVPlayerSelectionUntouched() async throws {
+        let mediaURL = "http://127.0.0.1:8766/master.m3u8"
+        XCTAssertFalse(store.hasSavedAudioPreferenceForCurrentMedia)
+        XCTAssertFalse(store.hasSavedSubtitlePreferenceForCurrentMedia)
+        XCTAssertFalse(store.forgetCurrentAudioPreference())
+        XCTAssertFalse(store.forgetCurrentSubtitlePreference())
+
+        store.play(channel("Owned HLS", url: mediaURL))
+        try await waitUntil({ self.store.audioTracks.count == 2 && self.store.subtitleTracks.count == 1 },
+                            timeout: 15)
+        XCTAssertTrue(store.selectAudioTrack(1))
+        XCTAssertTrue(store.selectSubtitleTrack(nil), "The owned HLS fixture allows subtitle Off")
+        XCTAssertTrue(store.hasSavedAudioPreferenceForCurrentMedia)
+        XCTAssertTrue(store.hasSavedSubtitlePreferenceForCurrentMedia)
+        let installed = store.player.currentItem
+        XCTAssertFalse(store.player.appliesMediaSelectionCriteriaAutomatically)
+
+        XCTAssertTrue(store.forgetCurrentAudioPreference())
+        XCTAssertFalse(store.hasSavedAudioPreferenceForCurrentMedia)
+        XCTAssertTrue(store.hasSavedSubtitlePreferenceForCurrentMedia,
+                      "Audio reset must not delete the subtitle Off preference")
+        XCTAssertEqual(store.selectedAudioTrack, 1)
+        XCTAssertTrue(store.player.currentItem === installed)
+        XCTAssertFalse(store.forgetCurrentAudioPreference(), "Already forgotten is a no-op")
+
+        XCTAssertTrue(store.forgetCurrentSubtitlePreference())
+        XCTAssertFalse(store.hasSavedSubtitlePreferenceForCurrentMedia)
+        XCTAssertNil(store.selectedSubtitleTrack, "Forgetting Off must not enable subtitles now")
+        XCTAssertTrue(store.player.currentItem === installed)
+        XCTAssertFalse(store.player.appliesMediaSelectionCriteriaAutomatically,
+                       "Forgetting affects future playback only")
+        XCTAssertFalse(store.forgetCurrentSubtitlePreference())
+
+        for key in ["tv-next-native-audio-preferences-v1", "tv-next-native-subtitle-preferences-v1"] {
+            let data = try XCTUnwrap(defaults.data(forKey: key))
+            XCTAssertLessThanOrEqual(data.count, 64_000)
+            XCTAssertFalse(String(decoding: data, as: UTF8.self).contains(mediaURL))
+            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+            XCTAssertTrue(try XCTUnwrap(json["entries"] as? [[String: Any]]).isEmpty)
+        }
+
+        let restored = MediaLibraryStore(defaults: defaults)
+        restored.play(channel("Owned HLS", url: mediaURL))
+        try await waitUntil({ restored.audioTracks.count == 2 && restored.subtitleTracks.count == 1 },
+                            timeout: 15)
+        XCTAssertTrue(restored.player.appliesMediaSelectionCriteriaAutomatically,
+                      "A future item must not restore forgotten track or Off selections")
+    }
+
+    func testForgettingCurrentTrackPreferencesPreservesOtherTitlesAndRejectsLocalMedia() throws {
+        let currentURL = "http://127.0.0.1:8766/master.m3u8"
+        let otherURL = "https://example.invalid/other.m3u8"
+        func digest(_ url: String) -> String {
+            SHA256.hash(data: Data(url.utf8)).map { String(format: "%02x", $0) }.joined()
+        }
+        let currentDigest = digest(currentURL)
+        let otherDigest = digest(otherURL)
+        let audioKey = "tv-next-native-audio-preferences-v1"
+        let subtitleKey = "tv-next-native-subtitle-preferences-v1"
+        let audioEntries: [[String: Any]] = [
+            ["urlDigest": currentDigest, "displayName": "English", "languageTag": "en"],
+            ["urlDigest": otherDigest, "displayName": "Japanese", "languageTag": "ja"]
+        ]
+        let subtitleEntries: [[String: Any]] = [
+            ["urlDigest": currentDigest, "displayName": "English", "languageTag": "en", "isOff": false],
+            ["urlDigest": otherDigest, "displayName": NSNull(), "languageTag": NSNull(), "isOff": true]
+        ]
+        defaults.set(try JSONSerialization.data(withJSONObject: ["version": 2, "entries": audioEntries]),
+                     forKey: audioKey)
+        defaults.set(try JSONSerialization.data(withJSONObject: ["version": 1, "entries": subtitleEntries]),
+                     forKey: subtitleKey)
+
+        let seeded = MediaLibraryStore(defaults: defaults)
+        seeded.play(channel("Owned HLS", url: currentURL))
+        XCTAssertTrue(seeded.hasSavedAudioPreferenceForCurrentMedia)
+        XCTAssertTrue(seeded.hasSavedSubtitlePreferenceForCurrentMedia)
+        XCTAssertTrue(seeded.forgetCurrentAudioPreference())
+        XCTAssertTrue(seeded.forgetCurrentSubtitlePreference())
+        for key in [audioKey, subtitleKey] {
+            let data = try XCTUnwrap(defaults.data(forKey: key))
+            XCTAssertFalse(String(decoding: data, as: UTF8.self).contains(currentURL))
+            XCTAssertFalse(String(decoding: data, as: UTF8.self).contains(otherURL))
+            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+            let entries = try XCTUnwrap(json["entries"] as? [[String: Any]])
+            XCTAssertEqual(entries.count, 1)
+            XCTAssertEqual(entries.first?["urlDigest"] as? String, otherDigest)
+        }
+
+        seeded.playLocalFile(try fixture(), name: "fixture.mp4")
+        XCTAssertFalse(seeded.hasSavedAudioPreferenceForCurrentMedia)
+        XCTAssertFalse(seeded.hasSavedSubtitlePreferenceForCurrentMedia)
+        XCTAssertFalse(seeded.forgetCurrentAudioPreference())
+        XCTAssertFalse(seeded.forgetCurrentSubtitlePreference())
+        seeded.clear()
+    }
+
     func testAudioPreferenceIdentityNeverTruncatesOrMatchesAmbiguousNames() {
         let prefix = String(repeating: "A", count: 80)
         let first = prefix + " - English"
