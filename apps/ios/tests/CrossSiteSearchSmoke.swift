@@ -219,6 +219,22 @@ private actor RequestCounter {
         precondition(clippedThenFailed.failedKeys == ["partial"])
         precondition(clippedThenFailed.warnings == ["1 个站点单页超过 40 条，仅保留每页前 40 条。"])
 
-        print("Native cross-provider search: ordering, concurrency, bounds, failed-key retries, stable partial results and cancellation passed")
+        let initialWarnings = NativeSearchWarningState(
+            omittedSiteCount: 2, pageLimitKeys: ["a", "b"],
+            clippedPageKeys: ["b"], globalResultCapReached: true
+        )
+        let recoveredB = NativeSearchWarningState.empty
+        let unchanged = initialWarnings.replacingRecoveredProviders(with: recoveredB, recoveredKeys: [])
+        precondition(unchanged.messages == initialWarnings.messages)
+        let reconciled = initialWarnings.replacingRecoveredProviders(with: recoveredB, recoveredKeys: ["b"])
+        precondition(reconciled.pageLimitKeys == ["a"] && reconciled.clippedPageKeys.isEmpty)
+        precondition(reconciled.omittedSiteCount == 2 && reconciled.globalResultCapReached)
+        precondition(reconciled.messages.count == 3)
+        let twoClipped = NativeSearchWarningState(
+            omittedSiteCount: 0, pageLimitKeys: [],
+            clippedPageKeys: ["a", "b"], globalResultCapReached: false
+        )
+        precondition(twoClipped.messages == ["2 个站点单页超过 40 条，仅保留每页前 40 条。"])
+        print("Native cross-provider search: ordering, concurrency, bounds, failed-key retries, warning reconciliation and cancellation passed")
     }
 }

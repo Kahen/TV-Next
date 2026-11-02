@@ -266,3 +266,8 @@ The iPhone/iPad AVPlayer menus now provide explicit **future-playback-only** for
 ### P2 native search response clipping transparency (#156)
 
 The iPhone/iPad cross-site search UI now distinguishes an oversized individual response (>40 entries) from a provider advertising further pages beyond the two-page budget. Both cases preserve existing limits and provider provenance, and are covered by positive/negative Swift, owned localhost and simulator tests. Final-head CI is required before merging. This does not close P2 #3 or establish licensed provider compatibility.
+
+
+### P2 native failed-only retry warning reconciliation (#158)
+
+Native cross-site search warning provenance now uses selected provider keys, not localized warning string deduplication. Recovery replaces only the recovered provider's clipping/page-limit warnings alongside its partial hits; a repeated failure retains prior partial-hit warnings. The original 16-site/4-concurrent/2-page/40-item/600-result caps remain. Swift smoke/XCTest, localhost fixture, iPhone/iPad XCUI and full final-HEAD integration gate are required before accepting the slice. No physical-device, authorized external source or signed release claim.

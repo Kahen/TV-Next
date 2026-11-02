@@ -17,12 +17,57 @@ struct NativeSearchHit<Item> {
     let item: Item
 }
 
+/// Typed warning provenance; a localized message is not a provider identity.
+struct NativeSearchWarningState {
+    let omittedSiteCount: Int
+    let pageLimitKeys: Set<String>
+    let clippedPageKeys: Set<String>
+    let globalResultCapReached: Bool
+
+    static let empty = NativeSearchWarningState(
+        omittedSiteCount: 0, pageLimitKeys: [], clippedPageKeys: [],
+        globalResultCapReached: false
+    )
+
+    var messages: [String] {
+        var warnings: [String] = []
+        if omittedSiteCount > 0 {
+            warnings.append("仅搜索前 \(NativeCrossSiteSearch.maxSites) 个可用站点，其余 \(omittedSiteCount) 个未请求。")
+        }
+        if !pageLimitKeys.isEmpty {
+            warnings.append("\(pageLimitKeys.count) 个站点仍有更多结果；每站最多检索 \(NativeCrossSiteSearch.maxPages) 页。")
+        }
+        if !clippedPageKeys.isEmpty {
+            warnings.append("\(clippedPageKeys.count) 个站点单页超过 \(NativeCrossSiteSearch.maxItemsPerPage) 条，仅保留每页前 \(NativeCrossSiteSearch.maxItemsPerPage) 条。")
+        }
+        if globalResultCapReached {
+            warnings.append("仅显示前 \(NativeCrossSiteSearch.maxResults) 条结果。")
+        }
+        return warnings
+    }
+
+    /// Failed-again providers retain their previous partial hits and warnings.
+    /// A prior global cap remains conservative: discarded overflow cannot be
+    /// reconstructed without requerying already successful providers.
+    func replacingRecoveredProviders(with retry: Self, recoveredKeys: Set<String>) -> Self {
+        NativeSearchWarningState(
+            omittedSiteCount: omittedSiteCount,
+            pageLimitKeys: pageLimitKeys.subtracting(recoveredKeys)
+                .union(retry.pageLimitKeys.intersection(recoveredKeys)),
+            clippedPageKeys: clippedPageKeys.subtracting(recoveredKeys)
+                .union(retry.clippedPageKeys.intersection(recoveredKeys)),
+            globalResultCapReached: globalResultCapReached || retry.globalResultCapReached
+        )
+    }
+}
+
 struct NativeSearchResult<Item> {
     let items: [NativeSearchHit<Item>]
     let failed: [String]
     /// Stable provider keys, never display names (which may collide).
     let failedKeys: [String]
-    let warnings: [String]
+    let warningState: NativeSearchWarningState
+    var warnings: [String] { warningState.messages }
 }
 
 private struct NativeSearchOutcome<Item> {
@@ -165,14 +210,19 @@ enum NativeCrossSiteSearch {
         }
         try Task.checkCancellation()
         let all = grouped.flatMap { $0 }
-        var warnings: [String] = []
-        if eligible.count > maxSites { warnings.append("仅搜索前 \(maxSites) 个可用站点，其余 \(eligible.count - maxSites) 个未请求。") }
-        if !truncated.isEmpty { warnings.append("\(truncated.count) 个站点仍有更多结果；每站最多检索 \(maxPages) 页。") }
-        if !clippedPages.isEmpty { warnings.append("\(clippedPages.count) 个站点单页超过 \(maxItemsPerPage) 条，仅保留每页前 \(maxItemsPerPage) 条。") }
-        if all.count > maxResults { warnings.append("仅显示前 \(maxResults) 条结果。") }
+        let warningState = NativeSearchWarningState(
+            omittedSiteCount: max(0, eligible.count - maxSites),
+            pageLimitKeys: Set(selected.enumerated().compactMap {
+                truncated.contains($0.offset) ? $0.element.key : nil
+            }),
+            clippedPageKeys: Set(selected.enumerated().compactMap {
+                clippedPages.contains($0.offset) ? $0.element.key : nil
+            }),
+            globalResultCapReached: all.count > maxResults
+        )
         return NativeSearchResult(items: Array(all.prefix(maxResults)),
                                   failed: selected.enumerated().compactMap { failures.contains($0.offset) ? $0.element.name : nil },
                                   failedKeys: selected.enumerated().compactMap { failures.contains($0.offset) ? $0.element.key : nil },
-                                  warnings: warnings)
+                                  warningState: warningState)
     }
 }
