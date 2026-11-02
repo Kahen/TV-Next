@@ -18,7 +18,7 @@ struct NativeSearchHit<Item> {
 }
 
 /// Typed warning provenance; a localized message is not a provider identity.
-struct NativeSearchWarningState {
+struct NativeSearchWarningState: Sendable {
     let omittedSiteCount: Int
     let pageLimitKeys: Set<String>
     let clippedPageKeys: Set<String>
