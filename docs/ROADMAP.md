@@ -271,3 +271,7 @@ The iPhone/iPad cross-site search UI now distinguishes an oversized individual r
 ### P2 native failed-only retry warning reconciliation (#158)
 
 Native cross-site search warning provenance now uses selected provider keys, not localized warning string deduplication. Recovery replaces only the recovered provider's clipping/page-limit warnings alongside its partial hits; a repeated failure retains prior partial-hit warnings. The original 16-site/4-concurrent/2-page/40-item/600-result caps remain. Swift smoke/XCTest, localhost fixture, iPhone/iPad XCUI and full final-HEAD integration gate are required before accepting the slice. No physical-device, authorized external source or signed release claim.
+
+## Native manual DLNA read-only failure control-state regression (P4, #160)
+
+A failed GetTransportInfo/GetPositionInfo does not prove the last acknowledged cast stopped. Preserve Stop/Pause availability for an acknowledged cast, but invalidate paused/Resume until a new verified state; mutating-command errors still fail closed. Owned Python SOAP fixture, Swift smoke/XCTest and production iPhone/iPad XCUI are required at the final PR HEAD. See [IOS_DLNA.md](IOS_DLNA.md). Physical iPhone/iPad/TV, multicast entitlement and release/security acceptance remain open.
