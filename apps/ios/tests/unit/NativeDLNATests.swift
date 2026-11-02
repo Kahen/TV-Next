@@ -3,6 +3,40 @@ import XCTest
 @testable import TVNext
 
 final class NativeDLNATests: XCTestCase {
+    func testFailedReadOnlyDLNAQueryPreservesCastButInvalidatesPausedResume() {
+        for action in [NativeDLNAAction.getTransportInfo, .getPositionInfo] {
+            let active = NativeDLNAControlSnapshot(castStarted: true, paused: true)
+                .afterFailure(action)
+            XCTAssertTrue(active.castStarted, "A failed read must not invent a Stop acknowledgement")
+            XCTAssertFalse(active.paused, "Resume requires a fresh paused state")
+            let inactive = NativeDLNAControlSnapshot(castStarted: false, paused: false)
+                .afterFailure(action)
+            XCTAssertFalse(inactive.castStarted)
+            XCTAssertFalse(inactive.paused)
+        }
+        for action in [NativeDLNAAction.setURI, .play, .pause, .stop, .seek] {
+            let invalidated = NativeDLNAControlSnapshot(castStarted: true, paused: true)
+                .afterFailure(action)
+            XCTAssertFalse(invalidated.castStarted, "Mutating failure must fail closed")
+            XCTAssertFalse(invalidated.paused)
+        }
+    }
+
+    func testOwnedLoopbackReadOnlyFailureDoesNotAcknowledgeTransportState() async throws {
+        let endpoint = try NativeDLNA.rendererURL("http://127.0.0.1:8768/upnp/control/AVTransport1/fail-readonly")
+        let media = try NativeDLNA.mediaURL("https://media.example/owned.mp4?a=1&b=2")
+        try await NativeDLNA.cast(endpoint: endpoint, media: media)
+        do {
+            _ = try await NativeDLNA.queryState(endpoint: endpoint)
+            XCTFail("Failed query unexpectedly returned a trusted transport state")
+        } catch NativeDLNAError.httpStatus(let code) { XCTAssertEqual(code, 503) }
+        do {
+            _ = try await NativeDLNA.queryPosition(endpoint: endpoint)
+            XCTFail("Failed query unexpectedly returned a trusted position")
+        } catch NativeDLNAError.httpStatus(let code) { XCTAssertEqual(code, 503) }
+        try await NativeDLNA.send(.stop, endpoint: endpoint)
+    }
+
     func testAbsoluteSeekStrictTimeAndDuration() throws {
         XCTAssertEqual(try NativeDLNASeek.parseAbsolute("00:01:30"), 90)
         XCTAssertEqual(try NativeDLNASeek.parseAbsolute("99:59:59"), NativeDLNASeek.maxSeconds)
