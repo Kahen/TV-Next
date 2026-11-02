@@ -114,11 +114,17 @@ A transient 503, malformed SOAP response or timeout from explicit `GetTransportI
 
 Positive/negative Swift smoke and XCTest exercise read-only versus mutating errors; the owned localhost fixture acknowledges cast/pause/stop but returns HTTP 503 for status/position reads. Python and production SwiftUI iPhone/iPad XCUI assert the error, disabled Resume, retained Stop/Pause and successful Stop. Final-HEAD full CI is required before closing #160. No physical renderer, Apple device, entitlement, security audit or signed distribution claim.
 
+## P4 native manual DLNA navigation-state invalidation (#164, 2026-11-02)
+
+Leaving the native DLNA screen cancels any in-flight request and discards UI-only cast/paused flags, stale status/error and previous seek text. Renderer/media fields are not persisted or sent to a server, and navigation never sends an implicit Stop to the renderer. A fresh explicit cast or verified transport-state query is required to enable playback controls after return. This differs from a failed read-only query **within** the same screen, which preserves the last acknowledged cast. Swift smoke/XCTest and production SwiftUI iPhone/iPad XCUI use only the owned localhost fixture; final-head Web/API, PostgreSQL, Compose, NAS, Spider isolation and aggregate CI are required before merging. Physical Apple/TV interoperability, multicast entitlement, legal Spider corpus, security audit and signing remain open.
+
 ## Failed relative/absolute Seek invalidates local controls (P4, #162)
 
 Both manual ±15-second REL_TIME Seek and explicit HH:MM:SS Seek are mutating commands. A failed status/position preflight or rejected SOAP Seek does not establish a valid post-command renderer state. Previously the two SwiftUI catch paths displayed an error but left local Pause/Stop/Resume controls enabled. They now use the same conservative `NativeDLNAControlSnapshot.afterFailure(.seek)` policy as other failed mutations: invalidate `castStarted` and `paused`, keep the entered URLs, and allow an explicit new cast or fresh state query. A successful seek does not reset controls. Cancellation and endpoint edits still discard stale asynchronous completions.
 
 The owned loopback fixture accepts SetURI/Play/status/position but returns HTTP 503 for valid Seek requests; invalid SOAP still returns 400. Python tests, Swift network smoke, XCTest and production iPhone/iPad XCUI cover both relative and absolute failure paths and verify no synthetic position mutation. Final-HEAD full integration CI is required before closing #162. Physical renderer/iPhone/iPad behavior, multicast entitlement, independent security audit and signed distribution remain unverified.
+
+The native root uses one persistent `ScrollViewReader`/`VStack`: toolbar section changes scroll without necessarily firing the DLNA subview's `onDisappear`. The implementation therefore observes explicit navigation requests as well as actual disappearance; reselecting DLNA does not reset an active session. The iPhone/iPad XCUI regression covers both paths.
 
 ## Native iOS DLNA current-media autofill eligibility (P4, #166)
 

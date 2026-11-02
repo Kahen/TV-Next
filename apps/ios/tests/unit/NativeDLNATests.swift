@@ -22,6 +22,25 @@ final class NativeDLNATests: XCTestCase {
         }
     }
 
+    func testDLNANavigationClearsOnlyLocalCommandState() {
+        for snapshot in [
+            NativeDLNAControlSnapshot(castStarted: false, paused: false),
+            NativeDLNAControlSnapshot(castStarted: true, paused: false),
+            NativeDLNAControlSnapshot(castStarted: true, paused: true)
+        ] {
+            let cleared = snapshot.afterLeavingScreen()
+            XCTAssertFalse(cleared.castStarted)
+            XCTAssertFalse(cleared.paused)
+            XCTAssertEqual(cleared.afterLeavingScreen(), cleared, "Repeated navigation must be idempotent")
+        }
+        // A failed read-only query within the same screen differs from leaving.
+        let afterRead = NativeDLNAControlSnapshot(castStarted: true, paused: true)
+            .afterFailure(.getTransportInfo)
+        XCTAssertTrue(afterRead.castStarted)
+        XCTAssertFalse(afterRead.paused)
+        XCTAssertFalse(afterRead.afterLeavingScreen().castStarted)
+    }
+
     func testOwnedLoopbackReadOnlyFailureDoesNotAcknowledgeTransportState() async throws {
         let endpoint = try NativeDLNA.rendererURL("http://127.0.0.1:8768/upnp/control/AVTransport1/fail-readonly")
         let media = try NativeDLNA.mediaURL("https://media.example/owned.mp4?a=1&b=2")

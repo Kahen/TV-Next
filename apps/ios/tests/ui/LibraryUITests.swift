@@ -127,7 +127,8 @@ final class LibraryUITests: XCTestCase {
             reveal(clear)
             clear.tap()
             app.alerts.buttons["删除本地媒体库"].tap()
-            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.alerts.firstMatch)], timeout: 5), .completed)
+            // Allow slow iPad alert dismissal after local library deletion.
+            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.alerts.firstMatch)], timeout: 15), .completed)
             XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: clear)], timeout: 5), .completed)
         }
     }
@@ -939,6 +940,41 @@ final class LibraryUITests: XCTestCase {
         XCTAssertFalse(pause.isEnabled)
         XCTAssertFalse(resume.isEnabled)
         XCTAssertTrue(cast.isEnabled, "User can explicitly start a new session")
+    }
+
+    func testDLNANavigatingAwayClearsStaleCastControls() {
+        jump("DLNA 投屏")
+        enter(app.textFields["dlna-renderer-url"],
+              "http://127.0.0.1:8768/upnp/control/AVTransport1")
+        enter(app.textFields["dlna-media-url"], "https://media.example/owned.mp4?a=1&b=2")
+        let cast = app.buttons["dlna-cast"]
+        reveal(cast)
+        cast.tap()
+        let status = app.staticTexts["dlna-status"]
+        XCTAssertTrue(status.waitForExistence(timeout: 15))
+        XCTAssertEqual(status.label, "投屏已开始")
+        let pause = app.buttons["dlna-pause"]
+        reveal(pause)
+        XCTAssertTrue(pause.isEnabled)
+        pause.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "已发送暂停命令"), object: status)],
+            timeout: 15), .completed)
+        let resume = app.buttons["dlna-resume"]
+        reveal(resume)
+        XCTAssertTrue(resume.isEnabled)
+        jump("DLNA 投屏")
+        XCTAssertTrue(app.buttons["dlna-resume"].isEnabled, "Re-selecting DLNA must preserve its current session")
+        jump("媒体库")
+        jump("DLNA 投屏")
+        let stop = app.buttons["dlna-stop"]
+        XCTAssertTrue(stop.waitForExistence(timeout: 5))
+        XCTAssertFalse(stop.isEnabled, "Navigation must not reuse the previous cast session")
+        XCTAssertFalse(app.buttons["dlna-pause"].isEnabled)
+        XCTAssertFalse(app.buttons["dlna-resume"].isEnabled)
+        XCTAssertFalse(app.staticTexts["dlna-status"].exists)
+        XCTAssertFalse(app.staticTexts["dlna-error"].exists)
+        // Navigation must never send an implicit Stop to the renderer.
     }
 
     func testDLNAImportsControlURLFromOwnedDeviceDescription() {
