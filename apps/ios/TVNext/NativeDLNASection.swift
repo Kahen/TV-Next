@@ -4,6 +4,8 @@ import SwiftUI
 /// Nothing entered here is persisted or sent to the TV-Next home server.
 struct NativeDLNASection: View {
     @ObservedObject var library: MediaLibraryStore
+    let navigationRequest: UUID
+    let navigationDestination: String?
     @State private var descriptionAddress = ""
     @State private var importedControlAddress: String?
     @State private var importedDeviceName: String?
@@ -143,11 +145,26 @@ struct NativeDLNASection: View {
             Text("仅支持手动填写的私有 IPv4 HTTP 控制端点（含端口）；投屏 URL 必须由电视直接获取。")
                 .font(.caption).foregroundStyle(.secondary)
         }
-        .onDisappear {
-            task?.cancel()
-            task = nil
-            busy = false
+        // Toolbar navigation scrolls a persistent VStack; onDisappear alone
+        // does not fire when moving to another section.
+        .onChange(of: navigationRequest) { _, _ in
+            if navigationDestination != "dlna" { clearForNavigation() }
         }
+        .onDisappear { clearForNavigation() }
+    }
+
+    private func clearForNavigation() {
+        task?.cancel()
+        task = nil
+        busy = false
+        // This is UI state only; never send an implicit Stop to the renderer.
+        let cleared = NativeDLNAControlSnapshot(castStarted: castStarted, paused: paused)
+            .afterLeavingScreen()
+        castStarted = cleared.castStarted
+        paused = cleared.paused
+        seekTime = ""
+        status = nil
+        error = nil
     }
 
     private func reset() {

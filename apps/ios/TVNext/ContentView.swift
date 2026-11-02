@@ -96,7 +96,8 @@ struct ContentView: View {
                     ConfigPreviewSection().id("config")
                     CloudSection(serverURL: serverURL) { library.play($0) }.id("cloud")
                     NativeWebDAVSection(onPlay: { library.play($0) }, onDisconnect: { library.revokeWebDAV(root: $0) }).id("webdav")
-                    NativeDLNASection(library: library).id("dlna")
+                    NativeDLNASection(library: library, navigationRequest: navigationRequest,
+                                      navigationDestination: scrollDestination).id("dlna")
                     SubscriptionSection(serverURL: serverURL, session:homeSession, onPlay: { playback, title in
                         library.play(TVChannel(name: title + " · " + playback.name, url: playback.url, group: playback.lineName, logo: nil, tvgId: nil, headers:playback.headers, timeshift:playback.timeshift))
                         remoteResourceKey = playback.url
