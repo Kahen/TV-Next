@@ -11,7 +11,9 @@ jobs:
   simulator-build:
     name: ${{ matrix.family }} simulator acceptance
     runs-on: macos-15
-    timeout-minutes: 30
+    # iPhone production XCUI suite exceeded 30 minutes despite passing its first 26 UI cases;
+    # keep per-test 300-second bounds while allowing the complete serial suite to finish.
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
