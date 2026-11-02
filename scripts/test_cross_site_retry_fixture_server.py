@@ -52,6 +52,17 @@ class CrossSiteRetryFixtureTests(unittest.TestCase):
         self.assertEqual(state["counts"], {"a": 1, "b": 2})
         self.assertEqual({q["query"] for q in state["queries"]}, {"original"})
 
+    def test_successful_empty_search_is_not_a_transport_failure(self):
+        self.get("/fixture/reset")
+        for key in ("a", "b"):
+            result = self.post("/api/v1/subscriptions/search",
+                               {"siteKey": key, "query": "no-results"})
+            self.assertEqual(result["items"], [])
+            self.assertEqual(result["total"], 0)
+            self.assertFalse(result["hasMore"])
+        state = self.get("/fixture/state")
+        self.assertEqual(state["counts"], {"a": 1, "b": 1})
+
     def test_reject_unknown_and_oversized(self):
         self.get("/fixture/reset")
         with self.assertRaises(HTTPError) as error:

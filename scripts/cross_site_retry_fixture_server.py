@@ -72,6 +72,13 @@ class Handler(BaseHTTPRequestHandler):
             _counts[key] += 1
             count = _counts[key]
             _queries.append({"siteKey": key, "query": keyword})
+        # An explicit zero-hit search succeeds on both providers; it must
+        # not be misreported as a failure or show a retry action.
+        if keyword == "no-results":
+            return self.respond(200, {
+                "categories": [], "filters": {}, "total": 0,
+                "page": 1, "hasMore": False, "items": []
+            })
         if key == "b" and count == 1:
             return self.respond(503, {"error": "synthetic transient failure"})
         # Fail closed if SwiftUI re-queries a healthy site or retries using

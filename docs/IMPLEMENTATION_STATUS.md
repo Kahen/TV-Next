@@ -207,3 +207,8 @@ The existing bounded SwiftUI FongMi type 0/1/2/4 cross-provider search now expos
 ## Native cross-site search provenance correction (P2, #146)
 
 The existing failed-only retry routes by eligible provider keys, but its result buttons previously looked up a display name in the unfiltered subscription. A hidden/unsupported earlier duplicate key could therefore mislabel a real searched provider. Native SwiftUI now stores a nonpersistent selected-provider name snapshot alongside the original search ordering and clears both on context reset. The shared helper enforces first eligible key and 16-site cap. Synthetic Swift smoke/XCTest and production iPhone/iPad XCUI with an owned hidden-duplicate fixture provide regression coverage; final-head CI must pass before merging. This does not validate real FongMi providers, Apple hardware, Spider safety or release readiness.
+
+
+## Native P2 cross-site completed-empty feedback (#148)
+
+A completed native SwiftUI cross-provider search with no visible hits no longer looks like an untouched search form. The display differentiates zero-match success, partial failure and all-failed outcomes, with the same existing failed-only retry. The completion flag resets on new searches, subscription/context changes and view dismissal, and updates only after the current-generation search or retry finishes. Pure Swift positive/negative/boundary tests, a localhost empty-result fixture, Python tests and production iPhone/iPad XCUI are added. Final HEAD aggregate CI is required before closing this implementation issue. P2 #3, real-device/provider, P3 legal/sandbox review and signed release remain open.

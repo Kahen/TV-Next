@@ -26,6 +26,7 @@ struct SubscriptionSection: View {
     @State private var crossSiteSourceOrder: [String] = []
     @State private var crossSiteSourceNames: [String: String] = [:]
     @State private var crossSiteWarnings: [String] = []
+    @State private var crossSiteCompleted = false
     @State private var line = 0
     @State private var error: String?
     @State private var busy = false
@@ -72,6 +73,14 @@ struct SubscriptionSection: View {
                         .accessibilityIdentifier("retry-failed-cross-site-search")
                 }
                 ForEach(crossSiteWarnings, id: \.self) { Text($0).font(.caption).foregroundStyle(.secondary) }
+                if crossSiteCompleted, let message = NativeCrossSiteSearch.emptyState(
+                    resultCount: crossSiteResults.count,
+                    failedCount: crossSiteFailedKeys.count,
+                    selectedCount: crossSiteSourceOrder.count
+                ) {
+                    Text(message).font(.caption).foregroundStyle(.secondary)
+                        .accessibilityIdentifier("cross-site-empty-state")
+                }
                 if !crossSiteResults.isEmpty {
                     LazyVStack(alignment: .leading) {
                         Text("跨站搜索结果").font(.headline)
@@ -109,7 +118,7 @@ struct SubscriptionSection: View {
     }
     private func clearCrossSiteSearch() {
         crossSiteResults = []; crossSiteFailures = []; crossSiteFailedKeys = []
-        crossSiteSearchKeyword = nil; crossSiteSourceOrder = []; crossSiteSourceNames = [:]; crossSiteWarnings = []
+        crossSiteSearchKeyword = nil; crossSiteSourceOrder = []; crossSiteSourceNames = [:]; crossSiteWarnings = []; crossSiteCompleted = false
     }
     private func switchDetailSite(_ key: String) {
         var scope = NativeSiteBrowsingContext(
@@ -190,6 +199,7 @@ struct SubscriptionSection: View {
             crossSiteFailures = result.failed
             crossSiteFailedKeys = result.failedKeys
             crossSiteWarnings = result.warnings
+            crossSiteCompleted = true
         }
     }
 
@@ -227,6 +237,7 @@ struct SubscriptionSection: View {
             )
             crossSiteFailures = retry.failed
             crossSiteFailedKeys = retry.failedKeys
+            crossSiteCompleted = true
             for warning in retry.warnings where !crossSiteWarnings.contains(warning) {
                 crossSiteWarnings.append(warning)
             }

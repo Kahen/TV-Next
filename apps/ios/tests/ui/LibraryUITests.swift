@@ -143,7 +143,46 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["TVBox / FongMi 原版订阅"].waitForExistence(timeout: 5))
     }
 
-    func testCrossSiteRetryOnlyFailedProviderPreservesOriginalQuery() {
+    private func resetCrossSiteFixture() async throws {
+        let url = try XCTUnwrap(URL(string: "http://127.0.0.1:8769/fixture/reset"))
+        let (_, response) = try await URLSession.shared.data(from: url)
+        XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
+    }
+
+    func testCrossSiteSuccessfulEmptySearchHasExplicitFeedback() async throws {
+        try await resetCrossSiteFixture()
+        app.terminate()
+        app.launchArguments += ["-tv-next-api-url", "http://127.0.0.1:8769"]
+        app.launch()
+        jump("TVBox 订阅")
+        let editor = app.textViews["订阅配置内容"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        enter(editor, "{\"sites\":[]}")
+        let load = app.buttons["加载订阅"]
+        reveal(load)
+        load.tap()
+        let query = app.textFields["搜索当前站点"]
+        XCTAssertTrue(query.waitForExistence(timeout: 10))
+        enter(query, "no-results")
+        let search = app.buttons["跨站搜索"]
+        reveal(search)
+        search.tap()
+        let empty = app.staticTexts["cross-site-empty-state"]
+        XCTAssertTrue(empty.waitForExistence(timeout: 15))
+        XCTAssertEqual(empty.label, "未找到匹配结果。")
+        XCTAssertFalse(app.buttons["retry-failed-cross-site-search"].exists)
+        XCTAssertFalse(app.staticTexts["跨站搜索结果"].exists)
+        // A successful subscription reload must clear the old search status.
+        reveal(load)
+        load.tap()
+        let dismissed = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"), object: empty
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 10), .completed)
+    }
+
+    func testCrossSiteRetryOnlyFailedProviderPreservesOriginalQuery() async throws {
+        try await resetCrossSiteFixture()
         // The owned localhost fixture deliberately gives two providers the
         // same display name. Provider B fails once; provider A must never be
         // requested again. B's retry rejects an edited query.

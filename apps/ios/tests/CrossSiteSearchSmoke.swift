@@ -61,6 +61,14 @@ private actor RequestCounter {
         },identity:{$0.id}) }
         task.cancel()
         do { _ = try await task.value; fatalError("Cancellation was ignored") } catch is CancellationError {}
+        // Empty successful results, partial failure and total failure must
+        // not collapse into the same ambiguous blank UI.
+        precondition(NativeCrossSiteSearch.emptyState(resultCount: 0, failedCount: 0, selectedCount: 2) == "未找到匹配结果。")
+        precondition(NativeCrossSiteSearch.emptyState(resultCount: 0, failedCount: 1, selectedCount: 2) == "尚无匹配结果，部分站点搜索失败，可重试。")
+        precondition(NativeCrossSiteSearch.emptyState(resultCount: 0, failedCount: 2, selectedCount: 2) == "所有站点搜索失败，请重试失败站点。")
+        precondition(NativeCrossSiteSearch.emptyState(resultCount: 1, failedCount: 2, selectedCount: 2) == nil)
+        precondition(NativeCrossSiteSearch.emptyState(resultCount: 0, failedCount: 0, selectedCount: 0) == nil)
+        precondition(NativeCrossSiteSearch.emptyState(resultCount: 0, failedCount: -1, selectedCount: 2) == nil)
         // Opening a search hit from B after browsing A must not leak A's
         // category filters into subsequent B requests. Same-site detail keeps them.
         var scope = NativeSiteBrowsingContext<String>(
