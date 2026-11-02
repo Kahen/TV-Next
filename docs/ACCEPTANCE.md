@@ -210,3 +210,7 @@ Final HEAD must pass Swift smoke/XCTest for duplicate eligible keys, unknown key
 ### P2 native cross-site completed-empty state (#148)
 
 Require Swift smoke/XCTest to distinguish zero-hit success, partial failure, all-failed and nonempty/not-started cases; owned localhost Python fixture returning HTTP 200 with zero items from both providers; production iPhone/iPad XCUI verifying the explicit no-match message, no false retry button and reset on subscription reload. Final HEAD Web/API, PostgreSQL, NAS, Compose, Spider isolation and both iOS simulator gates must pass. This does not establish real provider, real iPhone/iPad, independent security or signing acceptance.
+
+### P4 iOS stale subtitle preference regression (#150)
+
+Verify pure Swift valid/invalid/80-81 name and 64-65 language boundaries, Off handling, and XCTest against the owned HLS fixture: a previously stored per-title track or Off must be removed after an explicit unpersistable track selection, without persisting the raw media URL. Require iPhone/iPad unsigned Xcode simulator build/XCTest/XCUI and all final-head Web/API/PostgreSQL/NAS/Compose/Spider isolation checks. This is not physical-device, external-provider, security-audit or signed-release acceptance.

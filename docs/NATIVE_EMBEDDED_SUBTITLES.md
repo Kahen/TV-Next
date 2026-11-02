@@ -11,3 +11,9 @@ Explicit subtitle selections (including **Off**, only when supported by the curr
 The iPhone/iPad simulator workflow serves a local FFmpeg-generated 4-second HLS fixture with two synthetic AAC renditions and a synthetic WebVTT subtitle rendition declared through `EXT-X-MEDIA:TYPE=SUBTITLES`. XCTest checks discovery, valid selection, explicit off, invalid indices, stale-item rejection and reset on local-file switch and clear. Additional XCTest covers same-title track/off restoration after store recreation, corrupted and unmatched preference fallback, no raw URL persistence, local-file isolation and clear-data deletion. The full cross-platform gate must pass on the PR's final HEAD before merge.
 
 No authorized external streams, physical-device codecs, VoiceOver, PiP/AirPlay subtitle rendering, native styled ASS/SSA or independent security review are claimed. Physical checks stay in #38. No signed IPA/Release is produced.
+
+## Stale subtitle preference eviction (#150)
+
+An explicit selection of an embedded/HLS subtitle track with a name longer than 80 characters, an empty name, or a language tag longer than 64 characters cannot be stored as a complete identity. Previously the app left the prior per-title preference in place, risking a stale rendition being restored on the next playback. The selection now keeps the current AVPlayer track but writes a bounded snapshot **without** the old entry. A valid track and explicit supported Off still persist normally. This uses only a SHA-256 media URL digest, never the URL or request headers.
+
+Pure Swift positive/negative/80-81/64-65 boundary smoke and owned HLS XCTest verify the policy and actual store eviction. Both iPhone/iPad simulator acceptance and full integration are required on the final PR HEAD; this does not establish physical Apple-device codec/provider compatibility, independent audit or signed distribution.

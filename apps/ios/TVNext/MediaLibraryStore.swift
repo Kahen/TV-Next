@@ -179,13 +179,22 @@ final class MediaLibraryStore: ObservableObject {
     }
 
     private func rememberSubtitlePreference(_ option: AVMediaSelectionOption?) {
+        rememberSubtitlePreferenceIdentity(displayName: option?.displayName,
+            languageTag: option?.extendedLanguageTag, isOff: option == nil)
+    }
+
+    /// Called only after an explicit selection. If its full identity cannot be
+    /// persisted, remove the previous per-title choice instead of restoring a
+    /// stale track on the next playback. The current AVPlayer selection stays.
+    func rememberSubtitlePreferenceIdentity(displayName: String?, languageTag: String?, isOff: Bool) {
         guard let key = mediaPreferenceKey() else { return }
-        let name = option.flatMap { Self.persistableSubtitleDisplayName($0.displayName) }
-        guard option == nil || (name != nil
-              && (option?.extendedLanguageTag?.count ?? 0) <= 64) else { return }
-        let preference = NativeSubtitlePreference(urlDigest: key,
-            displayName: name, languageTag: option?.extendedLanguageTag, isOff: option == nil)
-        let updated = Array((subtitlePreferences.filter { $0.urlDigest != key } + [preference]).suffix(100))
+        let identity = NativeSubtitlePreferencePolicy.normalizedChoice(
+            displayName: displayName, languageTag: languageTag, isOff: isOff)
+        let saved: [NativeSubtitlePreference] = identity.map {
+            [NativeSubtitlePreference(urlDigest: key, displayName: $0.displayName,
+                languageTag: $0.languageTag, isOff: $0.isOff)]
+        } ?? []
+        let updated = Array((subtitlePreferences.filter { $0.urlDigest != key } + saved).suffix(100))
         let snapshot = NativeSubtitlePreferenceSnapshot(version: 1, entries: updated)
         guard let data = try? JSONEncoder().encode(snapshot), data.count <= 64_000 else { return }
         defaults.set(data, forKey: subtitlePreferenceStorageKey)

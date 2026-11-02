@@ -45,6 +45,11 @@ jobs:
         run: |
           swiftc -warnings-as-errors TVNext/CaptionParser.swift TVNext/LocalCaptionReader.swift tests/CaptionFilesSmoke.swift -o /tmp/tvnext-caption-files-tests
           /tmp/tvnext-caption-files-tests
+      - name: Verify native subtitle preference identity and invalid-choice eviction policy
+        working-directory: apps/ios
+        run: |
+          swiftc -warnings-as-errors TVNext/NativeSubtitlePreferencePolicy.swift tests/SubtitlePreferenceSmoke.swift -o /tmp/tvnext-subtitle-preference-tests
+          /tmp/tvnext-subtitle-preference-tests
       - name: Run native danmaku compatibility tests
         working-directory: apps/ios
         run: |

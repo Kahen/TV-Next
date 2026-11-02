@@ -212,3 +212,7 @@ The existing failed-only retry routes by eligible provider keys, but its result 
 ## Native P2 cross-site completed-empty feedback (#148)
 
 A completed native SwiftUI cross-provider search with no visible hits no longer looks like an untouched search form. The display differentiates zero-match success, partial failure and all-failed outcomes, with the same existing failed-only retry. The completion flag resets on new searches, subscription/context changes and view dismissal, and updates only after the current-generation search or retry finishes. Pure Swift positive/negative/boundary tests, a localhost empty-result fixture, Python tests and production iPhone/iPad XCUI are added. Final HEAD aggregate CI is required before closing this implementation issue. P2 #3, real-device/provider, P3 legal/sandbox review and signed release remain open.
+
+## Native subtitle preference stale-choice eviction (P4, #150)
+
+When an explicit embedded/HLS subtitle choice cannot be represented as a complete saved name/language identity, native iOS now clears the prior per-title preference instead of retaining a stale track/Off choice for the next playback. Current AVPlayer track selection is unchanged. Valid choices and supported Off remain stored only as bounded SHA-256-keyed local metadata. Pure Swift policy smoke and owned HLS XCTest cover valid/invalid and 80/81, 64/65 boundaries; final-head iPhone/iPad and aggregate CI must pass before merging. No physical-device/provider, Spider compatibility, audit or Apple signing claim.
