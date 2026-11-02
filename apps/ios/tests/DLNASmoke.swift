@@ -129,6 +129,16 @@ import FoundationNetworking
             do { _ = try NativeDLNA.parsePositionResponse(positionSOAP(bad), response: response); fatalError("Accepted malformed position") }
             catch NativeDLNAError.invalidResponse { }
         }
+        for action in [NativeDLNAAction.getTransportInfo, .getPositionInfo] {
+            let afterRead = NativeDLNAControlSnapshot(castStarted: true, paused: true).afterFailure(action)
+            precondition(afterRead.castStarted && !afterRead.paused)
+            let inactive = NativeDLNAControlSnapshot(castStarted: false, paused: false).afterFailure(action)
+            precondition(!inactive.castStarted && !inactive.paused)
+        }
+        for action in [NativeDLNAAction.setURI, .play, .pause, .stop, .seek] {
+            let afterWrite = NativeDLNAControlSnapshot(castStarted: true, paused: true).afterFailure(action)
+            precondition(!afterWrite.castStarted && !afterWrite.paused)
+        }
         print("Native manual DLNA SOAP and private endpoint contract passed")
     }
 }

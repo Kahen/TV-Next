@@ -92,7 +92,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self.path == '/fault':
             return self.reply(500, b'<s:Fault>owned failure</s:Fault>')
-        if self.path != '/upnp/control/AVTransport1':
+        if self.path not in ('/upnp/control/AVTransport1',
+                             '/upnp/control/AVTransport1/fail-readonly'):
             return self.reply(404, b'not found')
         try:
             size = int(self.headers.get('Content-Length', '0'))
@@ -139,6 +140,10 @@ class Handler(BaseHTTPRequestHandler):
                 assert getattr(self.server, 'transport_state', 'STOPPED') in ('PLAYING', 'PAUSED_PLAYBACK')
         except (AssertionError, ValueError, KeyError, IndexError, ET.ParseError):
             return self.reply(400, b'invalid SOAP')
+        # Deterministic read-only failure: cast/pause/stop still acknowledge.
+        # A 503 status query must not be interpreted as a stopped renderer.
+        if self.path.endswith('/fail-readonly') and action in ('GetTransportInfo', 'GetPositionInfo'):
+            return self.reply(503, b'owned read-only failure')
         if action == 'SetAVTransportURI':
             self.server.transport_state = 'STOPPED'
             self.server.position_seconds = 0

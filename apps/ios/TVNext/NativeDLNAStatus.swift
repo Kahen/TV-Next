@@ -36,6 +36,24 @@ enum NativeDLNATransportState: String, Equatable {
     }
 }
 
+/// A failed read-only query is not evidence that an acknowledged cast stopped.
+/// Keep Stop/Pause available for that known session, but never permit Resume
+/// without a fresh, verified PAUSED_PLAYBACK state. Mutating-command errors
+/// still invalidate all local control assumptions.
+struct NativeDLNAControlSnapshot: Equatable {
+    let castStarted: Bool
+    let paused: Bool
+
+    func afterFailure(_ action: NativeDLNAAction) -> Self {
+        switch action {
+        case .getTransportInfo, .getPositionInfo:
+            return Self(castStarted: castStarted, paused: false)
+        default:
+            return Self(castStarted: false, paused: false)
+        }
+    }
+}
+
 extension NativeDLNA {
     /// Read-only status query. Reuses the same private-address validation,
     /// eight-second deadline, cancellation, redirect denial and 32 KiB cap.
