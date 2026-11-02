@@ -127,7 +127,8 @@ final class LibraryUITests: XCTestCase {
             reveal(clear)
             clear.tap()
             app.alerts.buttons["删除本地媒体库"].tap()
-            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.alerts.firstMatch)], timeout: 5), .completed)
+            // Allow slow iPad alert dismissal after local library deletion.
+            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.alerts.firstMatch)], timeout: 15), .completed)
             XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: clear)], timeout: 5), .completed)
         }
     }
@@ -753,6 +754,24 @@ final class LibraryUITests: XCTestCase {
         XCTAssertFalse(app.buttons["dlna-seek-forward"].isEnabled)
         XCTAssertFalse(app.buttons["dlna-seek-absolute"].isEnabled)
         XCTAssertFalse(app.staticTexts["dlna-status"].exists)
+    }
+
+    func testDLNACurrentPlaybackAutofillOnlyForDirectMedia() {
+        jump("DLNA 投屏")
+        let useCurrent = app.buttons["dlna-use-current"]
+        reveal(useCurrent)
+        XCTAssertFalse(useCurrent.isEnabled, "No current media must not enable DLNA autofill")
+        importPlaylist("#EXTM3U\n#EXTINF:-1,Owned Direct\nhttp://127.0.0.1:8765/fixture.mp4")
+        jump("媒体库")
+        let owned = app.buttons["channel-Owned Direct"]
+        reveal(owned)
+        owned.tap()
+        jump("DLNA 投屏")
+        reveal(useCurrent)
+        XCTAssertTrue(useCurrent.isEnabled, "Direct owned HTTP media should allow DLNA autofill")
+        useCurrent.tap()
+        XCTAssertEqual(app.textFields["dlna-media-url"].value as? String,
+                       "http://127.0.0.1:8765/fixture.mp4")
     }
 
     func testManualDLNACastPauseStopAgainstOwnedLoopbackFixture() {

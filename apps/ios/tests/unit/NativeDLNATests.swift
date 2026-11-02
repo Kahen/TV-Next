@@ -131,6 +131,18 @@ final class NativeDLNATests: XCTestCase {
         }
     }
 
+    func testCurrentMediaAutofillEligibilityUsesCastSafetyPolicy() {
+        for direct in ["https://media.example/owned.mp4?a=1&b=2", "http://127.0.0.1:8765/fixture.mp4"] {
+            XCTAssertTrue(NativeDLNA.canUseCurrentMedia(direct, hasHeaders: false, replay: false))
+            XCTAssertFalse(NativeDLNA.canUseCurrentMedia(direct, hasHeaders: true, replay: false))
+            XCTAssertFalse(NativeDLNA.canUseCurrentMedia(direct, hasHeaders: false, replay: true))
+        }
+        for rejected in ["", "file:///private/owned.mp4", "https://user:pass@media.example/owned.mp4",
+                         "javascript:alert(1)", String(repeating: "a", count: 4097)] {
+            XCTAssertFalse(NativeDLNA.canUseCurrentMedia(rejected, hasHeaders: false, replay: false))
+        }
+    }
+
     func testSOAPEscapingAndMediaRestrictions() throws {
         let endpoint = try NativeDLNA.rendererURL("http://127.0.0.1:8768/upnp/control/AVTransport1")
         let media = try NativeDLNA.mediaURL("https://media.example/owned.mp4?a=1&b=2")

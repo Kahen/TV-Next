@@ -74,6 +74,11 @@ enum NativeDLNA {
         return url
     }
 
+    /// Share the actual cast URL/header/replay restrictions with autofill UI.
+    static func canUseCurrentMedia(_ raw: String, hasHeaders: Bool, replay: Bool) -> Bool {
+        (try? mediaURL(raw, hasHeaders: hasHeaders, replay: replay)) != nil
+    }
+
     private static func xmlEscaped(_ input: String) -> String {
         input.replacingOccurrences(of: "&", with: "&amp;")
             .replacingOccurrences(of: "<", with: "&lt;")
