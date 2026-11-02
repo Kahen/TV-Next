@@ -237,3 +237,7 @@ The original retry UI appended warning strings, so a recovered provider could le
 ## Native manual DLNA read-only failure control-state regression (P4, #160)
 
 A failed GetTransportInfo/GetPositionInfo does not prove the last acknowledged cast stopped. Preserve Stop/Pause availability for an acknowledged cast, but invalidate paused/Resume until a new verified state; mutating-command errors still fail closed. Owned Python SOAP fixture, Swift smoke/XCTest and production iPhone/iPad XCUI are required at the final PR HEAD. See [IOS_DLNA.md](IOS_DLNA.md). Physical iPhone/iPad/TV, multicast entitlement and release/security acceptance remain open.
+
+## Native DLNA failed Seek control invalidation (P4, #162)
+
+A rejected relative or absolute Seek no longer leaves previously acknowledged Pause/Stop/Resume UI controls enabled. Both SwiftUI paths reuse the mutating-command fail-closed policy, preserve entered endpoints and surface the error. Owned Python SOAP fixture, Swift smoke/XCTest and production iPhone/iPad XCUI are required with the final-HEAD Web/API/PostgreSQL/Compose/NAS/Spider aggregate gate. This is not physical TV/Apple compatibility, multicast permission, Spider authorization, security audit or signed release evidence. See [IOS_DLNA.md](IOS_DLNA.md).

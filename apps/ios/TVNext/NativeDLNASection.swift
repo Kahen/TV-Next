@@ -161,6 +161,15 @@ struct NativeDLNASection: View {
         error = nil
     }
 
+    /// A failed Seek is a mutating-command failure, not a verified playback state.
+    private func invalidateSeekControls(after failure: Error) {
+        let next = NativeDLNAControlSnapshot(castStarted: castStarted, paused: paused)
+            .afterFailure(.seek)
+        castStarted = next.castStarted
+        paused = next.paused
+        error = failure.localizedDescription
+    }
+
     private func importDescription() {
         guard !busy, (try? NativeDLNADescription.location(descriptionAddress)) != nil else { return }
         let source = descriptionAddress
@@ -217,7 +226,7 @@ struct NativeDLNASection: View {
                 status = "已请求跳转至：" + (try NativeDLNASeek.target(target))
             } catch {
                 guard !Task.isCancelled else { return }
-                self.error = error.localizedDescription
+                invalidateSeekControls(after: error)
             }
             if !Task.isCancelled { busy = false }
         }
@@ -235,7 +244,7 @@ struct NativeDLNASection: View {
                 status = "已请求跳转至：" + (try NativeDLNASeek.target(target))
             } catch {
                 guard !Task.isCancelled else { return }
-                self.error = error.localizedDescription
+                invalidateSeekControls(after: error)
             }
             if !Task.isCancelled { busy = false }
         }

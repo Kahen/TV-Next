@@ -876,6 +876,53 @@ final class LibraryUITests: XCTestCase {
         XCTAssertFalse(stop.isEnabled)
     }
 
+    func testDLNAFailedRelativeAndAbsoluteSeekInvalidateStaleControls() {
+        jump("DLNA 投屏")
+        enter(app.textFields["dlna-renderer-url"],
+              "http://127.0.0.1:8768/upnp/control/AVTransport1/fail-seek")
+        enter(app.textFields["dlna-media-url"], "https://media.example/owned.mp4?a=1&b=2")
+        let cast = app.buttons["dlna-cast"]
+        let stop = app.buttons["dlna-stop"]
+        let pause = app.buttons["dlna-pause"]
+        let resume = app.buttons["dlna-resume"]
+        let status = app.staticTexts["dlna-status"]
+        let failure = app.staticTexts["dlna-error"]
+        reveal(cast)
+        cast.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "投屏已开始"), object: status)],
+            timeout: 15), .completed)
+        XCTAssertTrue(stop.isEnabled)
+        let forward = app.buttons["dlna-seek-forward"]
+        reveal(forward)
+        forward.tap()
+        XCTAssertTrue(failure.waitForExistence(timeout: 15))
+        XCTAssertTrue(failure.label.contains("503"))
+        XCTAssertFalse(stop.isEnabled, "Failed relative Seek must invalidate stale Stop")
+        XCTAssertFalse(pause.isEnabled)
+        XCTAssertFalse(resume.isEnabled)
+        // A new acknowledged cast restores controls; the rejected absolute
+        // Seek must invalidate them independently of the relative path.
+        reveal(cast)
+        cast.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "投屏已开始"), object: status)],
+            timeout: 15), .completed)
+        XCTAssertFalse(failure.exists)
+        XCTAssertTrue(stop.isEnabled)
+        enter(app.textFields["dlna-seek-time"], "00:01:30")
+        let absolute = app.buttons["dlna-seek-absolute"]
+        reveal(absolute)
+        XCTAssertTrue(absolute.isEnabled)
+        absolute.tap()
+        XCTAssertTrue(failure.waitForExistence(timeout: 15))
+        XCTAssertTrue(failure.label.contains("503"))
+        XCTAssertFalse(stop.isEnabled, "Failed absolute Seek must invalidate stale Stop")
+        XCTAssertFalse(pause.isEnabled)
+        XCTAssertFalse(resume.isEnabled)
+        XCTAssertTrue(cast.isEnabled, "User can explicitly start a new session")
+    }
+
     func testDLNAImportsControlURLFromOwnedDeviceDescription() {
         jump("DLNA 投屏")
         let importButton = app.buttons["dlna-import-description"]

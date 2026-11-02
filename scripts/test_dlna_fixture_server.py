@@ -153,6 +153,24 @@ class DLNAFixtureTests(unittest.TestCase):
         self.assertEqual(self.post(endpoint, 'Stop')[0], 200)
         self.assertEqual(self.post('/unknown', 'GetTransportInfo')[0], 404)
 
+    def test_failed_seek_rejects_mutation_but_allows_read_only_queries(self):
+        endpoint = '/upnp/control/AVTransport1/fail-seek'
+        self.assertEqual(self.post(endpoint, 'SetAVTransportURI',
+                                   'https://media.example/owned.mp4?a=1&amp;b=2')[0], 200)
+        self.assertEqual(self.post(endpoint, 'Play')[0], 200)
+        self.assertIn(b'<RelTime>00:00:42</RelTime>',
+                      self.post(endpoint, 'GetPositionInfo')[1])
+        for target in ('00:00:57', '00:01:30'):
+            status, body = self.post(endpoint, 'Seek', target=target)
+            self.assertEqual(status, 503)
+            self.assertIn(b'owned seek failure', body)
+            self.assertIn(b'<RelTime>00:00:42</RelTime>',
+                          self.post(endpoint, 'GetPositionInfo')[1])
+        self.assertEqual(self.post(endpoint, 'Seek', target='00:60:00')[0], 400)
+        self.assertIn(b'<CurrentTransportState>PLAYING</CurrentTransportState>',
+                      self.post(endpoint, 'GetTransportInfo')[1])
+        self.assertEqual(self.post(endpoint, 'Stop')[0], 200)
+
     def test_redirect_fault_and_oversize(self):
         self.assertEqual(self.post('/redirect')[0], 302)
         self.assertEqual(self.post('/fault')[0], 500)
