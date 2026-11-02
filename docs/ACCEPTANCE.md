@@ -231,3 +231,7 @@ Accept only when 40-item terminal pages have no clipping warning, 41-item termin
 ### P2 iOS failed-provider retry warning provenance (#158, 2026-11-02)
 
 Verify that a failed provider's 41-item first page and failed second page show clipping, and a successful 40-item retry clears the obsolete warning while replacing only that provider's partial hits. Repeated failure must preserve both old hits and old warning state. Independent healthy provider warnings, 16-site/2-page limits, 600-result conservative cap and failure-key identity remain unchanged. Required: Swift positive/negative/boundary smoke, XCTest, localhost Python fixture, production iPhone/iPad XCUI and final-HEAD aggregate Web/API/PostgreSQL/Compose/NAS/Spider isolation gate. No physical-device, lawful provider corpus, security audit or signing claim.
+
+## Native manual DLNA read-only failure control-state regression (P4, #160)
+
+A failed GetTransportInfo/GetPositionInfo does not prove the last acknowledged cast stopped. Preserve Stop/Pause availability for an acknowledged cast, but invalidate paused/Resume until a new verified state; mutating-command errors still fail closed. Owned Python SOAP fixture, Swift smoke/XCTest and production iPhone/iPad XCUI are required at the final PR HEAD. See [IOS_DLNA.md](IOS_DLNA.md). Physical iPhone/iPad/TV, multicast entitlement and release/security acceptance remain open.
