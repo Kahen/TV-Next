@@ -79,6 +79,17 @@ class Handler(BaseHTTPRequestHandler):
                 "categories": [], "filters": {}, "total": 0,
                 "page": 1, "hasMore": False, "items": []
             })
+        # An oversized terminal page is valid fixture data: the iOS client
+        # must retain only 40 entries and explicitly disclose the clipping,
+        # even though the provider advertises no further pages.
+        if keyword == "oversized-page":
+            items = ([{"id": f"a-{index}", "name": f"Fixture {index:02d}",
+                       "remarks": None, "folder": False, "action": None}
+                      for index in range(41)] if key == "a" else [])
+            return self.respond(200, {
+                "categories": [], "filters": {}, "total": len(items),
+                "page": 1, "hasMore": False, "items": items
+            })
         if key == "b" and count == 1:
             return self.respond(503, {"error": "synthetic transient failure"})
         # Fail closed if SwiftUI re-queries a healthy site or retries using
