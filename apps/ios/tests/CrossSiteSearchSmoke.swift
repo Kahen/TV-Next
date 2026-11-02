@@ -200,7 +200,7 @@ private actor RequestCounter {
         let clippedAndMore = try await NativeCrossSiteSearch.search(
             sources: [NativeSearchSource(key: "both", name: "Both")],
             fetch: { _, page in
-                NativeSearchPage(items: (0..<41).map { Item(id: "\\(page)-\\($0)") }, hasMore: true)
+                NativeSearchPage(items: (0..<41).map { Item(id: "\(page)-\($0)") }, hasMore: true)
             }, identity: { $0.id }
         )
         precondition(clippedAndMore.items.count == 80)
