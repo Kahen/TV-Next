@@ -262,3 +262,7 @@ AVFoundation may report more than the 16 tracks exposed in the native menu. Prev
 ### P4 native per-title audio/subtitle preference reset (#154, 2026-11-02)
 
 The iPhone/iPad AVPlayer menus now provide explicit **future-playback-only** forget actions for the current remote title's remembered audio rendition or embedded subtitle/Off. They preserve the installed item, current selection, progress, other titles and the independent track type; local/replay/no-preference contexts cannot erase another title. Synthetic HLS XCTest and production SwiftUI XCUI plus final-head aggregate CI are the automated acceptance gates. P4 #5 and P6 remain open; no real-device/provider, Spider corpus, independent audit or signing evidence is claimed.
+
+### P2 native search response clipping transparency (#156)
+
+The iPhone/iPad cross-site search UI now distinguishes an oversized individual response (>40 entries) from a provider advertising further pages beyond the two-page budget. Both cases preserve existing limits and provider provenance, and are covered by positive/negative Swift, owned localhost and simulator tests. Final-head CI is required before merging. This does not close P2 #3 or establish licensed provider compatibility.
