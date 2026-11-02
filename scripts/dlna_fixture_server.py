@@ -92,7 +92,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self.path == '/fault':
             return self.reply(500, b'<s:Fault>owned failure</s:Fault>')
-        if self.path != '/upnp/control/AVTransport1':
+        if self.path not in ('/upnp/control/AVTransport1',
+                             '/upnp/control/AVTransport1/fail-readonly'):
             return self.reply(404, b'not found')
         try:
             size = int(self.headers.get('Content-Length', '0'))
