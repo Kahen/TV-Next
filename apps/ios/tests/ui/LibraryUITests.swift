@@ -181,6 +181,33 @@ final class LibraryUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 10), .completed)
     }
 
+    func testCrossSiteOversizedTerminalPageShowsPreciseWarning() async throws {
+        try await resetCrossSiteFixture()
+        app.terminate()
+        app.launchArguments += ["-tv-next-api-url", "http://127.0.0.1:8769"]
+        app.launch()
+        jump("TVBox 订阅")
+        let editor = app.textViews["订阅配置内容"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        enter(editor, "{\\"sites\\":[]}")
+        let load = app.buttons["加载订阅"]
+        reveal(load)
+        load.tap()
+        let query = app.textFields["搜索当前站点"]
+        XCTAssertTrue(query.waitForExistence(timeout: 10))
+        enter(query, "oversized-page")
+        let search = app.buttons["跨站搜索"]
+        reveal(search)
+        search.tap()
+        let warning = app.staticTexts["cross-site-warning"]
+        XCTAssertTrue(warning.waitForExistence(timeout: 15),
+                      "The provider returned 41 items with hasMore=false; clipping must be disclosed")
+        XCTAssertEqual(warning.label, "1 个站点单页超过 40 条，仅保留每页前 40 条。")
+        XCTAssertFalse(warning.label.contains("仍有更多结果"))
+        XCTAssertFalse(app.buttons["retry-failed-cross-site-search"].exists)
+        XCTAssertTrue(app.staticTexts["跨站搜索结果"].exists)
+    }
+
     func testCrossSiteRetryOnlyFailedProviderPreservesOriginalQuery() async throws {
         try await resetCrossSiteFixture()
         // The owned localhost fixture deliberately gives two providers the
