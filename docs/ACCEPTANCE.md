@@ -222,3 +222,7 @@ AVFoundation may report more than the 16 tracks exposed in the native menu. Prev
 ### Native per-title track preference forget controls (#154, 2026-11-02)
 
 Require positive/negative XCTest on owned HLS: save audio and subtitle Off, forget each independently, preserve current AVPlayerItem/selection, leave unrelated URL digests intact, reject local/replay/no-media and repeat no-op, and verify future playback uses automatic selection without persisting raw media URLs. Production SwiftUI XCUI must exercise both forget actions on iPhone and iPad simulators. All final-HEAD Web/API, PostgreSQL, Compose, NAS, Spider isolation and unsigned Xcode build/XCTest/XCUI checks must succeed before merge/issue closure. These controls are **not** an immediate track switch and do not establish physical-device playback, provider compatibility, security audit or Apple distribution. Keep P4 #5 open.
+
+### P2 iOS oversized cross-site page warning (#156)
+
+Accept only when 40-item terminal pages have no clipping warning, 41-item terminal pages show the exact first-40 omission warning without claiming more pages, and a second page with `hasMore=true` separately reports the page-count cap. Check partial failures, preserved hits, no exception leakage, and unchanged 16-site/4-concurrent/2-page/600-result limits. Required evidence: Swift smoke, XCTest, owned Python fixture, production iPhone/iPad XCUI and all final-HEAD Web/API/PostgreSQL/Compose/NAS/Spider isolation checks. Do not equate these fixtures with authorized external provider or physical Apple-device acceptance.

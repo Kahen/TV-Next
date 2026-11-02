@@ -112,4 +112,55 @@ final class CrossSiteRetryTests: XCTestCase {
         XCTAssertEqual(merged.last?.item.id, "598")
         XCTAssertFalse(merged.contains { $0.siteKey == "outside" })
     }
+    func testTerminalOversizedPageWarnsWithoutClaimingAdditionalPages() async throws {
+        let result = try await NativeCrossSiteSearch.search(
+            sources: [NativeSearchSource(key: "a", name: "Provider")],
+            fetch: { _, _ in
+                NativeSearchPage(items: (0..<41).map { Item(id: String($0)) }, hasMore: false)
+            }, identity: { $0.id }
+        )
+        XCTAssertEqual(result.items.count, 40)
+        XCTAssertEqual(result.items.last?.item.id, "39")
+        XCTAssertEqual(result.warnings, ["1 个站点单页超过 40 条，仅保留每页前 40 条。"])
+        XCTAssertTrue(result.failedKeys.isEmpty)
+    }
+
+    func testExactPageBoundaryHasNoFalseTruncationWarning() async throws {
+        let result = try await NativeCrossSiteSearch.search(
+            sources: [NativeSearchSource(key: "a", name: "Provider")],
+            fetch: { _, _ in
+                NativeSearchPage(items: (0..<40).map { Item(id: String($0)) }, hasMore: false)
+            }, identity: { $0.id }
+        )
+        XCTAssertEqual(result.items.count, 40)
+        XCTAssertTrue(result.warnings.isEmpty)
+    }
+
+    func testMorePagesAndOversizedResponseHaveDistinctWarnings() async throws {
+        let result = try await NativeCrossSiteSearch.search(
+            sources: [NativeSearchSource(key: "a", name: "Provider")],
+            fetch: { _, page in
+                NativeSearchPage(items: (0..<41).map { Item(id: "\(page)-\($0)") }, hasMore: true)
+            }, identity: { $0.id }
+        )
+        XCTAssertEqual(result.items.count, 80)
+        XCTAssertEqual(result.warnings.count, 2)
+        XCTAssertTrue(result.warnings.contains { $0.contains("仍有更多结果") })
+        XCTAssertTrue(result.warnings.contains { $0.contains("单页超过 40") })
+    }
+
+    func testPartialFailurePreservesClippedPageWarning() async throws {
+        let result = try await NativeCrossSiteSearch.search(
+            sources: [NativeSearchSource(key: "a", name: "Provider")],
+            fetch: { _, page in
+                if page == 2 { throw NSError(domain: "private", code: 1) }
+                return NativeSearchPage(items: (0..<41).map { Item(id: String($0)) }, hasMore: true)
+            }, identity: { $0.id }
+        )
+        XCTAssertEqual(result.items.count, 40)
+        XCTAssertEqual(result.failedKeys, ["a"])
+        XCTAssertEqual(result.warnings, ["1 个站点单页超过 40 条，仅保留每页前 40 条。"])
+        XCTAssertFalse(result.warnings.joined().contains("private"))
+    }
+
 }

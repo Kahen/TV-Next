@@ -72,7 +72,10 @@ struct SubscriptionSection: View {
                         .disabled(busy || crossSiteFailedKeys.isEmpty)
                         .accessibilityIdentifier("retry-failed-cross-site-search")
                 }
-                ForEach(crossSiteWarnings, id: \.self) { Text($0).font(.caption).foregroundStyle(.secondary) }
+                ForEach(crossSiteWarnings, id: \.self) {
+                    Text($0).font(.caption).foregroundStyle(.secondary)
+                        .accessibilityIdentifier("cross-site-warning")
+                }
                 if crossSiteCompleted, let message = NativeCrossSiteSearch.emptyState(
                     resultCount: crossSiteResults.count,
                     failedCount: crossSiteFailedKeys.count,

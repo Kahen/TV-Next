@@ -30,6 +30,7 @@ private struct NativeSearchOutcome<Item> {
     let hits: [NativeSearchHit<Item>]
     let failed: Bool
     let truncated: Bool
+    let clippedPage: Bool
 }
 
 enum NativeCrossSiteSearch {
@@ -120,6 +121,7 @@ enum NativeCrossSiteSearch {
         var grouped = Array(repeating: [NativeSearchHit<Item>](), count: selected.count)
         var failures = Set<Int>()
         var truncated = Set<Int>()
+        var clippedPages = Set<Int>()
 
         let parallel = min(maxConcurrent, max(1, concurrency))
         // Bound Android-host fan-out separately; each site's pages stay ordered.
@@ -131,28 +133,33 @@ enum NativeCrossSiteSearch {
                     group.addTask {
                         var hits: [NativeSearchHit<Item>] = []
                         var seenItems = Set<String>()
+                        var clippedPage = false
                         for number in 1...maxPages {
-                            if Task.isCancelled { return NativeSearchOutcome(index: index, hits: [], failed: false, truncated: false) }
+                            if Task.isCancelled { return NativeSearchOutcome(index: index, hits: [], failed: false, truncated: false, clippedPage: false) }
                             do {
                                 let response = try await fetch(source, number)
-                                if Task.isCancelled { return NativeSearchOutcome(index: index, hits: [], failed: false, truncated: false) }
+                                if Task.isCancelled { return NativeSearchOutcome(index: index, hits: [], failed: false, truncated: false, clippedPage: false) }
+                                // A provider can return >40 entries even with hasMore=false.
+                                // Report this separate truncation; it is not another page.
+                                clippedPage = clippedPage || response.items.count > maxItemsPerPage
                                 for item in response.items.prefix(maxItemsPerPage) {
                                     guard let id = identity(item), !id.isEmpty, seenItems.insert(id).inserted else { continue }
                                     hits.append(NativeSearchHit(siteKey: source.key, item: item))
                                 }
-                                if !response.hasMore { return NativeSearchOutcome(index: index, hits: hits, failed: false, truncated: false) }
-                                if number == maxPages { return NativeSearchOutcome(index: index, hits: hits, failed: false, truncated: true) }
+                                if !response.hasMore { return NativeSearchOutcome(index: index, hits: hits, failed: false, truncated: false, clippedPage: clippedPage) }
+                                if number == maxPages { return NativeSearchOutcome(index: index, hits: hits, failed: false, truncated: true, clippedPage: clippedPage) }
                             } catch {
-                                return NativeSearchOutcome(index: index, hits: hits, failed: !Task.isCancelled, truncated: false)
+                                return NativeSearchOutcome(index: index, hits: hits, failed: !Task.isCancelled, truncated: false, clippedPage: clippedPage)
                             }
                         }
-                        return NativeSearchOutcome(index: index, hits: hits, failed: false, truncated: false)
+                        return NativeSearchOutcome(index: index, hits: hits, failed: false, truncated: false, clippedPage: clippedPage)
                     }
                 }
                 for await outcome in group {
                     grouped[outcome.index] = outcome.hits
                     if outcome.failed { failures.insert(outcome.index) }
                     if outcome.truncated { truncated.insert(outcome.index) }
+                    if outcome.clippedPage { clippedPages.insert(outcome.index) }
                 }
             }
         }
@@ -161,6 +168,7 @@ enum NativeCrossSiteSearch {
         var warnings: [String] = []
         if eligible.count > maxSites { warnings.append("仅搜索前 \(maxSites) 个可用站点，其余 \(eligible.count - maxSites) 个未请求。") }
         if !truncated.isEmpty { warnings.append("\(truncated.count) 个站点仍有更多结果；每站最多检索 \(maxPages) 页。") }
+        if !clippedPages.isEmpty { warnings.append("\(clippedPages.count) 个站点单页超过 \(maxItemsPerPage) 条，仅保留每页前 \(maxItemsPerPage) 条。") }
         if all.count > maxResults { warnings.append("仅显示前 \(maxResults) 条结果。") }
         return NativeSearchResult(items: Array(all.prefix(maxResults)),
                                   failed: selected.enumerated().compactMap { failures.contains($0.offset) ? $0.element.name : nil },

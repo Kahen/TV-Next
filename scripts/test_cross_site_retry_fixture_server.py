@@ -63,6 +63,20 @@ class CrossSiteRetryFixtureTests(unittest.TestCase):
         state = self.get("/fixture/state")
         self.assertEqual(state["counts"], {"a": 1, "b": 1})
 
+    def test_oversized_terminal_page_is_not_a_pagination_request(self):
+        self.get("/fixture/reset")
+        first = self.post("/api/v1/subscriptions/search",
+                          {"siteKey": "a", "query": "oversized-page"})
+        second = self.post("/api/v1/subscriptions/search",
+                           {"siteKey": "b", "query": "oversized-page"})
+        self.assertEqual(len(first["items"]), 41)
+        self.assertEqual([item["id"] for item in first["items"]],
+                         [f"a-{index}" for index in range(41)])
+        self.assertFalse(first["hasMore"])
+        self.assertEqual(second["items"], [])
+        self.assertFalse(second["hasMore"])
+        self.assertEqual(self.get("/fixture/state")["counts"], {"a": 1, "b": 1})
+
     def test_reject_unknown_and_oversized(self):
         self.get("/fixture/reset")
         with self.assertRaises(HTTPError) as error:

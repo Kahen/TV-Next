@@ -224,3 +224,7 @@ AVFoundation may report more than the 16 tracks exposed in the native menu. Prev
 ### Native per-title track preference forget controls (P4, #154, 2026-11-02)
 
 Native SwiftUI audio and embedded-subtitle menus now expose a future-playback-only forget action for a remembered current remote title. Only the matching SHA-256 URL-digest record is removed from the bounded UserDefaults snapshot. The current AVPlayer selection, subtitle Off state, playback position and unrelated title/type preferences are not modified; local/replay/no-preference contexts are no-ops. Owned HLS XCTest and iPhone/iPad production XCUI plus final-head aggregate CI are required before merging. This does not close P4 #5 or claim real-device/provider, independent audit, Spider legality corpus, signing or release acceptance.
+
+## Native cross-site oversized-page warning (P2, #156)
+
+Native iOS now reports when a provider returns more than the allowed 40 entries in a single response, even if it sets `hasMore=false`. This warning is independent of the existing second-page `hasMore` warning. Results stay capped and provider-scoped, and failed second pages preserve clipping visibility without leaking upstream errors. Swift positive/negative/boundary smoke, XCTest, owned Python fixture and production SwiftUI XCUI cover this implementation slice; final-head full integration and real-device/provider acceptance remain separate. Parent P2 #3 stays open.
