@@ -836,6 +836,46 @@ final class LibraryUITests: XCTestCase {
             predicate: NSPredicate(format: "label == %@", "设备状态：已停止"), object: status)], timeout: 15), .completed)
     }
 
+    func testDLNAFailedReadOnlyQueryKeepsStopButRequiresFreshResumeState() {
+        jump("DLNA 投屏")
+        enter(app.textFields["dlna-renderer-url"],
+              "http://127.0.0.1:8768/upnp/control/AVTransport1/fail-readonly")
+        enter(app.textFields["dlna-media-url"], "https://media.example/owned.mp4?a=1&b=2")
+        let cast = app.buttons["dlna-cast"]
+        reveal(cast)
+        XCTAssertTrue(cast.isEnabled)
+        cast.tap()
+        let status = app.staticTexts["dlna-status"]
+        XCTAssertTrue(status.waitForExistence(timeout: 15))
+        XCTAssertEqual(status.label, "投屏已开始")
+        let pause = app.buttons["dlna-pause"]
+        reveal(pause)
+        XCTAssertTrue(pause.isEnabled)
+        pause.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "已发送暂停命令"), object: status)],
+            timeout: 15), .completed)
+        let resume = app.buttons["dlna-resume"]
+        reveal(resume)
+        XCTAssertTrue(resume.isEnabled)
+        let query = app.buttons["dlna-query-state"]
+        reveal(query)
+        query.tap()
+        let failure = app.staticTexts["dlna-error"]
+        XCTAssertTrue(failure.waitForExistence(timeout: 15))
+        XCTAssertTrue(failure.label.contains("503"))
+        XCTAssertFalse(resume.isEnabled, "Unverified paused state cannot enable Resume")
+        let stop = app.buttons["dlna-stop"]
+        reveal(stop)
+        XCTAssertTrue(stop.isEnabled, "Failed read-only query must not disable Stop")
+        XCTAssertTrue(pause.isEnabled, "Failed read-only query must not erase acknowledged cast")
+        stop.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "已发送停止命令"), object: status)],
+            timeout: 15), .completed)
+        XCTAssertFalse(stop.isEnabled)
+    }
+
     func testDLNAImportsControlURLFromOwnedDeviceDescription() {
         jump("DLNA 投屏")
         let importButton = app.buttons["dlna-import-description"]
