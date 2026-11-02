@@ -122,10 +122,8 @@ final class MediaLibraryStore: ObservableObject {
         name: String, languageTag: String?
     ) -> Int? {
         guard persistableAudioDisplayName(name) != nil else { return nil }
-        let matches = options.enumerated().filter {
-            $0.element.name == name && $0.element.languageTag == languageTag
-        }
-        return matches.count == 1 ? matches[0].offset : nil
+        return NativeTrackPreferencePolicy.uniqueVisibleIndex(
+            in: options, name: name, languageTag: languageTag)
     }
 
     private func rememberAudioPreference(_ option: AVMediaSelectionOption) {
@@ -176,6 +174,16 @@ final class MediaLibraryStore: ObservableObject {
     static func persistableSubtitleDisplayName(_ name: String) -> String? {
         guard !name.isEmpty, name.count <= 80 else { return nil }
         return name
+    }
+
+    /// Match the entire group for ambiguity, not just the 16 visible menu rows.
+    static func uniqueSubtitlePreferenceIndex(
+        in options: [(name: String, languageTag: String?)],
+        name: String, languageTag: String?
+    ) -> Int? {
+        guard persistableSubtitleDisplayName(name) != nil else { return nil }
+        return NativeTrackPreferencePolicy.uniqueVisibleIndex(
+            in: options, name: name, languageTag: languageTag)
     }
 
     private func rememberSubtitlePreference(_ option: AVMediaSelectionOption?) {
@@ -255,14 +263,14 @@ final class MediaLibraryStore: ObservableObject {
                             self.selectedSubtitleTrack = nil
                         }
                     } else {
-                        let matches = Array(group.options.prefix(16).enumerated()).filter {
-                            $0.element.displayName == preference.displayName &&
-                            $0.element.extendedLanguageTag == preference.languageTag
-                        }
-                        if matches.count == 1, let match = matches.first {
+                        let options = group.options
+                        if let name = preference.displayName,
+                           let index = Self.uniqueSubtitlePreferenceIndex(
+                            in: options.map { (name: $0.displayName, languageTag: $0.extendedLanguageTag) },
+                            name: name, languageTag: preference.languageTag) {
                             self.player.appliesMediaSelectionCriteriaAutomatically = false
-                            item.select(match.element, in: group)
-                            self.selectedSubtitleTrack = match.offset
+                            item.select(options[index], in: group)
+                            self.selectedSubtitleTrack = index
                         }
                     }
                 }
@@ -324,7 +332,9 @@ final class MediaLibraryStore: ObservableObject {
                 // Reapply only a unique, exact match. Never use a stale numeric index.
                 if let key = self.mediaPreferenceKey(),
                    let preference = self.audioPreferences.first(where: { $0.urlDigest == key }) {
-                    let options = Array(group.options.prefix(16))
+                    // All options participate in identity matching. An
+                    // invisible 17th rendition may duplicate a visible one.
+                    let options = group.options
                     if let index = Self.uniqueAudioPreferenceIndex(
                         in: options.map { (name: $0.displayName, languageTag: $0.extendedLanguageTag) },
                         name: preference.displayName, languageTag: preference.languageTag

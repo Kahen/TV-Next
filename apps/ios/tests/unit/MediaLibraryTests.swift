@@ -416,6 +416,28 @@ final class MediaLibraryTests: XCTestCase {
             name: "Original", languageTag: "en"))
     }
 
+    func testHiddenAVFoundationTrackIdentityCollisionsDoNotRestoreAudioOrSubtitles() {
+        typealias Option = (name: String, languageTag: String?)
+        let wanted: Option = (name: "English", languageTag: "en")
+        let filler: Option = (name: "Other", languageTag: "fr")
+        let visibleLast = Array(repeating: filler, count: 15) + [wanted]
+        let invisibleOnly = Array(repeating: filler, count: 16) + [wanted]
+        let hiddenCollision = [wanted] + Array(repeating: filler, count: 15) + [wanted]
+        for choose in [
+            MediaLibraryStore.uniqueAudioPreferenceIndex,
+            MediaLibraryStore.uniqueSubtitlePreferenceIndex
+        ] {
+            XCTAssertEqual(choose(visibleLast, "English", "en"), 15)
+            XCTAssertNil(choose(invisibleOnly, "English", "en"))
+            XCTAssertNil(choose(hiddenCollision, "English", "en"),
+                         "A 17th hidden duplicate must block automatic restoration")
+            XCTAssertNil(choose([wanted, wanted], "English", "en"))
+            XCTAssertNil(choose([wanted], "English", "ja"))
+            XCTAssertEqual(choose([wanted, (name: "English", languageTag: "ja")], "English", "en"), 0)
+            XCTAssertNil(choose([wanted], String(repeating: "x", count: 81), "en"))
+        }
+    }
+
     func testCorruptedAudioPreferenceIsIgnoredWithoutChangingPlayback() async throws {
         defaults.set(Data("not-json".utf8), forKey: "tv-next-native-audio-preferences-v1")
         let restored = MediaLibraryStore(defaults: defaults)
