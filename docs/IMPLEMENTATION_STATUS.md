@@ -251,3 +251,8 @@ The native root uses one persistent `ScrollViewReader`/`VStack`: toolbar section
 ## Native iOS DLNA current-media autofill eligibility (P4, #166)
 
 The “使用当前播放地址” control now uses the same bounded direct HTTP(S) media-URL validator as the actual DLNA cast path for both enablement and tap handling. Empty, file/local, credentialed, malformed/oversized, custom-header and replay media cannot silently enable a no-op autofill. A valid explicitly imported direct URL remains eligible. Foundation-only Swift positive/negative smoke and XCTest plus production SwiftUI iPhone/iPad XCUI against an owned M3U fixture cover the behavior. This is UI safety/feedback, not new renderer discovery, external-provider compatibility or physical TV acceptance; final-head full CI is required before merge.
+
+
+### P2 native failed-only search boundary regression (#168)
+
+The iOS retry coordinator now intersects failure keys with the original selected-site snapshot and the same first-16-unique eligible-provider boundary used by initial search. It does not expand requests to a 17th, newly inserted or otherwise unsearched provider. Swift smoke/XCTest cover negative and positive cases, including actual request counts; existing iPhone/iPad XCUI and full integration CI must pass on the final PR HEAD before closing #168. Physical devices, permitted external providers and P2/P3/P6 acceptance remain separate.

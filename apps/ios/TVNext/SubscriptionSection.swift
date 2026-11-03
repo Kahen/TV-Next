@@ -217,7 +217,9 @@ struct SubscriptionSection: View {
         let eligible = document.sites.filter {
             $0.searchable && !$0.hidden && $0.supported && ($0.type != 3 || session != nil)
         }.map { NativeSearchSource(key: $0.key, name: $0.name) }
-        let sources = NativeCrossSiteSearch.failedOnlySources(eligible, failedKeys: crossSiteFailedKeys)
+        let sources = NativeCrossSiteSearch.failedOnlySources(
+            eligible, failedKeys: crossSiteFailedKeys, searchedKeys: crossSiteSourceOrder
+        )
         guard !sources.isEmpty else { return }
         let sourceOrder = crossSiteSourceOrder
         run { api, id in
