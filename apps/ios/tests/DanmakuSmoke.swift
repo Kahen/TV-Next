@@ -11,14 +11,14 @@ import Foundation
         precondition(json.count == 1 && json[0].text == "hello")
         // Malformed JSON must expose the same bounded parser error as malformed XML,
         // not Foundation's platform-dependent JSONSerialization NSError.
-        for malformed in ["{", "{\\\"comments\\\":[", "[not-json]"] {
+        for malformed in ["{", "{\"comments\":[", "[not-json]"] {
             do {
                 _ = try DanmakuParser.parse(malformed)
                 fatalError("Malformed JSON accepted")
             } catch DanmakuError.invalid {
                 // Expected stable public error taxonomy.
             } catch {
-                fatalError("Unexpected malformed JSON error: \\(error)")
+                fatalError("Unexpected malformed JSON error: \(error)")
             }
         }
         do { _ = try DanmakuParser.parse("<!DOCTYPE i [<!ENTITY a SYSTEM 'file:///etc/passwd'>]><i/>"); fatalError("DTD accepted") } catch {}
