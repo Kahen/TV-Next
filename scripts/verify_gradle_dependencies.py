@@ -8,6 +8,14 @@ REQUIRED = {"compileClasspath", "runtimeClasspath", "testCompileClasspath", "tes
 EXACT = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 CONFIG = re.compile(r"[A-Za-z0-9_.-]+")
 SHA256 = re.compile(r"[a-f0-9]{64}")
+# Explicitly reviewed maintenance families. A new family needs its own review;
+# a numeric major-version comparison cannot establish fixes across branches.
+MAINTENANCE_FLOORS = {
+    "org.springframework.boot": (3, 5, 16),
+    "org.springframework": (6, 2, 19),
+    "org.apache.tomcat.embed": (10, 1, 61),
+    "ch.qos.logback": (1, 5, 38),
+}
 
 
 def validate(root: Path) -> tuple[int, int]:
@@ -43,6 +51,13 @@ def validate(root: Path) -> tuple[int, int]:
             raise ValueError("Mutable JVM version in lock")
         if not selected:
             raise ValueError("Locked module has no configuration")
+        floor = MAINTENANCE_FLOORS.get(parts[0])
+        if floor:
+            if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", parts[2]):
+                raise ValueError("Security baseline requires a stable maintenance version")
+            selected_version = tuple(int(value) for value in parts[2].split("."))
+            if selected_version[:2] != floor[:2] or selected_version < floor:
+                raise ValueError("Known JVM security baseline regressed or changed maintenance family")
         locked.add(tuple(parts))
     if not locked or not REQUIRED <= configurations:
         raise ValueError("Compile/runtime/test lock coverage is incomplete")
