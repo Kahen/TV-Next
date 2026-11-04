@@ -9,7 +9,10 @@ class ProviderSkipSegmentsTest {
 
     @Test fun originalMillisecondsNullableEndingAndMalformedMembersMatchNativeGolden() {
         val fixture = mapper.readTree(Path.of("../../fixtures/fongmi-provider-skips-golden.json").toFile())
-        assertEquals(fixture.path("expected"), mapper.valueToTree(ProviderSkipSegments.normalize(fixture.path("input"))))
+        // Compare the real JSON wire representation: valueToTree preserves
+        // LongNode versus the fixture reader's IntNode for small timestamps.
+        val wire = mapper.writeValueAsString(ProviderSkipSegments.normalize(fixture.path("input")))
+        assertEquals(fixture.path("expected"), mapper.readTree(wire))
         for (raw in listOf("null", "{}", "\"[]\"", "42")) {
             assertTrue(ProviderSkipSegments.normalize(mapper.readTree(raw)).isEmpty())
         }
