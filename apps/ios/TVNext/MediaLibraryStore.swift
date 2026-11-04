@@ -52,6 +52,12 @@ final class MediaLibraryStore: ObservableObject {
     private var providerSkipGeneration = -1
     private var providerSkipURL: String?
 
+    private func resetProviderSkipContext() {
+        providerSkipData = []
+        providerSkipGeneration = -1
+        providerSkipURL = nil
+    }
+
     var providerSkipSegments: [NativeProviderSkipSegment] {
         guard providerSkipGeneration == playbackGeneration,
               let channel = current, channel.url == providerSkipURL,
@@ -648,6 +654,7 @@ final class MediaLibraryStore: ObservableObject {
         let ownsPlayback = current.map(belongs) == true || requestedChannel.map(belongs) == true
         if ownsPlayback {
             playbackGeneration += 1
+            resetProviderSkipContext()
             savePosition()
             cancelRelay() // Cancels pending creation and closes an active capability.
             player.pause()
@@ -675,7 +682,7 @@ final class MediaLibraryStore: ObservableObject {
 
     func playLocalFile(_ file: URL, name: String) {
         playbackGeneration += 1
-        providerSkipData = []
+        resetProviderSkipContext()
         requestedChannel = nil
         savePosition()
         cancelRelay()
@@ -1023,7 +1030,7 @@ final class MediaLibraryStore: ObservableObject {
 
     func clear() {
         playbackGeneration += 1
-        providerSkipData = []
+        resetProviderSkipContext()
         cancelRelay()
         player.pause()
         player.replaceCurrentItem(with: nil)

@@ -171,6 +171,7 @@ final class LibraryUITests: XCTestCase {
         reveal(first); first.tap()
         jump("播放器")
         let count = app.staticTexts["provider-skip-count"]
+        reveal(count)
         XCTAssertTrue(count.waitForExistence(timeout: 10))
         let skip = app.buttons["skip-provider-segment"]
         reveal(skip)
@@ -178,6 +179,7 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(skip.isEnabled)
         skip.tap()
         let feedback = app.staticTexts["provider-skip-feedback"]
+        reveal(feedback)
         XCTAssertTrue(feedback.waitForExistence(timeout: 5))
         XCTAssertEqual(feedback.label, "已跳过来源标记片段。")
         jump("TVBox 订阅")
