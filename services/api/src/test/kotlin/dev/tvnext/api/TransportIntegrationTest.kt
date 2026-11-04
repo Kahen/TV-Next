@@ -99,12 +99,38 @@ class TransportIntegrationTest {
         var reached = false
         filter.doFilter(request,response,FilterChain { _,_ -> reached=true })
         assertEquals(413,response.status);assertFalse(reached)
-        val rateFilter = ApiRequestLimits()
+        // Keep the burst within one fixed window regardless of runner speed
+        // or wall-clock minute boundaries. Rollover is covered separately.
+        val rateFilter = ApiRequestLimits { 59_999L }
         repeat(301) { index ->
             val r = MockHttpServletRequest("POST","/api/v1/resources/text").apply { setContent("{}".toByteArray());remoteAddr="127.0.0.2";addHeader("X-Forwarded-For","1.2.3.$index") }
             val out = MockHttpServletResponse()
             rateFilter.doFilter(r,out,FilterChain { _,_ -> })
             assertEquals(if(index<300)200 else 429,out.status)
         }
+    }
+
+    @Test fun rateWindowsResetAtMinuteBoundaryAndKeepAuthAndActualPeersSeparate() {
+        var now = 59_999L
+        val filter = ApiRequestLimits { now }
+        fun status(path: String, peer: String = "192.0.2.1"): Int {
+            val request = MockHttpServletRequest("GET", path).apply { remoteAddr = peer }
+            val response = MockHttpServletResponse()
+            filter.doFilter(request, response, FilterChain { _, _ -> })
+            if (response.status == 429) assertEquals("60", response.getHeader("Retry-After"))
+            return response.status
+        }
+        val auth = "/api/v1/home/auth/login"
+        val api = "/api/v1/home/library"
+        repeat(10) { assertEquals(200, status(auth)) }
+        assertEquals(429, status(auth))
+        assertEquals(200, status(auth, "192.0.2.2"))
+        repeat(300) { assertEquals(200, status(api)) }
+        assertEquals(429, status(api))
+        now = 60_000L
+        repeat(10) { assertEquals(200, status(auth)) }
+        assertEquals(429, status(auth))
+        repeat(300) { assertEquals(200, status(api)) }
+        assertEquals(429, status(api))
     }
 }
