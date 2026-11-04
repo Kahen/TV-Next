@@ -25,7 +25,12 @@ enum DanmakuParser {
             guard parser.parse(), !delegate.exceeded else { throw DanmakuError.invalid }
             comments = delegate.comments
         } else {
-            let root = try JSONSerialization.jsonObject(with: Data(text.utf8))
+            let root: Any
+            do {
+                root = try JSONSerialization.jsonObject(with: Data(text.utf8))
+            } catch {
+                throw DanmakuError.invalid
+            }
             let rows = (root as? [[String: Any]]) ?? (root as? [String: Any])?["comments"] as? [[String: Any]]
             guard let rows, rows.count <= 20_000 else { throw DanmakuError.invalid }
             comments = rows.compactMap { row in
