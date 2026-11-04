@@ -1,53 +1,34 @@
 # Cross-platform integration and release-verification matrix
 
-This is a **continuously enforced code-level integration plan**, not a substitute for end-to-end playback and physical hardware validation. P1 device/browser UI E2E is deferred to the P6 release gate by current delivery priority; component and cross-language regression checks continue on every relevant change.
+Updated 2026-11-04. The full gate verifies actual owned-fixture browser playback and production SwiftUI on iPhone/iPad simulators, in addition to compilation, unit tests and service integration. Physical Apple/TV/NAS devices, third-party sources and signed distribution remain separate acceptance work.
 
-| Slice | Source fixture | Enforced check | Actual boundary covered | Still unverified |
-| --- | --- | --- | --- | --- |
-| M3U | `fixtures/p1-m3u-golden.m3u` and JSON expectation | Swift smoke + Kotlin parser tests | Swift and API normalization agreement | Real playlist variants and Apple device playback |
-| FongMi config | In-memory JSON / Swift smoke | Swift Foundation and Kotlin API tests | Safe metadata extraction; no Spider execution | Real Android provider compatibility |
-| FongMi Result | `fixtures/p2-fongmi-result.json` | Swift offline parser smoke + Kotlin MockMvc + live Compose nginx/API | Categories, search, details, lines, direct episodes, blocked scripts; same input | Physical AVPlayer playability, source-specific headers and remote providers |
-| XMLTV | In-memory deterministic SAX fixture | Kotlin tests + MockMvc + live Compose upload | Timezones, TVG-ID, XXE/DTD rejection, nginx body limits | Real feed updates, native iOS EPG |
-| Docker deployment | Clean GitHub Ubuntu runner | `compose-smoke.yml` | Web nginx, Kotlin service, request routing and error semantics | NAS environment / TLS / remote access |
-| Spider fixture sandbox | Bundled Node/Python/Java reference code | `spider-sandbox.yml` | OS network denial, cgroups, read-only storage, crash, output bounds, timeout | Real Spider plugins, audited network egress and untrusted-code threat model |
-| Native iOS | Swift parser smoke and unsigned Xcode simulator build | `ios.yml`, including `main` pushes with iOS/fixture changes | Swift source compilation and pure parsing | Interactive UIKit/SwiftUI E2E, AVPlayer codecs/PiP on real devices |
-| Web | Vitest, TypeScript/Vite build | `ci.yml` | Type-level and component/parser unit behavior | Full browser media/PWA and accessibility E2E |
+| Slice | Enforced check | Verified boundary | Still unverified |
+| --- | --- | --- | --- |
+| Shared M3U/Result/filter/replay/EPG contracts | Kotlin/Vitest/Swift golden fixtures and MockMvc | Same source-derived normalization and supported RPC semantics across clients | Wider permitted provider corpus |
+| Web/API | `ci.yml` | Web unit/type/build/audit/SBOM; Kotlin test/bootJar; PostgreSQL account/remote/EPG migration tests; exact JVM-library SBOM | Complete dependency/license audit and production load |
+| Browser media and Docker | `compose-smoke.yml` | Clean images, nginx/API HTTP, real Chromium/Firefox/WebKit MP4/HLS decode, library/resume/caption and shell-cache assertions | Physical installed-PWA matrix and third-party CORS/codec variants |
+| Native iOS | `ios.yml`, iPhone and iPad jobs | Swift smoke, owned network fixtures, unsigned build, XCTest and production SwiftUI XCUI with generated local media | Physical AVPlayer/codecs/PiP/AirPlay, Files providers and energy behavior |
+| NAS/account/sync/remote | `nas-integration.yml` | Actual Docker PostgreSQL stack, HTTP/WebSocket ownership/handshake, restart persistence, backup/restore | User NAS environment, TLS/remote-network/security/load acceptance |
+| Spider isolation | `spider-sandbox.yml` | Java/Node/Python fixture parity, actual owned-JAR loading, preflight, no-network/read-only/non-root quotas and teardown/failure checks | External JVM registry/dispatcher/egress, real JS/Python, ARM Android corpus and independent containment audit |
+| JVM integrity | `jvm-dependency-integrity.yml` | Strict pinned-toolchain build; real wrong-checksum/missing-lock rejection probes | Independent publisher/provenance/license review |
+| Unsigned release candidate | `release-candidate.yml` | Web/API/Linux amd64 packaging, corresponding source/checksums, exact shipped-library SBOM and independent host/Docker JAR byte equality | ARM/native/signed artifacts, full image SBOM, rollback and Apple distribution |
 
-## CI acceptance rules
+## Aggregate gate
 
-1. Any added parser, provider adapter or shared JSON fixture must include success, invalid-input and unsafe-protocol cases where applicable.
-2. Contract changes must update the same shared golden fixture, Kotlin tests and Swift smoke where both platforms implement that subset.
-3. Docker Compose smoke uses the **same** FongMi Result as both parsers, sends it through real nginx and Spring Boot, and verifies 422 for unsupported episodes.
-4. A feature branch may only merge after its affected checks have succeeded. Changing a shared fixture triggers both iOS and Compose checks.
-5. Verify the actual merge commit on `main`; record incomplete checks rather than claiming success early.
-6. No developer may treat an offline JSON fixture, simulator compile or isolated Spider demo as real source playback, arbitrary plugin compatibility, a signed IPA or a P6 release.
+[Full Cross-Platform Integration Gate](../.github/workflows/full-integration.yml) calls **five** reusable workflows at the same revision: Web/API, iOS, Compose/browser, Spider isolation and NAS. Its final verification job rejects failed, cancelled or skipped subsystem results. iPhone and iPad run independently with matrix fail-fast disabled so one failure does not erase the other's evidence.
 
-## Deferred release-scale E2E
+The gate runs on relevant code, fixture, script, contract and workflow PR/main changes, or explicit dispatch. Document-only changes do not trigger the full gate; normal Web/API PR checks still run. JVM-integrity and unsigned-candidate checks are additional path-selected workflows for affected dependency/build changes.
 
-Before P6 acceptance, run browser automation for playlist import, playback UI, subtitles, favorites, resume, and PWA install in supported browsers. Run real iPhone/iPad media/codecs, Files import/export, navigation, playback interruptions, AVPlayer lifecycle, PiP/AirPlay and accessibility checks; document hardware model and OS versions. Validate authenticated NAS sync, permitted provider corpus, security/audit and signed release provenance. Block release if prerequisites are unavailable.
+The candidate workflow's PR path only packages. Its reusable gate and draft-release jobs are intentionally skipped on PR events; the independently triggered full integration workflow must still pass before merging. A manual candidate dispatch runs its own full gate, and creating a draft Release is a separate explicit input. A successful package job is not a published Release.
 
-## Unified full-integration gate (P6 groundwork)
+## Acceptance rules
 
-The `.github/workflows/full-integration.yml` **Full Cross-Platform Integration Gate**
-invokes four existing workflows at **the same Git revision**, then fails the aggregate
-gate if any job is failed, cancelled or skipped:
+1. Require final-head affected checks, including the aggregate gate for code changes; a previous green commit does not cover later edits.
+2. Record exact PR/commit/run and test evidence. Check the actual merge revision on main and report pending results accurately.
+3. Shared protocol changes update the common fixture and applicable Kotlin/Swift/Web tests, including rejected inputs and stale/cancelled result behavior.
+4. No retries, skipped assertions or removed resource/security limits may stand in for diagnosing a failure. See [PR #172](https://github.com/Kahen/TV-Next/pull/172) for the fixed minute-window and early-413 test races.
+5. Owned local media, fixtures, simulators and container tests do not establish external source availability, arbitrary Spider compatibility, physical-device operation or signed release acceptance.
 
-1. Web Vitest, TypeScript/Vite build, Kotlin Gradle test/bootJar (MockMvc golden Result).
-2. Native Swift parser smoke, golden Result parity, unsigned simulator build.
-3. Clean Docker Compose boot and nginx-forwarded HTTP tests including XMLTV, FongMi
-   config/catalog, and the shared Result home/category/search/detail/episode flow.
-4. Node/Python/Java Docker sandbox: no network, read-only FS, resource constraints,
-   errors, crash/timeout cleanup, JAR inspection and parity tests.
+## Remaining release verification
 
-It triggers on `main` changes to relevant modules, can be run manually, and validates
-changes to its workflow orchestration in PRs. The aggregate verification job publishes
-a per-subsystem GitHub Actions summary. Only `contents:read` permissions are requested.
-
-**Still outside this gate:** real source-backed Spider integration, full Playwright
-browser media/PWA interactions, XCUI physical-device testing, NAS authentication/TLS,
-security audit/SBOM, signed/TestFlight distribution. Those P1–P6 launch checks
-remain blockers, not implicitly passing because the gate turns green.
-
-## Live replay source-parity increment
-
-`fixtures/fongmi-live-replay-golden.json` anchors Kotlin/Vitest/Swift window and metadata checks. `LiveReplayTest` covers Result RPC vs programme catchup, credentials, UTC/Hong Kong/DST, invalid windows/templates and historical XMLTV bounds; `LiveReplayIntegrationTest` verifies authorize-before-I/O, private capability output and revocation. Native XCTest covers persistence stripping and rejection preserving the player; Web component/browser regressions cover explicit controls, cancellation and original-URL identity. The iOS reusable workflow runs the new shared Swift smoke on both simulator jobs. Final-head aggregate success is required before acceptance; physical/device/provider corpus remains separate.
+Physical iPhone/iPad and installed PWA testing remains [#38](https://github.com/Kahen/TV-Next/issues/38). Validate actual codecs, Files/SMB hydration, LAN renderer behavior, PiP/AirPlay/background interruptions, permissions, storage and energy use with recorded hardware/OS/builds. Complete the permitted provider/plugin corpus, remote NAS security/operations, independent dependency/license/containment review, rollback exercises and signing/provenance requirements in P2–P6. These resource gates do not block independent implementation work.

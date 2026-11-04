@@ -1,6 +1,6 @@
 # TV-Next roadmap
 
-Updated: 2026-10-28. Current code backlog: [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md). This is a delivery plan, not a claim that every feature exists.
+Updated: 2026-11-04. Current code backlog: [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md). This is a delivery plan, not a claim that every feature exists.
 
 ## Goals and non-goals
 
@@ -14,7 +14,7 @@ Definition of done for each phase: implementation + automated checks + usage doc
 - [x] Web app shell, TypeScript types and basic player
 - [x] Kotlin API with health and bounded M3U parsing/config inspection
 - [x] SwiftUI iPhone/iPad app scaffold with native AVPlayer
-- [x] Web/API CI green; Docker Compose defined (live deployment smoke test pending)
+- [x] Web/API CI and real Docker Compose build/boot/HTTP integration checks.
 - [x] CI green on GitHub; unsigned native iOS simulator build passed on macOS (device test pending)
 
 Acceptance: Web dev server works; API tests pass; import an explicitly provided M3U containing an HTTP(S) media URL; MP4/HLS playback works for compatible CORS-enabled sources; iOS can open user-supplied native-compatible media URL. No Spider execution yet.
@@ -29,9 +29,9 @@ Tracking: https://github.com/Kahen/TV-Next/issues/2. Detailed implementation/aut
 - [x] Speed controls; browser fullscreen/PiP APIs with unsupported feedback; native fullscreen retaining caption/danmaku overlays, standard AVKit PiP on supported devices, and portrait/landscape layout.
 - [x] PWA manifest/raster icons and shell-only offline cache; no offline streaming claim.
 - [x] Keyboard/focus/active-view behavior on Web; labeled native controls, section navigation and large-text layout; lifecycle progress save and native background pause.
-- [x] Owned MP4/HLS playback regression on Chromium/Firefox/WebKit; native XCTest and production SwiftUI XCUI workflows for both iPhone/iPad simulators (PR #37 requires a passing final-head gate).
+- [x] Owned MP4/HLS playback regression on Chromium/Firefox/WebKit; passing native XCTest and production SwiftUI XCUI workflows for both iPhone/iPad simulators.
 
-Per explicit user instruction on 2026-10-25, close the implementation issue once code and automated acceptance pass; physical-device/installed-PWA acceptance is independently tracked in [#38](https://github.com/Kahen/TV-Next/issues/38). P1 basic system PiP is implemented; full background-media controls and AirPlay remain P4 implementation tasks (#5).
+Per explicit user instruction on 2026-10-25, close the implementation issue once code and automated acceptance pass; physical-device/installed-PWA acceptance is independently tracked in [#38](https://github.com/Kahen/TV-Next/issues/38). P1 basic system PiP is implemented; P4 adds opt-in background audio/system controls and AirPlay. Physical behavior remains separately tracked.
 
 ## P2 — FongMi core semantics
 
@@ -42,7 +42,8 @@ Tracking: https://github.com/Kahen/TV-Next/issues/3
 - [x] M3U/TXT/nested JSON live imports, offline and subscribed XMLTV/XMLTV.gz, persistent guide scheduling/cache and Web/iOS guide UI.
 - [x] Explicit timeshift Result RPC, bounded programme catchup subset, historical XMLTV and Web/iOS replay controls; see LIVE_REPLAY.md.
 - [x] Native AVPlayer embedded/HLS audio and subtitle selection menus with optional subtitle-off.
-- [x] Device-local per-title native audio preferences (#57); per-title embedded/HLS subtitle and explicit-off preferences (#60, PR gates passed).
+- [x] Native per-title audio/subtitle/off preferences with full unique identity, stale-choice eviction and per-title forget controls; opt-in subscription URL persistence in device-only Keychain.
+- [x] Native failed-provider-only search retry with original query and provider provenance, completed-empty feedback and bounded-page clipping warnings.
 - [ ] Broader audio/subtitle container and codec compatibility, including track identity changes across providers; device validation remains separate.
 - [ ] Broader permitted real-provider corpus, interactive QR/login workflows, parser chains and long-tail replay formats; device validation remains separate.
 
@@ -52,32 +53,48 @@ Acceptance: comparison snapshots for home/category/detail/search/player APIs aga
 
 Tracking: https://github.com/Kahen/TV-Next/issues/4
 
-- [ ] Define versioned Spider provider contract (home/category/detail/search/player)
-- [ ] Java 21 static reference JAR now uses a pure-JVM `ProviderSpi` interface. A non-executing, bounded JAR analyzer detects known Android API/JNI/native dependencies; dynamic provider activation, Android API compatibility corpus and permitted real JAR testing remain pending
-- [ ] Initial **bundled-fixture-only** Node.js Docker worker with fixed JSON v1 RPC; runtime compatibility with QuickJS and real FongMi JS providers still unimplemented
-- [ ] Initial **bundled-fixture-only** Python Docker worker with fixed JSON v1 RPC and OS quotas; real Python Spider library/third-party dependency compatibility unimplemented
-- [ ] Docker host harness for Node/Python/Java fixtures uses read-only filesystem, non-root UID, no network, cap-drop, no-new-privileges, pids/memory/CPU/wall-time/output limits; host threat assessment, escape regression and **real plugin execution** not yet complete
-- [ ] Error taxonomy: unsupported Android APIs, transport failures, parsing, timeouts
-- [ ] Compatibility test corpus: a dozen permitted representative plugins and failure cases
+- [x] Explicit versioned contracts: v1 bundled-fixture RPC and v2 owned-JAR original Spider media signatures.
+- [x] Bundled Java/Node/Python workers with fixed provider identities and Docker read-only/non-root/no-network/resource/output/time limits and cleanup regressions.
+- [x] Bounded nonexecuting JAR/DEX/Android/JNI preflight and a separately compiled, hash-checked owned pure-JVM JAR loaded inside the OS sandbox (#85).
+- [x] Administrator-bound Android SpiderTest bridge, five media operations, authenticated device binding and Web/native capability UI. This does not prove ARM plugin execution.
+- [x] Bounded worker error codes, timeout/crash/output/resource rejection and supported-subset contract/isolation regressions.
+- [ ] External pure-JVM artifact/dependency approval, permitted representative corpus and authorized dispatcher/API activation (#45).
+- [ ] Real FongMi JS/QuickJS and Python adapters/dependency compatibility.
+- [ ] Controlled egress, stateful Android sessions/actions/proxy callbacks and actual ARM DEX/native host validation.
+- [ ] Independent host/isolation/security review and broader real-plugin compatibility corpus.
 
 Acceptance: declared supported plugin fixtures pass on server; never execute remote code in the browser or iOS app. JVM bytecode alone is NOT a promise of Android JAR support.
+
+### Approved owned-JAR contract slice
+
+PR #85 adds an OS-isolated, version-2 harness which actually loads a separately
+compiled, statically preflighted and SHA-256-checked owned JAR through the original
+Spider media signatures. See [PURE_JVM_SPIDER.md](PURE_JVM_SPIDER.md). External
+artifact/dependency approval, representative corpus, live host/API activation,
+controlled egress, Android/DEX and real JS/Python compatibility remain pending.
+This increment does not close P3.
 
 ## P4 — Advanced media features
 
 Tracking: https://github.com/Kahen/TV-Next/issues/5
 
-- [x] External SRT/WebVTT timing offset, bounded ASS/SSA Dialogue text, Web/native danmaku parsers and timeline overlays.
-- [x] Basic native system PiP and AirPlay route picker; playback speed controls and AList/OpenList browsing.
-- [x] Native AVPlayer audio/embedded subtitle selection and bounded per-title audio preferences; per-title subtitle preferences (#60, PR gates passed).
-- [ ] Styled ASS positioning/karaoke/fonts, decoder diagnostics, **automatic** intro/outro skip and broader format support remain. Native iOS manual per-title skip markers are implemented in PR #69 (subject to final CI); see [IOS_INTRO_OUTRO.md](IOS_INTRO_OUTRO.md).
-- [x] Opt-in native background audio and system play/pause/finite-VOD seek/skip metadata controls; see NATIVE_BACKGROUND_PLAYBACK.md for final-head test gates and limits.
-- [ ] Physical background/lock-screen/PiP/AirPlay delivery, quality/codec/energy matrix.
+- [x] External SRT/WebVTT offsets, bounded ASS/SSA dialogue text and overlapping native text cues (#92), Web/native danmaku parsers and overlays.
+- [x] Native PiP/AirPlay, audio/embedded subtitle selection and preferences, opt-in background audio and system media controls.
+- [x] AList/OpenList browsing and bounded native read-only WebDAV with local filtering, refresh, parent/root breadcrumbs and credential revocation.
+- [x] Native per-title manual intro/outro markers and explicit opt-in automatic skipping of those markers; no automatic detection/provider metadata claim.
+- [x] Native foreground offline media-file downloads, persistent completed copies, local playback/deletion and byte/count quotas; see IOS_OFFLINE_MEDIA.md.
+- [x] Native subscription external subtitle resources and stale subtitle/danmaku request invalidation; active WebDAV credentials remain fixed until reconnect (#89).
+- [x] Read-only native codec/dimensions/audio/buffer/error diagnostics with credential redaction; actual hardware decoder selection is not exposed.
+- [ ] Styled ASS/fonts/karaoke, advanced subtitle matching/headers and provider-supplied/automatic skip detection.
+- [x] Manual private-LAN DLNA play/pause/resume/stop/state/position/relative and absolute seek, bounded UPnP description/UDN import and command/navigation state invalidation.
+- [x] Dormant bounded SSDP parser/UDP transport/candidate resolver, with owned loopback tests.
+- [x] Files-provider SMB media/caption import with coordinated bounded staging, cancellation/progress/free-space checks and cleanup; UTF-16 and explicit GB18030 subtitle decoding.
+- [ ] Production opt-in SSDP discovery/list, Apple multicast entitlement/provisioning and real renderer validation (#114); direct native SMB directory browsing/streaming.
+- [ ] HLS/background/resumable/authenticated offline download lifecycle and direct cloud login/QR/OAuth.
 - [ ] Optional transcoding sidecar with measured resource limits.
-- [x] Native iOS read-only WebDAV Depth:1 browsing with optional HTTPS Basic credentials and authenticated relay playback (PR #67); bounded incremental PROPFIND response-size hardening is tracked in #70. RFC 4918 successful propstat/direct href correctness is tracked in #72. Physical/provider verification remains open.
-- [ ] Authorized LAN DLNA discovery/control and SMB inputs with secure credentials; broader WebDAV auth/provider support remains.
-- [ ] Offline cache/download lifecycle and direct cloud login/QR/OAuth.
+- [ ] Physical iPhone/iPad codec, PiP/AirPlay/background, WebDAV/storage and energy acceptance.
 
-Acceptance: device matrix includes iPhone/iPad models, Safari/Chrome/Firefox, and H.264/H.265/AAC compatibility tests.
+Acceptance: device matrix includes iPhone/iPad models, Safari/Chrome/Firefox, and H.264/H.265/AAC compatibility tests. Automated simulator/owned-fixture success remains distinct from physical acceptance.
 
 ## P5 — Multi-device + home server
 
@@ -98,7 +115,9 @@ Tracking: https://github.com/Kahen/TV-Next/issues/7
 
 - [ ] Additional provider formats/legacy quirks; explicit compatibility status per module
 - [ ] Security reviews: sandbox escapes, SSRF, XSS, content injection, auth, supply chain
-- [ ] Automated dependency audits, license attribution and source disclosure
+- [x] Web npm audit/SBOM, immutable Action/image inputs, gated unsigned Web/API/Linux amd64 candidates with exact source/checksums and host/Docker API JAR byte equality.
+- [x] Strict JVM version/checksum evidence, real failure probes and a CycloneDX inventory of the exact shipped API library bytes (#90/#91); vendor maintenance security updates with exact refreshed evidence and version-family regression floors (#93).
+- [ ] Independent JVM/container/license review, complete runtime/container SBOM/provenance, signed artifacts and source/notice review
 - [ ] Native signing, TestFlight, App Store policy review; no promise of approval
 - [ ] Versioned REST contract, migration plan and release channels
 - [ ] macOS/tvOS investigation when stable (not required for initial release)
@@ -117,13 +136,17 @@ Acceptance: repeatable signed releases, published limitations, reproducible infr
 
 Initial work lives in feature branches and PRs. Only tested milestones get version tags. Separate Web, Server, and iOS build pipelines; no empty GitHub Release, unverified APK/IPA or pre-signed app claims. Android upstream continues separately in Kahen/TV.
 
+## Historical milestones
+
+The dated entries below describe their original commits, not the current backlog. Use the current phase checklist above for planning.
+
 ## 2026-10-23 source-parity implementation increment
 
 See [UPSTREAM_COMPATIBILITY.md](UPSTREAM_COMPATIBILITY.md) for exact original source paths and remaining gaps. Subscription decoding and type 0/1/2/4 HTTP operations now have Web/iOS client paths; AList/OpenList directory and raw-link browsing is implemented; Web/native danmaku parsers and timeline overlays are implemented. P3 type 3 execution, direct cloud account/login flows, remaining P4/P5 modules and P6 release gates remain open. This increment must not be reported as P1–P6 completion.
 
 ### P5 account/sync implementation increment
 
-Accounts, per-device tokens, expiring one-use pairing, user-scoped library CAS, Web/iOS controls, WebSocket ticket/ACK remote control, Flyway migrations, H2/PostgreSQL deployment paths and private metrics/request tracing are implemented in the P5 feature branch. Full CI and deployment acceptance are still required before closing any milestone. See HOME_SERVER.md. Provider/EPG scheduling, shared caches and native media byte relay remain open.
+Accounts, per-device tokens, expiring one-use pairing, user-scoped library CAS, Web/iOS controls, WebSocket ticket/ACK remote control, Flyway migrations, H2/PostgreSQL deployment paths and private metrics/request tracing are implemented in the P5 feature branch. Full CI and deployment acceptance are still required before closing any milestone. See HOME_SERVER.md. Provider/EPG scheduling, shared caches and native media byte relay were pending at that historical increment; current implementations and remaining operational gates are listed above.
 
 ### EPG subscription and native parity increment
 

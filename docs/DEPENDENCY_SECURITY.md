@@ -11,3 +11,6 @@ The initial 2026-10-23 scan found four affected package nodes in the build/test 
 JVM versions and artifact/metadata SHA-256 checksums are now committed and fail closed through strict Gradle locking/verification; see [JVM_DEPENDENCY_INTEGRITY.md](JVM_DEPENDENCY_INTEGRITY.md). Immutable image/Action inputs, real-browser E2E and unsigned candidate packaging are also implemented; see [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) for current evidence.
 
 Remaining P6 work: independent JVM/container vulnerability and license review, complete release-level SBOM/provenance retention, measured budgets, signed/ARM/native artifacts, rollback acceptance and Apple distribution.
+
+
+The JVM maintenance dependency baseline is refreshed for vendor-published security fixes in Spring Boot/Framework, embedded Tomcat and Logback, with exact version-family regression floors. See [JVM_MAINTENANCE_SECURITY.md](JVM_MAINTENANCE_SECURITY.md) for previous/new versions, source/advisory links, applicability limits and refreshed checksum evidence. This remains distinct from a complete vulnerability/license audit.

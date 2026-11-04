@@ -69,6 +69,27 @@ class GradleEvidenceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.check(lock=LOCK + "example:owned:1.2.3=" + CONFIGS + "\n")
 
+    def test_reviewed_security_maintenance_floors_pass(self):
+        for group, version in (("org.springframework.boot", "3.5.16"),
+                               ("org.springframework", "6.2.19"),
+                               ("org.apache.tomcat.embed", "10.1.61"),
+                               ("ch.qos.logback", "1.5.38")):
+            with self.subTest(group=group):
+                lock = LOCK.replace("example:", group + ":").replace("1.2.3", version)
+                xml = XML.replace('group="example"', 'group="' + group + '"').replace("1.2.3", version)
+                self.assertEqual(self.check(lock=lock, xml=xml), (1, 1))
+
+    def test_security_downgrades_and_unreviewed_families_fail(self):
+        for group, version in (("org.springframework.boot", "3.5.6"),
+                               ("org.springframework", "6.2.11"),
+                               ("org.apache.tomcat.embed", "10.1.46"),
+                               ("ch.qos.logback", "1.5.18"),
+                               ("org.apache.tomcat.embed", "11.0.1"),
+                               ("ch.qos.logback", "1.6.0")):
+            with self.subTest(group=group, version=version), self.assertRaises(ValueError):
+                self.check(lock=LOCK.replace("example:", group + ":").replace("1.2.3", version),
+                           xml=XML.replace('group="example"', 'group="' + group + '"').replace("1.2.3", version))
+
     def test_dtd_is_rejected(self):
         with self.assertRaises(ValueError):
             self.check(xml=XML.replace("<verification-metadata", "<!DOCTYPE x><verification-metadata", 1))
