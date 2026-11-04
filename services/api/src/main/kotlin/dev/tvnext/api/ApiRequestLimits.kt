@@ -17,13 +17,14 @@ import org.springframework.web.filter.OncePerRequestFilter
 /** Bounded JSON envelope and per-peer request rate. Forwarded headers never define the peer. */
 @Component
 @Order(1)
-class ApiRequestLimits : OncePerRequestFilter() {
+class ApiRequestLimits internal constructor(private val epochMillis: () -> Long) : OncePerRequestFilter() {
+    constructor() : this(System::currentTimeMillis)
     private data class Window(val minute: Long, var count: Int)
     private val windows = ConcurrentHashMap<String,Window>()
     private val inFlight = Semaphore(8)
     override fun doFilterInternal(request: HttpServletRequest, response: HttpServletResponse, chain: FilterChain) {
         if (!request.requestURI.startsWith("/api/v1/") || request.method !in setOf("POST","GET")) { chain.doFilter(request,response); return }
-        val now = System.currentTimeMillis() / 60_000
+        val now = epochMillis() / 60_000
         val accepted = synchronized(windows) {
             if (windows.size >= 4096) windows.entries.removeIf { it.value.minute != now }
             val auth = request.requestURI.startsWith("/api/v1/home/auth/") || request.requestURI == "/api/v1/home/pairings/claim"

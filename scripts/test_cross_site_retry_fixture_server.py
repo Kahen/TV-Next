@@ -1,5 +1,6 @@
 """Regression tests for the owned iOS cross-site search fixture."""
 import json
+from http.client import HTTPConnection
 import threading
 import unittest
 from http.server import ThreadingHTTPServer
@@ -97,14 +98,30 @@ class CrossSiteRetryFixtureTests(unittest.TestCase):
         self.assertEqual(recovered["items"][0]["id"], "new-0")
         self.assertEqual(self.get("/fixture/state")["counts"], {"a": 1, "b": 3})
 
-    def test_reject_unknown_and_oversized(self):
+    def test_reject_unknown_site(self):
         self.get("/fixture/reset")
         with self.assertRaises(HTTPError) as error:
             self.post("/api/v1/subscriptions/search", {"siteKey": "other", "query": "x"})
         self.assertEqual(error.exception.code, 400)
-        with self.assertRaises(HTTPError) as error:
-            self.post("/api/v1/subscriptions/search", {"siteKey": "a", "query": "x" * 70000})
-        self.assertEqual(error.exception.code, 413)
+
+    def test_reject_oversized_before_reading_body(self):
+        # Send headers only: the fixture rejects Content-Length before reading
+        # bytes. Sending a body with urllib races the early response against
+        # socket teardown with unread bytes (ECONNRESET on macOS).
+        self.get("/fixture/reset")
+        connection = HTTPConnection("127.0.0.1", self.server.server_port, timeout=3)
+        try:
+            connection.putrequest("POST", "/api/v1/subscriptions/search")
+            connection.putheader("Content-Type", "application/json")
+            connection.putheader("Content-Length", "70000")
+            connection.endheaders()
+            response = connection.getresponse()
+            self.assertEqual(response.status, 413)
+            self.assertEqual(json.loads(response.read()), {"error": "fixture request too large"})
+        finally:
+            connection.close()
+        self.assertEqual(self.get("/fixture/state"), {"counts": {}, "queries": []})
+        self.assertEqual(self.get("/health"), {"ok": True})
 
 
 if __name__ == "__main__":
