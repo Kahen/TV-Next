@@ -1,0 +1,198 @@
+import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
+#if canImport(FoundationXML)
+import FoundationXML
+#endif
+
+/// Opt-in import of a single AVTransport:1 control URL from a LAN UPnP description.
+/// This deliberately does not perform SSDP discovery or trust XML URLBase.
+enum NativeDLNADescription {
+    static let deviceNamespace = "urn:schemas-upnp-org:device-1-0"
+
+    struct Details: Equatable {
+        let controlURL: URL
+        let friendlyName: String?
+        let modelName: String?
+        let deviceUDN: String?
+    }
+
+    static func location(_ text: String) throws -> URL {
+        try NativeDLNA.rendererURL(text)
+    }
+
+    static func load(_ text: String) async throws -> URL {
+        try await loadDetails(text).controlURL
+    }
+
+    static func loadDetails(_ text: String) async throws -> Details {
+        let approved = try location(text)
+        var request = URLRequest(url: approved, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 8)
+        request.httpMethod = "GET"
+        request.setValue("application/xml, text/xml", forHTTPHeaderField: "Accept")
+        let (data, response) = try await NativeDLNABoundedTransport.load(request, maxBytes: NativeDLNA.maxResponseBytes)
+        guard let http = response as? HTTPURLResponse else { throw NativeDLNAError.invalidDescription }
+        guard http.statusCode == 200 else { throw NativeDLNAError.httpStatus(http.statusCode) }
+        return try parseDetails(data, location: approved)
+    }
+
+    static func parse(_ data: Data, location: URL) throws -> URL {
+        try parseDetails(data, location: location).controlURL
+    }
+
+    static func parseDetails(_ data: Data, location: URL) throws -> Details {
+        let approved = try self.location(location.absoluteString)
+        guard !data.isEmpty, data.count <= NativeDLNA.maxResponseBytes,
+              let body = String(data: data, encoding: .utf8),
+              !body.localizedCaseInsensitiveContains("<!DOCTYPE"),
+              !body.localizedCaseInsensitiveContains("<!ENTITY") else {
+            throw NativeDLNAError.invalidDescription
+        }
+        let collector = DescriptionCollector()
+        let parser = XMLParser(data: Data(body.utf8))
+        parser.shouldProcessNamespaces = true
+        parser.shouldResolveExternalEntities = false
+        parser.delegate = collector
+        guard parser.parse(), !collector.invalid, collector.stack.isEmpty,
+              let control = collector.control else { throw NativeDLNAError.invalidDescription }
+        return Details(controlURL: try resolve(control, from: approved), friendlyName: collector.friendlyName, modelName: collector.modelName, deviceUDN: collector.deviceUDN)
+    }
+
+    /// Only a matching SSDP USN and root-device UDN may promote a discovery candidate.
+    /// Manual URL import remains compatible with descriptions without UDN.
+    static func verifyDiscovered(_ data: Data, candidate: NativeSSDPResponse.Candidate) throws -> Details {
+        let details = try parseDetails(data, location: candidate.location)
+        guard NativeSSDPResponse.matchesDescriptionUDN(candidate, udn: details.deviceUDN) else {
+            throw NativeDLNAError.invalidDescription
+        }
+        return details
+    }
+
+    static func resolve(_ raw: String, from location: URL) throws -> URL {
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty, value.utf8.count <= 256,
+              !value.contains("%"), !value.contains("?"), !value.contains("#"),
+              !value.contains("\\"), !value.contains(" "), !value.hasPrefix("//"),
+              !value.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }),
+              !value.split(separator: "/", omittingEmptySubsequences: false)
+                .contains(where: { $0 == "." || $0 == ".." }),
+              let absolute = URL(string: value, relativeTo: location)?.absoluteURL,
+              let checked = try? NativeDLNA.rendererURL(absolute.absoluteString),
+              checked.host == location.host, checked.port == location.port,
+              checked.scheme == location.scheme else { throw NativeDLNAError.invalidDescription }
+        return checked
+    }
+}
+
+private final class DescriptionCollector: NSObject, XMLParserDelegate {
+    private let namespace = NativeDLNADescription.deviceNamespace
+    private let fields = ["serviceType", "controlURL"]
+    private(set) var stack: [String] = []
+    private(set) var control: String?
+    private(set) var friendlyName: String?
+    private(set) var modelName: String?
+    private(set) var deviceUDN: String?
+    private(set) var invalid = false
+    private var identitySeen = Set<String>()
+    private var rootDeviceSeen = false
+    private var serviceFields: [String: String] = [:]
+    private var collecting: String?
+    private var text = ""
+
+    private func correctNamespace(_ value: String?) -> Bool { value == namespace }
+    private func isService(_ names: [String]) -> Bool {
+        names == ["root", "device", "serviceList", "service"]
+    }
+
+    func parser(_ parser: XMLParser, didStartElement name: String,
+                namespaceURI: String?, qualifiedName: String?, attributes: [String: String]) {
+        if collecting != nil { invalid = true }
+        if stack.isEmpty {
+            if name != "root" || !correctNamespace(namespaceURI) { invalid = true }
+        } else if ["device", "serviceList", "service", "serviceType", "controlURL", "friendlyName", "modelName", "UDN"].contains(name),
+                  !correctNamespace(namespaceURI) {
+            invalid = true
+        }
+        stack.append(name)
+        if stack == ["root", "device"] {
+            if rootDeviceSeen { invalid = true }
+            rootDeviceSeen = true
+        }
+        if stack.count == 3 && stack[0] == "root" && stack[1] == "device" &&
+            (name == "friendlyName" || name == "modelName" || name == "UDN") {
+            if !identitySeen.insert(name).inserted { invalid = true }
+            collecting = name
+            text = ""
+        }
+        if isService(stack) { serviceFields = [:] }
+        if fields.contains(name) && isService(Array(stack.dropLast())) {
+            if serviceFields[name] != nil || collecting != nil { invalid = true }
+            collecting = name
+            text = ""
+        }
+    }
+
+    private func append(_ fragment: String) {
+        guard let collecting else { return }
+        let limit = collecting == "controlURL" ? 256 : ((collecting == "friendlyName" || collecting == "modelName") ? 160 : 128)
+        guard fragment.utf8.count <= limit, text.utf8.count <= limit - fragment.utf8.count else {
+            invalid = true
+            return
+        }
+        text += fragment
+    }
+
+    func parser(_ parser: XMLParser, foundCharacters string: String) { append(string) }
+    func parser(_ parser: XMLParser, foundCDATA data: Data) {
+        guard collecting != nil else { return }
+        guard let fragment = String(data: data, encoding: .utf8) else { invalid = true; return }
+        append(fragment)
+    }
+
+    func parser(_ parser: XMLParser, didEndElement name: String,
+                namespaceURI: String?, qualifiedName: String?) {
+        guard stack.last == name else { invalid = true; return }
+        if collecting == name && stack.count == 3 && stack[0] == "root" && stack[1] == "device" &&
+            (name == "friendlyName" || name == "modelName" || name == "UDN") {
+            let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            // Check raw XML text before trimming: even leading/trailing controls are unsafe.
+            // Names are display-only; reject controls and Unicode bidi overrides.
+            let unsafe = text.unicodeScalars.contains { scalar in
+                let code = scalar.value
+                return CharacterSet.controlCharacters.contains(scalar) ||
+                    code == 0x200E || code == 0x200F ||
+                    (0x202A...0x202E).contains(code) || (0x2066...0x2069).contains(code)
+            }
+            if name == "UDN" {
+                // UDN is a machine identity, not a display label: never trim or
+                // normalize arbitrary XML text into a different identifier.
+                let tail = text.dropFirst(5)
+                if !text.hasPrefix("uuid:") || tail.isEmpty || text.utf8.count > 128 ||
+                    !tail.utf8.allSatisfy({ (65...90).contains($0) || (97...122).contains($0) ||
+                        (48...57).contains($0) || $0 == 45 || $0 == 46 || $0 == 95 }) {
+                    invalid = true
+                } else { deviceUDN = text }
+            } else {
+                if unsafe || value.count > 80 { invalid = true }
+                if name == "friendlyName" { friendlyName = value.isEmpty ? nil : value }
+                else { modelName = value.isEmpty ? nil : value }
+            }
+            collecting = nil
+            text = ""
+        } else if collecting == name && isService(Array(stack.dropLast())) {
+            serviceFields[name] = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            collecting = nil
+            text = ""
+        }
+        if isService(stack) && serviceFields["serviceType"] == NativeDLNA.service {
+            guard control == nil, let value = serviceFields["controlURL"], !value.isEmpty else {
+                invalid = true
+                stack.removeLast()
+                return
+            }
+            control = value
+        }
+        stack.removeLast()
+    }
+}

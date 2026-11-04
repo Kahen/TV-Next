@@ -61,6 +61,14 @@ private actor RequestCounter {
         },identity:{$0.id}) }
         task.cancel()
         do { _ = try await task.value; fatalError("Cancellation was ignored") } catch is CancellationError {}
+        // Empty successful results, partial failure and total failure must
+        // not collapse into the same ambiguous blank UI.
+        precondition(NativeCrossSiteSearch.emptyState(resultCount: 0, failedCount: 0, selectedCount: 2) == "未找到匹配结果。")
+        precondition(NativeCrossSiteSearch.emptyState(resultCount: 0, failedCount: 1, selectedCount: 2) == "尚无匹配结果，部分站点搜索失败，可重试。")
+        precondition(NativeCrossSiteSearch.emptyState(resultCount: 0, failedCount: 2, selectedCount: 2) == "所有站点搜索失败，请重试失败站点。")
+        precondition(NativeCrossSiteSearch.emptyState(resultCount: 1, failedCount: 2, selectedCount: 2) == nil)
+        precondition(NativeCrossSiteSearch.emptyState(resultCount: 0, failedCount: 0, selectedCount: 0) == nil)
+        precondition(NativeCrossSiteSearch.emptyState(resultCount: 0, failedCount: -1, selectedCount: 2) == nil)
         // Opening a search hit from B after browsing A must not leak A's
         // category filters into subsequent B requests. Same-site detail keeps them.
         var scope = NativeSiteBrowsingContext<String>(
@@ -74,6 +82,187 @@ private actor RequestCounter {
         precondition(scope.siteKey == "B" && scope.category == nil && scope.mode == "home")
         precondition(scope.filterCatalog.isEmpty && scope.filters.isEmpty && scope.appliedFilters.isEmpty)
         precondition(!scope.switchToDetailSite("B"))
-        print("Native cross-provider search: ordering, concurrency, bounds, failures, duplicates, site scope and cancellation passed")
+        // Duplicate subscription keys must not shift the 16-site boundary:
+        // search and retry ordering must select the same unique providers.
+        let repeatedSources = [
+            NativeSearchSource(key: "a", name: "A"),
+            NativeSearchSource(key: "a", name: "Duplicate A"),
+            NativeSearchSource(key: "b", name: "B")
+        ]
+        precondition(NativeCrossSiteSearch.selectedSourceKeys(repeatedSources) == ["a", "b"])
+        // The UI must render provenance from the eligible searched sites,
+        // never the first raw-subscription entry with a matching key.
+        let eligibleNames = [
+            NativeSearchSource(key: "a", name: "Visible A"),
+            NativeSearchSource(key: "b", name: "Visible B"),
+            NativeSearchSource(key: "b", name: "Duplicate Eligible B")
+        ]
+        let names = NativeCrossSiteSearch.selectedSourceNames(eligibleNames)
+        precondition(names == ["a": "Visible A", "b": "Visible B"])
+        precondition(names["unknown"] == nil)
+        let limitedNames = NativeCrossSiteSearch.selectedSourceNames(
+            (0..<20).map { NativeSearchSource(key: String($0), name: "Visible \($0)") }
+        )
+        precondition(limitedNames.count == 16 && limitedNames["15"] == "Visible 15")
+        precondition(limitedNames["16"] == nil)
+        precondition(NativeCrossSiteSearch.selectedSources(repeatedSources).map(\.name) == ["A", "B"])
+        // The UI filters hidden/unsupported subscription entries *before*
+        // resolving failed keys. A hidden first occurrence of "b" must not
+        // shadow a later eligible "b"; duplicate eligible keys are requested once.
+        let eligibleForRetry = [
+            NativeSearchSource(key: "a", name: "Visible A"),
+            NativeSearchSource(key: "b", name: "Visible B"),
+            NativeSearchSource(key: "b", name: "Duplicate B")
+        ]
+        let failedOnly = NativeCrossSiteSearch.failedOnlySources(
+            eligibleForRetry, failedKeys: ["b", "missing", "b"], searchedKeys: ["a", "b"])
+        precondition(failedOnly.map(\.key) == ["b"])
+        precondition(failedOnly.map(\.name) == ["Visible B"])
+        precondition(NativeCrossSiteSearch.failedOnlySources(
+            eligibleForRetry, failedKeys: ["unknown"], searchedKeys: ["a", "b"]).isEmpty)
+
+        // The original search selected only the first 16 distinct sites.
+        // A foreign/stale failure key, including site 17, cannot widen retry.
+        let oversizedEligible = (0..<18).map {
+            NativeSearchSource(key: String($0), name: "Site \($0)")
+        }
+        let boundedRetry = NativeCrossSiteSearch.failedOnlySources(
+            oversizedEligible, failedKeys: ["16", "15", "0", "unknown"],
+            searchedKeys: NativeCrossSiteSearch.selectedSourceKeys(oversizedEligible))
+        precondition(boundedRetry.map(\.key) == ["0", "15"])
+        precondition(NativeCrossSiteSearch.failedOnlySources(
+            oversizedEligible, failedKeys: ["0", "1", "16"],
+            searchedKeys: ["1"]).map(\.key) == ["1"])
+        // Inserting a new eligible site must not accidentally select a
+        // previously unsearched site or resurrect a displaced provider.
+        let changedEligible = [NativeSearchSource(key: "new", name: "New")] + oversizedEligible
+        precondition(NativeCrossSiteSearch.failedOnlySources(
+            changedEligible, failedKeys: ["15", "new", "16"],
+            searchedKeys: NativeCrossSiteSearch.selectedSourceKeys(oversizedEligible)).isEmpty)
+        let boundaryCounter = RequestCounter()
+        let boundedResult = try await NativeCrossSiteSearch.search(sources: boundedRetry, fetch: { source, _ in
+            await boundaryCounter.begin(source.key)
+            await boundaryCounter.end()
+            return NativeSearchPage(items: [Item(id: source.key)], hasMore: false)
+        }, identity: { $0.id })
+        let (_, retriedKeys) = await boundaryCounter.snapshot()
+        precondition(Set(retriedKeys) == Set(["0", "15"]))
+        precondition(boundedResult.items.map(\.siteKey) == ["0", "15"])
+
+        // A retry is routed by provider key, not display name. Failed page-2
+        // providers retain their partial results until a successful retry.
+        let sameNames = [
+            NativeSearchSource(key: "a", name: "Mirror"),
+            NativeSearchSource(key: "b", name: "Mirror"),
+            NativeSearchSource(key: "c", name: "Other")
+        ]
+        let first = try await NativeCrossSiteSearch.search(sources: sameNames, fetch: { source, page in
+            if source.key == "b" { throw NSError(domain: "private token", code: 1) }
+            if source.key == "c" && page == 2 { throw NSError(domain: "private token", code: 2) }
+            return NativeSearchPage(items: [Item(id: source.key + "-old")],
+                                    hasMore: source.key == "c")
+        }, identity: { $0.id })
+        precondition(first.failed == ["Mirror", "Other"])
+        precondition(first.failedKeys == ["b", "c"])
+        precondition(first.items.map { $0.item.id } == ["a-old", "c-old"])
+
+        let originalKeyword = "original"
+        let editedDraft = "different"
+        let retrySources = first.failedKeys.compactMap { key in sameNames.first { $0.key == key } }
+        let retryCounter = RequestCounter()
+        let retry = try await NativeCrossSiteSearch.search(sources: retrySources, fetch: { source, _ in
+            await retryCounter.begin(source.key + ":" + originalKeyword)
+            await retryCounter.end()
+            if source.key == "c" { throw NSError(domain: "private token", code: 3) }
+            return NativeSearchPage(items: [Item(id: "b-new"), Item(id: "b-new")], hasMore: false)
+        }, identity: { $0.id })
+        let (_, retriedCalls) = await retryCounter.snapshot()
+        precondition(editedDraft != originalKeyword)
+        precondition(Set(retriedCalls) == Set(["b:original", "c:original"]))
+        precondition(retry.failedKeys == ["c"])
+        let recovered = Set(retrySources.map(\.key)).subtracting(retry.failedKeys)
+        let merged = NativeCrossSiteSearch.mergeRetry(
+            previous: first.items, refreshed: retry.items,
+            recoveredKeys: recovered, sourceOrder: sameNames.map(\.key), identity: { $0.id }
+        )
+        precondition(merged.map { $0.item.id } == ["a-old", "b-new", "c-old"])
+        // Unknown provider injection and duplicate source order are ignored.
+        let injected = NativeCrossSiteSearch.mergeRetry(
+            previous: merged,
+            refreshed: [NativeSearchHit(siteKey: "unrequested", item: Item(id: "bad"))],
+            recoveredKeys: ["unrequested"], sourceOrder: ["a", "b", "b", "c"],
+            identity: { $0.id }
+        )
+        precondition(injected.map { $0.item.id } == merged.map { $0.item.id })
+        // The 600-result global cap still applies after recovered sites expand.
+        let many = (0..<700).map { NativeSearchHit(siteKey: "b", item: Item(id: String($0))) }
+        let cappedRetry = NativeCrossSiteSearch.mergeRetry(
+            previous: first.items, refreshed: many, recoveredKeys: ["b"],
+            sourceOrder: ["a", "b", "c"], identity: { $0.id }
+        )
+        precondition(cappedRetry.count == 600)
+        precondition(cappedRetry.first?.item.id == "a-old")
+        precondition(cappedRetry.last?.item.id == "598")
+
+        // A provider returning 41 entries with hasMore=false still silently
+        // loses its 41st entry unless the per-page clip is reported.
+        let clippedTerminal = try await NativeCrossSiteSearch.search(
+            sources: [NativeSearchSource(key: "oversized", name: "Oversized")],
+            fetch: { _, _ in
+                NativeSearchPage(items: (0..<41).map { Item(id: String($0)) }, hasMore: false)
+            }, identity: { $0.id }
+        )
+        precondition(clippedTerminal.items.count == 40)
+        precondition(clippedTerminal.items.last?.item.id == "39")
+        precondition(clippedTerminal.failedKeys.isEmpty)
+        precondition(clippedTerminal.warnings == ["1 个站点单页超过 40 条，仅保留每页前 40 条。"])
+
+        let exactBoundary = try await NativeCrossSiteSearch.search(
+            sources: [NativeSearchSource(key: "exact", name: "Exact")],
+            fetch: { _, _ in
+                NativeSearchPage(items: (0..<40).map { Item(id: String($0)) }, hasMore: false)
+            }, identity: { $0.id }
+        )
+        precondition(exactBoundary.items.count == 40 && exactBoundary.warnings.isEmpty)
+
+        let clippedAndMore = try await NativeCrossSiteSearch.search(
+            sources: [NativeSearchSource(key: "both", name: "Both")],
+            fetch: { _, page in
+                NativeSearchPage(items: (0..<41).map { Item(id: "\(page)-\($0)") }, hasMore: true)
+            }, identity: { $0.id }
+        )
+        precondition(clippedAndMore.items.count == 80)
+        precondition(clippedAndMore.warnings.count == 2)
+        precondition(clippedAndMore.warnings.contains { $0.contains("仍有更多结果") })
+        precondition(clippedAndMore.warnings.contains { $0.contains("单页超过 40") })
+
+        let clippedThenFailed = try await NativeCrossSiteSearch.search(
+            sources: [NativeSearchSource(key: "partial", name: "Partial")],
+            fetch: { _, page in
+                if page == 2 { throw NSError(domain: "private", code: 1) }
+                return NativeSearchPage(items: (0..<41).map { Item(id: String($0)) }, hasMore: true)
+            }, identity: { $0.id }
+        )
+        precondition(clippedThenFailed.items.count == 40)
+        precondition(clippedThenFailed.failedKeys == ["partial"])
+        precondition(clippedThenFailed.warnings == ["1 个站点单页超过 40 条，仅保留每页前 40 条。"])
+
+        let initialWarnings = NativeSearchWarningState(
+            omittedSiteCount: 2, pageLimitKeys: ["a", "b"],
+            clippedPageKeys: ["b"], globalResultCapReached: true
+        )
+        let recoveredB = NativeSearchWarningState.empty
+        let unchanged = initialWarnings.replacingRecoveredProviders(with: recoveredB, recoveredKeys: [])
+        precondition(unchanged.messages == initialWarnings.messages)
+        let reconciled = initialWarnings.replacingRecoveredProviders(with: recoveredB, recoveredKeys: ["b"])
+        precondition(reconciled.pageLimitKeys == ["a"] && reconciled.clippedPageKeys.isEmpty)
+        precondition(reconciled.omittedSiteCount == 2 && reconciled.globalResultCapReached)
+        precondition(reconciled.messages.count == 3)
+        let twoClipped = NativeSearchWarningState(
+            omittedSiteCount: 0, pageLimitKeys: [],
+            clippedPageKeys: ["a", "b"], globalResultCapReached: false
+        )
+        precondition(twoClipped.messages == ["2 个站点单页超过 40 条，仅保留每页前 40 条。"])
+        print("Native cross-provider search: ordering, concurrency, bounds, failed-key retries, warning reconciliation and cancellation passed")
     }
 }

@@ -2,13 +2,18 @@
 
 The **Unsigned Web and Server Release Candidate** workflow builds versioned Web,
 API JAR, Linux amd64 Docker archives and the corresponding exact GPL source,
-LICENSE/NOTICE, Web dependency audit/SBOM, build-input lock, image identities and SHA256SUMS. The manifest
+LICENSE/NOTICE, Web dependency audit/SBOM, an exact shipped-JVM-library SBOM,
+Gradle version/checksum evidence, build-input lock, image identities and SHA256SUMS. The manifest
 records the tested source commit and explicitly marks the candidate unsigned.
 This is an experimental compatibility subset, not completion of P1–P6. No IPA,
 TestFlight, App Store, real-device or real Spider execution result is included.
 
 PR packaging checks exercise directory/version boundaries, real Web/API/image
-builds, archive load and checksum verification without creating a release. Manual
+builds, archive load and checksum verification without creating a release. The API
+JAR built on the hosted runner must also be byte-identical to `/app/api.jar`
+extracted from the independently compiled pinned Docker build; mismatch fails
+candidate generation. This checks the two actual distributed API binaries, not
+the reproducibility of every toolchain/container layer. Manual
 dispatch first requires the entire cross-platform integration gate for the same
 revision. Set a unique version (`v0.2.0-rc.1`, for example). By default only a
 14-day workflow artifact is produced. Explicitly selecting **create_draft** on
@@ -32,5 +37,12 @@ production upgrade/rollback drills and signed provenance remain acceptance work.
 
 Web tar metadata and JAR entry ordering/timestamps are stabilized. Container
 archives are not claimed bit-reproducible. Remaining P6 gates include full JVM/
-container/license audit and SBOMs, independently verified provenance/signatures,
+container/license audit and complete runtime/container SBOMs, independently verified provenance/signatures,
 performance budgets, real-provider/device acceptance and Apple distribution.
+
+The candidate's `sbom-api.cdx.json` is regenerated from its exact API JAR bytes.
+Every embedded library must match the committed Maven coordinate/SHA-256 baseline;
+unknown or altered libraries fail packaging. Both Gradle evidence files are also
+included in the manifest/checksums. This is a flat library inventory and does not
+claim license/vulnerability clearance, dependency edges or JDK/OS coverage. See
+[JVM_RUNTIME_SBOM.md](JVM_RUNTIME_SBOM.md).

@@ -60,16 +60,16 @@ struct NativeOfflineSection: View {
         .alert("删除离线媒体？", isPresented: Binding(
             get: { pendingDeletion != nil },
             set: { if !$0 { pendingDeletion = nil } }
-        )) {
+        ), presenting: pendingDeletion) { entry in
             Button("删除离线文件", role: .destructive) {
-                guard let entry = pendingDeletion else { return }
-                // Only a confirmed deletion may release the active AVPlayer item.
+                // SwiftUI may clear isPresented before invoking the action.
+                // Use the entry captured at presentation, not mutable alert state.
                 if let file = downloads.fileURL(entry) { library.stopLocalFile(file) }
                 downloads.remove(entry)
                 pendingDeletion = nil
             }
             Button("取消", role: .cancel) { pendingDeletion = nil }
-        } message: {
+        } message: { _ in
             Text("删除后无法恢复。取消不会影响已下载文件或正在播放的媒体。")
         }
     }

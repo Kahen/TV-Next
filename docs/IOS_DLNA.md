@@ -1,0 +1,131 @@
+# Native iPhone/iPad manual DLNA AVTransport control (P4, #100)
+
+## Source mapping and scope
+
+Reference: [FongMi/TV mobile DLNACast.java](https://github.com/FongMi/TV/blob/fongmi/app/src/mobile/java/com/fongmi/android/tv/dlna/DLNACast.java). The original uses jUPnP to find a renderer's AVTransport service and sends SetAVTransportURI, Play and optional Seek. TV-Next's **initial native subset** implements **manual** AVTransport v1 SetAVTransportURI → Play, Pause and Stop. It does **not** implement SSDP/M-SEARCH discovery, device descriptions, automatic device selection, automatic start-position resume, DLNA metadata generation, remote subtitle injection, transcoding or provider-specific headers. Explicit manual ±15-second REL_TIME seeking is separately described below.
+
+In the native **DLNA 投屏** section, enter the device's **actual AVTransport control URL** (not its device-description URL), for example http://192.168.1.20:1400/MediaRenderer/AVTransport/Control, and a direct HTTP(S) media URL the renderer can fetch independently. You can copy a current native channel's URL only when it does not require custom headers or replay resolution. A successful SOAP response means the command was acknowledged; it does **not** prove that the renderer decoded/played the media.
+
+## Explicit safety and compatibility boundaries
+
+- Renderer control URL must be an explicit IPv4 literal in 10/8, 172.16/12, 192.168/16 or loopback 127/8, use HTTP, have an explicit port and non-root path, and have no credentials, query, fragment or percent-encoded path. Hostnames, WAN endpoints, IPv6 and automatic discovery are deliberately excluded until a controlled LAN discovery implementation is tested.
+- The app never persists the renderer URL or media URL in this section, and does not send them to the home API. It does send the supplied media URL to the selected renderer over **unencrypted LAN HTTP**, including any query tokens; use only a trusted LAN device. HTTP renderer control is not protected against LAN interception. Do not use an untrusted Wi-Fi network.
+- Only direct HTTP(S) media URLs without embedded credentials/fragment are accepted. User-specific authorization headers, local files, replay sessions, private proxy headers and DRM cannot be forwarded. The renderer must support the media codec, URL and network route.
+- Requests are opt-in, POST only, 8-second total deadline (including slow/trickled responses), cancellation synchronized with task creation, ephemeral session without cookies or configured proxies, no HTTP redirects, 32 KiB streaming response cap, and namespaced SOAP Envelope/Body/action-response verification. SOAP Fault, HTTP errors and malformed/oversized responses fail. All requests revalidate the private endpoint.
+- iOS 17+ local-network permission/ATS behavior and device AVTransport compatibility require physical verification. No multicast entitlement, Apple signing, real TV, SMB or third-party provider compatibility is claimed.
+
+## Automated verification
+
+Run the Python fixture unit tests and Swift smoke tests from apps/ios. The macOS iOS workflow compiles NativeDLNA.swift with DLNASmoke.swift and DLNANetworkSmoke.swift, starts the owned loopback SOAP fixture on port 8768, and runs the Xcode native scheme on iPhone/iPad simulators. NativeDLNATests and production LibraryUITests cover SetURI, Play, Pause and Stop, including XML-escaped query parameters. Negative cases cover WAN/credential/encoded traversal endpoints, unsafe media, wrong SOAP action/namespace, HTTP 302/500, a 32 KiB + 1 response, pre-cancelled tasks and a slow-trickled response beyond eight seconds. The full integration gate must pass at the **final PR HEAD** before merge. Synthetic fixture success does not imply physical renderer interoperability.
+
+## iPhone simulator regression and remediation (2026-10-30)
+
+The initial final-head [full integration run #41005691395](https://github.com/Kahen/TV-Next/actions/runs/41005691395) passed Web/API, PostgreSQL, Compose, NAS, Spider isolation and iPad, but **failed iPhone XCUI**. The compact iPhone navigation Menu omitted its final “媒体库” action from the accessible, initially visible menu items. The existing production XCUI setup calls `jump("媒体库")` to clear local media before every test; therefore unrelated UI tests failed at setup, not at DLNA SOAP transport. The fix promotes “媒体库” to a dedicated, accessible top-bar shortcut instead of moving the truncation to another Menu item. The remaining 13 Menu actions and their production destinations are unchanged. The XCUI `jump("媒体库")` helper now exercises the real shortcut, while other destinations still exercise the Menu. The existing `LibraryUITests.setUp → clearLibraryIfNeeded → jump` path is the regression test on both simulator sizes. This is a UI reachability fix, **not** a relaxation of the test or a claim of successful revalidation. Merge requires the new HEAD's full iPhone/iPad XCTest/XCUI and aggregate gate to pass.
+
+## Remaining work
+
+SSDP discovery and device description parsing with network permission and multicast-entitlement assessment, real renderer models, DLNA URI metadata/DIDL-Lite compatibility, authenticated media relay for approved streams, automatic start-position resume, external subtitles, background behavior and physical iPhone/iPad tests remain P4/P5 tasks. Parent #5 stays open; release/signing gates remain P6.
+
+## Read-only renderer playback state query (P4, #102)
+
+The native **查询设备播放状态** button sends the standard AVTransport v1 `GetTransportInfo` action to the same manually approved LAN control endpoint. The app displays the **device-reported** `CurrentTransportState` separately from acknowledgements for SetURI/Play/Pause/Stop. A query can report STOPPED, PLAYING, PAUSED_PLAYBACK, TRANSITIONING, NO_MEDIA_PRESENT, RECORDING or PAUSED_RECORDING. Unknown, absent, duplicated, nested or foreign-namespace states are rejected rather than displayed as verified playback. A successful state query is not proof that the renderer decoded video or that the screen is showing the requested media.
+
+The query uses the same explicit private IPv4 control URL, 8-second overall deadline, no redirects/cookies/proxy, 32 KiB streamed cap, cancellation and strict SOAP namespace validation as manual casting. No automatic SSDP discovery, background polling, credentials or URL persistence is added. A user may query an already-playing renderer; pause/stop become available only when its reported state permits playback control. An invalid/public endpoint leaves the query disabled.
+
+Automated coverage: positive and negative Swift smoke/XCTest for exact state extraction, missing/unknown/duplicate/nested/foreign values and response limits; an owned stateful localhost SOAP fixture verifies Play → PAUSED_PLAYBACK → STOPPED; production SwiftUI XCUI exercises the real query button on both simulator families. Final-HEAD integration CI and physical renderer testing remain separate. No physical iPhone/iPad, real TV, SSDP, security audit or signed distribution is claimed.
+
+
+## Read-only renderer position query (P4, #104)
+
+The native **查询播放进度** button explicitly sends AVTransport v1 `GetPositionInfo` to the same user-approved private IPv4 control URL. It shows the renderer's reported `RelTime` and `TrackDuration`, without inferring playback, polling, seeking, persistence or new destinations. Only one direct, namespace-validated value of each is accepted. `HH:MM:SS` is bounded to 0–99 hours with minutes/seconds 0–59; `NOT_IMPLEMENTED` is accepted only for duration (display elapsed time alone). Missing, duplicate, nested, foreign-namespace, malformed, oversized, CDATA-spoofed, or position-greater-than-duration fields are rejected. The existing 8-second deadline, 32 KiB response cap, private IPv4 validation, redirect denial and cancellation remain in force.
+
+Owned Python SOAP fixture, Swift positive/negative smoke, XCTest network/parser cases and production SwiftUI XCUI on both simulator families are required. Final-head full integration CI must pass before merging. This does **not** demonstrate SSDP discovery, seeking, actual TV interoperability, physical iPhone/iPad behavior, independent security review or signed distribution. Parent #5 stays open.
+
+## Explicit bounded REL_TIME seek (P4, #106)
+
+FongMi's original mobile `DLNACast.java` invokes jUPnP `Seek(SeekMode.REL_TIME, ...)` after Play when a start position exists. TV-Next's separate, explicit native **快退15秒 / 快进15秒** controls use AVTransport v1 `Seek` with `Unit=REL_TIME` and a canonical `HH:MM:SS` target. They first query **fresh** `GetTransportInfo` and `GetPositionInfo` on the same manually approved private IPv4 endpoint. Only PLAYING or PAUSED_PLAYBACK and a positive, known finite duration are accepted; targets clamp to [0, duration]. Unknown-duration/live media, STOPPED/TRANSITIONING/RECORDING states, invalid deltas, out-of-range times and malformed SOAP fail closed. No stored position, background polling, auto-seek or new network destinations.
+
+Each bounded request retains the existing private-IP/port/path validation, no cookies/proxy/redirects, 8-second per-request deadline, 32 KiB response cap and cancellation. The three requests are not an atomic transaction: a real renderer can change media/state between queries. A successful Seek SOAP acknowledgement does not establish playback, timing accuracy or real-device interoperability. The app sends the user's chosen target only to the manually configured LAN device over unencrypted HTTP; do not use untrusted Wi-Fi.
+
+Owned localhost stateful SOAP fixture and Python tests verify accepted Seek and stopped/invalid targets; Swift smoke/XCTest cover target bounds, 15-second clamping, missing duration, invalid deltas and full network flow. Production SwiftUI XCUI exercises an actual forward seek and a subsequent fresh position query on iPhone/iPad simulators. Final-HEAD complete integration CI is required before closing #106. Physical TV/iPhone/iPad, SSDP, SMB, security review and Apple signing remain separate; parent #5 stays open.
+
+## Explicit resume from paused renderer (P4, #108)
+
+The native **继续播放** control completes the manual AVTransport Play/Pause/Stop loop. It is enabled only after a successful explicit pause or a user-initiated `GetTransportInfo` response reporting `PAUSED_PLAYBACK`. A missing/public endpoint, an in-flight request, or any other reported state disables the control. Editing the renderer/media address, leaving the screen, or an operation error invalidates the local paused indication; it is never persisted or synchronized.
+
+Before sending `Play(Speed=1)`, the app queries **fresh** `GetTransportInfo` on the same validated private IPv4 endpoint. Only `PAUSED_PLAYBACK` may proceed. STOPPED, PLAYING, TRANSITIONING, recording states, malformed responses and changed media/state fail closed. The state query and Play command are not atomic: another controller can change the renderer between requests. SOAP acknowledgement is not proof of resumed playback.
+
+This uses the existing explicit private IPv4 control address, 8-second deadline per request, streamed 32 KiB cap, redirect/cookie/proxy denial, cancellation and strict SOAP response parsing. It adds no SSDP, background polling, credentials, stored URLs or new network destinations. The owned localhost fixture, Swift network smoke and XCTest cover paused success and stopped/already-playing rejection. Production iPhone/iPad XCUI exercises pause → resume → fresh state query and disabled states. Final HEAD Web/API, native simulator, PostgreSQL, Compose, NAS and Spider isolation must pass before #108 can close; real devices and signing remain separate.
+
+
+## Explicit absolute HH:MM:SS seek (P4, #110)
+
+The native DLNA page adds a user-entered `HH:MM:SS` target and **跳转到指定时间**. The field accepts only eight ASCII bytes with two colons, hours 00–99, and minutes/seconds 00–59. Invalid values disable the action without networking. A valid request performs fresh GetTransportInfo and GetPositionInfo against the already approved private IPv4 AVTransport endpoint, requires PLAYING or PAUSED_PLAYBACK and a known positive finite duration, rejects target times beyond that duration (rather than silently clamping), then sends SOAP Seek with `Unit=REL_TIME`. All requests retain the existing no-redirect/cookie/proxy policy, 8-second per-request deadline, 32 KiB cap and cancellation.
+
+The three SOAP operations are non-atomic; a renderer can change state between them. This does not add SSDP, live seeking, remote control of arbitrary hosts, polling, real-TV compatibility or signed distribution. Owned Swift smoke and loopback SOAP tests cover zero/end/beyond-end, malformed ASCII/Unicode input, stopped/unknown-duration rejection; production iPhone/iPad XCUI must exercise input → seek → fresh position query. Final-head full integration is required before closing #110. Physical Apple/TV acceptance remains separate.
+
+## Explicit UPnP device-description import (P4, #112)
+
+The native **从设备描述导入控制地址** button accepts a user-entered device-description URL such as `http://192.168.1.20:1400/device.xml` and reads it with one bounded HTTP GET. This is a usability improvement for devices whose AVTransport control URL is not known; it is **not** SSDP/M-SEARCH discovery, automatic LAN scanning or proof of renderer interoperability. The app does not persist the description URL or send it to TV-Next's server.
+
+Both the description and extracted control endpoint must use the existing explicit private/loopback IPv4 HTTP literal, port, non-root path and no-credentials/query/fragment/encoded-path policy. The parser accepts a single direct `root/device/serviceList/service` AVTransport:1 entry in the UPnP device namespace, ignores XML `URLBase` and resolves `controlURL` only on the exact same IP, port and scheme as the entered description. Duplicate AVTransport services, nested/foreign namespace fields, external URLs, traversal, DTD/entity declarations and malformed XML are rejected. The 8-second total request deadline, no redirects/cookies/proxy and 32 KiB streamed response cap are reused; the imported address is still only a manual candidate, not an automatic playback action.
+
+The owned localhost description fixture provides valid, duplicate, missing, public-origin, DTD, redirect and oversized responses. Python fixture assertions, Swift parser/network smoke, XCTest and production iPhone/iPad SwiftUI XCUI cover positive and negative paths. Final-head Web/API and full simulator/integration checks must pass before merging/closing #112. Physical iPhone/iPad, real TV, multicast permission/entitlements, broader UPnP variants, independent security review and signed release remain separate.
+
+The SwiftUI import flow now renders a read-only success acknowledgement containing the exact approved control URL. The production XCUI acceptance asserts that the typed source URL is unchanged on iPad, waits for either the success acknowledgement or an error, and then verifies the actual renderer field. This distinguishes keyboard entry, network failure, and accessibility/scrolling regressions without weakening the security assertions.
+
+## SSDP M-SEARCH response validation prerequisite (P4, #114)
+
+A standalone native Swift parser validates one bounded (at most 4096-byte) SSDP HTTPU M-SEARCH response from a known IPv4 sender. It accepts only `HTTP/1.1 200 OK`, single ASCII headers, a supported MediaRenderer:1 or AVTransport:1 ST, a matching UUID-style USN, and a single private IPv4 HTTP LOCATION with explicit port and path whose IP equals the sender's IP. It rejects duplicate/ambiguous headers, folded or malformed lines, public/foreign/credentialed/encoded/traversal URLs, unknown targets and response bodies. The candidate is **not** automatically fetched, trusted, persisted or used to cast.
+
+This is a **parser-only prerequisite**, not SSDP discovery or network transport. There is no multicast socket, M-SEARCH sender, device list, local-network scan, or automatic renderer control in this PR. Swift smoke and XCTest run on the final iPhone/iPad CI HEAD; real-device discovery and signing remain unverified. Apple requires the restricted `com.apple.developer.networking.multicast` entitlement to send/receive IP multicast on iOS (Apple documentation: https://developer.apple.com/documentation/network/nwmulticastgroup). Until approval and provisioning are available, the manual device-description import in #112 remains the practical user path. See #114 for the remaining transport/permission/physical-device acceptance.
+
+A discovery candidate must also be non-loopback RFC1918 IPv4: an otherwise matching `127.0.0.1` sender and LOCATION is rejected. Explicit localhost DLNA fixtures remain available through the separate manual endpoint validator. This regression is covered by Swift smoke and XCTest.
+
+## Optional renderer identity on explicit description import (P4, #116)
+
+After the user enters a private IPv4 UPnP device-description URL, the existing bounded GET now extracts an optional, direct `root/device/friendlyName` in the UPnP device namespace. The native iPhone/iPad page displays `设备名称` beside the imported AVTransport control URL. A description without a friendly name remains valid; names are display-only, never sent to the home service, persisted, or used to authorize the control endpoint. Editing either the description source or the imported endpoint clears the name; stale asynchronous imports cannot overwrite a newly edited source. The existing same-IP/port validation, 8-second deadline, 32 KiB cap, no redirect, and strict AVTransport service selection remain unchanged.
+
+The parser rejects duplicate/nested/foreign-namespace names, more than 160 UTF-8 bytes or 80 characters, XML control characters and Unicode bidi overrides. Owned localhost positive/negative descriptions, Swift smoke, XCTest and production iPhone/iPad XCUI verify this subset; the final PR HEAD must pass the full aggregate CI. This does not implement SSDP multicast discovery, verify actual TV identity, prove physical Apple-device behavior, authorize Spider plugins or permit signed distribution. P4 #5 and SSDP #114 remain open.
+
+## Optional UPnP renderer modelName on explicit import (P4, #118)
+
+The user-initiated, bounded LAN device-description GET also accepts one optional direct `root/device/modelName` in the UPnP device namespace and displays `设备型号` beside the already validated control URL and optional friendly name. Missing or empty modelName is valid. The model name is display-only: it is never used as a renderer identity, permission, URL, authentication token or casting destination, and is not persisted or sent to the home service. Editing the source or control address clears it; stale asynchronous imports cannot overwrite a newer source.
+
+The existing 8-second deadline, 32 KiB response cap, same-IP/port AVTransport control URL, no redirects, and private IPv4 restrictions remain unchanged. Duplicate, nested, foreign-namespace, control/bidi and over-160-byte/80-character model names fail closed. Owned loopback positive/negative fixtures, Swift parser/network smoke, XCTest and production iPhone/iPad XCUI are required on the final HEAD before closing #118. This does not add SSDP, real-device interoperability, SMB, Spider execution, signing or a security audit.
+
+
+## Opt-in DIDL-Lite video metadata (P4, #122)
+
+The native manual-cast form accepts an **optional, device-local video title**. If left blank, SetAVTransportURI still sends an empty CurrentURIMetaData for compatibility with renderers that reject DIDL. If explicitly provided, it sends one FongMi-inspired DIDL-Lite videoItem (dc:title, upnp:class, res with http-get:*:video/*:*) inside SOAP-escaped CurrentURIMetaData. The media URL is identical to CurrentURI, not a new destination. Provider headers, artwork and remote scripts are not serialized. The title is not persisted.
+
+Titles are bounded to 80 characters and 160 UTF-8 bytes; empty/whitespace-only, leading/trailing whitespace, controls and Unicode bidirectional overrides fail closed. Generated DIDL is limited to 4096 bytes, and opt-in SOAP bodies to 8192 bytes. A malformed title disables the native cast button. The existing manual LAN control origin, transport deadline, response cap, no-redirect policy and explicit user action remain unchanged. An optional title may improve renderer compatibility, but no physical TV or Apple device acceptance is claimed.
+
+Verification: Swift positive/negative request smoke and XCTest, owned localhost SOAP fixture parsing the nested DIDL namespace/item/resource and rejecting malformed payloads, an actual metadata-enabled network cast, production SwiftUI XCUI on iPhone/iPad, and final-HEAD full integration CI. FongMi source reference: `app/src/mobile/java/com/fongmi/android/tv/dlna/DLNACast.java` (`VideoItem` / `DIDLParser`). This does not implement SSDP, SMB, renderer auto-detection, external subtitle casting, real-device interoperability or signed distribution.
+
+
+## Dormant bounded SSDP M-SEARCH transport (#132)
+
+A separate native UDP component now constructs and transmits two fixed MediaRenderer:1/AVTransport:1 M-SEARCH probes to 239.255.255.250:1900, with TTL 1, bounded response collection and strict existing private-IP LOCATION validation. It has no production discovery UI and does not change manual DLNA device import/control. See [IOS_SSDP_DISCOVERY.md](IOS_SSDP_DISCOVERY.md). Apple multicast entitlement, real LAN/device verification and automatic device selection remain open under #114. Synthetic loopback and simulator CI are not physical interoperability evidence.
+
+## Failed read-only status query does not erase acknowledged cast (#160)
+
+A transient 503, malformed SOAP response or timeout from explicit `GetTransportInfo` or `GetPositionInfo` is **not** a Stop acknowledgement. Previously the SwiftUI catch path cleared both local flags, disabling Pause and Stop even if the last successful SetURI → Play still ran on the renderer. The native control policy now preserves only the previously acknowledged `castStarted` flag for failed **read-only** queries. It always invalidates the paused flag: Resume stays disabled until a fresh, valid PAUSED_PLAYBACK report or a successful explicit Pause. Failed mutating actions still clear both flags; changing endpoints/media or leaving the screen still resets state. This is a UI command-availability policy, not a verified playback status.
+
+Positive/negative Swift smoke and XCTest exercise read-only versus mutating errors; the owned localhost fixture acknowledges cast/pause/stop but returns HTTP 503 for status/position reads. Python and production SwiftUI iPhone/iPad XCUI assert the error, disabled Resume, retained Stop/Pause and successful Stop. Final-HEAD full CI is required before closing #160. No physical renderer, Apple device, entitlement, security audit or signed distribution claim.
+
+## P4 native manual DLNA navigation-state invalidation (#164, 2026-11-02)
+
+Leaving the native DLNA screen cancels any in-flight request and discards UI-only cast/paused flags, stale status/error and previous seek text. Renderer/media fields are not persisted or sent to a server, and navigation never sends an implicit Stop to the renderer. A fresh explicit cast or verified transport-state query is required to enable playback controls after return. This differs from a failed read-only query **within** the same screen, which preserves the last acknowledged cast. Swift smoke/XCTest and production SwiftUI iPhone/iPad XCUI use only the owned localhost fixture; final-head Web/API, PostgreSQL, Compose, NAS, Spider isolation and aggregate CI are required before merging. Physical Apple/TV interoperability, multicast entitlement, legal Spider corpus, security audit and signing remain open.
+
+## Failed relative/absolute Seek invalidates local controls (P4, #162)
+
+Both manual ±15-second REL_TIME Seek and explicit HH:MM:SS Seek are mutating commands. A failed status/position preflight or rejected SOAP Seek does not establish a valid post-command renderer state. Previously the two SwiftUI catch paths displayed an error but left local Pause/Stop/Resume controls enabled. They now use the same conservative `NativeDLNAControlSnapshot.afterFailure(.seek)` policy as other failed mutations: invalidate `castStarted` and `paused`, keep the entered URLs, and allow an explicit new cast or fresh state query. A successful seek does not reset controls. Cancellation and endpoint edits still discard stale asynchronous completions.
+
+The owned loopback fixture accepts SetURI/Play/status/position but returns HTTP 503 for valid Seek requests; invalid SOAP still returns 400. Python tests, Swift network smoke, XCTest and production iPhone/iPad XCUI cover both relative and absolute failure paths and verify no synthetic position mutation. Final-HEAD full integration CI is required before closing #162. Physical renderer/iPhone/iPad behavior, multicast entitlement, independent security audit and signed distribution remain unverified.
+
+The native root uses one persistent `ScrollViewReader`/`VStack`: toolbar section changes scroll without necessarily firing the DLNA subview's `onDisappear`. The implementation therefore observes explicit navigation requests as well as actual disappearance; reselecting DLNA does not reset an active session. The iPhone/iPad XCUI regression covers both paths.
+
+## Native iOS DLNA current-media autofill eligibility (P4, #166)
+
+The “使用当前播放地址” control now uses the same bounded direct HTTP(S) media-URL validator as the actual DLNA cast path for both enablement and tap handling. Empty, file/local, credentialed, malformed/oversized, custom-header and replay media cannot silently enable a no-op autofill. A valid explicitly imported direct URL remains eligible. Foundation-only Swift positive/negative smoke and XCTest plus production SwiftUI iPhone/iPad XCUI against an owned M3U fixture cover the behavior. This is UI safety/feedback, not new renderer discovery, external-provider compatibility or physical TV acceptance; final-head full CI is required before merge.

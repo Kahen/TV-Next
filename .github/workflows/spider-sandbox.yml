@@ -35,6 +35,7 @@ jobs:
           docker build -f services/spider-runtime/node/Dockerfile -t tvnext/spider-node-fixture:ci services/spider-runtime
           docker build -f services/spider-runtime/python/Dockerfile -t tvnext/spider-python-fixture:ci services/spider-runtime
           docker build -f services/spider-runtime/java/Dockerfile -t tvnext/spider-java-fixture:ci services/spider-runtime
+          docker build -f services/spider-runtime/jvm-spider/Dockerfile -t tvnext/spider-jvm-approved:ci services/spider-runtime
       - name: Validate bytecode inspector against Android/JNI/malformed JAR fixtures
         working-directory: services/spider-runtime
         run: python3 -m unittest -v test_jar_inspect
@@ -47,6 +48,9 @@ jobs:
       - name: Exercise OS isolation, protocol parity, network, filesystem and timeout
         working-directory: services/spider-runtime
         run: python3 -m unittest -v test_runtime
+      - name: Execute approved JVM JAR through original Spider media signatures
+        working-directory: services/spider-runtime
+        run: python3 -m unittest -v test_jvm_spider
       - name: Detect leaked runtime containers
         if: always()
         run: |

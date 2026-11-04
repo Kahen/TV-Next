@@ -1,6 +1,7 @@
 import SwiftUI
 import AVKit
 import UniformTypeIdentifiers
+import UIKit
 
 private enum LibraryView: String, CaseIterable, Identifiable {
     case channels = "全部频道"
@@ -22,7 +23,7 @@ struct ContentView: View {
     @AppStorage("tv-next-api-url") private var serverURL = "http://localhost:8080"
     @State private var homeSession: NativeHomeSession?
     @State private var danmaku: [DanmakuComment] = []
-    @State private var danmakuOptions = DanmakuOptions()
+    @State private var danmakuOptions = DanmakuOptionsStore.load()
     @State private var remoteResourceKey: String?
     @State private var remoteDanmaku: [NativePlaybackResource] = []
     @State private var remoteSubtitles: [NativePlaybackResource] = []
@@ -40,7 +41,13 @@ struct ContentView: View {
     @State private var isShowingMediaPicker = false
     @State private var isShowingCaptionPicker = false
     @State private var isLoadingMedia = false
+    @State private var mediaImportTask: Task<Void, Never>?
+    @State private var captionImportTask: Task<Void, Never>?
+    @State private var isLoadingCaption = false
+    @State private var stagedMediaBytes: Int64 = 0
+    @State private var stagedMediaTotal: Int64?
     @State private var captionFileName: String?
+    @State private var captionImportEncoding: CaptionTextEncoding = .unicode
     @State private var captionOffsetSeconds: Double = 0
     @State private var isShowingExporter = false
     @State private var exportDocument: M3UExportDocument?
@@ -49,6 +56,7 @@ struct ContentView: View {
     @State private var isLoading = false
     @State private var importGeneration = UUID()
     @State private var mediaGeneration = UUID()
+    @State private var captionImportGeneration = UUID()
 
     private var visibleChannels: [TVChannel] {
         let entries: [TVChannel]
@@ -88,6 +96,8 @@ struct ContentView: View {
                     ConfigPreviewSection().id("config")
                     CloudSection(serverURL: serverURL) { library.play($0) }.id("cloud")
                     NativeWebDAVSection(onPlay: { library.play($0) }, onDisconnect: { library.revokeWebDAV(root: $0) }).id("webdav")
+                    NativeDLNASection(library: library, navigationRequest: navigationRequest,
+                                      navigationDestination: scrollDestination).id("dlna")
                     SubscriptionSection(serverURL: serverURL, session:homeSession, onPlay: { playback, title in
                         library.play(TVChannel(name: title + " · " + playback.name, url: playback.url, group: playback.lineName, logo: nil, tvgId: nil, headers:playback.headers, timeshift:playback.timeshift))
                         remoteResourceKey = playback.url
@@ -121,6 +131,14 @@ struct ContentView: View {
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle("TV-Next")
             .toolbar {
+                // A dedicated library shortcut keeps all Menu actions reachable on
+                // compact iPhones: the 14th Menu item was not exposed by XCUI.
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { navigate(to: "library") } label: {
+                        Label("媒体库", systemImage: "square.stack")
+                    }
+                    .accessibilityIdentifier("library-navigation")
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         Button("播放器") { navigate(to: "player") }
@@ -132,10 +150,10 @@ struct ContentView: View {
                         Button("TVBox 订阅") { navigate(to: "subscription") }
                         Button("网盘文件") { navigate(to: "cloud") }
                         Button("WebDAV 文件") { navigate(to: "webdav") }
+                        Button("DLNA 投屏") { navigate(to: "dlna") }
                         Button("直播节目表") { navigate(to: serverURL+"|"+(homeSession?.token ?? "")) }
                         Button("家庭服务器") { navigate(to: "home-server") }
                         Button("弹幕设置") { navigate(to: "danmaku") }
-                        Button("媒体库") { navigate(to: "library") }
                     } label: { Label("功能导航", systemImage: "line.3.horizontal") }
                     .accessibilityIdentifier("section-navigation")
                 }
@@ -164,8 +182,8 @@ struct ContentView: View {
                     remoteCaptions.cancel()
                     remoteDanmakuRequest = UUID()
                     remoteDanmakuTask?.cancel()
-                    mediaGeneration = UUID()
-                    isLoadingMedia = false
+                    cancelMediaImport()
+                    cancelCaptionImport()
                     library.setApplicationBackground(true)
                     remote.configure(nil, server: serverURL)
                 } else if phase == .active {
@@ -198,18 +216,11 @@ struct ContentView: View {
                 importFile(result)
             }
             .fileImporter(
-                isPresented: $isShowingMediaPicker,
-                allowedContentTypes: [.item],
-                allowsMultipleSelection: false
-            ) { result in
-                Task { await importLocalMedia(result) }
-            }
-            .fileImporter(
                 isPresented: $isShowingCaptionPicker,
                 allowedContentTypes: [.item],
                 allowsMultipleSelection: false
             ) { result in
-                importCaption(result)
+                beginCaptionImport(result)
             }
             .fileExporter(
                 isPresented: $isShowingExporter,
@@ -225,9 +236,9 @@ struct ContentView: View {
                 Button("删除本地媒体库", role: .destructive) {
                     isShowingClearConfirmation = false
                     importGeneration = UUID()
-                    mediaGeneration = UUID()
+                    cancelMediaImport()
+                    cancelCaptionImport()
                     isLoading = false
-                    isLoadingMedia = false
                     library.clear()
                     playlistText = ""
                     search = ""
@@ -249,6 +260,7 @@ struct ContentView: View {
                 } catch { errorMessage = error.localizedDescription }
             }
             .onChange(of: library.playbackGeneration) { _, generation in
+                cancelCaptionImport()
                 remoteCaptions.cancel()
                 remoteDanmakuRequest = UUID()
                 remoteDanmakuTask?.cancel()
@@ -265,6 +277,7 @@ struct ContentView: View {
                 // Presenting fullscreen keeps the same selected item and overlay state.
                 guard !showingFullscreen else { return }
                 remote.configure(nil,server:serverURL)
+                cancelCaptionImport()
                 library.suspendPlayback()
                 remoteCaptions.cancel()
                 remoteDanmakuTask?.cancel()
@@ -309,19 +322,43 @@ struct ContentView: View {
                         }
                     }
                 }
-                Toggle("显示弹幕", isOn: $danmakuOptions.enabled)
+                HStack {
+                    Toggle("显示弹幕", isOn: $danmakuOptions.enabled)
+                        .fixedSize(horizontal: true, vertical: false)
+                        .accessibilityIdentifier("danmaku-enabled-toggle")
+                    Spacer(minLength: 8)
+                    // A separate, explicit action remains usable when a large
+                    // iPad accessibility row does not hit-test the switch thumb.
+                    Button(danmakuOptions.enabled ? "关闭弹幕" : "开启弹幕") {
+                        danmakuOptions.enabled.toggle()
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier("danmaku-enabled-action")
+                }
+                // Stable, user-visible state feedback; XCUI switch.value differs by iOS locale.
+                Text(danmakuOptions.enabled ? "弹幕已开启" : "弹幕已关闭")
+                    .font(.caption2).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("danmaku-enabled-status")
                 HStack { Text("透明度"); Slider(value: $danmakuOptions.opacity, in: 0.1...1) }
                 HStack { Text("字号"); Slider(value: $danmakuOptions.fontSize, in: 12...40, step: 1) }
                 HStack { Text("显示区域"); Slider(value: $danmakuOptions.area, in: 0.25...1, step: 0.25) }
                 HStack { Text("时长"); Slider(value: $danmakuOptions.duration, in: 4...15, step: 1) }
                 HStack { Text("偏移 \(Int(danmakuOptions.offset)) 秒"); Slider(value: $danmakuOptions.offset, in: -120...120, step: 1) }
-                TextField("屏蔽词，逗号分隔", text: $danmakuOptions.blocked).textFieldStyle(.roundedBorder)
+                TextField("屏蔽词，逗号分隔", text: Binding(
+                    get: { danmakuOptions.blocked },
+                    set: { danmakuOptions.blocked = DanmakuOptionsStore.boundedBlocked($0) }
+                )).textFieldStyle(.roundedBorder)
+                Text("显示设置仅保存在本机，不保存弹幕内容或媒体地址。")
+                    .font(.caption2).foregroundStyle(.secondary)
                 Button("清空弹幕") {
                     remoteDanmakuRequest = UUID()
                     remoteDanmakuTask?.cancel()
                     danmaku = []
                 }
             }
+        }
+        .onChange(of: danmakuOptions) { _, options in
+            DanmakuOptionsStore.save(options)
         }
     }
 
@@ -425,6 +462,7 @@ struct ContentView: View {
                 .accessibilityIdentifier("playback-speed")
                 NativeSeekControls(library: library)
                 NativeIntroOutroControls(library: library)
+                NativePlaybackDiagnosticsView(library: library)
                 ForEach(remoteSubtitles) { source in
                     Button("加载订阅字幕：" + source.name) { loadRemoteCaption(source) }
                         .disabled(library.current?.url != remoteResourceKey)
@@ -444,6 +482,13 @@ struct ContentView: View {
                                     Text(track.title)
                                 }
                             }
+                        }
+                        if library.hasSavedAudioPreferenceForCurrentMedia {
+                            Divider()
+                            Button("忘记本片音轨记忆（下次播放）") {
+                                _ = library.forgetCurrentAudioPreference()
+                            }
+                            .accessibilityIdentifier("forget-audio-track-preference")
                         }
                     } label: {
                         Label("音轨：" + (library.audioTracks.first(where: {
@@ -475,6 +520,13 @@ struct ContentView: View {
                                     Text(track.title)
                                 }
                             }
+                        }
+                        if library.hasSavedSubtitlePreferenceForCurrentMedia {
+                            Divider()
+                            Button("忘记本片字幕记忆（下次播放）") {
+                                _ = library.forgetCurrentSubtitlePreference()
+                            }
+                            .accessibilityIdentifier("forget-subtitle-track-preference")
                         }
                     } label: {
                         Label("内嵌字幕：" + (library.subtitleTracks.first(where: {
@@ -542,6 +594,31 @@ struct ContentView: View {
                 }
                 .buttonStyle(.bordered)
                 .disabled(isLoadingMedia)
+                Button {
+                    isShowingMediaPicker = true
+                } label: {
+                    Label(isLoadingMedia ? "正在导入…" : "从文件 App / SMB 共享选择媒体", systemImage: "externaldrive")
+                }
+                .buttonStyle(.bordered)
+                .disabled(isLoadingMedia)
+                .accessibilityIdentifier("smb-files-import")
+                if isLoadingMedia {
+                    VStack(alignment: .leading, spacing: 6) {
+                        if let total = stagedMediaTotal, total > 0 {
+                            ProgressView(value: Double(min(stagedMediaBytes, total)), total: Double(total))
+                        } else {
+                            ProgressView()
+                        }
+                        Text("已复制 " + ByteCountFormatter.string(fromByteCount: stagedMediaBytes, countStyle: .file))
+                            .font(.caption)
+                            .accessibilityIdentifier("smb-import-progress")
+                        Button("取消媒体导入") { cancelMediaImport() }
+                            .buttonStyle(.bordered)
+                            .accessibilityIdentifier("cancel-smb-import")
+                    }
+                }
+                Text("先在 iOS「文件」App 中通过「连接服务器」加入 SMB 共享，再在系统选择器中选取媒体。文件会复制到本机临时缓存；不保存 SMB 凭据，也不直接通过 SMB 流式播放。")
+                    .font(.caption).foregroundStyle(.secondary)
                 HStack {
                     Button {
                         isShowingCaptionPicker = true
@@ -549,8 +626,11 @@ struct ContentView: View {
                         Label("导入 SRT / VTT / ASS / SSA 字幕", systemImage: "captions.bubble")
                     }
                     .buttonStyle(.bordered)
+                    .disabled(isLoadingCaption)
+                    .accessibilityIdentifier("caption-files-import")
                     if captionFileName != nil {
                         Button("移除字幕") {
+                            cancelCaptionImport()
                             remoteCaptions.cancel()
                             library.clearCaptions()
                             captionFileName = nil
@@ -558,6 +638,27 @@ struct ContentView: View {
                         }.buttonStyle(.bordered)
                     }
                 }
+                Picker("字幕文件编码", selection: $captionImportEncoding) {
+                    Text("Unicode（默认）").tag(CaptionTextEncoding.unicode)
+                    Text("GB18030（手动）").tag(CaptionTextEncoding.gb18030)
+                }
+                .pickerStyle(.menu)
+                .disabled(isLoadingCaption)
+                .accessibilityIdentifier("caption-import-encoding")
+                Text("字幕编码：" + (captionImportEncoding == .gb18030 ? "GB18030（手动）" : "Unicode（默认）"))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("caption-encoding-mode")
+                Text("仅在确定字幕使用 GBK/GB18030 时手动选择；不会自动猜测或保存编码。")
+                    .font(.caption).foregroundStyle(.secondary)
+                if isLoadingCaption {
+                    ProgressView("正在从文件 App 读取字幕…")
+                        .accessibilityIdentifier("caption-import-progress")
+                    Button("取消字幕导入") { cancelCaptionImport() }
+                        .buttonStyle(.bordered)
+                        .accessibilityIdentifier("cancel-caption-import")
+                }
+                Text("文件 App 的 SMB 字幕会在后台协调读取；最大 1 MiB，不保存共享凭据。")
+                    .font(.caption).foregroundStyle(.secondary)
                 if let captionFileName {
                     Text("字幕：" + captionFileName)
                         .font(.caption).foregroundStyle(.secondary)
@@ -573,11 +674,46 @@ struct ContentView: View {
             }
             .padding(.top, 8)
         }
+        // The simulator did not present SwiftUI's fileImporter when several
+        // independent importers shared this NavigationStack. Use an explicit
+        // UIDocumentPicker inside an ordinary sheet so Files/SMB providers
+        // remain system-owned, without introducing an SMB protocol client.
+        .sheet(isPresented: $isShowingMediaPicker) {
+            VStack(spacing: 0) {
+                Text("选择本地媒体")
+                    .font(.headline)
+                    .padding(.top, 12)
+                    .padding(.bottom, 4)
+                NativeMediaDocumentPicker(
+                    onPick: { result in
+                        isShowingMediaPicker = false
+                        beginMediaImport(result)
+                    },
+                    onCancel: { isShowingMediaPicker = false }
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            // Keep the app-owned cancel action below the UIKit picker rather
+            // than in the top status-bar region. On CI simulators the picker
+            // can occlude a header button even while AX reports it as present.
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                Button("关闭文件选择器") { isShowingMediaPicker = false }
+                    .accessibilityIdentifier("smb-picker-dismiss")
+                    .buttonStyle(.borderedProminent)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(.regularMaterial)
+            }
+            .presentationDetents([.large])
+        }
     }
 
     @MainActor
     private func loadRemoteCaption(_ source: NativePlaybackResource) {
         guard let server = URL(string: serverURL), library.current?.url == remoteResourceKey else { return }
+        // A newer subscription choice supersedes an in-flight Files/SMB read.
+        cancelCaptionImport()
         let generation = library.playbackGeneration
         let mediaURL = library.current?.url
         remoteCaptions.load(source, api: TVNextAPI(server: server), isCurrent: {
@@ -772,43 +908,110 @@ struct ContentView: View {
     }
 
     @MainActor
-    private func importLocalMedia(_ result: Result<[URL], Error>) async {
+    private func cancelMediaImport() {
+        // Invalidate queued progress/completion before cancelling the detached
+        // coordinator/copy worker. It may finish after the UI has moved on.
+        mediaGeneration = UUID()
+        mediaImportTask?.cancel()
+        mediaImportTask = nil
+        isLoadingMedia = false
+        stagedMediaBytes = 0
+        stagedMediaTotal = nil
+    }
+
+    @MainActor
+    private func beginMediaImport(_ result: Result<[URL], Error>) {
+        cancelMediaImport()
         let generation = UUID()
         mediaGeneration = generation
         isLoadingMedia = true
-        defer { if mediaGeneration == generation { isLoadingMedia = false } }
+        mediaImportTask = Task { await importLocalMedia(result, generation: generation) }
+    }
+
+    @MainActor
+    private func importLocalMedia(_ result: Result<[URL], Error>, generation: UUID) async {
+        defer {
+            if mediaGeneration == generation {
+                isLoadingMedia = false
+                mediaImportTask = nil
+            }
+        }
         do {
             guard let source = try result.get().first else { return }
-            let localFile = try await LocalMediaStager.stage(source)
-            guard mediaGeneration == generation else { LocalMediaStager.discard(localFile); return }
+            let localFile = try await LocalMediaStager.stage(source) { copied, total in
+                Task { @MainActor in
+                    guard mediaGeneration == generation, isLoadingMedia else { return }
+                    stagedMediaBytes = copied
+                    stagedMediaTotal = total
+                }
+            }
+            guard mediaGeneration == generation, !Task.isCancelled else {
+                LocalMediaStager.discard(localFile)
+                return
+            }
             library.playLocalFile(localFile, name: source.lastPathComponent)
             captionFileName = nil
             errorMessage = nil
+        } catch is CancellationError {
+            // User cancellation is not a playback error.
         } catch {
             if mediaGeneration == generation { errorMessage = error.localizedDescription }
         }
     }
 
-    private func importCaption(_ result: Result<[URL], Error>) {
-        remoteCaptions.cancel()
+    @MainActor
+    private func cancelCaptionImport() {
+        // Invalidate completion before cancelling a potentially blocked
+        // File Provider coordinator. Previous subtitles remain unchanged.
+        captionImportGeneration = UUID()
+        captionImportTask?.cancel()
+        captionImportTask = nil
+        isLoadingCaption = false
+    }
+
+    @MainActor
+    private func beginCaptionImport(_ result: Result<[URL], Error>) {
+        // Only a genuine user dismissal is silent. Provider errors must be
+        // shown rather than mistaken for a cancelled picker.
+        let source: URL
+        switch result {
+        case .success(let urls):
+            guard let selected = urls.first else { return }
+            source = selected
+        case .failure(let error):
+            if !LocalCaptionReader.isUserCancellation(error) {
+                errorMessage = error.localizedDescription
+            }
+            return
+        }
+        cancelCaptionImport()
+        let generation = UUID()
+        captionImportGeneration = generation
+        isLoadingCaption = true
+        let encoding = captionImportEncoding
+        captionImportTask = Task { await importCaption(source, encoding: encoding, generation: generation) }
+    }
+
+    @MainActor
+    private func importCaption(_ source: URL, encoding: CaptionTextEncoding, generation: UUID) async {
+        defer {
+            if captionImportGeneration == generation {
+                isLoadingCaption = false
+                captionImportTask = nil
+            }
+        }
         do {
-            guard let url = try result.get().first else { return }
-            guard ["srt", "vtt", "ass", "ssa"].contains(url.pathExtension.lowercased()) else {
-                throw CaptionError.invalidTimeline
-            }
-            let permission = url.startAccessingSecurityScopedResource()
-            defer { if permission { url.stopAccessingSecurityScopedResource() } }
-            let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
-            if let size = attributes[.size] as? NSNumber, size.int64Value > 1_048_576 {
-                throw CaptionError.tooLarge
-            }
-            let cues = try CaptionParser.parse(Data(contentsOf: url))
+            let cues = try await LocalCaptionReader.load(source, encoding: encoding)
+            guard !Task.isCancelled, captionImportGeneration == generation else { return }
+            remoteCaptions.cancel()
             library.setCaptions(cues)
             captionOffsetSeconds = 0
-            captionFileName = url.lastPathComponent
+            captionFileName = source.lastPathComponent
             errorMessage = nil
+        } catch is CancellationError {
+            // A cancelled or superseded read must not replace existing cues.
         } catch {
-            errorMessage = error.localizedDescription
+            if captionImportGeneration == generation { errorMessage = error.localizedDescription }
         }
     }
 
@@ -826,6 +1029,39 @@ struct ContentView: View {
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+}
+
+
+private struct NativeMediaDocumentPicker: UIViewControllerRepresentable {
+    let onPick: (Result<[URL], Error>) -> Void
+    let onCancel: () -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
+
+    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
+        // Open in place: LocalMediaStager obtains the scoped URL and stages a
+        // bounded local copy before AVPlayer ever reads the provider resource.
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.item], asCopy: false)
+        picker.allowsMultipleSelection = false
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ controller: UIDocumentPickerViewController, context: Context) {}
+
+    final class Coordinator: NSObject, UIDocumentPickerDelegate {
+        let parent: NativeMediaDocumentPicker
+
+        init(parent: NativeMediaDocumentPicker) { self.parent = parent }
+
+        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+            parent.onPick(.success(urls))
+        }
+
+        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+            parent.onCancel()
         }
     }
 }

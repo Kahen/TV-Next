@@ -1,4 +1,11 @@
 import Foundation
+import CoreFoundation
+
+/// Explicit local-file charset choice. Never infer legacy encodings from arbitrary bytes.
+enum CaptionTextEncoding: String, Sendable {
+    case unicode
+    case gb18030
+}
 
 struct CaptionCue: Equatable {
     let start: TimeInterval
@@ -11,13 +18,15 @@ enum CaptionError: LocalizedError {
     case tooLarge
     case invalidEncoding
     case invalidTimeline
+    case unavailableFile
 
     var errorDescription: String? {
         switch self {
         case .empty: return "字幕文件为空。"
         case .tooLarge: return "字幕文件超过 1 MiB。"
-        case .invalidEncoding: return "字幕必须是 UTF-8 编码的 SRT、WebVTT 或 ASS/SSA。"
+        case .invalidEncoding: return "字幕编码无效：默认支持 UTF-8 / 带 BOM 的 UTF-16；旧字幕请在导入前手动选择 GB18030。"
         case .invalidTimeline: return "未识别有效的字幕时间轴；仅支持基础 SRT / WebVTT / ASS / SSA 文本字幕。"
+        case .unavailableFile: return "无法读取文件 App 或 SMB 共享中的字幕；请检查共享连接与文件权限。"
         }
     }
 }
@@ -30,10 +39,50 @@ enum CaptionParser {
     )
     private static let tags = try! NSRegularExpression(pattern: #"<[^>]*>"#)
 
-    static func parse(_ data: Data) throws -> [CaptionCue] {
+    static func parse(_ data: Data, encoding: CaptionTextEncoding = .unicode) throws -> [CaptionCue] {
         guard !data.isEmpty else { throw CaptionError.empty }
         guard data.count <= 1_048_576 else { throw CaptionError.tooLarge }
-        guard var input = String(data: data, encoding: .utf8) else { throw CaptionError.invalidEncoding }
+        // Unicode is the default. GB18030 is opt-in for a user-selected local
+        // file only; never guess a legacy charset or reinterpret BOM input.
+        let littleEndian = data.starts(with: [0xFF, 0xFE])
+        let bigEndian = data.starts(with: [0xFE, 0xFF])
+        let decoded: String?
+        if encoding == .gb18030 {
+            guard !littleEndian, !bigEndian, !data.starts(with: [0xEF, 0xBB, 0xBF]) else {
+                throw CaptionError.invalidEncoding
+            }
+            // CoreFoundation's GB18030-2000 identifier is 0x0632. Resolve
+            // the corresponding NSStringEncoding instead of guessing bytes.
+            let nsEncoding = CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(0x0632))
+            decoded = String(data: data, encoding: String.Encoding(rawValue: nsEncoding))
+        } else if littleEndian || bigEndian {
+            guard data.count > 2, data.count.isMultiple(of: 2) else {
+                throw CaptionError.invalidEncoding
+            }
+            // Foundation may replace malformed UTF-16 on some platforms.
+            // Validate surrogate pairing ourselves to fail closed everywhere.
+            var expectsLowSurrogate = false
+            for offset in stride(from: 2, to: data.count, by: 2) {
+                let first = UInt16(data[offset])
+                let second = UInt16(data[offset + 1])
+                let unit = littleEndian ? first | (second << 8) : (first << 8) | second
+                if expectsLowSurrogate {
+                    guard (0xDC00...0xDFFF).contains(unit) else {
+                        throw CaptionError.invalidEncoding
+                    }
+                    expectsLowSurrogate = false
+                } else if (0xD800...0xDBFF).contains(unit) {
+                    expectsLowSurrogate = true
+                } else if (0xDC00...0xDFFF).contains(unit) {
+                    throw CaptionError.invalidEncoding
+                }
+            }
+            guard !expectsLowSurrogate else { throw CaptionError.invalidEncoding }
+            decoded = String(data: data, encoding: .utf16)
+        } else {
+            decoded = String(data: data, encoding: .utf8)
+        }
+        guard var input = decoded else { throw CaptionError.invalidEncoding }
 
         input = input.replacingOccurrences(of: "\u{FEFF}", with: "")
             .replacingOccurrences(of: "\r\n", with: "\n")
@@ -139,7 +188,12 @@ enum CaptionParser {
                            offset: TimeInterval = 0) -> String {
         guard time.isFinite, offset.isFinite, offset >= -10, offset <= 10 else { return "" }
         let subtitleTime = time - offset
-        return cues.first(where: { subtitleTime >= $0.start && subtitleTime < $0.end })?.text ?? ""
+        // Multiple cues may be active at once (for example bilingual dialogue).
+        // Keep the parsed timeline order and bound the shared inline/fullscreen
+        // overlay even when a file contains thousands of simultaneous cues.
+        let active = cues.lazy.filter { subtitleTime >= $0.start && subtitleTime < $0.end }
+            .prefix(4).map(\.text).joined(separator: "\n")
+        return String(active.prefix(2_000))
     }
 
     private static func seconds(_ value: String) -> TimeInterval? {

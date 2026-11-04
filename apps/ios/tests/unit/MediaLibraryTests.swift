@@ -5,6 +5,21 @@ import CryptoKit
 import MediaPlayer
 @testable import TVNext
 
+private final class StagingProgressRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var samples: [(Int64, Int64?)] = []
+    func record(_ copied: Int64, _ total: Int64?) {
+        lock.lock()
+        samples.append((copied, total))
+        lock.unlock()
+    }
+    var snapshot: [(Int64, Int64?)] {
+        lock.lock()
+        defer { lock.unlock() }
+        return samples
+    }
+}
+
 @MainActor
 final class MediaLibraryTests: XCTestCase {
     private var suite = ""
@@ -357,6 +372,102 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertNil(defaults.data(forKey: "tv-next-native-audio-preferences-v1"))
     }
 
+    func testForgettingAudioAndSubtitlePreferencesLeavesCurrentAVPlayerSelectionUntouched() async throws {
+        let mediaURL = "http://127.0.0.1:8766/master.m3u8"
+        XCTAssertFalse(store.hasSavedAudioPreferenceForCurrentMedia)
+        XCTAssertFalse(store.hasSavedSubtitlePreferenceForCurrentMedia)
+        XCTAssertFalse(store.forgetCurrentAudioPreference())
+        XCTAssertFalse(store.forgetCurrentSubtitlePreference())
+
+        store.play(channel("Owned HLS", url: mediaURL))
+        try await waitUntil({ self.store.audioTracks.count == 2 && self.store.subtitleTracks.count == 1 },
+                            timeout: 15)
+        XCTAssertTrue(store.selectAudioTrack(1))
+        XCTAssertTrue(store.selectSubtitleTrack(nil), "The owned HLS fixture allows subtitle Off")
+        XCTAssertTrue(store.hasSavedAudioPreferenceForCurrentMedia)
+        XCTAssertTrue(store.hasSavedSubtitlePreferenceForCurrentMedia)
+        let installed = store.player.currentItem
+        XCTAssertFalse(store.player.appliesMediaSelectionCriteriaAutomatically)
+
+        XCTAssertTrue(store.forgetCurrentAudioPreference())
+        XCTAssertFalse(store.hasSavedAudioPreferenceForCurrentMedia)
+        XCTAssertTrue(store.hasSavedSubtitlePreferenceForCurrentMedia,
+                      "Audio reset must not delete the subtitle Off preference")
+        XCTAssertEqual(store.selectedAudioTrack, 1)
+        XCTAssertTrue(store.player.currentItem === installed)
+        XCTAssertFalse(store.forgetCurrentAudioPreference(), "Already forgotten is a no-op")
+
+        XCTAssertTrue(store.forgetCurrentSubtitlePreference())
+        XCTAssertFalse(store.hasSavedSubtitlePreferenceForCurrentMedia)
+        XCTAssertNil(store.selectedSubtitleTrack, "Forgetting Off must not enable subtitles now")
+        XCTAssertTrue(store.player.currentItem === installed)
+        XCTAssertFalse(store.player.appliesMediaSelectionCriteriaAutomatically,
+                       "Forgetting affects future playback only")
+        XCTAssertFalse(store.forgetCurrentSubtitlePreference())
+
+        for key in ["tv-next-native-audio-preferences-v1", "tv-next-native-subtitle-preferences-v1"] {
+            let data = try XCTUnwrap(defaults.data(forKey: key))
+            XCTAssertLessThanOrEqual(data.count, 64_000)
+            XCTAssertFalse(String(decoding: data, as: UTF8.self).contains(mediaURL))
+            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+            XCTAssertTrue(try XCTUnwrap(json["entries"] as? [[String: Any]]).isEmpty)
+        }
+
+        let restored = MediaLibraryStore(defaults: defaults)
+        restored.play(channel("Owned HLS", url: mediaURL))
+        try await waitUntil({ restored.audioTracks.count == 2 && restored.subtitleTracks.count == 1 },
+                            timeout: 15)
+        XCTAssertTrue(restored.player.appliesMediaSelectionCriteriaAutomatically,
+                      "A future item must not restore forgotten track or Off selections")
+    }
+
+    func testForgettingCurrentTrackPreferencesPreservesOtherTitlesAndRejectsLocalMedia() throws {
+        let currentURL = "http://127.0.0.1:8766/master.m3u8"
+        let otherURL = "https://example.invalid/other.m3u8"
+        func digest(_ url: String) -> String {
+            SHA256.hash(data: Data(url.utf8)).map { String(format: "%02x", $0) }.joined()
+        }
+        let currentDigest = digest(currentURL)
+        let otherDigest = digest(otherURL)
+        let audioKey = "tv-next-native-audio-preferences-v1"
+        let subtitleKey = "tv-next-native-subtitle-preferences-v1"
+        let audioEntries: [[String: Any]] = [
+            ["urlDigest": currentDigest, "displayName": "English", "languageTag": "en"],
+            ["urlDigest": otherDigest, "displayName": "Japanese", "languageTag": "ja"]
+        ]
+        let subtitleEntries: [[String: Any]] = [
+            ["urlDigest": currentDigest, "displayName": "English", "languageTag": "en", "isOff": false],
+            ["urlDigest": otherDigest, "displayName": NSNull(), "languageTag": NSNull(), "isOff": true]
+        ]
+        defaults.set(try JSONSerialization.data(withJSONObject: ["version": 2, "entries": audioEntries]),
+                     forKey: audioKey)
+        defaults.set(try JSONSerialization.data(withJSONObject: ["version": 1, "entries": subtitleEntries]),
+                     forKey: subtitleKey)
+
+        let seeded = MediaLibraryStore(defaults: defaults)
+        seeded.play(channel("Owned HLS", url: currentURL))
+        XCTAssertTrue(seeded.hasSavedAudioPreferenceForCurrentMedia)
+        XCTAssertTrue(seeded.hasSavedSubtitlePreferenceForCurrentMedia)
+        XCTAssertTrue(seeded.forgetCurrentAudioPreference())
+        XCTAssertTrue(seeded.forgetCurrentSubtitlePreference())
+        for key in [audioKey, subtitleKey] {
+            let data = try XCTUnwrap(defaults.data(forKey: key))
+            XCTAssertFalse(String(decoding: data, as: UTF8.self).contains(currentURL))
+            XCTAssertFalse(String(decoding: data, as: UTF8.self).contains(otherURL))
+            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+            let entries = try XCTUnwrap(json["entries"] as? [[String: Any]])
+            XCTAssertEqual(entries.count, 1)
+            XCTAssertEqual(entries.first?["urlDigest"] as? String, otherDigest)
+        }
+
+        seeded.playLocalFile(try fixture(), name: "fixture.mp4")
+        XCTAssertFalse(seeded.hasSavedAudioPreferenceForCurrentMedia)
+        XCTAssertFalse(seeded.hasSavedSubtitlePreferenceForCurrentMedia)
+        XCTAssertFalse(seeded.forgetCurrentAudioPreference())
+        XCTAssertFalse(seeded.forgetCurrentSubtitlePreference())
+        seeded.clear()
+    }
+
     func testAudioPreferenceIdentityNeverTruncatesOrMatchesAmbiguousNames() {
         let prefix = String(repeating: "A", count: 80)
         let first = prefix + " - English"
@@ -399,6 +510,28 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertNil(MediaLibraryStore.uniqueAudioPreferenceIndex(
             in: options + [(name: "Original", languageTag: "en")],
             name: "Original", languageTag: "en"))
+    }
+
+    func testHiddenAVFoundationTrackIdentityCollisionsDoNotRestoreAudioOrSubtitles() {
+        typealias Option = (name: String, languageTag: String?)
+        let wanted: Option = (name: "English", languageTag: "en")
+        let filler: Option = (name: "Other", languageTag: "fr")
+        let visibleLast = Array(repeating: filler, count: 15) + [wanted]
+        let invisibleOnly = Array(repeating: filler, count: 16) + [wanted]
+        let hiddenCollision = [wanted] + Array(repeating: filler, count: 15) + [wanted]
+        for choose in [
+            MediaLibraryStore.uniqueAudioPreferenceIndex,
+            MediaLibraryStore.uniqueSubtitlePreferenceIndex
+        ] {
+            XCTAssertEqual(choose(visibleLast, "English", "en"), 15)
+            XCTAssertNil(choose(invisibleOnly, "English", "en"))
+            XCTAssertNil(choose(hiddenCollision, "English", "en"),
+                         "A 17th hidden duplicate must block automatic restoration")
+            XCTAssertNil(choose([wanted, wanted], "English", "en"))
+            XCTAssertNil(choose([wanted], "English", "ja"))
+            XCTAssertEqual(choose([wanted, (name: "English", languageTag: "ja")], "English", "en"), 0)
+            XCTAssertNil(choose([wanted], String(repeating: "x", count: 81), "en"))
+        }
     }
 
     func testCorruptedAudioPreferenceIsIgnoredWithoutChangingPlayback() async throws {
@@ -478,6 +611,37 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertEqual(MediaLibraryStore.persistableSubtitleDisplayName(sharedPrefix), sharedPrefix)
         XCTAssertNil(MediaLibraryStore.persistableSubtitleDisplayName(""))
         XCTAssertNil(MediaLibraryStore.persistableSubtitleDisplayName(String(repeating: "x", count: 81)))
+    }
+
+    func testUnpersistableExplicitSubtitleChoiceClearsStalePerTitlePreference() throws {
+        let mediaURL = "http://127.0.0.1:8766/master.m3u8"
+        let key = "tv-next-native-subtitle-preferences-v1"
+        store.play(channel("Owned subtitle fixture", url: mediaURL))
+        func entries() throws -> [[String: Any]] {
+            let bytes = try XCTUnwrap(defaults.data(forKey: key))
+            XCTAssertLessThanOrEqual(bytes.count, 64_000)
+            XCTAssertFalse(String(decoding: bytes, as: UTF8.self).contains(mediaURL))
+            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: bytes) as? [String: Any])
+            return try XCTUnwrap(json["entries"] as? [[String: Any]])
+        }
+
+        store.rememberSubtitlePreferenceIdentity(displayName: "English", languageTag: "en", isOff: false)
+        XCTAssertEqual(try entries().count, 1)
+        XCTAssertEqual(try entries().first?["displayName"] as? String, "English")
+        store.rememberSubtitlePreferenceIdentity(
+            displayName: String(repeating: "x", count: 81), languageTag: "en", isOff: false)
+        XCTAssertTrue(try entries().isEmpty, "Long explicit selection must evict stale saved track")
+
+        store.rememberSubtitlePreferenceIdentity(displayName: "English", languageTag: "en", isOff: false)
+        store.rememberSubtitlePreferenceIdentity(
+            displayName: "English", languageTag: String(repeating: "z", count: 65), isOff: false)
+        XCTAssertTrue(try entries().isEmpty, "Invalid language tag must evict stale saved track")
+
+        store.rememberSubtitlePreferenceIdentity(displayName: nil, languageTag: nil, isOff: true)
+        XCTAssertEqual(try entries().count, 1)
+        XCTAssertEqual(try entries().first?["isOff"] as? Bool, true)
+        store.rememberSubtitlePreferenceIdentity(displayName: "", languageTag: nil, isOff: false)
+        XCTAssertTrue(try entries().isEmpty, "Invalid track must also clear previously saved Off")
     }
 
     func testCorruptedOrUnmatchedSubtitlePreferencesDoNotOverrideSystemSelection() async throws {
@@ -590,6 +754,101 @@ final class MediaLibraryTests: XCTestCase {
         do { _ = try await LocalMediaStager.stage(empty.deletingPathExtension().appendingPathExtension("mkv")); XCTFail("Accepted unsupported format") }
         catch { XCTAssertTrue(error is LocalMediaError) }
     }
+    func testFilesProviderStagingStreamsMultipleChunksAndHonorsCancellation() async throws {
+        let source = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString).appendingPathExtension("mp4")
+        let contents = Data(repeating: 0xAB, count: 2_500_000)
+        try contents.write(to: source)
+        defer { try? FileManager.default.removeItem(at: source) }
+        let staged = try await LocalMediaStager.stage(source)
+        defer { LocalMediaStager.discard(staged) }
+        XCTAssertEqual(try Data(contentsOf: staged), contents)
+        XCTAssertTrue(store.recent.isEmpty, "Staging a Files/SMB document must not persist media history")
+        let cancelled = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return try await LocalMediaStager.stage(source)
+        }
+        do { _ = try await cancelled.value; XCTFail("Accepted a cancelled import") }
+        catch is CancellationError { }
+    }
+
+    func testFilesStagingCapacityReserveAndDiskFullErrors() {
+        let reserve = LocalMediaStager.freeSpaceReserveBytes
+        XCTAssertFalse(LocalMediaStager.hasCapacity(availableBytes: reserve - 1, expectedBytes: nil))
+        XCTAssertTrue(LocalMediaStager.hasCapacity(availableBytes: reserve, expectedBytes: nil))
+        XCTAssertFalse(LocalMediaStager.hasCapacity(availableBytes: reserve, expectedBytes: 1))
+        XCTAssertTrue(LocalMediaStager.hasCapacity(availableBytes: reserve + 2_500_000, expectedBytes: 2_500_000))
+        XCTAssertFalse(LocalMediaStager.hasCapacity(availableBytes: reserve + 2_500_000, expectedBytes: 2_500_001))
+        XCTAssertTrue(LocalMediaStager.hasCapacity(availableBytes: Int64.max, expectedBytes: Int64.max - reserve))
+        XCTAssertFalse(LocalMediaStager.hasCapacity(availableBytes: Int64.max, expectedBytes: Int64.max))
+
+        for diskFull in [
+            NSError(domain: NSCocoaErrorDomain, code: NSFileWriteOutOfSpaceError),
+            NSError(domain: NSPOSIXErrorDomain, code: 28)
+        ] {
+            XCTAssertEqual(LocalMediaStager.normalizedWriteError(diskFull) as? LocalMediaError,
+                           .insufficientStorage)
+        }
+        let unrelated = NSError(domain: "TVNextSynthetic", code: 17)
+        let mapped = LocalMediaStager.normalizedWriteError(unrelated) as NSError
+        XCTAssertEqual(mapped.domain, unrelated.domain)
+        XCTAssertEqual(mapped.code, unrelated.code)
+    }
+
+    func testColdLaunchFilesStagingCleanupIsScopedAndIdempotent() throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try fm.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: root) }
+        let abandoned = root.appendingPathComponent(UUID().uuidString + ".mp4")
+        let other = root.appendingPathComponent("user-notes.mp4")
+        let unsupported = root.appendingPathComponent(UUID().uuidString + ".txt")
+        let link = root.appendingPathComponent(UUID().uuidString + ".mov")
+        let folder = root.appendingPathComponent(UUID().uuidString + ".m4a", isDirectory: true)
+        for url in [abandoned, other, unsupported] { try Data([1, 2, 3]).write(to: url) }
+        try fm.createDirectory(at: folder, withIntermediateDirectories: false)
+        try fm.createSymbolicLink(at: link, withDestinationURL: other)
+        XCTAssertEqual(LocalMediaStager.purgeAbandonedImports(in: root), 1)
+        XCTAssertFalse(fm.fileExists(atPath: abandoned.path))
+        for url in [other, unsupported, link, folder] { XCTAssertTrue(fm.fileExists(atPath: url.path)) }
+        XCTAssertEqual(LocalMediaStager.purgeAbandonedImports(in: root), 0)
+        let redirected = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try fm.createSymbolicLink(at: redirected, withDestinationURL: root)
+        defer { try? fm.removeItem(at: redirected) }
+        XCTAssertEqual(LocalMediaStager.purgeAbandonedImports(in: redirected), 0)
+        XCTAssertTrue(fm.fileExists(atPath: other.path))
+    }
+
+    func testFilesProviderProgressAndPartialCopyCancellationCleanup() async throws {
+        let fm = FileManager.default
+        let source = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".mp4")
+        let contents = Data(repeating: 0xA5, count: 2_500_000)
+        try contents.write(to: source)
+        defer { try? fm.removeItem(at: source) }
+        let recorder = StagingProgressRecorder()
+        let staged = try await LocalMediaStager.stage(source) { copied, total in
+            recorder.record(copied, total)
+        }
+        XCTAssertEqual(recorder.snapshot.map { $0.0 }, [1_048_576, 2_097_152, 2_500_000])
+        XCTAssertTrue(recorder.snapshot.allSatisfy { $0.1 == 2_500_000 })
+        XCTAssertEqual(try Data(contentsOf: staged), contents)
+        LocalMediaStager.discard(staged)
+
+        let cache = fm.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("TVNextImported", isDirectory: true)
+        let before = Set((try? fm.contentsOfDirectory(atPath: cache.path)) ?? [])
+        do {
+            _ = try await LocalMediaStager.stage(source) { copied, _ in
+                if copied >= 1_048_576 { withUnsafeCurrentTask { $0?.cancel() } }
+            }
+            XCTFail("Cancelled partial staging unexpectedly completed")
+        } catch is CancellationError {
+            // The next chunk must observe cancellation and delete the partial file.
+        }
+        XCTAssertEqual(Set((try? fm.contentsOfDirectory(atPath: cache.path)) ?? []), before)
+        XCTAssertTrue(store.recent.isEmpty, "Cancelled Files imports must not persist history")
+    }
+
     func testRetryTargetsFailedRelaySelectionRatherThanPreviousMedia() async throws {
         var requests: [String] = []
         let relayStore = MediaLibraryStore(defaults: defaults, createRelay: { _, request in

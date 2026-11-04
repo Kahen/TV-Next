@@ -8,4 +8,6 @@ Each Web CI job generates a CycloneDX JSON SBOM with `npm sbom --sbom-format cyc
 
 The initial 2026-10-23 scan found four affected package nodes in the build/test toolchain: Vite, Vitest, @vitest/mocker and tinypool (one moderate, one high and two critical). These are development/test dependencies; no production-media exploit is inferred from the audit. The exact pinned Vite and Vitest versions are upgraded and the lockfile regenerated with registry integrity hashes; tests/build/audit and the full integration gate must pass before merge.
 
-Remaining P6 work: JVM and container scans, audited license/source notices, immutable image/action digests, release-level SBOM/provenance retention, benchmarks, browser E2E, production artifact signing/rollback and Apple distribution.
+JVM versions and artifact/metadata SHA-256 checksums are now committed and fail closed through strict Gradle locking/verification; see [JVM_DEPENDENCY_INTEGRITY.md](JVM_DEPENDENCY_INTEGRITY.md). Immutable image/Action inputs, real-browser E2E and unsigned candidate packaging are also implemented; see [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) for current evidence.
+
+Remaining P6 work: independent JVM/container vulnerability and license review, complete release-level SBOM/provenance retention, measured budgets, signed/ARM/native artifacts, rollback acceptance and Apple distribution.

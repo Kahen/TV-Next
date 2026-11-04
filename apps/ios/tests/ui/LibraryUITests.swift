@@ -1,9 +1,11 @@
+import UIKit
 import XCTest
 
 /// Exercises production views, persistence and navigation; no seeded library or test-only app routes.
 @MainActor
 final class LibraryUITests: XCTestCase {
     private var app: XCUIApplication!
+    private var currentSection = "媒体库"
 
     override func setUp() async throws {
         continueAfterFailure = false
@@ -26,6 +28,15 @@ final class LibraryUITests: XCTestCase {
     }
 
     private func jump(_ name: String) {
+        if name == "媒体库" {
+            // A dedicated production toolbar action avoids compact iPhone Menu
+            // truncation; every test uses this path when clearing local state.
+            let shortcut = app.buttons["library-navigation"]
+            XCTAssertTrue(shortcut.waitForExistence(timeout: 5))
+            shortcut.tap()
+            currentSection = name
+            return
+        }
         let menu = app.buttons["section-navigation"]
         XCTAssertTrue(menu.waitForExistence(timeout: 5))
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: menu)], timeout: 5), .completed)
@@ -34,29 +45,69 @@ final class LibraryUITests: XCTestCase {
         destination.tap()
         let dismissed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: destination)
         XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 5), .completed, "Navigation menu did not dismiss")
+        currentSection = name
     }
 
     private func reveal(_ element: XCUIElement) {
-        // Menu dismissal and ScrollViewReader animation settle after the action returns.
-        let reachable = NSPredicate(format: "hittable == true")
-        if XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: reachable, object: element)], timeout: 3) == .completed { return }
-        for _ in 0..<8 {
-            // Offscreen children may be absent from a SwiftUI accessibility
-            // snapshot. Reading frame/identifier first throws before scrolling.
-            guard element.exists else { app.swipeUp(); continue }
-            if element.isHittable { return }
-            print("Reveal target \(element.identifier): exists=\(element.exists) frame=\(element.frame)")
-            let frame = element.frame
-            if frame.maxY < app.windows.firstMatch.frame.minY + 100 {
-                app.swipeDown()
-            } else {
-                app.swipeUp()
+        // XCTest can throw while evaluating hittability for a SwiftUI child
+        // outside the viewport. Check existence and safe geometry first, also
+        // inside waits; a hittable-only predicate bypasses that protection.
+        func visibleViewport() -> CGRect {
+            // AVKit may insert an empty auxiliary window ahead of the main
+            // window. Using firstMatch made drag distances zero after playback.
+            var bounds = app.frame
+            if bounds.isEmpty || bounds.isInfinite {
+                bounds = app.windows.allElementsBoundByIndex.map(\.frame)
+                    .filter { !$0.isEmpty && !$0.isInfinite }
+                    .max { $0.width * $0.height < $1.width * $1.height } ?? .zero
             }
+            if bounds.isEmpty || bounds.isInfinite {
+                // The test runner shares the simulator's UIKit screen. Keep a
+                // nonzero point-space fallback if AX publishes no window frame.
+                let screen = UIScreen.main.bounds
+                let landscape = XCUIDevice.shared.orientation == .landscapeLeft || XCUIDevice.shared.orientation == .landscapeRight
+                bounds = CGRect(x: 0, y: 0,
+                    width: landscape ? max(screen.width, screen.height) : min(screen.width, screen.height),
+                    height: landscape ? min(screen.width, screen.height) : max(screen.width, screen.height))
+            }
+            return bounds.insetBy(dx: 8, dy: 90)
         }
-        if XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: reachable, object: element)], timeout: 2) == .completed { return }
-        guard element.exists else { XCTFail("Target absent after bounded scrolling: \(app.debugDescription)"); return }
-        if !element.isHittable { print("Unreachable element: \(element.debugDescription)\n\(app.debugDescription)") }
-        XCTAssertTrue(element.isHittable)
+        func visible() -> Bool {
+            guard element.exists else { return false }
+            let frame = element.frame
+            let viewport = visibleViewport()
+            return !frame.isEmpty && !frame.isInfinite && viewport.contains(frame)
+        }
+        // A SwiftUI TextField may report an AX activation-point exception when
+        // isHittable is queried during a scroll transition. Geometry checks
+        // do not request an activation point; actual taps still exercise UI.
+        let reachable = NSPredicate { _, _ in visible() }
+        if XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: reachable, object: element)], timeout: 3) == .completed { return }
+        var resetToSection = false
+        for _ in 0..<12 {
+            guard element.exists else {
+                if !resetToSection { jump(currentSection); resetToSection = true }
+                else { app.swipeUp() }
+                continue
+            }
+            let frame = element.frame
+            let viewport = visibleViewport()
+            guard !viewport.isEmpty else { app.activate(); continue }
+            if visible() { return }
+            print("Reveal frame=\(frame), viewport=\(viewport)")
+            // Short controlled drags avoid oscillating past a control when its
+            // layout moves after keyboard dismissal or a validation message.
+            let amount: CGFloat
+            if !frame.isEmpty && frame.minY < viewport.minY {
+                amount = min(viewport.minY - frame.minY + 30, viewport.height * 0.25)
+            } else {
+                amount = -min(max(30, frame.maxY - viewport.maxY + 30), viewport.height * 0.25)
+            }
+            let origin = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            origin.press(forDuration: 0.05, thenDragTo: origin.withOffset(CGVector(dx: 0, dy: amount)))
+        }
+        let reached = XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: reachable, object: element)], timeout: 2) == .completed
+        XCTAssertTrue(reached, "Target was not visible and hittable after bounded scrolling")
     }
 
     private func enter(_ element: XCUIElement, _ text: String) {
@@ -76,7 +127,8 @@ final class LibraryUITests: XCTestCase {
             reveal(clear)
             clear.tap()
             app.alerts.buttons["删除本地媒体库"].tap()
-            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.alerts.firstMatch)], timeout: 5), .completed)
+            // Allow slow iPad alert dismissal after local library deletion.
+            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.alerts.firstMatch)], timeout: 15), .completed)
             XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: clear)], timeout: 5), .completed)
         }
     }
@@ -90,6 +142,227 @@ final class LibraryUITests: XCTestCase {
         }
         app.buttons["TVBox 订阅"].tap()
         XCTAssertTrue(app.staticTexts["TVBox / FongMi 原版订阅"].waitForExistence(timeout: 5))
+    }
+
+    private func resetCrossSiteFixture() async throws {
+        let url = try XCTUnwrap(URL(string: "http://127.0.0.1:8769/fixture/reset"))
+        let (_, response) = try await URLSession.shared.data(from: url)
+        XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
+    }
+
+    func testCrossSiteSuccessfulEmptySearchHasExplicitFeedback() async throws {
+        try await resetCrossSiteFixture()
+        app.terminate()
+        app.launchArguments += ["-tv-next-api-url", "http://127.0.0.1:8769"]
+        app.launch()
+        jump("TVBox 订阅")
+        let editor = app.textViews["订阅配置内容"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        enter(editor, "{\"sites\":[]}")
+        let load = app.buttons["加载订阅"]
+        reveal(load)
+        load.tap()
+        let query = app.textFields["搜索当前站点"]
+        XCTAssertTrue(query.waitForExistence(timeout: 10))
+        enter(query, "no-results")
+        let search = app.buttons["跨站搜索"]
+        reveal(search)
+        search.tap()
+        let empty = app.staticTexts["cross-site-empty-state"]
+        XCTAssertTrue(empty.waitForExistence(timeout: 15))
+        XCTAssertEqual(empty.label, "未找到匹配结果。")
+        XCTAssertFalse(app.buttons["retry-failed-cross-site-search"].exists)
+        XCTAssertFalse(app.staticTexts["跨站搜索结果"].exists)
+        // A successful subscription reload must clear the old search status.
+        reveal(load)
+        load.tap()
+        let dismissed = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"), object: empty
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 10), .completed)
+    }
+
+    func testCrossSiteOversizedTerminalPageShowsPreciseWarning() async throws {
+        try await resetCrossSiteFixture()
+        app.terminate()
+        app.launchArguments += ["-tv-next-api-url", "http://127.0.0.1:8769"]
+        app.launch()
+        jump("TVBox 订阅")
+        let editor = app.textViews["订阅配置内容"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        enter(editor, "{\"sites\":[]}")
+        let load = app.buttons["加载订阅"]
+        reveal(load)
+        load.tap()
+        let query = app.textFields["搜索当前站点"]
+        XCTAssertTrue(query.waitForExistence(timeout: 10))
+        enter(query, "oversized-page")
+        let search = app.buttons["跨站搜索"]
+        reveal(search)
+        search.tap()
+        let warning = app.staticTexts["cross-site-warning"]
+        XCTAssertTrue(warning.waitForExistence(timeout: 15),
+                      "The provider returned 41 items with hasMore=false; clipping must be disclosed")
+        XCTAssertEqual(warning.label, "1 个站点单页超过 40 条，仅保留每页前 40 条。")
+        XCTAssertFalse(warning.label.contains("仍有更多结果"))
+        XCTAssertFalse(app.buttons["retry-failed-cross-site-search"].exists)
+        XCTAssertTrue(app.staticTexts["跨站搜索结果"].exists)
+    }
+
+    func testRecoveredRetryClearsStaleClippingWarning() async throws {
+        try await resetCrossSiteFixture()
+        app.terminate()
+        app.launchArguments += ["-tv-next-api-url", "http://127.0.0.1:8769"]
+        app.launch()
+        jump("TVBox 订阅")
+        let editor = app.textViews["订阅配置内容"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        enter(editor, "{\"sites\":[]}")
+        let load = app.buttons["加载订阅"]
+        reveal(load)
+        load.tap()
+        let query = app.textFields["搜索当前站点"]
+        XCTAssertTrue(query.waitForExistence(timeout: 10))
+        enter(query, "retry-warning")
+        let search = app.buttons["跨站搜索"]
+        reveal(search)
+        search.tap()
+        let warning = app.staticTexts["cross-site-warning"]
+        let retry = app.buttons["retry-failed-cross-site-search"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 15))
+        XCTAssertTrue(warning.waitForExistence(timeout: 15))
+        XCTAssertEqual(warning.label, "1 个站点单页超过 40 条，仅保留每页前 40 条。")
+        reveal(retry)
+        retry.tap()
+        let dismissed = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"), object: retry
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 15), .completed)
+        let warningDismissed = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"), object: warning
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [warningDismissed], timeout: 10), .completed,
+                       "Recovered provider no longer clips pages; old warning must be cleared")
+        let newHit = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "New 0")).firstMatch
+        reveal(newHit)
+        XCTAssertTrue(newHit.exists)
+        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Old 0")).firstMatch.exists)
+    }
+
+    func testCrossSiteRetryOnlyFailedProviderPreservesOriginalQuery() async throws {
+        try await resetCrossSiteFixture()
+        // The owned localhost fixture deliberately gives two providers the
+        // same display name. Provider B fails once; provider A must never be
+        // requested again. B's retry rejects an edited query.
+        app.terminate()
+        app.launchArguments += ["-tv-next-api-url", "http://127.0.0.1:8769"]
+        app.launch()
+        jump("TVBox 订阅")
+        let retry = app.buttons["retry-failed-cross-site-search"]
+        XCTAssertFalse(retry.exists, "Retry must not appear before a failed search")
+        let editor = app.textViews["订阅配置内容"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        enter(editor, "{\"sites\":[]}")
+        let load = app.buttons["加载订阅"]
+        reveal(load)
+        load.tap()
+        let query = app.textFields["搜索当前站点"]
+        XCTAssertTrue(query.waitForExistence(timeout: 10))
+        enter(query, "original")
+        let search = app.buttons["跨站搜索"]
+        reveal(search)
+        search.tap()
+        let healthy = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "A result")).firstMatch
+        XCTAssertTrue(retry.waitForExistence(timeout: 15), "Partial failure must expose retry")
+        reveal(healthy)
+        XCTAssertTrue(healthy.exists, "Successful site results must survive partial failure")
+        // Change the draft after search. The retry must use the captured
+        // keyword, not the current TextField content.
+        enter(query, "-changed")
+        reveal(retry)
+        retry.tap()
+        let recovered = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "B result")).firstMatch
+        let dismissed = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"), object: retry
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 15), .completed,
+                       "Retry should disappear after all failed providers recover")
+        reveal(recovered)
+        XCTAssertTrue(recovered.exists, "Recovered provider result is missing")
+        XCTAssertTrue(healthy.exists, "Retry discarded an already successful provider")
+        // The raw subscription has a hidden B entry before the eligible B.
+        // Provenance must identify the actual searched provider, not the
+        // hidden first key match; both eligible providers share "Mirror".
+        XCTAssertEqual(recovered.label, "B result · Mirror")
+        XCTAssertEqual(healthy.label, "A result · Mirror")
+        XCTAssertFalse(app.buttons.matching(
+            NSPredicate(format: "label CONTAINS %@", "Hidden Spoof")
+        ).firstMatch.exists)
+    }
+
+    func testCaptionEncodingIsExplicitAndDoesNotStartImport() {
+        jump("本机文件与字幕")
+        let mode = app.staticTexts["caption-encoding-mode"]
+        reveal(mode)
+        XCTAssertEqual(mode.label, "字幕编码：Unicode（默认）")
+        let picker = app.descendants(matching: .any)["caption-import-encoding"]
+        reveal(picker)
+        picker.tap()
+        let legacy = app.buttons["GB18030（手动）"]
+        XCTAssertTrue(legacy.waitForExistence(timeout: 5))
+        legacy.tap()
+        reveal(mode)
+        XCTAssertEqual(mode.label, "字幕编码：GB18030（手动）")
+        XCTAssertTrue(app.buttons["caption-files-import"].exists)
+        XCTAssertFalse(app.staticTexts["caption-import-progress"].exists)
+    }
+
+    func testFilesSMBImportEntryOpensSystemDocumentPicker() {
+        jump("本机文件与字幕")
+        let entry = app.buttons["smb-files-import"]
+        reveal(entry)
+        XCTAssertTrue(entry.isEnabled)
+        XCTAssertFalse(app.buttons["cancel-smb-import"].exists, "Idle Files import must not expose cancellation")
+        XCTAssertFalse(app.staticTexts["smb-import-progress"].exists)
+        XCTAssertTrue(app.staticTexts["current-media"].label.contains("尚未选择媒体"))
+        entry.tap()
+
+        // An app-owned sheet hosts the real UIDocumentPickerViewController.
+        // The system Files process is not guaranteed to expose its controls
+        // through the host app's accessibility tree on CI simulators.
+        let dismiss = app.buttons["smb-picker-dismiss"]
+        XCTAssertTrue(dismiss.waitForExistence(timeout: 10), "Files import sheet did not open")
+        XCTAssertTrue(app.staticTexts["选择本地媒体"].exists)
+        // A button may exist in the AX tree while the UIKit document picker
+        // obscures it. Require a genuinely hittable bottom-safe-area action.
+        let tappable = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "hittable == true"), object: dismiss
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [tappable], timeout: 10), .completed,
+                       "SMB picker close action is obscured by the system picker")
+        dismiss.tap()
+        let closed = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"), object: dismiss
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [closed], timeout: 5), .completed)
+        XCTAssertTrue(entry.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["cancel-smb-import"].exists,
+                       "Picker cancellation must not begin a media copy")
+        XCTAssertFalse(app.staticTexts["smb-import-progress"].exists)
+        XCTAssertTrue(app.staticTexts["current-media"].label.contains("尚未选择媒体"),
+                      "Cancelling the Files picker must not start playback")
+    }
+
+    func testFilesSubtitleImportEntryStartsIdleAndPreservesPlayback() {
+        jump("本机文件与字幕")
+        let entry = app.buttons["caption-files-import"]
+        reveal(entry)
+        XCTAssertTrue(entry.exists)
+        XCTAssertTrue(entry.isEnabled)
+        XCTAssertFalse(app.buttons["cancel-caption-import"].exists,
+                       "No subtitle read may be active before a file is chosen")
+        XCTAssertFalse(app.descendants(matching: .any)["caption-import-progress"].exists)
+        XCTAssertTrue(app.staticTexts["current-media"].label.contains("尚未选择媒体"))
     }
 
     func testNativeWebDAVFormRejectsUnsafeURLWithoutNetworking() {
@@ -115,6 +388,7 @@ final class LibraryUITests: XCTestCase {
         XCTAssertFalse(connect.isEnabled)
         XCTAssertFalse(app.buttons["webdav-refresh"].exists)
         XCTAssertFalse(app.textFields["webdav-filter"].exists)
+        XCTAssertFalse(app.buttons["webdav-sort"].exists)
         enter(app.textFields["webdav-url"], "javascript:alert(1)")
         reveal(connect)
         connect.tap()
@@ -135,6 +409,18 @@ final class LibraryUITests: XCTestCase {
         let folder = app.buttons["Folder"]
         XCTAssertTrue(owned.waitForExistence(timeout: 15), "Localhost Depth:1 listing did not load")
         XCTAssertTrue(folder.exists)
+        XCTAssertTrue(app.staticTexts["webdav-size-Owned.mp4"].waitForExistence(timeout: 5),
+                      "Successful DAV:getcontentlength must appear beside the native file")
+        XCTAssertFalse(app.staticTexts["webdav-size-Folder"].exists, "Directories must never display a file size")
+        XCTAssertTrue(app.staticTexts["webdav-modified-Owned.mp4"].waitForExistence(timeout: 5),
+                      "Valid DAV:getlastmodified must appear beside the native file")
+        XCTAssertFalse(app.staticTexts["webdav-modified-Folder"].exists,
+                       "Absent DAV:getlastmodified must not produce a fabricated timestamp")
+        let sort = app.buttons["webdav-sort"]
+        reveal(sort)
+        XCTAssertTrue(sort.label.contains("升序"))
+        sort.tap()
+        XCTAssertTrue(sort.label.contains("降序"), "Native sort button must update its real state")
         let toggle = app.switches["webdav-media-only"]
         reveal(toggle)
         toggle.tap()
@@ -143,15 +429,39 @@ final class LibraryUITests: XCTestCase {
         enter(app.textFields["webdav-filter"], "owned")
         XCTAssertTrue(owned.exists, "Case-insensitive local search lost the matching file")
         XCTAssertFalse(folder.exists, "Search should narrow the visible listing")
+        // Draft credentials for another server must not affect this connection.
+        // The original anonymous HTTP fixture would reject newly applied Basic auth.
+        enter(app.textFields["webdav-url"], "https://unconnected.example/dav/")
+        enter(app.textFields["webdav-user"], "unconnected-account")
         let refresh = app.buttons["webdav-refresh"]
         reveal(refresh)
         refresh.tap()
+        let finished = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            refresh.exists && refresh.isEnabled
+        }, object: refresh)
+        XCTAssertEqual(XCTWaiter.wait(for: [finished], timeout: 15), .completed)
+        XCTAssertFalse(app.staticTexts["webdav-error"].waitForExistence(timeout: 2),
+                       "Editing an unconnected form applied credentials to the active server")
         XCTAssertTrue(owned.waitForExistence(timeout: 15))
+        XCTAssertTrue(sort.label.contains("降序"), "Refresh must preserve the local sort selection")
         XCTAssertFalse(folder.exists, "Refreshing the same folder must preserve its local search")
         let disconnect = app.buttons["webdav-disconnect"]
         reveal(disconnect)
         disconnect.tap()
+        // SwiftUI removes the connected subtree on its next render pass.
+        // Observe the completed disconnect rather than asserting immediately
+        // after XCTest's tap returns (which can precede accessibility refresh).
+        let disconnected = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            !self.app.textFields["webdav-filter"].exists &&
+            !self.app.staticTexts["webdav-modified-Owned.mp4"].exists &&
+            !sort.exists && !refresh.exists
+        }, object: disconnect)
+        XCTAssertEqual(XCTWaiter.wait(for: [disconnected], timeout: 10), .completed,
+                       "Disconnect must clear the connected browser, sort, refresh and stale metadata")
         XCTAssertFalse(app.textFields["webdav-filter"].exists)
+        XCTAssertFalse(app.staticTexts["webdav-modified-Owned.mp4"].exists,
+                       "Disconnect must remove stale file metadata")
+        XCTAssertFalse(sort.exists)
         XCTAssertFalse(refresh.exists)
     }
 
@@ -184,6 +494,20 @@ final class LibraryUITests: XCTestCase {
         XCTAssertFalse(forward.isEnabled)
     }
 
+    func testPlaybackDiagnosticsCanExpandAndRefreshWithoutMedia() {
+        jump("播放器")
+        let diagnostics = app.buttons["playback-diagnostics"]
+        reveal(diagnostics)
+        diagnostics.tap()
+        let state = app.staticTexts["diagnostics-state"]
+        XCTAssertTrue(state.waitForExistence(timeout: 5))
+        XCTAssertTrue(state.label.contains("尚未选择媒体"))
+        let refresh = app.buttons["diagnostics-refresh"]
+        reveal(refresh)
+        refresh.tap()
+        XCTAssertTrue(state.label.contains("尚未选择媒体"))
+    }
+
     func testOfflineDownloadSurvivesRelaunchAndCanBePlayedAndDeleted() {
         jump("离线媒体")
         let previous = app.buttons["offline-delete-Owned Offline"]
@@ -192,7 +516,9 @@ final class LibraryUITests: XCTestCase {
             previous.tap()
             XCTAssertTrue(app.alerts["删除离线媒体？"].waitForExistence(timeout: 5))
             app.alerts.buttons["删除离线文件"].tap()
-            XCTAssertFalse(previous.exists)
+            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "exists == false"), object: previous)], timeout: 5), .completed,
+                "Confirmed cleanup must remove the previous offline catalog entry")
         }
         enter(app.textFields["offline-url"], "http://127.0.0.1:8765/fixture.mp4")
         enter(app.textFields["offline-name"], "Owned Offline")
@@ -227,7 +553,9 @@ final class LibraryUITests: XCTestCase {
         remove.tap()
         XCTAssertTrue(confirmation.waitForExistence(timeout: 5))
         confirmation.buttons["删除离线文件"].tap()
-        XCTAssertFalse(play.exists, "Confirmed deletion must remove the offline catalog entry")
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"), object: play)], timeout: 5), .completed,
+            "Confirmed deletion must remove the offline catalog entry")
         jump("播放器")
         XCTAssertTrue(app.staticTexts["current-media"].label.contains("尚未选择媒体"), "Confirmed deletion must release the active local player item")
     }
@@ -312,6 +640,45 @@ final class LibraryUITests: XCTestCase {
         XCTAssertFalse(channel.exists)
     }
 
+    func testNativeHlsTrackMenusCanForgetRememberedChoicesWithoutStoppingPlayback() {
+        jump("快速播放")
+        enter(app.textFields["manual-url"], "http://127.0.0.1:8766/master.m3u8")
+        reveal(app.buttons["play-url"])
+        app.buttons["play-url"].tap()
+        jump("播放器")
+
+        let audioMenu = app.buttons["audio-track-menu"]
+        XCTAssertTrue(audioMenu.waitForExistence(timeout: 20), "Owned HLS audio tracks did not load")
+        reveal(audioMenu)
+        audioMenu.tap()
+        let secondAudio = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "音轨 2")).firstMatch
+        XCTAssertTrue(secondAudio.waitForExistence(timeout: 5))
+        secondAudio.tap()
+        reveal(audioMenu)
+        audioMenu.tap()
+        let forgetAudio = app.buttons["forget-audio-track-preference"]
+        XCTAssertTrue(forgetAudio.waitForExistence(timeout: 5))
+        forgetAudio.tap()
+
+        let subtitleMenu = app.buttons["embedded-subtitle-menu"]
+        XCTAssertTrue(subtitleMenu.waitForExistence(timeout: 20), "Owned HLS subtitles did not load")
+        reveal(subtitleMenu)
+        subtitleMenu.tap()
+        let off = app.buttons["关闭内嵌字幕"]
+        XCTAssertTrue(off.waitForExistence(timeout: 5))
+        off.tap()
+        reveal(subtitleMenu)
+        subtitleMenu.tap()
+        let forgetSubtitle = app.buttons["forget-subtitle-track-preference"]
+        XCTAssertTrue(forgetSubtitle.waitForExistence(timeout: 5))
+        forgetSubtitle.tap()
+
+        XCTAssertFalse(app.staticTexts["playback-error"].exists,
+                       "Forgetting future preferences must not interrupt the installed AVPlayerItem")
+        XCTAssertTrue(audioMenu.exists)
+        XCTAssertTrue(subtitleMenu.exists)
+    }
+
     func testPlaybackErrorRetryFullscreenRotationAndBackgroundReturn() {
         jump("快速播放")
         enter(app.textFields["manual-url"], "file:///not-allowed.mp4")
@@ -366,4 +733,315 @@ final class LibraryUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["config-error"].exists)
         XCTAssertTrue(app.staticTexts["Owned Fixture"].exists)
     }
+
+    func testManualDLNARejectsUnsafeRendererWithoutNetworking() {
+        jump("DLNA 投屏")
+        let cast = app.buttons["dlna-cast"]
+        XCTAssertFalse(cast.isEnabled)
+        XCTAssertFalse(app.buttons["dlna-pause"].isEnabled)
+        XCTAssertFalse(app.buttons["dlna-resume"].isEnabled)
+        XCTAssertFalse(app.buttons["dlna-query-state"].isEnabled)
+        XCTAssertFalse(app.buttons["dlna-query-position"].isEnabled)
+        XCTAssertFalse(app.buttons["dlna-seek-forward"].isEnabled)
+        XCTAssertFalse(app.buttons["dlna-seek-back"].isEnabled)
+        XCTAssertFalse(app.buttons["dlna-seek-absolute"].isEnabled)
+        enter(app.textFields["dlna-renderer-url"], "http://8.8.8.8:1400/upnp/control")
+        enter(app.textFields["dlna-media-url"], "https://media.example/owned.mp4?a=1&b=2")
+        reveal(cast)
+        XCTAssertFalse(cast.isEnabled, "Public WAN control endpoints must not be contacted")
+        XCTAssertFalse(app.buttons["dlna-query-state"].isEnabled)
+        XCTAssertFalse(app.buttons["dlna-query-position"].isEnabled)
+        XCTAssertFalse(app.buttons["dlna-seek-forward"].isEnabled)
+        XCTAssertFalse(app.buttons["dlna-seek-absolute"].isEnabled)
+        XCTAssertFalse(app.staticTexts["dlna-status"].exists)
+    }
+
+    func testDLNACurrentPlaybackAutofillOnlyForDirectMedia() {
+        jump("DLNA 投屏")
+        let useCurrent = app.buttons["dlna-use-current"]
+        reveal(useCurrent)
+        XCTAssertFalse(useCurrent.isEnabled, "No current media must not enable DLNA autofill")
+        importPlaylist("#EXTM3U\n#EXTINF:-1,Owned Direct\nhttp://127.0.0.1:8765/fixture.mp4")
+        jump("媒体库")
+        let owned = app.buttons["channel-Owned Direct"]
+        reveal(owned)
+        owned.tap()
+        jump("DLNA 投屏")
+        reveal(useCurrent)
+        XCTAssertTrue(useCurrent.isEnabled, "Direct owned HTTP media should allow DLNA autofill")
+        useCurrent.tap()
+        XCTAssertEqual(app.textFields["dlna-media-url"].value as? String,
+                       "http://127.0.0.1:8765/fixture.mp4")
+    }
+
+    func testManualDLNACastPauseStopAgainstOwnedLoopbackFixture() {
+        jump("DLNA 投屏")
+        enter(app.textFields["dlna-renderer-url"], "http://127.0.0.1:8768/upnp/control/AVTransport1")
+        enter(app.textFields["dlna-media-url"], "https://media.example/owned.mp4?a=1&b=2")
+        enter(app.textFields["dlna-metadata-title"], "Owned Video")
+        let cast = app.buttons["dlna-cast"]
+        reveal(cast)
+        XCTAssertTrue(cast.isEnabled)
+        cast.tap()
+        let status = app.staticTexts["dlna-status"]
+        XCTAssertTrue(status.waitForExistence(timeout: 15), "Owned SOAP SetURI + Play did not complete")
+        XCTAssertEqual(status.label, "投屏已开始")
+        XCTAssertFalse(app.staticTexts["dlna-error"].exists)
+        let position = app.buttons["dlna-query-position"]
+        reveal(position)
+        XCTAssertTrue(position.isEnabled)
+        position.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "设备进度：00:00:42 / 00:02:00"), object: status)], timeout: 15), .completed)
+
+        let seekForward = app.buttons["dlna-seek-forward"]
+        reveal(seekForward)
+        XCTAssertTrue(seekForward.isEnabled)
+        seekForward.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "已请求跳转至：00:00:57"), object: status)], timeout: 15), .completed)
+        reveal(position)
+        position.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "设备进度：00:00:57 / 00:02:00"), object: status)], timeout: 15), .completed)
+        let absoluteButton = app.buttons["dlna-seek-absolute"]
+        XCTAssertFalse(absoluteButton.isEnabled)
+        enter(app.textFields["dlna-seek-time"], "00:01:30")
+        reveal(absoluteButton)
+        XCTAssertTrue(absoluteButton.isEnabled)
+        absoluteButton.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "已请求跳转至：00:01:30"), object: status)], timeout: 15), .completed)
+        reveal(position)
+        position.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "设备进度：00:01:30 / 00:02:00"), object: status)], timeout: 15), .completed)
+        let query = app.buttons["dlna-query-state"]
+        reveal(query)
+        XCTAssertTrue(query.isEnabled)
+        query.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "设备状态：正在播放"), object: status)], timeout: 15), .completed)
+        let pause = app.buttons["dlna-pause"]
+        reveal(pause)
+        XCTAssertTrue(pause.isEnabled)
+        pause.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "已发送暂停命令"), object: status)], timeout: 15), .completed)
+        reveal(query)
+        query.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "设备状态：已暂停"), object: status)], timeout: 15), .completed)
+        let resume = app.buttons["dlna-resume"]
+        reveal(resume)
+        XCTAssertTrue(resume.isEnabled)
+        resume.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "已发送继续播放命令"), object: status)], timeout: 15), .completed)
+        XCTAssertFalse(resume.isEnabled)
+        reveal(query)
+        query.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "设备状态：正在播放"), object: status)], timeout: 15), .completed)
+        let stop = app.buttons["dlna-stop"]
+        reveal(stop)
+        stop.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "已发送停止命令"), object: status)], timeout: 15), .completed)
+        XCTAssertFalse(stop.isEnabled)
+        reveal(query)
+        query.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "设备状态：已停止"), object: status)], timeout: 15), .completed)
+    }
+
+    func testDLNAFailedReadOnlyQueryKeepsStopButRequiresFreshResumeState() {
+        jump("DLNA 投屏")
+        enter(app.textFields["dlna-renderer-url"],
+              "http://127.0.0.1:8768/upnp/control/AVTransport1/fail-readonly")
+        enter(app.textFields["dlna-media-url"], "https://media.example/owned.mp4?a=1&b=2")
+        let cast = app.buttons["dlna-cast"]
+        reveal(cast)
+        XCTAssertTrue(cast.isEnabled)
+        cast.tap()
+        let status = app.staticTexts["dlna-status"]
+        XCTAssertTrue(status.waitForExistence(timeout: 15))
+        XCTAssertEqual(status.label, "投屏已开始")
+        let pause = app.buttons["dlna-pause"]
+        reveal(pause)
+        XCTAssertTrue(pause.isEnabled)
+        pause.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "已发送暂停命令"), object: status)],
+            timeout: 15), .completed)
+        let resume = app.buttons["dlna-resume"]
+        reveal(resume)
+        XCTAssertTrue(resume.isEnabled)
+        let query = app.buttons["dlna-query-state"]
+        reveal(query)
+        query.tap()
+        let failure = app.staticTexts["dlna-error"]
+        XCTAssertTrue(failure.waitForExistence(timeout: 15))
+        XCTAssertTrue(failure.label.contains("503"))
+        XCTAssertFalse(resume.isEnabled, "Unverified paused state cannot enable Resume")
+        let stop = app.buttons["dlna-stop"]
+        reveal(stop)
+        XCTAssertTrue(stop.isEnabled, "Failed read-only query must not disable Stop")
+        XCTAssertTrue(pause.isEnabled, "Failed read-only query must not erase acknowledged cast")
+        stop.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "已发送停止命令"), object: status)],
+            timeout: 15), .completed)
+        XCTAssertFalse(stop.isEnabled)
+    }
+
+    func testDLNAFailedRelativeAndAbsoluteSeekInvalidateStaleControls() {
+        jump("DLNA 投屏")
+        enter(app.textFields["dlna-renderer-url"],
+              "http://127.0.0.1:8768/upnp/control/AVTransport1/fail-seek")
+        enter(app.textFields["dlna-media-url"], "https://media.example/owned.mp4?a=1&b=2")
+        let cast = app.buttons["dlna-cast"]
+        let stop = app.buttons["dlna-stop"]
+        let pause = app.buttons["dlna-pause"]
+        let resume = app.buttons["dlna-resume"]
+        let status = app.staticTexts["dlna-status"]
+        let failure = app.staticTexts["dlna-error"]
+        reveal(cast)
+        cast.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "投屏已开始"), object: status)],
+            timeout: 15), .completed)
+        XCTAssertTrue(stop.isEnabled)
+        let forward = app.buttons["dlna-seek-forward"]
+        reveal(forward)
+        forward.tap()
+        XCTAssertTrue(failure.waitForExistence(timeout: 15))
+        XCTAssertTrue(failure.label.contains("503"))
+        XCTAssertFalse(stop.isEnabled, "Failed relative Seek must invalidate stale Stop")
+        XCTAssertFalse(pause.isEnabled)
+        XCTAssertFalse(resume.isEnabled)
+        // A new acknowledged cast restores controls; the rejected absolute
+        // Seek must invalidate them independently of the relative path.
+        reveal(cast)
+        cast.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "投屏已开始"), object: status)],
+            timeout: 15), .completed)
+        XCTAssertFalse(failure.exists)
+        XCTAssertTrue(stop.isEnabled)
+        enter(app.textFields["dlna-seek-time"], "00:01:30")
+        let absolute = app.buttons["dlna-seek-absolute"]
+        reveal(absolute)
+        XCTAssertTrue(absolute.isEnabled)
+        absolute.tap()
+        XCTAssertTrue(failure.waitForExistence(timeout: 15))
+        XCTAssertTrue(failure.label.contains("503"))
+        XCTAssertFalse(stop.isEnabled, "Failed absolute Seek must invalidate stale Stop")
+        XCTAssertFalse(pause.isEnabled)
+        XCTAssertFalse(resume.isEnabled)
+        XCTAssertTrue(cast.isEnabled, "User can explicitly start a new session")
+    }
+
+    func testDLNANavigatingAwayClearsStaleCastControls() {
+        jump("DLNA 投屏")
+        enter(app.textFields["dlna-renderer-url"],
+              "http://127.0.0.1:8768/upnp/control/AVTransport1")
+        enter(app.textFields["dlna-media-url"], "https://media.example/owned.mp4?a=1&b=2")
+        let cast = app.buttons["dlna-cast"]
+        reveal(cast)
+        cast.tap()
+        let status = app.staticTexts["dlna-status"]
+        XCTAssertTrue(status.waitForExistence(timeout: 15))
+        XCTAssertEqual(status.label, "投屏已开始")
+        let pause = app.buttons["dlna-pause"]
+        reveal(pause)
+        XCTAssertTrue(pause.isEnabled)
+        pause.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "已发送暂停命令"), object: status)],
+            timeout: 15), .completed)
+        let resume = app.buttons["dlna-resume"]
+        reveal(resume)
+        XCTAssertTrue(resume.isEnabled)
+        jump("DLNA 投屏")
+        XCTAssertTrue(app.buttons["dlna-resume"].isEnabled, "Re-selecting DLNA must preserve its current session")
+        jump("媒体库")
+        jump("DLNA 投屏")
+        let stop = app.buttons["dlna-stop"]
+        XCTAssertTrue(stop.waitForExistence(timeout: 5))
+        XCTAssertFalse(stop.isEnabled, "Navigation must not reuse the previous cast session")
+        XCTAssertFalse(app.buttons["dlna-pause"].isEnabled)
+        XCTAssertFalse(app.buttons["dlna-resume"].isEnabled)
+        XCTAssertFalse(app.staticTexts["dlna-status"].exists)
+        XCTAssertFalse(app.staticTexts["dlna-error"].exists)
+        // Navigation must never send an implicit Stop to the renderer.
+    }
+
+    func testDLNAImportsControlURLFromOwnedDeviceDescription() {
+        jump("DLNA 投屏")
+        let importButton = app.buttons["dlna-import-description"]
+        XCTAssertFalse(importButton.isEnabled)
+        let description = app.textFields["dlna-description-url"]
+        let source = "http://127.0.0.1:8768/device.xml"
+        enter(description, source)
+        XCTAssertEqual(description.value as? String, source, "The iPad URL keyboard must preserve the exact entered location")
+        reveal(importButton)
+        XCTAssertTrue(importButton.isEnabled)
+        importButton.tap()
+        let imported = app.staticTexts["dlna-imported-control"]
+        let failure = app.staticTexts["dlna-error"]
+        let completed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            imported.exists || failure.exists
+        }, object: app)
+        XCTAssertEqual(XCTWaiter.wait(for: [completed], timeout: 15), .completed,
+                       "Import neither completed nor displayed a bounded error")
+        XCTAssertFalse(failure.exists, "Import failed: \(failure.label)")
+        let renderer = app.textFields["dlna-renderer-url"]
+        let expected = "http://127.0.0.1:8768/upnp/control/AVTransport1"
+        XCTAssertEqual(imported.label, "已导入控制地址：\(expected)")
+        let importedName = app.staticTexts["dlna-imported-name"]
+        XCTAssertTrue(importedName.waitForExistence(timeout: 5))
+        XCTAssertEqual(importedName.label, "设备名称：TV-Next Test Renderer")
+        let importedModel = app.staticTexts["dlna-imported-model"]
+        XCTAssertTrue(importedModel.waitForExistence(timeout: 5))
+        XCTAssertEqual(importedModel.label, "设备型号：TV-Next Test Model 1")
+        let importedUDN = app.staticTexts["dlna-imported-udn"]
+        XCTAssertTrue(importedUDN.waitForExistence(timeout: 5))
+        XCTAssertEqual(importedUDN.label, "设备标识：uuid:tvnext-fixture")
+        reveal(renderer)
+        XCTAssertEqual(renderer.value as? String, expected,
+                       "Native UI did not populate the same-origin AVTransport control URL")
+        let query = app.buttons["dlna-query-state"]
+        reveal(query)
+        XCTAssertTrue(query.isEnabled, "Imported renderer must be accepted by the existing manual controller")
+        query.tap()
+        XCTAssertTrue(app.staticTexts["dlna-status"].waitForExistence(timeout: 15))
+        XCTAssertFalse(app.staticTexts["dlna-error"].exists)
+        // Editing the source must not keep displaying identity from the previous device.
+        reveal(description)
+        description.tap()
+        description.typeText("x")
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"), object: importedName)], timeout: 5), .completed)
+        XCTAssertFalse(importedModel.exists, "Changing the source must clear the prior renderer model")
+        XCTAssertFalse(importedUDN.exists, "Changing the source must clear the prior renderer identity")
+    }
+
+    func testDLNARejectsForeignDeviceDescriptionWithoutChangingRenderer() {
+        jump("DLNA 投屏")
+        let importButton = app.buttons["dlna-import-description"]
+        enter(app.textFields["dlna-description-url"], "http://127.0.0.1:8768/device-foreign.xml")
+        reveal(importButton)
+        XCTAssertTrue(importButton.isEnabled)
+        importButton.tap()
+        XCTAssertTrue(app.staticTexts["dlna-error"].waitForExistence(timeout: 15))
+        let renderer = app.textFields["dlna-renderer-url"]
+        XCTAssertFalse((renderer.value as? String ?? "").contains("8.8.8.8"),
+                       "A foreign description must not change the renderer endpoint")
+        XCTAssertFalse(app.buttons["dlna-query-state"].isEnabled)
+        XCTAssertFalse(app.staticTexts["dlna-imported-name"].exists)
+        XCTAssertFalse(app.staticTexts["dlna-imported-model"].exists)
+        XCTAssertFalse(app.staticTexts["dlna-imported-udn"].exists)
+    }
+
 }

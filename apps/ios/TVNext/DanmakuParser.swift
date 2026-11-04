@@ -52,10 +52,12 @@ private final class SafeDanmakuXML: NSObject, XMLParserDelegate {
     private var text = ""
     private var count = 0
     private var depth = 0
+    private var activeCommentDepth: Int?
     func parser(_ parser: XMLParser, didStartElement name: String, namespaceURI: String?, qualifiedName: String?, attributes: [String:String]) {
         depth += 1
         if depth > 20 { exceeded = true; parser.abortParsing(); return }
-        if name == "d" {
+        if name == "d" && activeCommentDepth == nil {
+            activeCommentDepth = depth
             count += 1
             if count > 20_000 { exceeded = true; parser.abortParsing(); return }
             parameter = attributes["p"]; text = ""
@@ -66,8 +68,11 @@ private final class SafeDanmakuXML: NSObject, XMLParserDelegate {
     }
     func parser(_ parser: XMLParser, foundCDATA data: Data) { self.parser(parser, foundCharacters: String(decoding: data, as: UTF8.self)) }
     func parser(_ parser: XMLParser, didEndElement name: String, namespaceURI: String?, qualifiedName: String?) {
-        if name == "d", let parameter {
+        if name == "d", activeCommentDepth == depth {
+            activeCommentDepth = nil
+            if let parameter {
             if let comment = DanmakuParser.comment(parameter,text) { comments.append(comment) }
+            }
             self.parameter = nil; text = ""
         }
         depth -= 1
