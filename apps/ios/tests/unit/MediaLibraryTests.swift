@@ -53,6 +53,61 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertTrue(condition(), "AVPlayer did not reach the expected state")
     }
 
+    func testProviderSkipSeeksOnlyCurrentSubscriptionAndNeverPersistsHints() async throws {
+        let source = channel("Skip owned fixture", url: "http://127.0.0.1:8765/fixture.mp4?skip-test")
+        let segment = NativeProviderSkipSegment(type: "opening", startMs: 0, endMs: 15_250)
+        store.play(source, providerSkipSegments: [segment])
+        try await waitUntil { self.store.player.currentItem?.status == .readyToPlay }
+        XCTAssertTrue(store.handleSystemPlaybackCommand(.pause))
+        XCTAssertTrue(store.handleSystemPlaybackCommand(.seek(0)))
+        try await waitUntil { self.store.player.currentTime().seconds < 0.1 }
+        let firstGeneration = store.playbackGeneration
+        XCTAssertEqual(store.activeProviderSkipSegment, segment)
+        XCTAssertFalse(store.skipProviderSegment(
+            NativeProviderSkipSegment(type: "middle", startMs: 0, endMs: 30_000), generation: firstGeneration))
+        // Merely receiving source metadata never seeks, even inside opening.
+        try await Task.sleep(nanoseconds: 200_000_000)
+        XCTAssertLessThan(store.player.currentTime().seconds, 0.1)
+        XCTAssertTrue(store.skipProviderSegment(segment, generation: firstGeneration))
+        try await waitUntil { abs(self.store.player.currentTime().seconds - 15.25) < 0.1 }
+        XCTAssertNil(store.activeProviderSkipSegment)
+        XCTAssertFalse(store.skipProviderSegment(segment, generation: firstGeneration))
+        let saved = try XCTUnwrap(defaults.data(forKey: "tv-next-library-v1"))
+        XCTAssertFalse(String(decoding: saved, as: UTF8.self).contains("startMs"))
+        XCTAssertFalse(String(decoding: saved, as: UTF8.self).contains("skipSegments"))
+
+        // The next episode can reuse the same URL and identical metadata. A
+        // captured button from the old playback must still be rejected.
+        store.play(source, providerSkipSegments: [segment])
+        XCTAssertFalse(store.skipProviderSegment(segment, generation: firstGeneration))
+        try await waitUntil { self.store.player.currentItem?.status == .readyToPlay }
+        store.retryPlayback()
+        XCTAssertEqual(store.providerSkipSegments, [segment], "Same-request retry retains only its own hints")
+        store.play(source)
+        XCTAssertTrue(store.providerSkipSegments.isEmpty, "Ordinary playback does not reuse source hints")
+        store.play(source, providerSkipSegments: [segment])
+        store.playLocalFile(try fixture(), name: "Local")
+        XCTAssertTrue(store.providerSkipSegments.isEmpty)
+        XCTAssertFalse(store.skipProviderSegment(segment, generation: store.playbackGeneration))
+        store.clear()
+        XCTAssertTrue(store.providerSkipSegments.isEmpty)
+    }
+
+    func testLiveAndReplayCannotAcquireProviderSkipControls() {
+        let segment = NativeProviderSkipSegment(type: "opening", startMs: 0, endMs: 15_250)
+        var live = channel()
+        live.timeshift = NativeTimeshift(url: "https://example.invalid/seek?time={time}", start: 1, window: 1000)
+        store.play(live, providerSkipSegments: [segment])
+        XCTAssertTrue(store.providerSkipSegments.isEmpty)
+        XCTAssertFalse(store.skipProviderSegment(segment, generation: store.playbackGeneration))
+        var replay = channel()
+        replay.replay = NativeReplaySession(path: "/unavailable", expiresAt: Int64.max, hls: false, time: 1)
+        store.play(replay, providerSkipSegments: [segment])
+        XCTAssertTrue(store.providerSkipSegments.isEmpty)
+        XCTAssertNil(store.activeProviderSkipSegment)
+        XCTAssertFalse(store.skipProviderSegment(segment, generation: store.playbackGeneration))
+    }
+
     func testSystemAirPlayIsAllowedForAVPlayer() {
         // A simulator may not advertise any actual AirPlay destination.
         // Verify only that the production player permits the system route.

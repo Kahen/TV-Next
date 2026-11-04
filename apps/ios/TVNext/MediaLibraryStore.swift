@@ -48,6 +48,32 @@ struct NativeSubtitleTrack: Identifiable, Equatable {
 @MainActor
 final class MediaLibraryStore: ObservableObject {
     @Published private(set) var playbackGeneration=0
+    @Published private var providerSkipData: [NativeProviderSkipSegment] = []
+    private var providerSkipGeneration = -1
+    private var providerSkipURL: String?
+
+    var providerSkipSegments: [NativeProviderSkipSegment] {
+        guard providerSkipGeneration == playbackGeneration,
+              let channel = current, channel.url == providerSkipURL,
+              requestedChannel?.url == channel.url, currentLocalFile == nil,
+              channel.replay == nil, channel.timeshift == nil else { return [] }
+        return providerSkipData
+    }
+
+    var activeProviderSkipSegment: NativeProviderSkipSegment? {
+        guard let item = player.currentItem, item.status == .readyToPlay else { return nil }
+        return providerSkipSegments.first {
+            $0.target(current: player.currentTime().seconds, duration: item.duration.seconds) != nil
+        }
+    }
+
+    @discardableResult
+    func skipProviderSegment(_ segment: NativeProviderSkipSegment, generation: Int) -> Bool {
+        guard generation == playbackGeneration, providerSkipSegments.contains(segment),
+              let item = player.currentItem, item.status == .readyToPlay,
+              let target = segment.target(current: player.currentTime().seconds, duration: item.duration.seconds) else { return false }
+        return handleSystemPlaybackCommand(.seek(target))
+    }
     @Published private(set) var channels: [TVChannel] = []
     @Published private(set) var favorites: [String] = []
     @Published private(set) var recent: [TVChannel] = []
@@ -530,10 +556,14 @@ final class MediaLibraryStore: ObservableObject {
         favorites.contains(channel.url)
     }
 
-    func play(_ channel: TVChannel) {
+    func play(_ channel: TVChannel, providerSkipSegments: [NativeProviderSkipSegment] = []) {
         playbackError = nil
         guard MediaAddress.valid(channel.url), let url = URL(string: channel.url) else { return }
         playbackGeneration += 1
+        providerSkipGeneration = playbackGeneration
+        providerSkipURL = channel.url
+        providerSkipData = channel.replay == nil && channel.timeshift == nil
+            ? NativeProviderSkipSegment.normalized(providerSkipSegments) : []
         if let replay = channel.replay {
             guard let api=relayAPI else { playbackError="请先登录家庭服务器以播放回放。";return }
             requestedChannel=channel
@@ -645,6 +675,7 @@ final class MediaLibraryStore: ObservableObject {
 
     func playLocalFile(_ file: URL, name: String) {
         playbackGeneration += 1
+        providerSkipData = []
         requestedChannel = nil
         savePosition()
         cancelRelay()
@@ -835,7 +866,11 @@ final class MediaLibraryStore: ObservableObject {
                 }
             }
         }
-        else if let requestedChannel { play(requestedChannel) }
+        else if let requestedChannel {
+            let segments = providerSkipGeneration == playbackGeneration && providerSkipURL == requestedChannel.url
+                ? providerSkipData : []
+            play(requestedChannel, providerSkipSegments: segments)
+        }
         else if let file = currentLocalFile, let name = localFileName {
             // Reuse the staged file; playLocalFile would discard it before reopening.
             playbackError = nil
@@ -988,6 +1023,7 @@ final class MediaLibraryStore: ObservableObject {
 
     func clear() {
         playbackGeneration += 1
+        providerSkipData = []
         cancelRelay()
         player.pause()
         player.replaceCurrentItem(with: nil)

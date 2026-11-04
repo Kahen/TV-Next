@@ -164,6 +164,11 @@ jobs:
         run: |
           swiftc -warnings-as-errors TVNext/NativeIntroOutroMarkers.swift tests/IntroOutroSmoke.swift -o /tmp/tvnext-intro-outro-tests
           /tmp/tvnext-intro-outro-tests
+      - name: Verify provider skip milliseconds and shared JVM fixture
+        working-directory: apps/ios
+        run: |
+          swiftc -warnings-as-errors TVNext/NativeProviderSkipSegments.swift tests/ProviderSkipSegmentsSmoke.swift -o /tmp/tvnext-provider-skip-tests
+          /tmp/tvnext-provider-skip-tests
       - name: Validate original filter contract with shared JVM fixture
         working-directory: apps/ios
         run: |

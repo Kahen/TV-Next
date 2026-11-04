@@ -27,6 +27,7 @@ struct NativeMediaPlayback: Decodable {
     let timeshift: NativeTimeshift?
     let url: String; let name: String; let lineName: String; let headers: [String:String]
     let danmaku: [NativePlaybackResource]; let subtitles: [NativePlaybackResource]
+    let skipSegments: NativeProviderSkipSegments?
 }
 struct NativeSiteRequest: Encodable {
     var content = ""; var url = ""; var siteKey = ""; var categoryId: String?; var query: String?; var vodId: String?

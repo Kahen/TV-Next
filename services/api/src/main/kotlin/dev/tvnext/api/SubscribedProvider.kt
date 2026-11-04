@@ -70,7 +70,8 @@ class SubscribedProvider(private val subscriptions: Subscriptions, private val m
         Subscriptions.httpUri(resultUrl)
         val resultHeaders = header(root.path("header")).ifEmpty { headers }
         return MediaPlayback(resultUrl, episode.name, line.name, r.siteKey, resultHeaders,
-            resources(root.path("subs")), resources(root.path("danmaku")), LiveReplay.timeshift(root.path("timeshift"), mapper))
+            resources(root.path("subs")), resources(root.path("danmaku")), LiveReplay.timeshift(root.path("timeshift"), mapper),
+            ProviderSkipSegments.normalize(root.path("skips")))
     }
     fun action(r: SiteRequest): JsonNode {
         val site = site(r)

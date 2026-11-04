@@ -150,6 +150,45 @@ final class LibraryUITests: XCTestCase {
         XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
     }
 
+    func testProviderSegmentsCanBeSkippedAndAreClearedForTheNextEpisode() {
+        app.terminate()
+        app.launchArguments += ["-tv-next-api-url", "http://127.0.0.1:8769"]
+        app.launch()
+        jump("TVBox 订阅")
+        let editor = app.textViews["订阅配置内容"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        enter(editor, "{\"fixture\":\"provider-skip-fixture\",\"sites\":[]}")
+        let load = app.buttons["加载订阅"]
+        reveal(load); load.tap()
+        let source = app.buttons["Owned skip source"]
+        XCTAssertTrue(source.waitForExistence(timeout: 10))
+        reveal(source); source.tap()
+        let movie = app.buttons["Owned skip movie"]
+        XCTAssertTrue(movie.waitForExistence(timeout: 10))
+        reveal(movie); movie.tap()
+        let first = app.buttons["带来源标记"]
+        XCTAssertTrue(first.waitForExistence(timeout: 10))
+        reveal(first); first.tap()
+        jump("播放器")
+        let count = app.staticTexts["provider-skip-count"]
+        XCTAssertTrue(count.waitForExistence(timeout: 10))
+        let skip = app.buttons["skip-provider-segment"]
+        reveal(skip)
+        XCTAssertEqual(skip.label, "跳过来源片头")
+        XCTAssertTrue(skip.isEnabled)
+        skip.tap()
+        let feedback = app.staticTexts["provider-skip-feedback"]
+        XCTAssertTrue(feedback.waitForExistence(timeout: 5))
+        XCTAssertEqual(feedback.label, "已跳过来源标记片段。")
+        jump("TVBox 订阅")
+        let second = app.buttons["无来源标记"]
+        reveal(second); second.tap()
+        jump("播放器")
+        let removed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: count)
+        XCTAssertEqual(XCTWaiter.wait(for: [removed], timeout: 5), .completed)
+        XCTAssertFalse(skip.exists, "The same media URL in a new episode must not retain old source markers")
+    }
+
     func testCrossSiteSuccessfulEmptySearchHasExplicitFeedback() async throws {
         try await resetCrossSiteFixture()
         app.terminate()

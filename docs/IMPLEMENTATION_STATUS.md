@@ -11,6 +11,10 @@ Source baseline: main `41545bc1` after PR #172 (deterministic CI regressions) an
 | P5 | Accounts, pairing/revocation, hashed device credentials, CAS library sync, authenticated WebSocket remote control, bounded DNS-pinned HTTP/HLS relay, provider health/search cache, EPG scheduling, H2/PostgreSQL/NAS restart/restore | Actual remote-NAS operational/security/load acceptance #6 |
 | P6 | Web audit/CycloneDX, immutable image/Action pins, strict JVM locks/SHA-256 verification and rejection probes, shipped API-library SBOM, unsigned Web/API/Linux amd64 candidate packaging with source/checksums and host/Docker JAR equality; JVM maintenance refresh in #93 | Independent JVM/container/license/provenance review, complete runtime/container SBOM, performance budgets, rollback drills, ARM/native artifacts and signed Apple distribution #7 |
 
+## Native provider skip implementation increment
+
+The current feature adds bounded FongMi `Result.skips` normalization and explicit native manual seeking through the existing player. Opening/middle/ending hints retain millisecond timestamps and nullable ending-to-EOF semantics. Generation/URL/range validation excludes stale, local, replay and known timeshift contexts; hints remain ephemeral and do not alter saved user markers. See [IOS_PROVIDER_SKIPS.md](IOS_PROVIDER_SKIPS.md). Final-head CI for this increment must pass before merge; the accepted baseline above is historical evidence, not acceptance of these new changes. Automatic provider skipping, Web controls and the broader P2/P4 backlog remain open.
+
 ## Native delivery boundaries
 
 - **DLNA:** explicit private-LAN AVTransport URL or same-origin UPnP description import; optional name/model/UDN and DIDL-Lite title; SetURI/play/pause/resume/stop, fresh state/position, relative and absolute finite-media seek. Media/renderer edits, navigation and failed commands invalidate stale controls. Current-media autofill excludes local/replay/header-protected inputs. See [IOS_DLNA.md](IOS_DLNA.md).

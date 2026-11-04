@@ -64,7 +64,8 @@ data class MediaPlayback(
     val headers: Map<String, String> = emptyMap(),
     val subtitles: List<PlaybackResource> = emptyList(),
     val danmaku: List<PlaybackResource> = emptyList(),
-    val timeshift: LiveTimeshift? = null
+    val timeshift: LiveTimeshift? = null,
+    val skipSegments: List<PlaybackSkipSegment> = emptyList()
 )
 data class PlaybackResource(val name: String, val url: String, val lang: String? = null)
 data class MediaContent(val categories: List<MediaCategory>, val entries: List<MediaEntry>)
