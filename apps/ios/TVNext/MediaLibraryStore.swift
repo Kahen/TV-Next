@@ -122,10 +122,8 @@ final class MediaLibraryStore: ObservableObject {
         name: String, languageTag: String?
     ) -> Int? {
         guard persistableAudioDisplayName(name) != nil else { return nil }
-        let matches = options.enumerated().filter {
-            $0.element.name == name && $0.element.languageTag == languageTag
-        }
-        return matches.count == 1 ? matches[0].offset : nil
+        return NativeTrackPreferencePolicy.uniqueVisibleIndex(
+            in: options, name: name, languageTag: languageTag)
     }
 
     private func rememberAudioPreference(_ option: AVMediaSelectionOption) {
@@ -146,6 +144,26 @@ final class MediaLibraryStore: ObservableObject {
         defaults.set(data, forKey: audioPreferenceStorageKey)
         audioPreferences = updated
     }
+    /// A saved selection belongs to this exact remote VOD URL digest only.
+    /// Forgetting it changes the next playback, not the installed AVPlayerItem.
+    var hasSavedAudioPreferenceForCurrentMedia: Bool {
+        guard let key = mediaPreferenceKey() else { return false }
+        return audioPreferences.contains { $0.urlDigest == key }
+    }
+
+    @discardableResult
+    func forgetCurrentAudioPreference() -> Bool {
+        guard let key = mediaPreferenceKey(),
+              audioPreferences.contains(where: { $0.urlDigest == key }) else { return false }
+        let updated = audioPreferences.filter { $0.urlDigest != key }
+        let snapshot = NativeAudioPreferenceSnapshot(version: 2, entries: updated)
+        guard let data = try? JSONEncoder().encode(snapshot), data.count <= 64_000 else { return false }
+        objectWillChange.send()
+        defaults.set(data, forKey: audioPreferenceStorageKey)
+        audioPreferences = updated
+        return true
+    }
+
     @Published private(set) var subtitleTracks: [NativeSubtitleTrack] = []
     @Published private(set) var selectedSubtitleTrack: Int?
     @Published private(set) var canDisableEmbeddedSubtitles = false
@@ -178,18 +196,57 @@ final class MediaLibraryStore: ObservableObject {
         return name
     }
 
+    /// Match the entire group for ambiguity, not just the 16 visible menu rows.
+    static func uniqueSubtitlePreferenceIndex(
+        in options: [(name: String, languageTag: String?)],
+        name: String, languageTag: String?
+    ) -> Int? {
+        guard persistableSubtitleDisplayName(name) != nil else { return nil }
+        return NativeTrackPreferencePolicy.uniqueVisibleIndex(
+            in: options, name: name, languageTag: languageTag)
+    }
+
     private func rememberSubtitlePreference(_ option: AVMediaSelectionOption?) {
+        rememberSubtitlePreferenceIdentity(displayName: option?.displayName,
+            languageTag: option?.extendedLanguageTag, isOff: option == nil)
+    }
+
+    /// Called only after an explicit selection. If its full identity cannot be
+    /// persisted, remove the previous per-title choice instead of restoring a
+    /// stale track on the next playback. The current AVPlayer selection stays.
+    func rememberSubtitlePreferenceIdentity(displayName: String?, languageTag: String?, isOff: Bool) {
         guard let key = mediaPreferenceKey() else { return }
-        let name = option.flatMap { Self.persistableSubtitleDisplayName($0.displayName) }
-        guard option == nil || (name != nil
-              && (option?.extendedLanguageTag?.count ?? 0) <= 64) else { return }
-        let preference = NativeSubtitlePreference(urlDigest: key,
-            displayName: name, languageTag: option?.extendedLanguageTag, isOff: option == nil)
-        let updated = Array((subtitlePreferences.filter { $0.urlDigest != key } + [preference]).suffix(100))
+        let identity = NativeSubtitlePreferencePolicy.normalizedChoice(
+            displayName: displayName, languageTag: languageTag, isOff: isOff)
+        let saved: [NativeSubtitlePreference] = identity.map {
+            [NativeSubtitlePreference(urlDigest: key, displayName: $0.displayName,
+                languageTag: $0.languageTag, isOff: $0.isOff)]
+        } ?? []
+        let updated = Array((subtitlePreferences.filter { $0.urlDigest != key } + saved).suffix(100))
         let snapshot = NativeSubtitlePreferenceSnapshot(version: 1, entries: updated)
         guard let data = try? JSONEncoder().encode(snapshot), data.count <= 64_000 else { return }
         defaults.set(data, forKey: subtitlePreferenceStorageKey)
         subtitlePreferences = updated
+    }
+
+    var hasSavedSubtitlePreferenceForCurrentMedia: Bool {
+        guard let key = mediaPreferenceKey() else { return false }
+        return subtitlePreferences.contains { $0.urlDigest == key }
+    }
+
+    /// Forget a saved track or explicit Off for this title only. Neither
+    /// current AVPlayer selection nor any other title's preference changes.
+    @discardableResult
+    func forgetCurrentSubtitlePreference() -> Bool {
+        guard let key = mediaPreferenceKey(),
+              subtitlePreferences.contains(where: { $0.urlDigest == key }) else { return false }
+        let updated = subtitlePreferences.filter { $0.urlDigest != key }
+        let snapshot = NativeSubtitlePreferenceSnapshot(version: 1, entries: updated)
+        guard let data = try? JSONEncoder().encode(snapshot), data.count <= 64_000 else { return false }
+        objectWillChange.send()
+        defaults.set(data, forKey: subtitlePreferenceStorageKey)
+        subtitlePreferences = updated
+        return true
     }
 
     /// Only the installed item may receive a legible-track selection.
@@ -246,14 +303,14 @@ final class MediaLibraryStore: ObservableObject {
                             self.selectedSubtitleTrack = nil
                         }
                     } else {
-                        let matches = Array(group.options.prefix(16).enumerated()).filter {
-                            $0.element.displayName == preference.displayName &&
-                            $0.element.extendedLanguageTag == preference.languageTag
-                        }
-                        if matches.count == 1, let match = matches.first {
+                        let options = group.options
+                        if let name = preference.displayName,
+                           let index = Self.uniqueSubtitlePreferenceIndex(
+                            in: options.map { (name: $0.displayName, languageTag: $0.extendedLanguageTag) },
+                            name: name, languageTag: preference.languageTag) {
                             self.player.appliesMediaSelectionCriteriaAutomatically = false
-                            item.select(match.element, in: group)
-                            self.selectedSubtitleTrack = match.offset
+                            item.select(options[index], in: group)
+                            self.selectedSubtitleTrack = index
                         }
                     }
                 }
@@ -315,7 +372,9 @@ final class MediaLibraryStore: ObservableObject {
                 // Reapply only a unique, exact match. Never use a stale numeric index.
                 if let key = self.mediaPreferenceKey(),
                    let preference = self.audioPreferences.first(where: { $0.urlDigest == key }) {
-                    let options = Array(group.options.prefix(16))
+                    // All options participate in identity matching. An
+                    // invisible 17th rendition may duplicate a visible one.
+                    let options = group.options
                     if let index = Self.uniqueAudioPreferenceIndex(
                         in: options.map { (name: $0.displayName, languageTag: $0.extendedLanguageTag) },
                         name: preference.displayName, languageTag: preference.languageTag

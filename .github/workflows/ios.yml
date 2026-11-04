@@ -11,7 +11,9 @@ jobs:
   simulator-build:
     name: ${{ matrix.family }} simulator acceptance
     runs-on: macos-15
-    timeout-minutes: 30
+    # iPhone production XCUI suite exceeded 30 minutes despite passing its first 26 UI cases;
+    # keep per-test 300-second bounds while allowing the complete serial suite to finish.
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -40,11 +42,31 @@ jobs:
         run: |
           swiftc TVNext/CaptionParser.swift tests/CaptionSmoke.swift -o /tmp/tvnext-caption-tests
           /tmp/tvnext-caption-tests
+      - name: Verify coordinated bounded Files/SMB subtitle reads (synthetic local fixture)
+        working-directory: apps/ios
+        run: |
+          swiftc -warnings-as-errors TVNext/CaptionParser.swift TVNext/LocalCaptionReader.swift tests/CaptionFilesSmoke.swift -o /tmp/tvnext-caption-files-tests
+          /tmp/tvnext-caption-files-tests
+      - name: Verify native subtitle preference identity and invalid-choice eviction policy
+        working-directory: apps/ios
+        run: |
+          swiftc -warnings-as-errors TVNext/NativeSubtitlePreferencePolicy.swift tests/SubtitlePreferenceSmoke.swift -o /tmp/tvnext-subtitle-preference-tests
+          /tmp/tvnext-subtitle-preference-tests
+      - name: Reject hidden AVFoundation audio/subtitle identity collisions
+        working-directory: apps/ios
+        run: |
+          swiftc -warnings-as-errors TVNext/NativeTrackPreferencePolicy.swift tests/TrackPreferenceSmoke.swift -o /tmp/tvnext-track-preference-tests
+          /tmp/tvnext-track-preference-tests
       - name: Run native danmaku compatibility tests
         working-directory: apps/ios
         run: |
           swiftc TVNext/DanmakuParser.swift tests/DanmakuSmoke.swift -o /tmp/tvnext-danmaku-tests
           /tmp/tvnext-danmaku-tests
+      - name: Verify bounded native danmaku settings persistence
+        working-directory: apps/ios
+        run: |
+          swiftc -warnings-as-errors TVNext/DanmakuOptions.swift tests/DanmakuOptionsSmoke.swift -o /tmp/tvnext-danmaku-options-tests
+          /tmp/tvnext-danmaku-options-tests
       - name: Run native XMLTV shared contract tests
         working-directory: apps/ios
         run: |
@@ -55,6 +77,11 @@ jobs:
         run: |
           swiftc TVNext/MediaRelayAddress.swift tests/MediaRelaySmoke.swift -o /tmp/tvnext-relay-tests
           /tmp/tvnext-relay-tests
+      - name: Verify read-only Files SMB staging bounds (no live SMB)
+        working-directory: apps/ios
+        run: |
+          swiftc -warnings-as-errors TVNext/LocalMediaStager.swift tests/SMBFilesSmoke.swift -o /tmp/tvnext-smb-files-tests
+          /tmp/tvnext-smb-files-tests
       - name: Verify bounded native WebDAV XML and URL security
         working-directory: apps/ios
         run: |
@@ -85,6 +112,53 @@ jobs:
           PYTHON
           swiftc -warnings-as-errors TVNext/NativeWebDAV.swift tests/WebDAVNetworkSmoke.swift -o /tmp/tvnext-webdav-network-tests
           /tmp/tvnext-webdav-network-tests
+      - name: Verify bounded native DLNA SOAP and owned loopback transport
+        working-directory: apps/ios
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s ../../scripts -p 'test_dlna_fixture_server.py'
+          swiftc -warnings-as-errors TVNext/NativeDLNA.swift TVNext/NativeDLNAStatus.swift TVNext/NativeDLNAPosition.swift TVNext/NativeDLNASeek.swift tests/DLNASmoke.swift -o /tmp/tvnext-dlna-tests
+          /tmp/tvnext-dlna-tests
+          python3 ../../scripts/dlna_fixture_server.py > /tmp/tvnext-dlna-fixture.log 2>&1 &
+          dlna_pid=$!
+          trap 'kill "$dlna_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..20}; do
+            if curl --fail --silent http://127.0.0.1:8768/health -o /dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:8768/health -o /dev/null
+          swiftc -warnings-as-errors TVNext/NativeDLNA.swift TVNext/NativeDLNAStatus.swift TVNext/NativeDLNAPosition.swift TVNext/NativeDLNASeek.swift tests/DLNANetworkSmoke.swift -o /tmp/tvnext-dlna-network-tests
+          /tmp/tvnext-dlna-network-tests
+          swiftc -warnings-as-errors TVNext/NativeDLNA.swift TVNext/NativeDLNAStatus.swift TVNext/NativeDLNAPosition.swift TVNext/NativeDLNASeek.swift TVNext/NativeDLNADescription.swift TVNext/NativeSSDPResponse.swift tests/DLNADescriptionSmoke.swift -o /tmp/tvnext-dlna-description-tests
+          /tmp/tvnext-dlna-description-tests
+          swiftc -warnings-as-errors TVNext/NativeDLNA.swift TVNext/NativeDLNAStatus.swift TVNext/NativeDLNAPosition.swift TVNext/NativeDLNASeek.swift TVNext/NativeDLNADescription.swift TVNext/NativeSSDPResponse.swift tests/DLNADescriptionNetworkSmoke.swift -o /tmp/tvnext-dlna-description-network-tests
+          /tmp/tvnext-dlna-description-network-tests
+      - name: Validate bounded native SSDP response candidates (no multicast)
+        working-directory: apps/ios
+        run: |
+          swiftc -warnings-as-errors TVNext/NativeDLNA.swift TVNext/NativeDLNAStatus.swift TVNext/NativeDLNAPosition.swift TVNext/NativeDLNASeek.swift TVNext/NativeSSDPResponse.swift tests/SSDPResponseSmoke.swift -o /tmp/tvnext-ssdp-response-tests
+          /tmp/tvnext-ssdp-response-tests
+      - name: Verify SSDP candidate preflight and bounded UPnP description promotion
+        working-directory: apps/ios
+        run: |
+          swiftc -warnings-as-errors TVNext/NativeDLNA.swift TVNext/NativeDLNAStatus.swift TVNext/NativeDLNAPosition.swift TVNext/NativeDLNASeek.swift TVNext/NativeDLNADescription.swift TVNext/NativeSSDPResponse.swift TVNext/NativeSSDPResolver.swift tests/SSDPResolverSmoke.swift -o /tmp/tvnext-ssdp-resolver-tests
+          /tmp/tvnext-ssdp-resolver-tests
+      - name: Verify bounded native SSDP M-SEARCH UDP transport (owned fixture, no multicast)
+        working-directory: apps/ios
+        run: |
+          set -euo pipefail
+          python3 ../../scripts/ssdp_fixture_server.py /tmp/tvnext-ssdp-fixture.json > /tmp/tvnext-ssdp-fixture.log 2>&1 &
+          ssdp_pid=$!
+          trap 'kill "$ssdp_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if grep -q '^ready$' /tmp/tvnext-ssdp-fixture.log; then break; fi
+            sleep 0.1
+          done
+          grep -q '^ready$' /tmp/tvnext-ssdp-fixture.log
+          swiftc -DDEBUG -warnings-as-errors TVNext/NativeDLNA.swift TVNext/NativeDLNAStatus.swift TVNext/NativeDLNAPosition.swift TVNext/NativeDLNASeek.swift TVNext/NativeSSDPResponse.swift TVNext/NativeSSDPDiscovery.swift tests/SSDPDiscoverySmoke.swift -o /tmp/tvnext-ssdp-discovery-tests
+          /tmp/tvnext-ssdp-discovery-tests
+          wait "$ssdp_pid"
+          python3 -c "import json; from pathlib import Path; f=json.loads(Path('/tmp/tvnext-ssdp-fixture.json').read_text()); assert f['requests']==2; assert set(f['targets'])=={'urn:schemas-upnp-org:device:MediaRenderer:1','urn:schemas-upnp-org:service:AVTransport:1'}"
       - name: Verify manual intro/outro marker bounds and local persistence
         working-directory: apps/ios
         run: |
@@ -98,6 +172,7 @@ jobs:
       - name: Verify native bounded cross-provider search
         working-directory: apps/ios
         run: |
+          python3 -m unittest discover -s ../../scripts -p 'test_cross_site_retry_fixture_server.py'
           swiftc -warnings-as-errors TVNext/NativeCrossSiteSearch.swift TVNext/NativeSiteBrowsingContext.swift tests/CrossSiteSearchSmoke.swift -o /tmp/tvnext-cross-site-tests
           /tmp/tvnext-cross-site-tests
       - name: Validate native FongMi action web subset against shared fixture
@@ -170,7 +245,24 @@ jobs:
           # localhost-only RFC 4918 fixture used by the Swift network smoke.
           python3 ../../scripts/webdav_fixture_server.py > /tmp/tvnext-webdav-ui-fixture.log 2>&1 &
           webdav_pid=$!
-          trap 'kill "$fixture_pid" "$audio_pid" "$webdav_pid" 2>/dev/null || true' EXIT
+          # Real SwiftUI DLNA buttons exercise the same owned SOAP fixture.
+          python3 ../../scripts/dlna_fixture_server.py > /tmp/tvnext-dlna-ui-fixture.log 2>&1 &
+          dlna_pid=$!
+          # The production subscription view uses a localhost-only FongMi
+          # fixture with a deliberately failing provider and no real sources.
+          python3 ../../scripts/cross_site_retry_fixture_server.py > /tmp/tvnext-cross-site-ui-fixture.log 2>&1 &
+          cross_pid=$!
+          trap 'kill "$fixture_pid" "$audio_pid" "$webdav_pid" "$dlna_pid" "$cross_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8769/health -o /dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:8769/health -o /dev/null
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8768/health -o /dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:8768/health -o /dev/null
           for attempt in {1..30}; do
             if curl --silent http://127.0.0.1:8767/dav/ -o /dev/null; then break; fi
             sleep 1
@@ -219,4 +311,5 @@ jobs:
           path: |
             apps/ios/*.xcresult
             /tmp/tvnext-native-fixture.log
+            /tmp/tvnext-cross-site-ui-fixture.log
           retention-days: 14

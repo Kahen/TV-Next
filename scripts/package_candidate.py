@@ -9,6 +9,7 @@ import re
 import shutil
 import subprocess
 import tarfile
+from generate_jvm_sbom import build_sbom, render
 
 
 def version_name(value: str) -> str:
@@ -52,7 +53,12 @@ def package(root: Path, output: Path, version: str, web: Path, jar: Path,
     ids = json.loads(image_ids.read_text())
     if set(ids) != {'api', 'web'} or not all(re.fullmatch(r'sha256:[a-f0-9]{64}', value) for value in ids.values()):
         raise ValueError('Expected exact API/Web OCI image identities')
+    # Bind the SBOM to the exact distributed bytes, not a stale resolved-graph report.
+    jvm_sbom = build_sbom(jar, root / 'services/api/gradle/verification-metadata.xml', version.removeprefix('v'))
     output.mkdir(parents=True, exist_ok=False)
+    (output / 'sbom-api.cdx.json').write_text(render(jvm_sbom), encoding='utf-8')
+    shutil.copyfile(root / 'services/api/gradle.lockfile', output / 'gradle.lockfile')
+    shutil.copyfile(root / 'services/api/gradle/verification-metadata.xml', output / 'verification-metadata.xml')
     source = subprocess.check_output(['git', 'archive', '--format=tar', '--prefix=tv-next-source/', 'HEAD'], cwd=root)
     (output / f'tv-next-{version}-source.tar.gz').write_bytes(gzip.compress(source, mtime=0))
     archive_directory(web, output / f'tv-next-{version}-web.tar.gz', 'web', epoch)
@@ -67,6 +73,8 @@ def package(root: Path, output: Path, version: str, web: Path, jar: Path,
         'schema': 1, 'version': version, 'source_commit': commit,
         'source_date_epoch': epoch, 'container_platform': 'linux/amd64',
         'image_ids': ids, 'files': files, 'signed': False,
+        'sbom_scopes': {'api': 'Exact shipped BOOT-INF/lib bytes; no transitive graph or license/vulnerability assertion',
+                        'web': 'npm installed tree including development dependencies'},
         'limitations': ['Experimental subset; see source docs/IMPLEMENTATION_STATUS.md',
                         'No signed iOS IPA, TestFlight, physical-device or real Spider acceptance',
                         'Docker archive is not claimed bit-reproducible; OCI identities are recorded'],

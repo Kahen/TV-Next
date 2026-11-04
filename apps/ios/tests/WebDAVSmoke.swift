@@ -4,6 +4,20 @@ import Foundation
     static func main() throws {
         let root = try NativeWebDAV.rootURL("https://media.example/dav")
         precondition(root.absoluteString == "https://media.example/dav/")
+        var draftUser = "alice"
+        var draftPassword = "first-secret"
+        let active = try NativeWebDAVConnection(address: root.absoluteString, username: draftUser, password: draftPassword)
+        draftUser = "bob"
+        draftPassword = "second-secret"
+        let next = try NativeWebDAVConnection(address: "https://other.example/dav", username: draftUser, password: draftPassword)
+        let activeAuthorization = try active.authorization(for: root)
+        precondition(activeAuthorization == "Basic " + Data("alice:first-secret".utf8).base64EncodedString())
+        let nextAuthorization = try next.authorization(for: next.root)
+        precondition(nextAuthorization == "Basic " + Data("bob:second-secret".utf8).base64EncodedString())
+        do { _ = try active.authorization(for: next.root); fatalError("Credentials escaped the connected root") }
+        catch NativeWebDAVError.invalidFolder { }
+        do { _ = try NativeWebDAVConnection(address: root.absoluteString, username: "alice", password: String(repeating: "密", count: 400)); fatalError("Accepted oversized UTF-8 credentials") }
+        catch NativeWebDAVError.insecureCredentials { }
         let folder = root.appendingPathComponent("Movies", isDirectory: true)
         let xml = """
         <?xml version="1.0" encoding="utf-8"?>
@@ -22,6 +36,75 @@ import Foundation
         precondition(items.map(\.name) == ["Sub", "Owned Film.mp4"], "Unexpected children: \(items)")
         precondition(items[0].url.absoluteString == "https://media.example/dav/Movies/Sub/")
         precondition(!NativeWebDAV.playable(items[0]) && NativeWebDAV.playable(items[1]))
+
+        // Only direct successful DAV:getlastmodified metadata is displayed.
+        let goodDate = "Mon, 01 Jan 2024 12:34:56 GMT"
+        precondition(NativeWebDAV.httpLastModified(goodDate) != nil)
+        for bad in ["", "Mon, 01 Jan 2024 12:34:56 PST", "Tue, 01 Jan 2024 12:34:56 GMT",
+                    "Mon, 01 Jan 2024 12:34:56 GMT\r\n", "2024-01-01T12:34:56Z",
+                    String(repeating: "A", count: 200)] {
+            precondition(NativeWebDAV.httpLastModified(bad) == nil, "Accepted unsafe DAV timestamp: \(bad)")
+        }
+        func modifiedRecord(_ name: String, _ properties: String, status: String = "HTTP/1.1 200 OK") -> String {
+            "<d:response><d:href>/dav/Movies/\(name)</d:href><d:propstat><d:prop><d:resourcetype/>\(properties)</d:prop><d:status>\(status)</d:status></d:propstat></d:response>"
+        }
+        let dateTag = "<d:getlastmodified>\(goodDate)</d:getlastmodified>"
+        let conflict = modifiedRecord("Conflict.mp4", dateTag).replacingOccurrences(
+            of: "</d:response>",
+            with: "<d:propstat><d:prop><d:getlastmodified>Tue, 02 Jan 2024 12:34:56 GMT</d:getlastmodified></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>")
+        let failedMetadata = modifiedRecord("Failed.mp4", "").replacingOccurrences(
+            of: "</d:response>",
+            with: "<d:propstat><d:prop>\(dateTag)</d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response>")
+        let modifiedXML = "<d:multistatus xmlns:d=\"DAV:\" xmlns:x=\"urn:foreign\">" +
+            modifiedRecord("Good.mp4", dateTag) +
+            failedMetadata +
+            modifiedRecord("Foreign.mp4", "<x:getlastmodified>\(goodDate)</x:getlastmodified>") +
+            modifiedRecord("Nested.mp4", "<d:getlastmodified><d:span>\(goodDate)</d:span></d:getlastmodified>") +
+            modifiedRecord("MixedNested.mp4", "<d:getlastmodified>\(goodDate)<x:fake/></d:getlastmodified>") +
+            modifiedRecord("Duplicate.mp4", dateTag + dateTag) +
+            modifiedRecord("Invalid.mp4", "<d:getlastmodified>not a date</d:getlastmodified>") +
+            conflict + "</d:multistatus>"
+        let dated = try NativeWebDAV.parse(Data(modifiedXML.utf8), root: root, folder: folder)
+        precondition(dated.count == 8)
+        precondition(dated.first(where: { $0.name == "Good.mp4" })?.lastModified == NativeWebDAV.httpLastModified(goodDate))
+        precondition(dated.filter { $0.name != "Good.mp4" }.allSatisfy { $0.lastModified == nil },
+                     "Failed, foreign, nested, duplicate and conflicting metadata must be ignored")
+
+        // Sorting is local and deterministic; directories stay first in both orders.
+        let sortCandidates = [
+            NativeWebDAVItem(url: root.appendingPathComponent("Season10", isDirectory: true), name: "Season10", isDirectory: true),
+            NativeWebDAVItem(url: root.appendingPathComponent("clip10.mp4"), name: "clip10.mp4", isDirectory: false),
+            NativeWebDAVItem(url: root.appendingPathComponent("Season2", isDirectory: true), name: "Season2", isDirectory: true),
+            NativeWebDAVItem(url: root.appendingPathComponent("clip2.mp4"), name: "clip2.mp4", isDirectory: false),
+            NativeWebDAVItem(url: root.appendingPathComponent("notes.txt"), name: "notes.txt", isDirectory: false)
+        ]
+        precondition(NativeWebDAV.visibleEntries(sortCandidates, search: "", mediaOnly: false).map(\.name) ==
+                     ["Season2", "Season10", "clip2.mp4", "clip10.mp4", "notes.txt"])
+        precondition(NativeWebDAV.visibleEntries(sortCandidates, search: "", mediaOnly: false,
+                                                 sortOrder: .descending).map(\.name) ==
+                     ["Season10", "Season2", "notes.txt", "clip10.mp4", "clip2.mp4"])
+        precondition(NativeWebDAV.visibleEntries(sortCandidates, search: " CLIP ", mediaOnly: true,
+                                                 sortOrder: .descending).map(\.name) == ["clip10.mp4", "clip2.mp4"])
+        precondition(NativeWebDAV.visibleEntries(sortCandidates, search: "notes", mediaOnly: true,
+                                                 sortOrder: .descending).isEmpty)
+
+        let sizeXML = """
+        <d:multistatus xmlns:d="DAV:" xmlns:x="urn:foreign">
+          <d:response><d:href>/dav/Movies/Good.mp4</d:href><d:propstat><d:prop><d:resourcetype/><d:getcontentlength>2048</d:getcontentlength></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+          <d:response><d:href>/dav/Movies/Bad.mp4</d:href><d:propstat><d:prop><d:resourcetype/><d:getcontentlength>-1</d:getcontentlength></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+          <d:response><d:href>/dav/Movies/Foreign.mp4</d:href><d:propstat><d:prop><d:resourcetype/><x:getcontentlength>999</x:getcontentlength></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+          <d:response><d:href>/dav/Movies/Folder/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype><d:getcontentlength>999</d:getcontentlength></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+        </d:multistatus>
+        """
+        let sizes = try NativeWebDAV.parse(Data(sizeXML.utf8), root: root, folder: folder)
+        precondition(sizes.first(where: { $0.name == "Good.mp4" })?.sizeBytes == 2048)
+        precondition(sizes.filter { $0.name != "Good.mp4" }.allSatisfy { $0.sizeBytes == nil })
+        precondition(NativeWebDAV.contentLength("0") == 0)
+        precondition(NativeWebDAV.contentLength(" 1048576 ") == 1_048_576)
+        for invalid in ["-1", "+1", "1.5", "NaN", "9223372036854775808", "8796093022209", ""] {
+            precondition(NativeWebDAV.contentLength(invalid) == nil)
+        }
+
         precondition(NativeWebDAV.contains(folder, root: root))
         precondition(!NativeWebDAV.contains(URL(string: "https://media.example/dav2")!, root: root))
         precondition(!NativeWebDAV.contains(URL(string: "https://evil.example/dav/Movies")!, root: root))

@@ -2,15 +2,6 @@ import SwiftUI
 import AVFoundation
 import UIKit
 
-struct DanmakuOptions: Equatable {
-    var enabled = true
-    var opacity = 0.8
-    var fontSize = 22.0
-    var area = 0.5
-    var duration = 8.0
-    var offset = 0.0
-    var blocked = ""
-}
 private struct PositionedDanmaku {
     let comment: DanmakuComment
     let lane: Int

@@ -10,7 +10,41 @@ struct NativeWebDAVItem: Identifiable, Equatable {
     let url: URL
     let name: String
     let isDirectory: Bool
+    // Optional DAV:getcontentlength metadata, never used to allocate memory.
+    var sizeBytes: Int64? = nil
+    // Optional RFC 1123 DAV:getlastmodified metadata; never trusted for file access.
+    var lastModified: Date? = nil
     var id: String { url.absoluteString }
+}
+
+/// Local ordering only; never changes the remote PROPFIND request.
+enum NativeWebDAVSortOrder {
+    case ascending, descending
+}
+
+/// Immutable active connection. Editing the form must never send another
+/// server's credentials to an existing listing or playback destination.
+struct NativeWebDAVConnection {
+    let root: URL
+    private let username: String
+    private let password: String
+
+    init(address: String, username: String, password: String) throws {
+        let root = try NativeWebDAV.rootURL(address, username: username, password: password)
+        _ = try NativeWebDAV.authorization(username: username, password: password, root: root)
+        self.root = root
+        self.username = username
+        self.password = password
+    }
+
+    func list(folder: URL) async throws -> [NativeWebDAVItem] {
+        try await NativeWebDAV.list(root: root, folder: folder, username: username, password: password)
+    }
+
+    func authorization(for resource: URL) throws -> String? {
+        guard NativeWebDAV.contains(resource, root: root) else { throw NativeWebDAVError.invalidFolder }
+        return try NativeWebDAV.authorization(username: username, password: password, root: root)
+    }
 }
 
 enum NativeWebDAVError: LocalizedError {
@@ -53,7 +87,7 @@ enum NativeWebDAV {
     static func authorization(username: String, password: String, root: URL) throws -> String? {
         guard !username.isEmpty || !password.isEmpty else { return nil }
         guard root.scheme?.lowercased() == "https", !username.isEmpty,
-              username.count <= 256, password.count <= 1024,
+              username.utf8.count <= 256, password.utf8.count <= 1024,
               !username.contains(":"), !username.contains("\r"), !username.contains("\n"),
               !password.contains("\r"), !password.contains("\n") else {
             throw NativeWebDAVError.insecureCredentials
@@ -125,7 +159,9 @@ enum NativeWebDAV {
                 components.percentEncodedPath += "/"
             }
             guard let normalized = components.url else { continue }
-            let item = NativeWebDAVItem(url: normalized, name: name, isDirectory: record.directory)
+            let item = NativeWebDAVItem(url: normalized, name: name, isDirectory: record.directory,
+                                        sizeBytes: record.directory ? nil : record.sizeBytes,
+                                        lastModified: record.lastModified)
             unique[item.id] = item
         }
         return Array(unique.values).sorted {
@@ -145,6 +181,30 @@ enum NativeWebDAV {
         return nil
     }
 
+    /// Untrusted optional byte metadata: decimal only, 0–8 TiB, no overflow.
+    static func contentLength(_ raw: String) -> Int64? {
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty, value.utf8.count <= 20,
+              value.utf8.allSatisfy({ (48...57).contains($0) }),
+              let bytes = Int64(value), bytes <= 8 * 1_099_511_627_776 else { return nil }
+        return bytes
+    }
+
+    /// Strict RFC 1123 GMT date. Untrusted values must be bounded and round-trip
+    /// exactly, including weekday, rather than DateFormatter's lenient defaults.
+    static func httpLastModified(_ raw: String) -> Date? {
+        guard raw.utf8.count == 29, raw == raw.trimmingCharacters(in: .whitespacesAndNewlines),
+              raw.unicodeScalars.allSatisfy({ $0.isASCII }) else { return nil }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)!
+        formatter.isLenient = false
+        formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss 'GMT'"
+        guard let date = formatter.date(from: raw), formatter.string(from: date) == raw else { return nil }
+        return date
+    }
+
     static func playable(_ item: NativeWebDAVItem) -> Bool {
         guard !item.isDirectory else { return false }
         return ["mp4", "m4v", "mov", "m3u8", "mp3", "m4a", "aac", "ts"].contains(item.url.pathExtension.lowercased())
@@ -153,11 +213,21 @@ enum NativeWebDAV {
     /// Filter only the already validated Depth:1 listing. Keep folders visible
     /// in media-only mode so users can still navigate to playable files.
     /// Search is local, never interpolated into URLs, headers or PROPFIND XML.
-    static func visibleEntries(_ entries: [NativeWebDAVItem], search: String, mediaOnly: Bool) -> [NativeWebDAVItem] {
+    static func visibleEntries(_ entries: [NativeWebDAVItem], search: String, mediaOnly: Bool,
+                               sortOrder: NativeWebDAVSortOrder = .ascending) -> [NativeWebDAVItem] {
         let term = search.trimmingCharacters(in: .whitespacesAndNewlines)
         return entries.filter { item in
             (!mediaOnly || item.isDirectory || playable(item)) &&
             (term.isEmpty || item.name.localizedCaseInsensitiveContains(term))
+        }.sorted { lhs, rhs in
+            // Keep folders navigable at the top even in descending order.
+            if lhs.isDirectory != rhs.isDirectory { return lhs.isDirectory }
+            let order = lhs.name.localizedStandardCompare(rhs.name)
+            if order == .orderedSame { return lhs.url.absoluteString < rhs.url.absoluteString }
+            switch sortOrder {
+            case .ascending: return order == .orderedAscending
+            case .descending: return order == .orderedDescending
+            }
         }
     }
 
@@ -194,7 +264,7 @@ enum NativeWebDAV {
         request.setValue("1", forHTTPHeaderField: "Depth")
         request.setValue("application/xml", forHTTPHeaderField: "Accept")
         request.setValue("application/xml; charset=utf-8", forHTTPHeaderField: "Content-Type")
-        request.httpBody = Data("<?xml version=\"1.0\" encoding=\"utf-8\"?><d:propfind xmlns:d=\"DAV:\"><d:prop><d:resourcetype/></d:prop></d:propfind>".utf8)
+        request.httpBody = Data("<?xml version=\"1.0\" encoding=\"utf-8\"?><d:propfind xmlns:d=\"DAV:\"><d:prop><d:resourcetype/><d:getcontentlength/><d:getlastmodified/></d:prop></d:propfind>".utf8)
         if let auth { request.setValue(auth, forHTTPHeaderField: "Authorization") }
         request.timeoutInterval = 15
         // The URLSession data delegate enforces the cap per received chunk,
@@ -322,6 +392,10 @@ private final class WebDAVXMLCollector: NSObject, XMLParserDelegate {
         var directory = false
         var hasResourceType = false
         var invalidHref = false
+        var sizeBytes: Int64?
+        var invalidLength = false
+        var lastModified: Date?
+        var invalidModified = false
     }
     private struct PropertyStatus {
         var status = ""
@@ -329,6 +403,12 @@ private final class WebDAVXMLCollector: NSObject, XMLParserDelegate {
         var invalidStatus = false
         var hasResourceType = false
         var directory = false
+        var lengthSeen = false
+        var invalidLength = false
+        var lengthText = ""
+        var modifiedSeen = false
+        var invalidModified = false
+        var modifiedText = ""
     }
 
     var records: [Record] = []
@@ -376,6 +456,16 @@ private final class WebDAVXMLCollector: NSObject, XMLParserDelegate {
             property?.hasResourceType = true
         } else if path == ["multistatus", "response", "propstat", "prop", "resourcetype", "collection"] {
             property?.directory = true
+        } else if path == ["multistatus", "response", "propstat", "prop", "getcontentlength"] {
+            if property?.lengthSeen == true { property?.invalidLength = true }
+            property?.lengthSeen = true
+        } else if path == ["multistatus", "response", "propstat", "prop", "getlastmodified"] {
+            if property?.modifiedSeen == true { property?.invalidModified = true }
+            property?.modifiedSeen = true
+        } else if path.count > 5 && Array(path.prefix(5)) ==
+                    ["multistatus", "response", "propstat", "prop", "getlastmodified"] {
+            // Mixed text plus nested markup is not a direct DAV timestamp.
+            property?.invalidModified = true
         }
     }
 
@@ -386,6 +476,13 @@ private final class WebDAVXMLCollector: NSObject, XMLParserDelegate {
             responseStatus? += string
         } else if path == ["multistatus", "response", "propstat", "status"] {
             property?.status += string
+        } else if path == ["multistatus", "response", "propstat", "prop", "getcontentlength"] {
+            property?.lengthText += string
+        } else if path == ["multistatus", "response", "propstat", "prop", "getlastmodified"] {
+            // Bound text accumulation independently of the 1 MiB XML response cap.
+            if let count = property?.modifiedText.utf8.count, count + string.utf8.count > 64 {
+                property?.invalidModified = true
+            } else { property?.modifiedText += string }
         }
     }
 
@@ -393,12 +490,42 @@ private final class WebDAVXMLCollector: NSObject, XMLParserDelegate {
                 qualifiedName qName: String?) {
         if path == ["multistatus", "response", "propstat"] {
             if let property, property.hasStatus, !property.invalidStatus,
-               property.hasResourceType, Self.successfulStatus(property.status) {
-                if var record = active {
+               Self.successfulStatus(property.status), var record = active {
+                if property.hasResourceType {
                     record.hasResourceType = true
                     record.directory = record.directory || property.directory
-                    active = record
                 }
+                // Ignore failed/foreign/nested properties and conflicting values.
+                // Malformed metadata must not hide an otherwise valid file.
+                if property.lengthSeen {
+                    if property.invalidLength || record.invalidLength {
+                        record.sizeBytes = nil
+                        record.invalidLength = true
+                    } else if let bytes = NativeWebDAV.contentLength(property.lengthText) {
+                        if let existing = record.sizeBytes, existing != bytes {
+                            record.sizeBytes = nil
+                            record.invalidLength = true
+                        } else { record.sizeBytes = bytes }
+                    } else {
+                        record.sizeBytes = nil
+                        record.invalidLength = true
+                    }
+                }
+                if property.modifiedSeen {
+                    if property.invalidModified || record.invalidModified {
+                        record.lastModified = nil
+                        record.invalidModified = true
+                    } else if let date = NativeWebDAV.httpLastModified(property.modifiedText) {
+                        if let existing = record.lastModified, existing != date {
+                            record.lastModified = nil
+                            record.invalidModified = true
+                        } else { record.lastModified = date }
+                    } else {
+                        record.lastModified = nil
+                        record.invalidModified = true
+                    }
+                }
+                active = record
             }
             property = nil
         } else if path == ["multistatus", "response"] {

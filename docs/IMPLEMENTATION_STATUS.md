@@ -87,3 +87,172 @@ Production iPhone/iPad XCUI covers owned-fixture download, relaunch, playback,
 cancel and confirm. See [IOS_OFFLINE_DELETE.md](IOS_OFFLINE_DELETE.md).
 Final-head simulator/integration gates and physical-device acceptance are distinct;
 this does not implement resumable/HLS/DRM downloads, SMB/DLNA or signed releases.
+
+## Native WebDAV folder-first sorting (P4, #96)
+
+The native connected-directory view now offers a local ascending/descending natural filename sort. Folders remain first; a deterministic URL tie-breaker avoids unstable equal-name ordering. The selected order survives directory navigation and refresh but resets on new connection/disconnect. This does not change Depth:1 requests, the 200-entry limit, credential handling or media relay. Positive/negative/boundary Swift smoke and XCTest plus production SwiftUI XCUI are added; final-head CI, physical-device and external-provider verification are separate. Parent P4 #5 remains open.
+
+## Native WebDAV bounded file sizes (P4, #98)
+
+Read-only native WebDAV requests optional `DAV:getcontentlength` in the same Depth:1 listing, displays validated file byte counts and omits unknown/folder sizes. Successful direct DAV propstat scope and 0–8 TiB decimal bounds prevent malformed/foreign/failed metadata from being shown. No extra network request, credential persistence, server-side sort, SMB/DLNA or device acceptance is implied. Final-head Swift smoke/XCTest/XCUI and full integration evidence belong to issue #98; parent #5 stays open.
+
+
+## Native manual DLNA AVTransport subset (P4, #100)
+
+Native SwiftUI now exposes a manually entered LAN AVTransport control URL and direct HTTP(S) media URL. A bounded SOAP v1 client issues SetAVTransportURI → Play, and separate Pause/Stop, following FongMi's mobile DLNACast sequence. Renderer endpoints are restricted to explicit private/loopback IPv4 HTTP literals; redirects, credentialed URLs and oversized/malformed SOAP responses are rejected. A synthetic localhost fixture and iPhone/iPad XCTest/XCUI cover positive/negative paths; **final-head CI is required before accepting this increment**. This is not SSDP discovery, real renderer/codec interoperability, credentialed media relay, signed distribution or physical-device acceptance. See [IOS_DLNA.md](IOS_DLNA.md). P4 #5 remains open.
+
+## Native DLNA read-only transport status (P4, #102)
+
+A native iPhone/iPad manual renderer now supports explicit AVTransport v1 GetTransportInfo and a read-only status button, reusing the bounded SOAP transport. The parser requires one direct CurrentTransportState in the correct SOAP action response and accepts only known UPnP state values; invalid/nested/duplicate/foreign values fail closed. A stateful owned fixture, positive/negative Swift smoke, XCTest and production XCUI test the reported transitions. Final-head CI evidence belongs to the feature PR. This is not SSDP discovery, a physical TV compatibility result, a decoder test or a security audit.
+
+
+## Native DLNA read-only position snapshot (P4, #104)
+
+The native manual DLNA view adds an explicit GetPositionInfo request and a strict bounded SOAP RelTime/TrackDuration parser. No automatic polling, seek, persistence, SSDP or extra destination is introduced. Positive/negative Swift smoke, owned loopback transport, Python fixture and production iPhone/iPad XCUI are part of the new slice; only final-head successful CI constitutes automated acceptance. Real TV/Apple hardware and signed release remain unverified; parent #5 stays open.
+
+## 2026-10-30 native manual DLNA bounded seek (#106)
+
+A new iPhone/iPad explicit ±15-second REL_TIME seek subset uses fresh AVTransport GetTransportInfo/GetPositionInfo and strict finite-duration clamping before a private-LAN SOAP Seek. The owned fixture and positive/negative Swift/Python/XCTest/XCUI regressions are tracked in the feature PR; only a successful final-head full gate permits merging/closing the implementation issue. SSDP, real renderer models, SMB, independent security review, physical Apple devices and signed distribution remain unverified. P4 #5 and P2–P6 remain open.
+
+## Native DLNA explicit pause/resume control (P4, #108)
+
+A native SwiftUI **继续播放** button is enabled only after an acknowledged pause or a fresh user-requested PAUSED_PLAYBACK state. A second fresh GetTransportInfo immediately precedes Play(Speed=1), rejecting stopped, already-playing and unsupported states. Renderer/media edits and failures clear the local paused state. The owned loopback SOAP fixture is exercised by positive/negative Swift network smoke, XCTest and production iPhone/iPad XCUI. This is pending final-HEAD integration CI, and does not establish actual TV/Apple device support, SSDP, SMB or release readiness.
+
+
+## Native DLNA absolute time seek (P4, #110)
+
+A native SwiftUI HH:MM:SS field and explicit seek action extend the manually configured private-LAN AVTransport subset. Input is strictly ASCII and validated before network access; the action checks fresh renderer state and finite media duration and rejects targets beyond the reported duration. Owned fixture, positive/negative Swift smoke/XCTest, network and production iPhone/iPad XCUI are part of the PR; final-head full CI remains required. No SSDP, real renderer compatibility, SMB, physical device acceptance or signed distribution is implied.
+
+## Native opt-in DLNA device-description import (P4, #112)
+
+The manual iOS DLNA page now accepts an explicitly supplied private-LAN UPnP device-description URL and imports its unique, same-origin AVTransport:1 control endpoint after a bounded GET and strict XML validation. No SSDP, multicast discovery, automatic playback, credentials, URLBase trust or additional server endpoint. Positive/negative Swift smoke, localhost network, XCTest, production SwiftUI XCUI and final-head CI are required before implementation acceptance. Real TV/iPhone/iPad, broader UPnP compatibility, SMB, independent security review and signing are not claimed.
+
+## Native SSDP response parser prerequisite (P4, #114)
+
+A pure Swift, non-networking parser now screens bounded SSDP M-SEARCH HTTPU response datagrams and sender-matched private IPv4 LOCATION candidates before any future UPnP device-description fetch. Adversarial Swift smoke/XCTest cases cover forged origin, duplicate headers, unsupported targets, malformed line endings, trailing bodies and size limits. This is not a multicast implementation or a user-visible discovery feature. Final-head iPhone/iPad simulator and aggregate CI must pass before accepting the parser increment. SSDP M-SEARCH transport, Apple multicast entitlement/provisioning, actual iPhone/iPad and renderer tests remain open under #114 and parent #5.
+
+## Native optional UPnP renderer friendlyName (P4, #116)
+
+An explicit native DLNA device-description import now returns a bounded, display-only friendly name alongside the previously validated same-origin AVTransport control URL. Names are optional, not trusted as device identity, and neither persisted nor used as authorization. Malformed/duplicate/nested/foreign/oversized/control/bidi names are rejected; owned Swift smoke/XCTest/XCUI and loopback fixtures are required, with final-head full CI before merging. SSDP transport/entitlement, real renderer interoperability, SMB, Apple hardware acceptance and P6 release remain open.
+
+## Native WebDAV bounded last-modified display (P4, #119)
+
+The iPhone/iPad read-only Depth:1 PROPFIND now requests optional `DAV:getlastmodified` and displays validated RFC 1123 GMT timestamps in the SwiftUI listing. The parser accepts only direct DAV properties in successful propstat; duplicate, conflicting, nested, foreign, failed, malformed and oversized values become unknown rather than blocking file access. The existing 1 MiB XML, 200-entry, credential-scope and no-redirect limits remain unchanged. Owned fixture, Swift positive/negative smoke, network, XCTest and iPhone/iPad XCUI are part of the PR; final-head aggregate CI must pass before merge. No external provider, physical Apple device, SMB, independent security audit or release validation is claimed.
+
+## Native UPnP optional renderer modelName (P4, #118)
+
+The explicit, user-entered LAN description import parses one bounded optional direct `root/device/modelName` and displays it in native SwiftUI beside the approved control URL and optional friendly name. Empty/missing is valid; duplicate, nested, foreign, control/bidi or oversized model names fail closed. Model data is display-only and never persisted or used for endpoint trust. Owned Python loopback, Swift parser/network smoke, XCTest and production iPhone/iPad XCUI are required; final-head full CI is pending before merge. This does not establish SSDP multicast discovery, SMB, physical Apple/TV interoperability, legal Spider corpus, independent security audit or signed release.
+
+
+## Native opt-in DLNA DIDL-Lite metadata (P4, #122)
+
+This PR adds a user-entered optional title to native manual casting. Empty title preserves the existing empty CurrentURIMetaData; a bounded, validated title generates a FongMi-inspired DIDL-Lite videoItem with the same direct media URL and generic video protocolInfo. It does not serialize provider headers, persist the title, or add any network destination. Positive/negative Swift smoke, owned localhost SOAP fixture and production iPhone/iPad XCTest/XCUI are required, followed by final-head aggregate CI. Physical TV/Apple device compatibility, SSDP entitlement, SMB, security audit and signed release remain unverified.
+
+
+### Native Files-provider SMB import (#124; pending final HEAD gate)
+
+The existing Files document picker gains an explicit SMB-share entry and the local-media staging path gains NSFileCoordinator, cancellation propagation, bounded 1 MiB streaming, actual 2 GiB enforcement and partial-copy cleanup. This only imports files selected from an SMB share already connected through Apple's Files app; it does not implement native SMB directory browsing or direct remote playback. Synthetic tests and final-head iPhone/iPad CI must pass before merging; physical NAS/Apple devices remain unverified. Parent P4 #5 remains open.
+
+
+#### 2026-11-01 Files picker presentation follow-up (#124)
+
+The earlier local-section `fileImporter` relocation did not fix iPhone/iPad XCUI: full CI [41231112970](https://github.com/Kahen/TV-Next/actions/runs/41231112970) still failed 2 simulator jobs while Web/API and six other integration jobs passed. The media picker now uses an explicit SwiftUI sheet containing Apple's `UIDocumentPickerViewController`, with app-owned cancellation controls and unchanged security-scoped bounded staging. XCUI checks sheet presentation/dismissal and preservation of the unplayed state. It does not certify Files provider browsing, actual SMB hydration or NAS compatibility. Final-HEAD aggregate CI is required before #124 closes.
+
+## Native Files/SMB cancelable media staging (#126)
+
+Following the Files-provider bounded import in #125, the native SwiftUI view exposes copied-byte progress and an explicit cancel action while an import is active. The detached coordinated read receives cancellation through its parent Task, and generation checks prevent late callbacks or successful-but-cancelled copies from triggering playback. Synthetic Swift smoke/XCTest cover positive progress, preflight and mid-copy cancellation and partial-file cleanup; production XCUI covers the no-import state after picker dismissal. Final-head simulator/aggregate CI is required. This does not establish actual NAS SMB interoperability, immediate interruption of NSFileCoordinator, physical-device compatibility, independent security review or signed distribution.
+
+
+## Native Files/SMB cold-start cache reclamation (#128)
+
+User-selected Files documents are staged into a private app cache and never persisted as resumable media. After an unexpected process exit, a prior staged file could remain. App initialization now removes only UUID-named, supported-extension regular files from that dedicated directory; it excludes other files, directories, symlinks and redirected cache roots, and never runs during an active session. Synthetic positive/negative Swift smoke and XCTest cover the cleanup contract. Final-head CI and actual iPhone/iPad/NAS validation remain separate; this is not native SMB directory access, streaming or signed distribution.
+
+
+## Native Files/SMB storage preflight (P4, #130)
+
+The iOS staged-copy path now checks the cache volume's reported free capacity before allocating a local media copy, reserving 64 MiB after any known source length. Unknown File Provider lengths require the reserve only; missing capacity metadata does not block an otherwise permitted import. Out-of-space errors during actual writes map to a localized storage warning, while partial copies are removed. Swift smoke/XCTest cover exact boundaries, large values and error mapping. This is a conservative preflight, not a guaranteed space reservation or real iPhone/NAS validation; final-head simulator and aggregate CI are required.
+
+
+### P4 iOS SSDP UDP M-SEARCH transport (#132)
+
+The new NativeSSDPDiscovery actor provides a dormant opt-in fixed-multicast M-SEARCH implementation with two bounded targets, TTL 1, a 3-second deadline, cancellation, a 10-second cooldown, 64-packet/4096-byte receive bounds and 32 deduplicated candidate locations. It reuses the existing strict private IPv4 sender-matched response parser. A DEBUG-only owned loopback UDP fixture tests transport behavior. The production SwiftUI DLNA page remains manual because Apple multicast entitlement, signed profile and real iPhone/iPad permission are **not** established. Final-head simulator and full CI are required for subtask closure; parent #114 remains open. See [IOS_SSDP_DISCOVERY.md](IOS_SSDP_DISCOVERY.md).
+
+## Native Files/SMB caption reader (#134, 2026-11-01)
+
+The native external subtitle picker now delegates to a detached, cancellable, security-scoped and NSFileCoordinator-backed SRT/VTT/ASS/SSA reader. It enforces a 1 MiB actual byte cap even when a provider's size is stale, preserves prior cues on failure/cancel, and prevents stale completion after playback/library changes. Swift smoke/XCTest, native XCUI and aggregate CI must pass on the final PR HEAD before merging. This does not implement direct SMB browsing/streaming, styled ASS, real NAS interoperability, independent security audit or signed distribution. See [IOS_CAPTION_FILES.md](IOS_CAPTION_FILES.md).
+
+## Native Files subtitle UTF-16 increment (#136, 2026-11-01)
+
+Adds explicitly BOM-marked UTF-16LE/BE subtitle text decoding to the existing native Files/SMB SRT/VTT/ASS/SSA path; UTF-8 behavior, 1 MiB raw-byte cap, cancellable coordinated reads and text-only parsing remain unchanged. Invalid BOM-only, odd-length and unpaired-surrogate sequences are rejected. Swift smoke/XCTest and final-head iPhone/iPad/full integration results must be attached to PR #137 before the subtask is closed. Legacy GBK/GB18030 and real NAS/iPhone/iPad remain unverified; P4/P6 parents stay open.
+
+### P4 iOS root-device UDN identity binding (#138, 2026-11-01)
+
+Manual native UPnP device-description import now parses and displays an optional bounded `uuid:` root UDN. A pure discovery-candidate validation helper binds the SSDP USN UUID to that UDN and rejects missing/mismatched identity while retaining strict same-IP/port AVTransport control URL validation. Manual imports without UDN remain compatible. Positive/negative Swift smoke, XCTest, owned localhost XML and iPhone/iPad XCUI plus final-head integration are required for this subtask. Apple multicast entitlement, real renderer/iPhone/iPad interoperability, authentication of the device identity and parent #114/#5 remain open.
+
+
+## Native SSDP candidate-to-description resolution (P4, #140)
+
+A dormant Swift resolver now preflights previously parsed SSDP candidates before requesting any LOCATION, then uses the existing bounded private-LAN UPnP GET and checks root-device UDN against SSDP USN and AVTransport control origin. Owned positive/negative smoke and XCTest cover unsafe metadata, mismatched identity/control origin, and cancellation. This is not a user-facing multicast scanner, cryptographic device authentication, automatic casting or proof of physical interoperability. Final HEAD `b5244f37` passed [Web/API](https://github.com/Kahen/TV-Next/actions/runs/41317811679) and [full integration](https://github.com/Kahen/TV-Next/actions/runs/41317811712), including iPhone/iPad XCTest/XCUI; PR #141 merged and #140 closed. #114 and P4 #5 remain open. No Apple signing or Release.
+
+
+## P4 native iOS explicit GB18030 subtitle import (#142)
+
+The user may explicitly select GB18030 for a **local Files/SMB SRT/VTT/ASS/SSA** import. Default decoding remains strict UTF-8 or BOM-marked UTF-16LE/BE; no legacy encoding sniffing or persisted charset is added. The choice is captured when import starts, while the existing coordinated 1 MiB read, cancellation, old-cue-on-error behavior and private Files Provider credentials remain unchanged. Malformed GB18030 and BOM-marked input in legacy mode are rejected. Remote subscription captions are unaffected. Swift smoke, XCTest and production iPhone/iPad XCUI plus final-HEAD Web/API and full integration CI are required; physical SMB/provider behavior, Apple signing and P4 parent #5 remain unverified.
+
+
+## Native P2 cross-site failed-provider retry (#144, 2026-11-02)
+
+The existing bounded SwiftUI FongMi type 0/1/2/4 cross-provider search now exposes a retry control only after partial provider failure. It uses stable site keys rather than potentially duplicated display names, captures the original submitted keyword, requests failed providers only, and merges recovered hits into original site order without replacing successful results. A repeat failure retains previous partial hits; stale/cancelled generation callbacks remain excluded. The original 16-site / 4-concurrent / 2-page / 600-hit limits remain. The owned localhost API fixture deliberately fails the first B search and rejects A refetch or a changed retry query. Swift smoke, XCTest and production iPhone/iPad XCUI plus final-head aggregate CI are required before closing #144. Parent P2 #3, real-provider corpus, physical Apple-device testing, Spider security and signing remain open. See [IOS_CROSS_SITE_RETRY.md](IOS_CROSS_SITE_RETRY.md).
+
+## Native cross-site search provenance correction (P2, #146)
+
+The existing failed-only retry routes by eligible provider keys, but its result buttons previously looked up a display name in the unfiltered subscription. A hidden/unsupported earlier duplicate key could therefore mislabel a real searched provider. Native SwiftUI now stores a nonpersistent selected-provider name snapshot alongside the original search ordering and clears both on context reset. The shared helper enforces first eligible key and 16-site cap. Synthetic Swift smoke/XCTest and production iPhone/iPad XCUI with an owned hidden-duplicate fixture provide regression coverage; final-head CI must pass before merging. This does not validate real FongMi providers, Apple hardware, Spider safety or release readiness.
+
+
+## Native P2 cross-site completed-empty feedback (#148)
+
+A completed native SwiftUI cross-provider search with no visible hits no longer looks like an untouched search form. The display differentiates zero-match success, partial failure and all-failed outcomes, with the same existing failed-only retry. The completion flag resets on new searches, subscription/context changes and view dismissal, and updates only after the current-generation search or retry finishes. Pure Swift positive/negative/boundary tests, a localhost empty-result fixture, Python tests and production iPhone/iPad XCUI are added. Final HEAD aggregate CI is required before closing this implementation issue. P2 #3, real-device/provider, P3 legal/sandbox review and signed release remain open.
+
+## Native subtitle preference stale-choice eviction (P4, #150)
+
+When an explicit embedded/HLS subtitle choice cannot be represented as a complete saved name/language identity, native iOS now clears the prior per-title preference instead of retaining a stale track/Off choice for the next playback. Current AVPlayer track selection is unchanged. Valid choices and supported Off remain stored only as bounded SHA-256-keyed local metadata. Pure Swift policy smoke and owned HLS XCTest cover valid/invalid and 80/81, 64/65 boundaries; final-head iPhone/iPad and aggregate CI must pass before merging. No physical-device/provider, Spider compatibility, audit or Apple signing claim.
+
+### Native audio/subtitle hidden-option identity collision (#152, 2026-11-02)
+
+AVFoundation may report more than the 16 tracks exposed in the native menu. Previously an invisible duplicate could make a saved visible audio/subtitle name-language identity ambiguous while the restore logic still selected it. The new Foundation-only policy scans the entire option group, restoring only a unique exact identity within the 16 visible choices; later duplicates and unique hidden-only choices leave the system selection untouched. Positive/negative/16–17 boundary Swift smoke, XCTest for both track kinds, final-head iPhone/iPad unsigned simulator build/XCTest/XCUI and Web/API/PostgreSQL/Compose/NAS/Spider isolation are required before merging #152. This does not establish physical media compatibility, external-provider parity, security audit or signed distribution. Parent P4 #5 remains open.
+
+### Native per-title track preference forget controls (P4, #154, 2026-11-02)
+
+Native SwiftUI audio and embedded-subtitle menus now expose a future-playback-only forget action for a remembered current remote title. Only the matching SHA-256 URL-digest record is removed from the bounded UserDefaults snapshot. The current AVPlayer selection, subtitle Off state, playback position and unrelated title/type preferences are not modified; local/replay/no-preference contexts are no-ops. Owned HLS XCTest and iPhone/iPad production XCUI plus final-head aggregate CI are required before merging. This does not close P4 #5 or claim real-device/provider, independent audit, Spider legality corpus, signing or release acceptance.
+
+## Native cross-site oversized-page warning (P2, #156)
+
+Native iOS now reports when a provider returns more than the allowed 40 entries in a single response, even if it sets `hasMore=false`. This warning is independent of the existing second-page `hasMore` warning. Results stay capped and provider-scoped, and failed second pages preserve clipping visibility without leaking upstream errors. Swift positive/negative/boundary smoke, XCTest, owned Python fixture and production SwiftUI XCUI cover this implementation slice; final-head full integration and real-device/provider acceptance remain separate. Parent P2 #3 stays open.
+
+
+## Native cross-site retry warning reconciliation (P2, #158)
+
+The original retry UI appended warning strings, so a recovered provider could leave obsolete clipping/page-limit warnings after its partial results were replaced. Structured per-provider-key warning provenance now follows the same recovered-only replacement policy as search results. Failed-again providers retain their previous warning state; healthy providers and the initial site cap are untouched. The global 600-result warning remains conservatively sticky after retry because discarded overflow cannot be recomputed without re-fetching healthy sites. Owned Swift, Python and iPhone/iPad XCUI regressions require final-HEAD aggregate CI before merge. Parent P2 #3, external provider/device acceptance and P3/P6 gates remain open.
+
+## Native manual DLNA read-only failure control-state regression (P4, #160)
+
+A failed GetTransportInfo/GetPositionInfo does not prove the last acknowledged cast stopped. Preserve Stop/Pause availability for an acknowledged cast, but invalidate paused/Resume until a new verified state; mutating-command errors still fail closed. Owned Python SOAP fixture, Swift smoke/XCTest and production iPhone/iPad XCUI are required at the final PR HEAD. See [IOS_DLNA.md](IOS_DLNA.md). Physical iPhone/iPad/TV, multicast entitlement and release/security acceptance remain open.
+
+## P4 native manual DLNA navigation-state invalidation (#164, 2026-11-02)
+
+Leaving the native DLNA screen cancels any in-flight request and discards UI-only cast/paused flags, stale status/error and previous seek text. Renderer/media fields are not persisted or sent to a server, and navigation never sends an implicit Stop to the renderer. A fresh explicit cast or verified transport-state query is required to enable playback controls after return. This differs from a failed read-only query **within** the same screen, which preserves the last acknowledged cast. Swift smoke/XCTest and production SwiftUI iPhone/iPad XCUI use only the owned localhost fixture; final-head Web/API, PostgreSQL, Compose, NAS, Spider isolation and aggregate CI are required before merging. Physical Apple/TV interoperability, multicast entitlement, legal Spider corpus, security audit and signing remain open.
+
+## Native DLNA failed Seek control invalidation (P4, #162)
+
+A rejected relative or absolute Seek no longer leaves previously acknowledged Pause/Stop/Resume UI controls enabled. Both SwiftUI paths reuse the mutating-command fail-closed policy, preserve entered endpoints and surface the error. Owned Python SOAP fixture, Swift smoke/XCTest and production iPhone/iPad XCUI are required with the final-HEAD Web/API/PostgreSQL/Compose/NAS/Spider aggregate gate. This is not physical TV/Apple compatibility, multicast permission, Spider authorization, security audit or signed release evidence. See [IOS_DLNA.md](IOS_DLNA.md).
+
+The native root uses one persistent `ScrollViewReader`/`VStack`: toolbar section changes scroll without necessarily firing the DLNA subview's `onDisappear`. The implementation therefore observes explicit navigation requests as well as actual disappearance; reselecting DLNA does not reset an active session. The iPhone/iPad XCUI regression covers both paths.
+
+## Native iOS DLNA current-media autofill eligibility (P4, #166)
+
+The “使用当前播放地址” control now uses the same bounded direct HTTP(S) media-URL validator as the actual DLNA cast path for both enablement and tap handling. Empty, file/local, credentialed, malformed/oversized, custom-header and replay media cannot silently enable a no-op autofill. A valid explicitly imported direct URL remains eligible. Foundation-only Swift positive/negative smoke and XCTest plus production SwiftUI iPhone/iPad XCUI against an owned M3U fixture cover the behavior. This is UI safety/feedback, not new renderer discovery, external-provider compatibility or physical TV acceptance; final-head full CI is required before merge.
+
+
+### P2 native failed-only search boundary regression (#168)
+
+The iOS retry coordinator now intersects failure keys with the original selected-site snapshot and the same first-16-unique eligible-provider boundary used by initial search. It does not expand requests to a 17th, newly inserted or otherwise unsearched provider. Swift smoke/XCTest cover negative and positive cases, including actual request counts; existing iPhone/iPad XCUI and full integration CI must pass on the final PR HEAD before closing #168. Physical devices, permitted external providers and P2/P3/P6 acceptance remain separate.
