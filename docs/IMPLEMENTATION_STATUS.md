@@ -1,6 +1,6 @@
-# Implementation status — 2026-11-04
+# Implementation status — 2026-11-05
 
-Source baseline: main `62ca3e21` through PR #171. Its [full cross-platform gate](https://github.com/Kahen/TV-Next/actions/runs/41696401543) passed Web/API/PostgreSQL, real browsers/Compose, NAS, Spider isolation and iPhone/iPad simulators. PR #172 repairs two intermittent CI races; PR #93 integrates the JVM maintenance baseline with current main. Their final-head evidence is tracked below before merge. Automated owned-fixture results do not establish arbitrary source or physical-device compatibility.
+Source baseline: main `41545bc1` after PR #172 (deterministic CI regressions) and PR #93 (JVM maintenance/integrity refresh). PR #172 passed [final-head full integration](https://github.com/Kahen/TV-Next/actions/runs/41797242230). PR #93 passed [final-head full integration](https://github.com/Kahen/TV-Next/actions/runs/41797558083), [strict JVM probes](https://github.com/Kahen/TV-Next/actions/runs/41797558108) and [candidate binary comparison](https://github.com/Kahen/TV-Next/actions/runs/41797558092): 99 API tests with zero failures/skips, 24 real-browser cases, PostgreSQL/NAS/isolation and both iPhone/iPad simulators. Both PRs are merged. Main-merge checks are tracked separately; these exact source-head results remain the acceptance evidence. Automated owned-fixture results do not establish arbitrary source or physical-device compatibility.
 
 | Phase | Implemented code | Still unfinished |
 | --- | --- | --- |
