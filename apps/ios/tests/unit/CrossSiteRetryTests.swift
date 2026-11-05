@@ -171,11 +171,35 @@ final class CrossSiteRetryTests: XCTestCase {
             previous: previous, refreshed: refreshed, recoveredKeys: ["b", "outside"],
             sourceOrder: ["a", "b"], identity: { $0.id }
         )
-        XCTAssertEqual(merged.count, NativeCrossSiteSearch.maxResults)
+        XCTAssertEqual(merged.count, NativeCrossSiteSearch.maxPages * NativeCrossSiteSearch.maxItemsPerPage + 1)
         XCTAssertEqual(merged.first?.item.id, "stable")
-        XCTAssertEqual(merged.last?.item.id, "598")
+        XCTAssertEqual(merged.last?.item.id, "79")
         XCTAssertFalse(merged.contains { $0.siteKey == "outside" })
     }
+    func testRetryReconciliationBoundsEveryProviderAndKeepsOriginalOrder() {
+        let previous = (0..<200).map { NativeSearchHit(siteKey: "stable", item: Item(id: "s\($0)")) }
+        let refreshed = (0..<200).map { NativeSearchHit(siteKey: "recovered", item: Item(id: "r\($0)")) }
+        let merged = NativeCrossSiteSearch.mergeRetry(
+            previous: previous, refreshed: refreshed, recoveredKeys: ["recovered"],
+            sourceOrder: ["stable", "recovered"], identity: { $0.id }
+        )
+        XCTAssertEqual(merged.count, 160)
+        XCTAssertEqual(merged[0].item.id, "s0")
+        XCTAssertEqual(merged[79].item.id, "s79")
+        XCTAssertEqual(merged[80].item.id, "r0")
+        XCTAssertEqual(merged[159].item.id, "r79")
+    }
+
+    func testRetryReconciliationRejectsUnselectedOverflowAndFailedRefresh() {
+        let previous = [NativeSearchHit(siteKey: "failed", item: Item(id: "old"))]
+        let refreshed = (0..<1000).map { NativeSearchHit(siteKey: "failed", item: Item(id: "new\($0)")) }
+        let merged = NativeCrossSiteSearch.mergeRetry(
+            previous: previous, refreshed: refreshed, recoveredKeys: [],
+            sourceOrder: ["failed"], identity: { $0.id }
+        )
+        XCTAssertEqual(merged.map { $0.item.id }, ["old"])
+    }
+
     func testTerminalOversizedPageWarnsWithoutClaimingAdditionalPages() async throws {
         let result = try await NativeCrossSiteSearch.search(
             sources: [NativeSearchSource(key: "a", name: "Provider")],
