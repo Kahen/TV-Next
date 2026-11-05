@@ -48,9 +48,9 @@ final class NativeProviderSkipSegmentsTests: XCTestCase {
 
     func testDecoderStopsAtThirtyTwoUniqueValidHintsAndPreservesOrder() throws {
         let hints = (0..<32).map { index in
-            "{\\"type\\":\\"middle\\",\\"startMs\\":\\(index * 1000),\\"endMs\\":\\(index * 1000 + 500)}"
+            #"{"type":"middle","startMs":\#(index * 1000),"endMs":\#(index * 1000 + 500)}"#
         }
-        let late = "{\\"type\\":\\"ending\\",\\"startMs\\":32000}"
+        let late = #"{"type":"ending","startMs":32000}"#
         let raw = "[" + (["null", hints[0], hints[0]] + hints + [late]).joined(separator: ",") + "]"
         let parsed = try JSONDecoder().decode(NativeProviderSkipSegments.self, from: Data(raw.utf8))
         XCTAssertEqual(parsed.values.count, 32)
@@ -60,7 +60,7 @@ final class NativeProviderSkipSegmentsTests: XCTestCase {
     }
 
     func testDecoderStillInspectsThrough128WhenQuotaNotReached() throws {
-        let valid = "{\\"type\\":\\"opening\\",\\"startMs\\":0,\\"endMs\\":1000}"
+        let valid = #"{"type":"opening","startMs":0,"endMs":1000}"#
         let raw = "[" + (Array(repeating: "null", count: 127) + [valid, valid]).joined(separator: ",") + "]"
         let parsed = try JSONDecoder().decode(NativeProviderSkipSegments.self, from: Data(raw.utf8))
         XCTAssertEqual(parsed.values, [NativeProviderSkipSegment(type: "opening", startMs: 0, endMs: 1000)])
