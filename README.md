@@ -9,7 +9,7 @@ Independent cross-platform media app for Web, iPhone, and iPad, with a self-host
 | Component | Technology | Current scope |
 | --- | --- | --- |
 | Web / PWA | React 19 + TypeScript + Vite + hls.js | Persistent library, imports/export, MP4/HLS/local media, text subtitles/danmaku, subscriptions/catalog/filter/search/live EPG/replay, cloud browsing, opt-in sync and shell-only offline cache |
-| iPhone / iPad | SwiftUI + AVPlayer | Native library/subscriptions/search/EPG, track preferences, text captions/danmaku, PiP/AirPlay/background controls, manual LAN DLNA, WebDAV, Files/SMB imports, opt-in skip markers and bounded offline files |
+| iPhone / iPad | SwiftUI + AVPlayer | Native library/subscriptions/search/EPG, track preferences, text captions/danmaku, PiP/AirPlay/background controls, manual LAN DLNA, WebDAV, Files/SMB imports, manual provider skips, opt-in user skip markers and bounded offline files |
 | API | Kotlin + Spring Boot | Source-derived type 0/1/2/4 operations, bounded transports, accounts/pairing/sync/remote, XMLTV feeds, provider cache/health and HTTP/HLS media relay |
 | Infrastructure | Docker Compose, nginx, GitHub Actions | PostgreSQL/NAS integration, real browser and iPhone/iPad simulator automation, isolated Spider fixtures, pinned build inputs and unsigned release-candidate packaging |
 

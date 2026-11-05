@@ -16,7 +16,7 @@
 | External SRT/VTT/ASS/SSA | Text-only cues with -10..+10 s offset | Text overlay, up to four overlapping cues; Files UTF-8/UTF-16 and explicit GB18030; subscription captions | Bounded subscription text-resource retrieval |
 | Styled ASS/fonts/karaoke | Not implemented | Not implemented; external overlays are not composited into system PiP | N/A |
 | Danmaku | Bounded parser/timeline overlay and settings | Bounded XML/JSON parser/overlay, persisted display settings and nested-XML ownership regression | Subscription resource retrieval |
-| Intro/outro | No equivalent saved-marker feature | Manual per-title markers with opt-in automatic skipping; no detection/provider metadata | N/A |
+| Intro/outro | No equivalent saved-marker feature | Manual provider opening/middle/ending skips and per-title user markers with opt-in automatic skipping; source-driven automatic policy/detection remains pending | N/A |
 | Playback diagnostics | Browser error reporting | Private codec/dimensions/audio/buffer/timeline/error metadata; actual hardware-decoder selection not exposed | Private diagnostics/metrics |
 | AList/OpenList | Read-only listing/folder/media selection | Read-only listing/folder/media selection | Bounded adapter/opaque IDs; no direct cloud QR/OAuth login |
 | WebDAV | No dedicated client | Bounded read-only Depth:1, root/parent/refresh/filter/sort, size/date metadata; in-memory HTTPS Basic credentials | Existing authenticated relay used for protected media |
