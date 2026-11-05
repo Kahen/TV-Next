@@ -194,15 +194,15 @@ private actor RequestCounter {
             identity: { $0.id }
         )
         precondition(injected.map { $0.item.id } == merged.map { $0.item.id })
-        // The 600-result global cap still applies after recovered sites expand.
+        // Retry reconciliation applies the 80-result per-provider cap before the global cap.
         let many = (0..<700).map { NativeSearchHit(siteKey: "b", item: Item(id: String($0))) }
         let cappedRetry = NativeCrossSiteSearch.mergeRetry(
             previous: first.items, refreshed: many, recoveredKeys: ["b"],
             sourceOrder: ["a", "b", "c"], identity: { $0.id }
         )
-        precondition(cappedRetry.count == 600)
+        precondition(cappedRetry.count == 81)
         precondition(cappedRetry.first?.item.id == "a-old")
-        precondition(cappedRetry.last?.item.id == "598")
+        precondition(cappedRetry.last?.item.id == "79")
 
         // A provider returning 41 entries with hasMore=false still silently
         // loses its 41st entry unless the per-page clip is reported.
