@@ -38,7 +38,9 @@ class Handler(BaseHTTPRequestHandler):
         return self.respond(404, {"error": "unknown fixture route"})
 
     def do_POST(self):
-        if self.path not in ("/api/v1/subscriptions/load", "/api/v1/subscriptions/search"):
+        if self.path not in ("/api/v1/subscriptions/load", "/api/v1/subscriptions/search",
+                             "/api/v1/subscriptions/home", "/api/v1/subscriptions/detail",
+                             "/api/v1/subscriptions/play"):
             return self.respond(404, {"error": "unknown fixture route"})
         try:
             length = int(self.headers.get("Content-Length", "-1"))
@@ -49,6 +51,16 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError("object required")
         except (ValueError, UnicodeDecodeError, json.JSONDecodeError):
             return self.respond(400, {"error": "invalid fixture request"})
+        if self.path.endswith("/load") and "provider-skip-fixture" in str(body.get("content", "")):
+            return self.respond(200, {
+                "content": "owned provider-skip-fixture", "url": "", "depots": [],
+                "liveCount": 0, "warnings": [], "sites": [
+                    {"key": "skip", "name": "Owned skip source", "type": 4,
+                     "searchable": False, "hidden": False, "support": ""}
+                ]
+            })
+        if self.path.rsplit("/", 1)[-1] in ("home", "detail", "play"):
+            return self.provider_skip_fixture(body)
         if self.path.endswith("/load"):
             return self.respond(200, {
                 "content": "owned fixture", "url": "", "depots": [],
@@ -131,6 +143,31 @@ class Handler(BaseHTTPRequestHandler):
             "page": 1, "hasMore": False,
             "items": [{"id": key + "-id", "name": ("A result" if key == "a" else "B result"),
                        "remarks": None, "folder": False, "action": None}]
+        })
+
+    def provider_skip_fixture(self, body):
+        if body.get("siteKey") != "skip":
+            return self.respond(400, {"error": "invalid fixture site"})
+        item = {"id": "owned-skip", "name": "Owned skip movie", "remarks": None,
+                "folder": False, "action": None}
+        if self.path.endswith("/home"):
+            return self.respond(200, {"categories": [], "filters": {}, "total": 1,
+                                      "page": 1, "hasMore": False, "items": [item]})
+        if body.get("vodId") != "owned-skip":
+            return self.respond(400, {"error": "invalid fixture video"})
+        if self.path.endswith("/detail"):
+            return self.respond(200, {"item": item, "description": None, "lines": [
+                {"name": "Owned", "episodes": [{"name": "带来源标记", "playable": True},
+                                                 {"name": "无来源标记", "playable": True}]}
+            ]})
+        index = body.get("episodeIndex", 0)
+        if type(index) is not int or index not in (0, 1):
+            return self.respond(400, {"error": "invalid fixture episode"})
+        return self.respond(200, {
+            "url": "http://127.0.0.1:8765/fixture.mp4", "name": "Owned episode",
+            "lineName": "Owned", "headers": {}, "subtitles": [], "danmaku": [],
+            "timeshift": None,
+            "skipSegments": [{"type": "opening", "startMs": 0, "endMs": 85000}] if index == 0 else []
         })
 
 if __name__ == "__main__":

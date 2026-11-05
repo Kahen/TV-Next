@@ -124,7 +124,7 @@ class SubscriptionCompatibilityTest {
         val request = SiteRequest(content=config,siteKey="pan",vodId="v1")
         assertTrue(provider.detail(request).lines.single().episodes.single().playable)
         assertEquals("https://provider.example/", transport.headers["Referer"])
-        transport.answer = """{"url":"https://cdn.example/movie.mp4","parse":0,"header":{"User-Agent":"OwnPlayer"},"danmaku":"[{\"name\":\"弹幕\",\"url\":\"https://cdn.example/dm.xml\"}]","subs":[{"name":"中文","url":"https://cdn.example/s.vtt","lang":"zh"}]}"""
+        transport.answer = """{"url":"https://cdn.example/movie.mp4","parse":0,"header":{"User-Agent":"OwnPlayer"},"danmaku":"[{\"name\":\"弹幕\",\"url\":\"https://cdn.example/dm.xml\"}]","subs":[{"name":"中文","url":"https://cdn.example/s.vtt","lang":"zh"}],"skips":[{"type":"opening","start":0,"end":90500},{"type":"ending","start":1100000}]}"""
         // Playback makes detail then play calls; return separate responses per operation.
         val switching = object : ProviderTransport() {
             override fun get(uri: URI, headers: Map<String,String>, form: String?) = if (uri.rawQuery.contains("play=")) transport.answer else
@@ -136,6 +136,7 @@ class SubscriptionCompatibilityTest {
         assertEquals("OwnPlayer",play.headers["User-Agent"])
         assertEquals("https://cdn.example/dm.xml",play.danmaku.single().url)
         assertEquals("zh",play.subtitles.single().lang)
+        assertEquals(listOf(PlaybackSkipSegment("opening", 0, 90500), PlaybackSkipSegment("ending", 1100000, null)), play.skipSegments)
     }
     @Test fun xmlTypeZeroUsesOriginalVodMappingAndRejectsEntities() {
         val xml = """<rss><class><ty id="1">电影</ty></class><list page="2" pagecount="3" pagesize="20" recordcount="45"><video><id>v1</id><name>Movie</name><dl><dd flag="line"><![CDATA[E1${'$'}https://example.org/a.mp4#E2${'$'}https://example.org/b.mp4]]></dd></dl></video></list></rss>"""

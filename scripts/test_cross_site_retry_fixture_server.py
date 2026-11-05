@@ -104,6 +104,23 @@ class CrossSiteRetryFixtureTests(unittest.TestCase):
             self.post("/api/v1/subscriptions/search", {"siteKey": "other", "query": "x"})
         self.assertEqual(error.exception.code, 400)
 
+    def test_provider_skip_subscription_detail_and_ephemeral_episode_metadata(self):
+        document = self.post("/api/v1/subscriptions/load", {"content": "provider-skip-fixture"})
+        self.assertEqual(document["sites"][0]["key"], "skip")
+        request = {"siteKey": "skip", "vodId": "owned-skip"}
+        page = self.post("/api/v1/subscriptions/home", request)
+        self.assertEqual(page["items"][0]["id"], "owned-skip")
+        detail = self.post("/api/v1/subscriptions/detail", request)
+        self.assertEqual(len(detail["lines"][0]["episodes"]), 2)
+        first = self.post("/api/v1/subscriptions/play", request)
+        self.assertEqual(first["skipSegments"], [{"type": "opening", "startMs": 0, "endMs": 85000}])
+        second = self.post("/api/v1/subscriptions/play", dict(request, episodeIndex=1))
+        self.assertEqual(second["skipSegments"], [])
+        self.assertEqual(first["url"], second["url"], "Same URL must not preserve previous episode hints")
+        with self.assertRaises(HTTPError) as error:
+            self.post("/api/v1/subscriptions/play", dict(request, episodeIndex=True))
+        self.assertEqual(error.exception.code, 400)
+
     def test_reject_oversized_before_reading_body(self):
         # Send headers only: the fixture rejects Content-Length before reading
         # bytes. Sending a body with urllib races the early response against

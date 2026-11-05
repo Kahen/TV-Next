@@ -1634,6 +1634,12 @@ components:
           anyOf:
           - $ref: '#/components/schemas/LiveTimeshift'
           - type: 'null'
+        skipSegments:
+          type: array
+          maxItems: 32
+          description: Ephemeral validated FongMi Result.skips metadata, in milliseconds. Not an instruction to seek automatically.
+          items:
+            $ref: '#/components/schemas/PlaybackSkipSegment'
     EpgGuideRequest:
       type: object
       required:
@@ -1757,6 +1763,24 @@ components:
           type: array
           items:
             type: string
+    PlaybackSkipSegment:
+      type: object
+      required: [type, startMs, endMs]
+      properties:
+        type:
+          type: string
+          enum: [opening, middle, ending]
+        startMs:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 604800000
+        endMs:
+          type: [integer, 'null']
+          format: int64
+          minimum: 1
+          maximum: 604800000
+          description: Exclusive end greater than startMs. Null is allowed only for ending with startMs greater than zero.
     PlaybackResource:
       type: object
       required:

@@ -85,7 +85,8 @@ Tracking: https://github.com/Kahen/TV-Next/issues/5
 - [x] Native foreground offline media-file downloads, persistent completed copies, local playback/deletion and byte/count quotas; see IOS_OFFLINE_MEDIA.md.
 - [x] Native subscription external subtitle resources and stale subtitle/danmaku request invalidation; active WebDAV credentials remain fixed until reconnect (#89).
 - [x] Read-only native codec/dimensions/audio/buffer/error diagnostics with credential redaction; actual hardware decoder selection is not exposed.
-- [ ] Styled ASS/fonts/karaoke, advanced subtitle matching/headers and provider-supplied/automatic skip detection.
+- [x] Bounded FongMi provider skip metadata and native manual in-range seeking; no source-driven automatic seek or next-episode claim. See [IOS_PROVIDER_SKIPS.md](IOS_PROVIDER_SKIPS.md); final-head CI is required for this increment.
+- [ ] Styled ASS/fonts/karaoke, advanced subtitle matching/headers, source-driven automatic skipping and automatic skip detection.
 - [x] Manual private-LAN DLNA play/pause/resume/stop/state/position/relative and absolute seek, bounded UPnP description/UDN import and command/navigation state invalidation.
 - [x] Dormant bounded SSDP parser/UDP transport/candidate resolver, with owned loopback tests.
 - [x] Files-provider SMB media/caption import with coordinated bounded staging, cancellation/progress/free-space checks and cleanup; UTF-16 and explicit GB18030 subtitle decoding.

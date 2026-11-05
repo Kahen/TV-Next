@@ -99,7 +99,7 @@ struct ContentView: View {
                     NativeDLNASection(library: library, navigationRequest: navigationRequest,
                                       navigationDestination: scrollDestination).id("dlna")
                     SubscriptionSection(serverURL: serverURL, session:homeSession, onPlay: { playback, title in
-                        library.play(TVChannel(name: title + " · " + playback.name, url: playback.url, group: playback.lineName, logo: nil, tvgId: nil, headers:playback.headers, timeshift:playback.timeshift))
+                        library.play(TVChannel(name: title + " · " + playback.name, url: playback.url, group: playback.lineName, logo: nil, tvgId: nil, headers:playback.headers, timeshift:playback.timeshift), providerSkipSegments: playback.skipSegments?.values ?? [])
                         remoteResourceKey = playback.url
                         remoteDanmaku = playback.danmaku
                         remoteSubtitles = playback.subtitles
@@ -461,6 +461,7 @@ struct ContentView: View {
                 .pickerStyle(.menu)
                 .accessibilityIdentifier("playback-speed")
                 NativeSeekControls(library: library)
+                NativeProviderSkipControls(library: library)
                 NativeIntroOutroControls(library: library)
                 NativePlaybackDiagnosticsView(library: library)
                 ForEach(remoteSubtitles) { source in
