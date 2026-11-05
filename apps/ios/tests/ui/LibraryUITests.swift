@@ -885,6 +885,7 @@ final class LibraryUITests: XCTestCase {
         reveal(query)
         query.tap()
         let failure = app.staticTexts["dlna-error"]
+        reveal(failure)
         XCTAssertTrue(failure.waitForExistence(timeout: 15))
         XCTAssertTrue(failure.label.contains("503"))
         XCTAssertFalse(resume.isEnabled, "Unverified paused state cannot enable Resume")
@@ -919,6 +920,7 @@ final class LibraryUITests: XCTestCase {
         let forward = app.buttons["dlna-seek-forward"]
         reveal(forward)
         forward.tap()
+        reveal(failure)
         XCTAssertTrue(failure.waitForExistence(timeout: 15))
         XCTAssertTrue(failure.label.contains("503"))
         XCTAssertFalse(stop.isEnabled, "Failed relative Seek must invalidate stale Stop")
@@ -938,6 +940,7 @@ final class LibraryUITests: XCTestCase {
         reveal(absolute)
         XCTAssertTrue(absolute.isEnabled)
         absolute.tap()
+        reveal(failure)
         XCTAssertTrue(failure.waitForExistence(timeout: 15))
         XCTAssertTrue(failure.label.contains("503"))
         XCTAssertFalse(stop.isEnabled, "Failed absolute Seek must invalidate stale Stop")
