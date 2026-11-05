@@ -345,6 +345,10 @@ final class LibraryUITests: XCTestCase {
             predicate: NSPredicate(format: "exists == false"), object: dismiss
         )
         XCTAssertEqual(XCTWaiter.wait(for: [closed], timeout: 5), .completed)
+        // Dismissing the system Files sheet can change the underlying scroll
+        // viewport and virtualize its SwiftUI children. Re-anchor/reveal through
+        // the same bounded production navigation helper used before opening it.
+        reveal(entry)
         XCTAssertTrue(entry.waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["cancel-smb-import"].exists,
                        "Picker cancellation must not begin a media copy")
@@ -881,6 +885,7 @@ final class LibraryUITests: XCTestCase {
         reveal(query)
         query.tap()
         let failure = app.staticTexts["dlna-error"]
+        reveal(failure)
         XCTAssertTrue(failure.waitForExistence(timeout: 15))
         XCTAssertTrue(failure.label.contains("503"))
         XCTAssertFalse(resume.isEnabled, "Unverified paused state cannot enable Resume")
@@ -915,6 +920,7 @@ final class LibraryUITests: XCTestCase {
         let forward = app.buttons["dlna-seek-forward"]
         reveal(forward)
         forward.tap()
+        reveal(failure)
         XCTAssertTrue(failure.waitForExistence(timeout: 15))
         XCTAssertTrue(failure.label.contains("503"))
         XCTAssertFalse(stop.isEnabled, "Failed relative Seek must invalidate stale Stop")
@@ -934,6 +940,7 @@ final class LibraryUITests: XCTestCase {
         reveal(absolute)
         XCTAssertTrue(absolute.isEnabled)
         absolute.tap()
+        reveal(failure)
         XCTAssertTrue(failure.waitForExistence(timeout: 15))
         XCTAssertTrue(failure.label.contains("503"))
         XCTAssertFalse(stop.isEnabled, "Failed absolute Seek must invalidate stale Stop")
