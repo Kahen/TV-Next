@@ -811,6 +811,12 @@ final class LibraryUITests: XCTestCase {
         let owned = app.buttons["channel-Owned Direct"]
         reveal(owned)
         owned.tap()
+        // Wait for the selected channel to replace any prior playback context before
+        // checking the DLNA autofill. A previous test can leave an active media URL.
+        let currentMedia = app.staticTexts["current-media"]
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label CONTAINS %@", "Owned Direct"), object: currentMedia)], timeout: 10), .completed,
+            "Selected direct media did not become the current playback context")
         jump("DLNA 投屏")
         reveal(useCurrent)
         XCTAssertTrue(useCurrent.isEnabled, "Direct owned HTTP media should allow DLNA autofill")
