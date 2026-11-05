@@ -51,11 +51,14 @@ struct NativeProviderSkipSegments: Decodable {
     init(from decoder: Decoder) throws {
         guard var container = try? decoder.unkeyedContainer() else { values = []; return }
         var parsed: [NativeProviderSkipSegment] = []
+        var seen = Set<NativeProviderSkipSegment>()
         for _ in 0..<128 {
-            if container.isAtEnd { break }
+            if container.isAtEnd || parsed.count == 32 { break }
             let child = try container.superDecoder()
-            if let segment = try? NativeProviderSkipSegment(from: child) { parsed.append(segment) }
+            guard let segment = try? NativeProviderSkipSegment(from: child),
+                  segment.isValid, seen.insert(segment).inserted else { continue }
+            parsed.append(segment)
         }
-        values = NativeProviderSkipSegment.normalized(parsed)
+        values = parsed
     }
 }
