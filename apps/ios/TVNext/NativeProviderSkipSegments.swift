@@ -33,7 +33,13 @@ struct NativeProviderSkipSegment: Decodable, Hashable {
 
     static func normalized(_ input: [NativeProviderSkipSegment]) -> [NativeProviderSkipSegment] {
         var seen = Set<NativeProviderSkipSegment>()
-        return Array(input.prefix(128).filter { $0.isValid && seen.insert($0).inserted }.prefix(32))
+        var result: [NativeProviderSkipSegment] = []
+        for segment in input.prefix(128) {
+            guard segment.isValid, seen.insert(segment).inserted else { continue }
+            result.append(segment)
+            if result.count == 32 { break }
+        }
+        return result
     }
 }
 
