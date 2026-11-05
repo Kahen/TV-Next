@@ -23,6 +23,29 @@ final class NativeProviderSkipSegmentsTests: XCTestCase {
         XCTAssertFalse(NativeProviderSkipSegment(type: "opening", startMs: 0, endMs: nil).isValid)
     }
 
+    func testNormalizationPreservesProviderOrderAndStopsAtThirtyTwoUniqueSegments() {
+        let first = NativeProviderSkipSegment(type: "opening", startMs: 0, endMs: 1_000)
+        let invalid = NativeProviderSkipSegment(type: "middle", startMs: -1, endMs: 10)
+        let valid = (0..<40).map { index in
+            NativeProviderSkipSegment(type: "middle",
+                                      startMs: Int64(index + 1) * 2_000,
+                                      endMs: Int64(index + 1) * 2_000 + 1_000)
+        }
+        let normalized = NativeProviderSkipSegment.normalized([invalid, first, first] + valid)
+        XCTAssertEqual(normalized.count, 32)
+        XCTAssertEqual(normalized.first, first)
+        XCTAssertEqual(normalized[1], valid[0])
+        XCTAssertEqual(normalized.last, valid[30])
+        XCTAssertEqual(Set(normalized).count, normalized.count)
+    }
+
+    func testNormalizationDoesNotInspectValidEntriesAfterFirst128() {
+        let invalid = NativeProviderSkipSegment(type: "opening", startMs: -1, endMs: 100)
+        let late = NativeProviderSkipSegment(type: "ending", startMs: 500, endMs: nil)
+        XCTAssertEqual(NativeProviderSkipSegment.normalized(Array(repeating: invalid, count: 128) + [late]), [])
+        XCTAssertEqual(NativeProviderSkipSegment.normalized(Array(repeating: invalid, count: 127) + [late]), [late])
+    }
+
     func testMalformedOptionalMetadataDoesNotBreakPlaybackDecoding() throws {
         let prefix = "\"url\":\"https://example.invalid/owned.mp4\",\"name\":\"Owned\",\"lineName\":\"Owned\",\"headers\":{},\"danmaku\":[],\"subtitles\":[]"
         for raw in ["null", "{}", "\"[]\"", "[null,{},4,{\"type\":\"opening\",\"startMs\":true,\"endMs\":5}]"] {
