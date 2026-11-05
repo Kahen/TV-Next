@@ -46,6 +46,26 @@ final class NativeProviderSkipSegmentsTests: XCTestCase {
         XCTAssertEqual(NativeProviderSkipSegment.normalized(Array(repeating: invalid, count: 127) + [late]), [late])
     }
 
+    func testDecoderStopsAtThirtyTwoUniqueValidHintsAndPreservesOrder() throws {
+        let hints = (0..<32).map { index in
+            "{\\"type\\":\\"middle\\",\\"startMs\\":\\(index * 1000),\\"endMs\\":\\(index * 1000 + 500)}"
+        }
+        let late = "{\\"type\\":\\"ending\\",\\"startMs\\":32000}"
+        let raw = "[" + (["null", hints[0], hints[0]] + hints + [late]).joined(separator: ",") + "]"
+        let parsed = try JSONDecoder().decode(NativeProviderSkipSegments.self, from: Data(raw.utf8))
+        XCTAssertEqual(parsed.values.count, 32)
+        XCTAssertEqual(parsed.values.first?.startMs, 0)
+        XCTAssertEqual(parsed.values.last?.startMs, 31_000)
+        XCTAssertFalse(parsed.values.contains { $0.type == "ending" })
+    }
+
+    func testDecoderStillInspectsThrough128WhenQuotaNotReached() throws {
+        let valid = "{\\"type\\":\\"opening\\",\\"startMs\\":0,\\"endMs\\":1000}"
+        let raw = "[" + (Array(repeating: "null", count: 127) + [valid, valid]).joined(separator: ",") + "]"
+        let parsed = try JSONDecoder().decode(NativeProviderSkipSegments.self, from: Data(raw.utf8))
+        XCTAssertEqual(parsed.values, [NativeProviderSkipSegment(type: "opening", startMs: 0, endMs: 1000)])
+    }
+
     func testMalformedOptionalMetadataDoesNotBreakPlaybackDecoding() throws {
         let prefix = "\"url\":\"https://example.invalid/owned.mp4\",\"name\":\"Owned\",\"lineName\":\"Owned\",\"headers\":{},\"danmaku\":[],\"subtitles\":[]"
         for raw in ["null", "{}", "\"[]\"", "[null,{},4,{\"type\":\"opening\",\"startMs\":true,\"endMs\":5}]"] {
