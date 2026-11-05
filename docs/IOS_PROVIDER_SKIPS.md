@@ -19,6 +19,8 @@ Receiving source metadata never seeks automatically. Existing manually created i
 
 Segments stay in the current in-memory playback context. They do not enter TVChannel snapshots, favorites/history, home-server sync, UserDefaults or the manual marker store. Older server responses without the new field still decode. A malformed optional array/member is ignored by the native decoder. Web UI parity and provider-driven automatic skipping remain follow-up work.
 
+The native normalization loop now stops immediately after retaining 32 unique valid entries (rather than filtering all 128 candidates first). The first 128 source entries remain the only eligible input, and original provider order and duplicate precedence are unchanged. XCTest covers invalid/duplicate entries, the 32-entry cap, and both sides of the 128-entry boundary. This is a bounded-processing improvement, not automatic skipping or new provider compatibility.
+
 ## Verification
 
 `fixtures/fongmi-provider-skips-golden.json` anchors Kotlin normalization and native active-range/target tests, including millisecond precision, nullable endings, overlaps, exact boundaries and invalid members. Additional API tests exercise the existing subscription detail/player flow; native smoke/XCTest cover quotas and permissive optional metadata decoding. Actual AVPlayer tests verify a manual seek, no automatic seek, rejected stale/synthetic segment actions, retry, local/new-play cleanup and snapshot exclusion. Production iPhone/iPad XCUI loads an owned subscription through the normal UI, skips its opening, then selects a second episode at the same media URL and verifies the old controls disappear.
