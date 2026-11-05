@@ -31,6 +31,11 @@ snapshots and must not be read as the present implementation backlog.
 
 If Apple devices, authorized external fixtures, signing credentials or independent security review are unavailable, mark **BLOCKED**; never invent passed tests, signed IPA artifacts or App Store approval. Physical checks and release decisions require verifiable access.
 
+## Evidence ledger — 2026-11-05
+
+- [PR #173](https://github.com/Kahen/TV-Next/pull/173), source `e4de8ecd4a47be45cbec3f75545a9c5c9e8a81f3`: stable native malformed-JSON danmaku errors and bounded Files/DLNA UI visibility regressions. [Web/API](https://github.com/Kahen/TV-Next/actions/runs/41938097903) and [full integration](https://github.com/Kahen/TV-Next/actions/runs/41938097961) passed; each iPhone/iPad simulator ran 131 unit and 30 UI tests with no failures. Merged as `0045da1c1f3422a1636bbdbd0bdf0d1e69f74f73`; exact source-head results are the acceptance evidence. Physical-device/provider and signed-release acceptance remain open.
+- [PR #175](https://github.com/Kahen/TV-Next/pull/175), source `59fff68cafe0187ee7b5ca496144100fa053a9c3`: bounded FongMi provider skip ranges and explicit native seeking, with no source-driven automatic seek. [Full integration](https://github.com/Kahen/TV-Next/actions/runs/41938225257) passed 9/9 jobs: API 101 tests with zero failures/errors/skips, Web/PostgreSQL/Compose/NAS/Spider isolation and 135 unit plus 31 UI tests on each iPhone/iPad simulator. The production skip/same-URL next-episode regression passed on both. Separate [Web/API](https://github.com/Kahen/TV-Next/actions/runs/41938225188), [JVM integrity](https://github.com/Kahen/TV-Next/actions/runs/41938225191) and [Compose](https://github.com/Kahen/TV-Next/actions/runs/41938225149) checks passed. Merge `d75d64612b3bfa309ae0af4c8db10343447e9a6f` has the exact tested tree; #174 is closed. P2 #3, P4 #5, physical #38 and release/security gates remain open.
+
 ## Evidence ledger — 2026-10-20
 
 - Web/API and unsigned iOS simulator checks have passed; this does NOT validate actual media playback. A clean GitHub-hosted Linux Docker Compose build/boot and HTTP integration smoke has passed: https://github.com/Kahen/TV-Next/actions/runs/39444315596. Additional expanded endpoint coverage is under PR #14 and requires its own CI evidence. Real NAS installation remains unverified.
