@@ -626,14 +626,37 @@ final class LibraryUITests: XCTestCase {
             let expected=XCTNSPredicateExpectation(predicate:NSPredicate(format:"value == %@",value),object:toggle)
             XCTAssertEqual(XCTWaiter.wait(for:[expected],timeout:5),.completed)
         }
-        if toggle.value as? String == "1" { toggle.tap() }
+        // A SwiftUI player page may still reflow after navigation. Wait for a
+        // hittable switch with a stable frame before each single interaction.
+        // Keep the exact off/on/relaunch/off assertions; never retry a tap.
+        func tapSettledToggle() {
+            reveal(toggle)
+            var lastFrame: CGRect?
+            var stableSince = Date()
+            let stable = NSPredicate { _, _ in
+                guard toggle.exists, toggle.isEnabled else { return false }
+                let frame = toggle.frame
+                guard !frame.isEmpty, !frame.isInfinite else { return false }
+                if lastFrame != frame {
+                    lastFrame = frame
+                    stableSince = Date()
+                    return false
+                }
+                return toggle.isHittable && Date().timeIntervalSince(stableSince) >= 1
+            }
+            XCTAssertEqual(XCTWaiter.wait(for: [
+                XCTNSPredicateExpectation(predicate: stable, object: toggle)
+            ], timeout: 5), .completed, "Background audio switch did not settle")
+            toggle.tap()
+        }
+        if toggle.value as? String == "1" { tapSettledToggle() }
         expectValue("0")
-        toggle.tap()
+        tapSettledToggle()
         expectValue("1")
         app.terminate();app.launch();jump("播放器")
         reveal(toggle)
         expectValue("1")
-        toggle.tap()
+        tapSettledToggle()
         expectValue("0")
     }
 
