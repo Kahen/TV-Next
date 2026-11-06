@@ -143,22 +143,25 @@ enum NativeCrossSiteSearch {
         // of 40 hits per provider; keep that same bound during reconciliation.
         let maxHitsPerSource = maxPages * maxItemsPerPage
         var grouped: [String: [NativeSearchHit<Item>]] = [:]
+        var seenBySource: [String: Set<String>] = [:]
+        // Apply the limit to distinct, valid identities rather than raw entries:
+        // a malformed or duplicate leading page must not evict later valid hits.
+        func retain(_ hit: NativeSearchHit<Item>) {
+            guard let id = identity(hit.item), !id.isEmpty,
+                  grouped[hit.siteKey, default: []].count < maxHitsPerSource,
+                  seenBySource[hit.siteKey, default: []].insert(id).inserted else { return }
+            grouped[hit.siteKey, default: []].append(hit)
+        }
         for hit in previous where permitted.contains(hit.siteKey) && !recoveredKeys.contains(hit.siteKey) {
-            if grouped[hit.siteKey, default: []].count < maxHitsPerSource {
-                grouped[hit.siteKey, default: []].append(hit)
-            }
+            retain(hit)
         }
         for hit in refreshed where permitted.contains(hit.siteKey) && recoveredKeys.contains(hit.siteKey) {
-            if grouped[hit.siteKey, default: []].count < maxHitsPerSource {
-                grouped[hit.siteKey, default: []].append(hit)
-            }
+            retain(hit)
         }
         var merged: [NativeSearchHit<Item>] = []
         var visited = Set<String>()
         for key in sourceOrder.prefix(maxSites) where visited.insert(key).inserted {
-            var seen = Set<String>()
             for hit in grouped[key] ?? [] {
-                guard let id = identity(hit.item), !id.isEmpty, seen.insert(id).inserted else { continue }
                 merged.append(hit)
                 if merged.count == maxResults { return merged }
             }
