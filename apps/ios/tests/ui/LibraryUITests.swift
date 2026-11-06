@@ -821,8 +821,15 @@ final class LibraryUITests: XCTestCase {
         reveal(useCurrent)
         XCTAssertTrue(useCurrent.isEnabled, "Direct owned HTTP media should allow DLNA autofill")
         useCurrent.tap()
-        XCTAssertEqual(app.textFields["dlna-media-url"].value as? String,
-                       "http://127.0.0.1:8765/fixture.mp4")
+        // With large Dynamic Type the field is above the visible button. Bring
+        // it back into view and wait for SwiftUI's updated accessibility value;
+        // an immediate offscreen snapshot can still contain the placeholder.
+        let mediaURL = app.textFields["dlna-media-url"]
+        reveal(mediaURL)
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "value == %@", "http://127.0.0.1:8765/fixture.mp4"),
+            object: mediaURL)], timeout: 5), .completed,
+            "DLNA autofill did not display the selected direct media URL after one tap")
     }
 
     func testManualDLNACastPauseStopAgainstOwnedLoopbackFixture() {
