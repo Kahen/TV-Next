@@ -138,12 +138,20 @@ enum NativeCrossSiteSearch {
         identity: (Item) -> String?
     ) -> [NativeSearchHit<Item>] {
         let permitted = Set(sourceOrder.prefix(maxSites))
+        // A retry must not turn a malformed or oversized caller snapshot into
+        // unbounded retained memory. A normal search returns at most two pages
+        // of 40 hits per provider; keep that same bound during reconciliation.
+        let maxHitsPerSource = maxPages * maxItemsPerPage
         var grouped: [String: [NativeSearchHit<Item>]] = [:]
         for hit in previous where permitted.contains(hit.siteKey) && !recoveredKeys.contains(hit.siteKey) {
-            grouped[hit.siteKey, default: []].append(hit)
+            if grouped[hit.siteKey, default: []].count < maxHitsPerSource {
+                grouped[hit.siteKey, default: []].append(hit)
+            }
         }
         for hit in refreshed where permitted.contains(hit.siteKey) && recoveredKeys.contains(hit.siteKey) {
-            grouped[hit.siteKey, default: []].append(hit)
+            if grouped[hit.siteKey, default: []].count < maxHitsPerSource {
+                grouped[hit.siteKey, default: []].append(hit)
+            }
         }
         var merged: [NativeSearchHit<Item>] = []
         var visited = Set<String>()

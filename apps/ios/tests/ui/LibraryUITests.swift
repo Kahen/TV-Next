@@ -626,14 +626,37 @@ final class LibraryUITests: XCTestCase {
             let expected=XCTNSPredicateExpectation(predicate:NSPredicate(format:"value == %@",value),object:toggle)
             XCTAssertEqual(XCTWaiter.wait(for:[expected],timeout:5),.completed)
         }
-        if toggle.value as? String == "1" { toggle.tap() }
+        // A SwiftUI player page may still reflow after navigation. Wait for a
+        // hittable switch with a stable frame before each single interaction.
+        // Keep the exact off/on/relaunch/off assertions; never retry a tap.
+        func tapSettledToggle() {
+            reveal(toggle)
+            var lastFrame: CGRect?
+            var stableSince = Date()
+            let stable = NSPredicate { _, _ in
+                guard toggle.exists, toggle.isEnabled else { return false }
+                let frame = toggle.frame
+                guard !frame.isEmpty, !frame.isInfinite else { return false }
+                if lastFrame != frame {
+                    lastFrame = frame
+                    stableSince = Date()
+                    return false
+                }
+                return toggle.isHittable && Date().timeIntervalSince(stableSince) >= 1
+            }
+            XCTAssertEqual(XCTWaiter.wait(for: [
+                XCTNSPredicateExpectation(predicate: stable, object: toggle)
+            ], timeout: 5), .completed, "Background audio switch did not settle")
+            toggle.tap()
+        }
+        if toggle.value as? String == "1" { tapSettledToggle() }
         expectValue("0")
-        toggle.tap()
+        tapSettledToggle()
         expectValue("1")
         app.terminate();app.launch();jump("播放器")
         reveal(toggle)
         expectValue("1")
-        toggle.tap()
+        tapSettledToggle()
         expectValue("0")
     }
 
@@ -820,9 +843,33 @@ final class LibraryUITests: XCTestCase {
         jump("DLNA 投屏")
         reveal(useCurrent)
         XCTAssertTrue(useCurrent.isEnabled, "Direct owned HTTP media should allow DLNA autofill")
+        // Playback layout can still shift the enclosing scroll view after
+        // navigation. Require a stable, hittable button before the single tap.
+        var lastFrame: CGRect?
+        var unchangedSince = Date()
+        let settled = NSPredicate { _, _ in
+            guard useCurrent.exists, useCurrent.isEnabled else { return false }
+            let frame = useCurrent.frame
+            guard !frame.isEmpty, !frame.isInfinite else { return false }
+            if lastFrame != frame {
+                lastFrame = frame
+                unchangedSince = Date()
+                return false
+            }
+            return Date().timeIntervalSince(unchangedSince) >= 1 && useCurrent.isHittable
+        }
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: settled, object: useCurrent)], timeout: 5), .completed,
+            "DLNA autofill button did not settle after playback navigation")
         useCurrent.tap()
-        XCTAssertEqual(app.textFields["dlna-media-url"].value as? String,
-                       "http://127.0.0.1:8765/fixture.mp4")
+        // Reveal the field independently after the button tap and wait for
+        // SwiftUI to publish the exact new accessibility value.
+        let mediaURL = app.textFields["dlna-media-url"]
+        reveal(mediaURL)
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "value == %@", "http://127.0.0.1:8765/fixture.mp4"),
+            object: mediaURL)], timeout: 5), .completed,
+            "DLNA autofill did not display the selected direct media URL after one tap")
     }
 
     func testManualDLNACastPauseStopAgainstOwnedLoopbackFixture() {
