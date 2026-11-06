@@ -200,9 +200,10 @@ private actor RequestCounter {
             previous: first.items, refreshed: many, recoveredKeys: ["b"],
             sourceOrder: ["a", "b", "c"], identity: { $0.id }
         )
-        precondition(cappedRetry.count == 81)
+        precondition(cappedRetry.count == 82)
         precondition(cappedRetry.first?.item.id == "a-old")
-        precondition(cappedRetry.last?.item.id == "79")
+        precondition(cappedRetry[80].item.id == "79")
+        precondition(cappedRetry.last?.item.id == "c-old")
 
         // A provider returning 41 entries with hasMore=false still silently
         // loses its 41st entry unless the per-page clip is reported.
