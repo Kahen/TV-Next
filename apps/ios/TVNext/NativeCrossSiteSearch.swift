@@ -89,7 +89,12 @@ enum NativeCrossSiteSearch {
     /// subscriptions that repeat a key before the 16-site boundary.
     static func selectedSources(_ sources: [NativeSearchSource]) -> [NativeSearchSource] {
         var seen = Set<String>()
-        return Array(sources.filter { seen.insert($0.key).inserted }.prefix(maxSites))
+        return Array(sources.filter { source in
+            // Empty/whitespace-only provider keys cannot identify a retry target.
+            // Reject them before they consume one of the bounded search slots.
+            !source.key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+                seen.insert(source.key).inserted
+        }.prefix(maxSites))
     }
 
     /// Explicit completion feedback: no matches is different from transport failure.
@@ -177,7 +182,10 @@ enum NativeCrossSiteSearch {
     ) async throws -> NativeSearchResult<Item> {
         try Task.checkCancellation()
         var seenSources = Set<String>()
-        let eligible = sources.filter { seenSources.insert($0.key).inserted }
+        let eligible = sources.filter { source in
+            !source.key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+                seenSources.insert(source.key).inserted
+        }
         let selected = selectedSources(eligible)
         var grouped = Array(repeating: [NativeSearchHit<Item>](), count: selected.count)
         var failures = Set<Int>()
