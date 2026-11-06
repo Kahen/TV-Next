@@ -18,8 +18,8 @@ final class CrossSiteRetryTests: XCTestCase {
         XCTAssertEqual(selected.last?.key, "site-15")
         XCTAssertEqual(NativeCrossSiteSearch.failedOnlySources(
             malformed + valid, failedKeys: ["", " \n ", "site-0"],
-            searchedKeys: selected.map(\\.key)
-        ).map(\\.key), ["site-0"])
+            searchedKeys: selected.map(\.key)
+        ).map(\.key), ["site-0"])
 
         let result = try await NativeCrossSiteSearch.search(
             sources: malformed + [valid[0]],
@@ -28,7 +28,7 @@ final class CrossSiteRetryTests: XCTestCase {
                 return NativeSearchPage(items: [Item(id: "ok")], hasMore: false)
             }, identity: { $0.id }
         )
-        XCTAssertEqual(result.items.map(\\.siteKey), ["site-0"])
+        XCTAssertEqual(result.items.map(\.siteKey), ["site-0"])
         XCTAssertEqual(result.failedKeys, [])
     }
 
