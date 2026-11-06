@@ -820,10 +820,27 @@ final class LibraryUITests: XCTestCase {
         jump("DLNA 投屏")
         reveal(useCurrent)
         XCTAssertTrue(useCurrent.isEnabled, "Direct owned HTTP media should allow DLNA autofill")
+        // Playback layout can still shift the enclosing scroll view after
+        // navigation. Require a stable, hittable button before the single tap.
+        var lastFrame: CGRect?
+        var unchangedSince = Date()
+        let settled = NSPredicate { _, _ in
+            guard useCurrent.exists, useCurrent.isEnabled else { return false }
+            let frame = useCurrent.frame
+            guard !frame.isEmpty, !frame.isInfinite else { return false }
+            if lastFrame != frame {
+                lastFrame = frame
+                unchangedSince = Date()
+                return false
+            }
+            return Date().timeIntervalSince(unchangedSince) >= 1 && useCurrent.isHittable
+        }
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: settled, object: useCurrent)], timeout: 5), .completed,
+            "DLNA autofill button did not settle after playback navigation")
         useCurrent.tap()
-        // With large Dynamic Type the field is above the visible button. Bring
-        // it back into view and wait for SwiftUI's updated accessibility value;
-        // an immediate offscreen snapshot can still contain the placeholder.
+        // Reveal the field independently after the button tap and wait for
+        // SwiftUI to publish the exact new accessibility value.
         let mediaURL = app.textFields["dlna-media-url"]
         reveal(mediaURL)
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
