@@ -205,6 +205,19 @@ private actor RequestCounter {
         precondition(cappedRetry[80].item.id == "79")
         precondition(cappedRetry.last?.item.id == "c-old")
 
+        // Duplicate-heavy retry pages must not exhaust the 80 distinct-hit
+        // allowance before later valid results are considered.
+        let duplicateHeavy = (0..<100).map { _ in NativeSearchHit(siteKey: "b", item: Item(id: "same")) }
+            + (0..<90).map { NativeSearchHit(siteKey: "b", item: Item(id: "tail-\($0)")) }
+        let uniqueRetry = NativeCrossSiteSearch.mergeRetry(
+            previous: first.items, refreshed: duplicateHeavy, recoveredKeys: ["b"],
+            sourceOrder: ["a", "b", "c"], identity: { $0.id }
+        )
+        precondition(uniqueRetry.count == 82)
+        precondition(uniqueRetry[1].item.id == "same")
+        precondition(uniqueRetry[80].item.id == "tail-78")
+        precondition(uniqueRetry.last?.item.id == "c-old")
+
         // A provider returning 41 entries with hasMore=false still silently
         // loses its 41st entry unless the per-page clip is reported.
         let clippedTerminal = try await NativeCrossSiteSearch.search(

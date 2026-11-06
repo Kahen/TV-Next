@@ -251,4 +251,34 @@ final class CrossSiteRetryTests: XCTestCase {
         XCTAssertFalse(result.warnings.joined().contains("private"))
     }
 
+    func testRetryCapCountsDistinctValidHitsRatherThanDuplicateEntries() {
+        let previous = [NativeSearchHit(siteKey: "a", item: Item(id: "old"))]
+        let duplicatePrefix = (0..<100).map { _ in NativeSearchHit(siteKey: "b", item: Item(id: "same")) }
+        let uniqueTail = (0..<90).map { NativeSearchHit(siteKey: "b", item: Item(id: "tail-\($0)")) }
+        let refreshed = duplicatePrefix + [NativeSearchHit(siteKey: "b", item: Item(id: ""))] + uniqueTail
+        let merged = NativeCrossSiteSearch.mergeRetry(
+            previous: previous, refreshed: refreshed, recoveredKeys: ["b"],
+            sourceOrder: ["a", "b"], identity: { $0.id }
+        )
+        XCTAssertEqual(merged.count, 81)
+        XCTAssertEqual(merged.first?.item.id, "old")
+        XCTAssertEqual(merged[1].item.id, "same")
+        XCTAssertEqual(merged.last?.item.id, "tail-78")
+        XCTAssertFalse(merged.contains { $0.item.id == "tail-79" })
+    }
+
+    func testRetryCannotInjectForeignOrFailedAgainProviderHits() {
+        let previous = [NativeSearchHit(siteKey: "a", item: Item(id: "retained"))]
+        let refreshed = [
+            NativeSearchHit(siteKey: "a", item: Item(id: "replace-attempt")),
+            NativeSearchHit(siteKey: "foreign", item: Item(id: "foreign")),
+            NativeSearchHit(siteKey: "b", item: Item(id: "valid"))
+        ]
+        let merged = NativeCrossSiteSearch.mergeRetry(
+            previous: previous, refreshed: refreshed, recoveredKeys: ["b", "foreign"],
+            sourceOrder: ["a", "b"], identity: { $0.id }
+        )
+        XCTAssertEqual(merged.map { $0.item.id }, ["retained", "valid"])
+    }
+
 }
