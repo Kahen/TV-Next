@@ -50,6 +50,12 @@ final class NativeOfflineMediaCatalog {
         self.maxEntries = maxEntries
         let fm = FileManager.default
         try fm.createDirectory(at: self.directory, withIntermediateDirectories: true)
+        // Refuse a redirected catalog root before reading its manifest or deleting orphans.
+        // createDirectory can succeed when the final component is an existing symlink.
+        let rootValues = try self.directory.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+        guard rootValues.isDirectory == true, rootValues.isSymbolicLink != true else {
+            throw NativeOfflineError.storage
+        }
         // Offline copies are reproducible media, not device backup material.
         var resource = self.directory
         var values = URLResourceValues()
