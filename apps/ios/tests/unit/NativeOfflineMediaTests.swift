@@ -77,6 +77,22 @@ final class NativeOfflineMediaTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: partial.path))
     }
 
+    func testStartupRejectsSymlinkedCatalogRootWithoutDeletingTargetMedia() throws {
+        let outside = temporaryDirectory()
+        let link = temporaryDirectory()
+        defer {
+            try? FileManager.default.removeItem(at: link)
+            try? FileManager.default.removeItem(at: outside)
+        }
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        let orphan = outside.appendingPathComponent(UUID().uuidString + ".mp4")
+        try Data([1, 2, 3]).write(to: orphan)
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: outside)
+
+        XCTAssertThrowsError(try NativeOfflineMediaCatalog(directory: link))
+        XCTAssertEqual(try Data(contentsOf: orphan), Data([1, 2, 3]))
+    }
+
     func testSourcesExcludeHLSLiveUserinfoFragmentsAndUnsupportedSchemes() {
         XCTAssertNotNil(NativeOfflineMediaCatalog.sourceURL("https://example.test/Owned.MP4?signature=private"))
         for raw in ["file:///tmp/owned.mp4", "https://u:p@example.test/a.mp4", "https://example.test/live.m3u8",
