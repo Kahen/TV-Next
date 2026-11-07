@@ -78,8 +78,8 @@ final class NativeOfflineMediaCatalog {
             let filename = file.lastPathComponent
             guard !retained.contains(filename),
                   Self.isOwnedOrphan(filename),
-                  let attributes = try? fm.attributesOfItem(atPath: file.path),
-                  attributes[.type] as? FileAttributeType == .typeRegular else { continue }
+                  let values = try? file.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]),
+                  values.isRegularFile == true, values.isSymbolicLink != true else { continue }
             // Never recursively delete an unexpected directory or follow a symlink.
             try? fm.removeItem(at: file)
         }
