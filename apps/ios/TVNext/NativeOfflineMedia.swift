@@ -74,9 +74,24 @@ final class NativeOfflineMediaCatalog {
         // A terminated transfer or failed atomic manifest write may leave files.
         // Cleanup is confined to this app-owned directory, never an imported URL.
         let retained = Set(entries.map(\.filename) + ["catalog.json"])
-        for file in try fm.contentsOfDirectory(at: self.directory, includingPropertiesForKeys: nil) {
-            if !retained.contains(file.lastPathComponent) { try? fm.removeItem(at: file) }
+        for file in try fm.contentsOfDirectory(at: self.directory, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey]) {
+            let filename = file.lastPathComponent
+            guard !retained.contains(filename),
+                  Self.isOwnedOrphan(filename),
+                  let attributes = try? fm.attributesOfItem(atPath: file.path),
+                  attributes[.type] as? FileAttributeType == .typeRegular else { continue }
+            // Never recursively delete an unexpected directory or follow a symlink.
+            try? fm.removeItem(at: file)
         }
+    }
+
+    private static func isOwnedOrphan(_ filename: String) -> Bool {
+        if filename.hasPrefix("partial-") {
+            return UUID(uuidString: String(filename.dropFirst("partial-".count))) != nil
+        }
+        let parts = filename.split(separator: ".", omittingEmptySubsequences: false)
+        return parts.count == 2 && UUID(uuidString: String(parts[0])) != nil &&
+            extensions.contains(String(parts[1]))
     }
 
     static func sourceURL(_ raw: String) -> URL? {
