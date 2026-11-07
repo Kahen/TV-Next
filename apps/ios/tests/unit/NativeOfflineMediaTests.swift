@@ -48,6 +48,35 @@ final class NativeOfflineMediaTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: catalog.stagingURL(secondID).path))
     }
 
+    func testStartupCleanupOnlyDeletesGeneratedOrphanRegularFiles() throws {
+        let root = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let unrelated = root.appendingPathComponent("user-notes.txt")
+        try Data("keep".utf8).write(to: unrelated)
+        let nested = root.appendingPathComponent("partial-" + UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
+        let nestedFile = nested.appendingPathComponent("important.txt")
+        try Data("keep".utf8).write(to: nestedFile)
+        let orphan = root.appendingPathComponent(UUID().uuidString + ".mp4")
+        try Data([1, 2, 3]).write(to: orphan)
+        let partial = root.appendingPathComponent("partial-" + UUID().uuidString)
+        try Data([4, 5]).write(to: partial)
+        let outside = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: outside) }
+        try Data("outside".utf8).write(to: outside)
+        let link = root.appendingPathComponent(UUID().uuidString + ".mp4")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: outside)
+
+        _ = try NativeOfflineMediaCatalog(directory: root)
+        XCTAssertEqual(try Data(contentsOf: unrelated), Data("keep".utf8))
+        XCTAssertEqual(try Data(contentsOf: nestedFile), Data("keep".utf8))
+        XCTAssertEqual(try Data(contentsOf: outside), Data("outside".utf8))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: link.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: orphan.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: partial.path))
+    }
+
     func testSourcesExcludeHLSLiveUserinfoFragmentsAndUnsupportedSchemes() {
         XCTAssertNotNil(NativeOfflineMediaCatalog.sourceURL("https://example.test/Owned.MP4?signature=private"))
         for raw in ["file:///tmp/owned.mp4", "https://u:p@example.test/a.mp4", "https://example.test/live.m3u8",
