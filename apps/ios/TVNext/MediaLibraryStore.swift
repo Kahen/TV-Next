@@ -212,10 +212,9 @@ final class MediaLibraryStore: ObservableObject {
               snapshot.version == 1 else { return }
         var seen = Set<String>()
         subtitlePreferences = Array(snapshot.entries.reversed().filter { entry in
-            let validChoice = entry.isOff
-                ? entry.displayName == nil && entry.languageTag == nil
-                : (entry.displayName.map { !$0.isEmpty && $0.count <= 80 } ?? false)
-                    && (entry.languageTag?.count ?? 0) <= 64
+            let validChoice = NativeSubtitlePreferencePolicy.normalizedChoice(
+                displayName: entry.displayName, languageTag: entry.languageTag,
+                isOff: entry.isOff) != nil
             return entry.urlDigest.count == 64 && entry.urlDigest.allSatisfy(\.isHexDigit)
                 && validChoice && seen.insert(entry.urlDigest).inserted
         }.prefix(100).reversed())
