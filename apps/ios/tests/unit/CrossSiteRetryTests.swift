@@ -307,4 +307,28 @@ final class CrossSiteRetryTests: XCTestCase {
         XCTAssertEqual(merged.map { $0.item.id }, ["retained", "valid"])
     }
 
+    func testMalformedOriginalSearchKeysDoNotConsumeRetrySlots() {
+        let eligible = (0..<17).map { NativeSearchSource(key: "site-\($0)", name: "Site \($0)") }
+        let snapshot = ["", "  ", "site-0", "site-0"] + (1..<16).map { "site-\($0)" }
+        let retry = NativeCrossSiteSearch.failedOnlySources(
+            eligible, failedKeys: ["", "  ", "site-15", "site-16"], searchedKeys: snapshot
+        )
+        XCTAssertEqual(retry.map(\.key), ["site-15"])
+    }
+
+    func testMalformedAndDuplicateOrderDoesNotEvictLastValidProviderOnMerge() {
+        let original = [
+            NativeSearchHit(siteKey: "site-0", item: Item(id: "old")),
+            NativeSearchHit(siteKey: "site-15", item: Item(id: "last"))
+        ]
+        let injected = [NativeSearchHit(siteKey: "site-16", item: Item(id: "foreign"))]
+        let order = ["", "  ", "site-0", "site-0"] + (1..<16).map { "site-\($0)" }
+        let merged = NativeCrossSiteSearch.mergeRetry(
+            previous: original, refreshed: injected, recoveredKeys: ["site-16"],
+            sourceOrder: order, identity: { $0.id }
+        )
+        XCTAssertEqual(merged.map(\.siteKey), ["site-0", "site-15"])
+        XCTAssertEqual(merged.map { $0.item.id }, ["old", "last"])
+    }
+
 }
