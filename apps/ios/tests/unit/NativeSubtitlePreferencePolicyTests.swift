@@ -3,7 +3,7 @@ import XCTest
 
 final class NativeSubtitlePreferencePolicyTests: XCTestCase {
     func testWhitespaceOnlyTrackIdentityIsRejected() {
-        for name in ["", " ", "\t\n", " \u{3000} "] {
+        for name in ["", " ", "\t\n", " \u{3000} ", "\u{200B}", "\u{FEFF}", "\u{2060}", " \u{200B}\u{FEFF} "] {
             XCTAssertNil(NativeSubtitlePreferencePolicy.normalizedChoice(
                 displayName: name, languageTag: "en", isOff: false))
         }
