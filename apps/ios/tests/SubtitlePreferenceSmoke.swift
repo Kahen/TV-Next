@@ -9,6 +9,7 @@ import Foundation
         precondition(NativeSubtitlePreferencePolicy.normalizedChoice(displayName: "English", languageTag: String(repeating: "z", count: 65), isOff: false) == nil)
         precondition(NativeSubtitlePreferencePolicy.normalizedChoice(displayName: "", languageTag: nil, isOff: false) == nil)
         precondition(NativeSubtitlePreferencePolicy.normalizedChoice(displayName: " \t\n ", languageTag: "en", isOff: false) == nil)
+        precondition(NativeSubtitlePreferencePolicy.normalizedChoice(displayName: "\u{200B}\u{FEFF}\u{2060}", languageTag: nil, isOff: false) == nil, "invisible-only track must be rejected")
         precondition(NativeSubtitlePreferencePolicy.normalizedChoice(displayName: "中文 字幕", languageTag: "zh", isOff: false) != nil)
         precondition(NativeSubtitlePreferencePolicy.normalizedChoice(displayName: " English ", languageTag: nil, isOff: false)?.displayName == " English ")
         precondition(NativeSubtitlePreferencePolicy.normalizedChoice(displayName: nil, languageTag: nil, isOff: false) == nil)
