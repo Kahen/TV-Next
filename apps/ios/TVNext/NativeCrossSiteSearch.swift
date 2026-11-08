@@ -130,7 +130,17 @@ enum NativeCrossSiteSearch {
         return selectedSources(eligible).filter { requested.contains($0.key) }
     }
 
-    /// Ignore malformed and repeated snapshot keys before applying the search cap.\n    /// A corrupt first entry must not consume one of the original 16 slots.\n    private static func validSourceOrder(_ keys: [String]) -> [String] {\n        var seen = Set<String>()\n        return Array(keys.filter { key in\n            !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&\n                seen.insert(key).inserted\n        }.prefix(maxSites))\n    }\n\n    /// Reconcile a failed-site retry with the last visible search. Successful
+    /// Ignore malformed and repeated snapshot keys before applying the search cap.
+    /// A corrupt first entry must not consume one of the original 16 slots.
+    private static func validSourceOrder(_ keys: [String]) -> [String] {
+        var seen = Set<String>()
+        return Array(keys.filter { key in
+            !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+                seen.insert(key).inserted
+        }.prefix(maxSites))
+    }
+
+    /// Reconcile a failed-site retry with the last visible search. Successful
     /// providers are never re-fetched or discarded; a recovered provider
     /// atomically replaces its old partial page. A provider that fails again
     /// retains its previous partial hits instead of showing a mixed snapshot.
@@ -142,7 +152,8 @@ enum NativeCrossSiteSearch {
         sourceOrder: [String],
         identity: (Item) -> String?
     ) -> [NativeSearchHit<Item>] {
-        let orderedKeys = validSourceOrder(sourceOrder)\n        let permitted = Set(orderedKeys)
+        let orderedKeys = validSourceOrder(sourceOrder)
+        let permitted = Set(orderedKeys)
         // A retry must not turn a malformed or oversized caller snapshot into
         // unbounded retained memory. A normal search returns at most two pages
         // of 40 hits per provider; keep that same bound during reconciliation.
