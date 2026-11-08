@@ -125,12 +125,12 @@ enum NativeCrossSiteSearch {
         failedKeys: [String],
         searchedKeys: [String]
     ) -> [NativeSearchSource] {
-        let originallySearched = Set(searchedKeys.prefix(maxSites))
+        let originallySearched = Set(validSourceOrder(searchedKeys))
         let requested = Set(failedKeys).intersection(originallySearched)
         return selectedSources(eligible).filter { requested.contains($0.key) }
     }
 
-    /// Reconcile a failed-site retry with the last visible search. Successful
+    /// Ignore malformed and repeated snapshot keys before applying the search cap.\n    /// A corrupt first entry must not consume one of the original 16 slots.\n    private static func validSourceOrder(_ keys: [String]) -> [String] {\n        var seen = Set<String>()\n        return Array(keys.filter { key in\n            !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&\n                seen.insert(key).inserted\n        }.prefix(maxSites))\n    }\n\n    /// Reconcile a failed-site retry with the last visible search. Successful
     /// providers are never re-fetched or discarded; a recovered provider
     /// atomically replaces its old partial page. A provider that fails again
     /// retains its previous partial hits instead of showing a mixed snapshot.
@@ -142,7 +142,7 @@ enum NativeCrossSiteSearch {
         sourceOrder: [String],
         identity: (Item) -> String?
     ) -> [NativeSearchHit<Item>] {
-        let permitted = Set(sourceOrder.prefix(maxSites))
+        let orderedKeys = validSourceOrder(sourceOrder)\n        let permitted = Set(orderedKeys)
         // A retry must not turn a malformed or oversized caller snapshot into
         // unbounded retained memory. A normal search returns at most two pages
         // of 40 hits per provider; keep that same bound during reconciliation.
@@ -165,7 +165,7 @@ enum NativeCrossSiteSearch {
         }
         var merged: [NativeSearchHit<Item>] = []
         var visited = Set<String>()
-        for key in sourceOrder.prefix(maxSites) where visited.insert(key).inserted {
+        for key in orderedKeys where visited.insert(key).inserted {
             for hit in grouped[key] ?? [] {
                 merged.append(hit)
                 if merged.count == maxResults { return merged }
