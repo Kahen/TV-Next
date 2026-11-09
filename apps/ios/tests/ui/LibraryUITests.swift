@@ -114,7 +114,14 @@ final class LibraryUITests: XCTestCase {
         let clear = app.buttons["clear-" + element.identifier]
         if clear.exists && clear.isEnabled { reveal(clear); clear.tap() }
         reveal(element)
-        element.tap()
+        // The iPad TextEditor AX center can be outside the editable text inset.
+        if element.elementType == .textView {
+            element.coordinate(withNormalizedOffset: CGVector(dx: 0.12, dy: 0.12)).tap()
+        } else {
+            element.tap()
+        }
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 10),
+                      "Text input did not acquire keyboard focus")
         element.typeText(text)
         let done = app.buttons["收起键盘"]
         if done.exists { done.tap() }
@@ -626,27 +633,15 @@ final class LibraryUITests: XCTestCase {
             let expected=XCTNSPredicateExpectation(predicate:NSPredicate(format:"value == %@",value),object:toggle)
             XCTAssertEqual(XCTWaiter.wait(for:[expected],timeout:5),.completed)
         }
-        // A SwiftUI player page may still reflow after navigation. Wait for a
-        // hittable switch with a stable frame before each single interaction.
-        // Keep the exact off/on/relaunch/off assertions; never retry a tap.
+        // AVKit can reflow while the switch is interactable. Preserve one
+        // tap and all persistence assertions; avoid an arbitrary stable-frame gate.
         func tapSettledToggle() {
             reveal(toggle)
-            var lastFrame: CGRect?
-            var stableSince = Date()
-            let stable = NSPredicate { _, _ in
-                guard toggle.exists, toggle.isEnabled else { return false }
-                let frame = toggle.frame
-                guard !frame.isEmpty, !frame.isInfinite else { return false }
-                if lastFrame != frame {
-                    lastFrame = frame
-                    stableSince = Date()
-                    return false
-                }
-                return toggle.isHittable && Date().timeIntervalSince(stableSince) >= 1
-            }
-            XCTAssertEqual(XCTWaiter.wait(for: [
-                XCTNSPredicateExpectation(predicate: stable, object: toggle)
-            ], timeout: 5), .completed, "Background audio switch did not settle")
+            let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                toggle.exists && toggle.isEnabled && toggle.isHittable
+            }, object: toggle)
+            XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 10), .completed,
+                           "Background audio switch never became interactable")
             toggle.tap()
         }
         if toggle.value as? String == "1" { tapSettledToggle() }

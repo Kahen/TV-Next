@@ -1,4 +1,8 @@
-# Implementation status — 2026-11-08
+# Implementation status — 2026-11-09
+
+> **2026-11-09 proposed iOS control-only subtitle identity guard:** A subtitle display name consisting only of C0 control characters or additional invisible format characters (soft hyphen, ZWNJ, ZWJ) must not become a saved track identity. Meaningful Unicode labels and explicit Off remain supported. Positive/negative XCTest and Swift smoke are included. This is a narrow code fix; final-head iPhone/iPad simulator and full integration results are required before merge. Physical device and provider compatibility remain unverified.
+
+> **Merged historical changes:** PR #184 (native search retry snapshot) and PR #185 (subtitle whitespace/invisible identity) are merged; their earlier pending-CI notes below are historical, not current open PRs.
 
 > **2026-11-08 pending final-head verification (native subtitle identity):** Reject whitespace-only AVPlayer subtitle display names before persisting a per-title track preference. Preserve the exact nonblank display name (including meaningful spacing) for full-identity matching, and preserve explicit Off semantics. Added positive/negative Swift smoke and XCTest coverage. This is an owned-code edge-case fix, not real-provider track or physical-device acceptance; iPhone/iPad simulator and full integration CI must pass before merge.
 

@@ -2,8 +2,8 @@ import XCTest
 @testable import TVNext
 
 final class NativeSubtitlePreferencePolicyTests: XCTestCase {
-    func testWhitespaceOnlyTrackIdentityIsRejected() {
-        for name in ["", " ", "\t\n", " \u{3000} ", "\u{200B}", "\u{FEFF}", "\u{2060}", " \u{200B}\u{FEFF} "] {
+    func testNonMeaningfulTrackIdentityIsRejected() {
+        for name in ["", " ", "\t\n", " \u{3000} ", "\u{200B}", "\u{FEFF}", "\u{2060}", " \u{200B}\u{FEFF} ", "\u{0000}", "\u{0007}\u{001B}", "\u{00AD}", "\u{200C}\u{200D}"] {
             XCTAssertNil(NativeSubtitlePreferencePolicy.normalizedChoice(
                 displayName: name, languageTag: "en", isOff: false))
         }
