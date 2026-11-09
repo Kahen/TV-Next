@@ -93,7 +93,7 @@ struct NativeAutomaticProviderSkipState {
         return nil
     }
 
-    mutating func recordExplicitSeek(to time: Double, segments: [NativeProviderSkipSegment], duration: Double) {
+    // Rebase the clock after an opt-in change without consuming any source range.\n    // Time elapsed while disabled must not be mistaken for a manual seek.\n    mutating func rebaseClock(to time: Double, duration: Double) {\n        guard time.isFinite, duration.isFinite, duration > 0,\n              duration < 604_800, time >= 0, time < duration else { return }\n        previousTime = time\n    }\n\n    mutating func recordExplicitSeek(to time: Double, segments: [NativeProviderSkipSegment], duration: Double) {
         guard time.isFinite, duration.isFinite, time >= 0, time <= duration else { return }
         previousTime = time
         for segment in segments.prefix(32) where segment.target(current: time, duration: duration) != nil {
