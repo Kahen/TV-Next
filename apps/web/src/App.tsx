@@ -84,7 +84,7 @@ export default function App() {
   useEffect(() => {
     const video = videoRef.current;
     if (video && subtitleUrl && video.textTracks.length) video.textTracks[0].mode = "showing";
-  }, [subtitleUrl, playbackGeneration, relay.url]);
+  }, [subtitleUrl]);
 
   useEffect(() => {
     const ok = saveLibrary(library);
@@ -392,10 +392,10 @@ export default function App() {
         <section className="player-card">
           <div className="player-header"><span className="small-dot" /> {localVideo?.name || selected?.name || "尚未选择媒体"} <span className="player-type">{localVideo ? "LOCAL / NOT SAVED" : "HTTP(S) · HLS / MP4"}</span></div>
           <div className="video-stage">
-          <video key={`${playbackGeneration}:${relay.url ?? ""}`} ref={videoRef} controls playsInline preload="metadata" aria-label="视频播放器">
+          <video ref={videoRef} controls playsInline preload="metadata" aria-label="视频播放器">
             {subtitleUrl && <track key={subtitleUrl} kind="subtitles" label="外置字幕" srcLang="zh" src={subtitleUrl} default />}
           </video>
-          <DanmakuOverlay key={`${playbackGeneration}:${relay.url ?? ""}`} video={videoRef} comments={danmaku} settings={danmakuSettings}/>
+          <DanmakuOverlay video={videoRef} comments={danmaku} settings={danmakuSettings}/>
           </div>
           {playerError && <p className="player-error" role="alert">{playerError}</p>}
           {(selected || localVideo) && <div className="player-actions">

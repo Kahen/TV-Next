@@ -15,7 +15,7 @@ export default function ProviderSkipControls({video, segments, mediaURL}: {
     if (!media || media.element !== video.current) return null;
     const {element, source} = media;
     if (element.readyState < 1 || element.error || element.seeking) return null;
-    // The player attaches hls.js MediaSource to this playback's own element.
+    // hls.js uses a MediaSource blob on the player; local files have no source controls.
     return element.currentSrc === source || element.currentSrc.startsWith("blob:") ? element : null;
   };
 

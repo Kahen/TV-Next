@@ -71,6 +71,7 @@ test.describe("provider skip controls", () => {
 
     await page.getByRole("button", {name: "Unmarked episode", exact: true}).click();
     await expect(page.locator(".player-header")).toContainText("Unmarked episode");
+    await expect(video).toHaveCount(1);
     await expect(page.getByText("来源片段标记：1 个")).toHaveCount(0);
     await expect.poll(() => video.evaluate(node => (node as HTMLVideoElement).currentSrc)).toBe(media);
   });
