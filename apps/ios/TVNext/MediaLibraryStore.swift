@@ -94,7 +94,12 @@ final class MediaLibraryStore: ObservableObject {
     @discardableResult
     func setAutomaticProviderSkipEnabled(_ enabled: Bool, generation: Int) -> Bool {
         guard generation == playbackGeneration, !providerSkipSegments.isEmpty else { return false }
-        if automaticProviderSkipEnabled != enabled, let item = player.currentItem {\n            automaticProviderSkipState.rebaseClock(to: player.currentTime().seconds,\n                duration: item.duration.seconds)\n        }\n        automaticProviderSkipEnabled = enabled\n        // Do not re-arm consumed ranges on an off/on toggle within one playback.
+        if automaticProviderSkipEnabled != enabled, let item = player.currentItem {
+            automaticProviderSkipState.rebaseClock(to: player.currentTime().seconds,
+                duration: item.duration.seconds)
+        }
+        automaticProviderSkipEnabled = enabled
+        // Do not re-arm consumed ranges on an off/on toggle within one playback.
         return true
     }
 
