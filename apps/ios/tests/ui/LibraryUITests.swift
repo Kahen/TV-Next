@@ -637,7 +637,7 @@ final class LibraryUITests: XCTestCase {
         // tap and all persistence assertions; avoid an arbitrary stable-frame gate.
         func tapSettledToggle() {
             reveal(toggle)
-            let ready = NSPredicateExpectation(predicate: NSPredicate { _, _ in
+            let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
                 toggle.exists && toggle.isEnabled && toggle.isHittable
             }, object: toggle)
             XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 10), .completed,
