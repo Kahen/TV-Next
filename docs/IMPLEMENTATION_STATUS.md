@@ -1,5 +1,9 @@
 # Implementation status — 2026-11-09
 
+> **2026-11-09 PR #186 merged:** [PR #186](https://github.com/Kahen/TV-Next/pull/186) was merged as main `8e06fe2a` after final source HEAD `8874404e` passed [full integration 9/9](https://github.com/Kahen/TV-Next/actions/runs/42552551431) including iPhone/iPad simulators and [Web/API 3/3](https://github.com/Kahen/TV-Next/actions/runs/42552551386). The earlier pending-merge note below is historical. This does not establish physical-device acceptance.
+
+> **2026-11-09 proposed iOS UTF-8 identity bound:** In addition to the existing 80-character subtitle name and 64-character language tag limits, bound UTF-8 encoded bytes (320/128) so a single extended grapheme made of many combining scalars cannot bypass size limits in persisted AVPlayer track preferences. Preserve valid 80-character CJK names and exact identity. XCTest and standalone Swift smoke include positive/negative cases. This is a pending PR, not yet simulator/integration verified or merged.
+
 > **2026-11-09 proposed iOS control-only subtitle identity guard:** A subtitle display name consisting only of C0 control characters or additional invisible format characters (soft hyphen, ZWNJ, ZWJ) must not become a saved track identity. Meaningful Unicode labels and explicit Off remain supported. Positive/negative XCTest and Swift smoke are included. This is a narrow code fix; final-head iPhone/iPad simulator and full integration results are required before merge. Physical device and provider compatibility remain unverified.
 
 > **Merged historical changes:** PR #184 (native search retry snapshot) and PR #185 (subtitle whitespace/invisible identity) are merged; their earlier pending-CI notes below are historical, not current open PRs.
