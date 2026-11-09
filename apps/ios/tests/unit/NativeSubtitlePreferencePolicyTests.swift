@@ -18,6 +18,20 @@ final class NativeSubtitlePreferencePolicyTests: XCTestCase {
             displayName: "中文 字幕", languageTag: nil, isOff: false))
     }
 
+    func testEncodedIdentityBoundsRejectCombiningSequenceAmplification() {
+        let oversizedName = "A" + String(repeating: "\u{0301}", count: 200)
+        XCTAssertLessThanOrEqual(oversizedName.count, 80)
+        XCTAssertNil(NativeSubtitlePreferencePolicy.normalizedChoice(
+            displayName: oversizedName, languageTag: "en", isOff: false))
+        let oversizedTag = "en" + String(repeating: "\u{0301}", count: 100)
+        XCTAssertLessThanOrEqual(oversizedTag.count, 64)
+        XCTAssertNil(NativeSubtitlePreferencePolicy.normalizedChoice(
+            displayName: "English", languageTag: oversizedTag, isOff: false))
+        XCTAssertNotNil(NativeSubtitlePreferencePolicy.normalizedChoice(
+            displayName: String(repeating: "中", count: 80),
+            languageTag: "zh-Hans", isOff: false))
+    }
+
     func testExplicitOffRequiresNoTrackIdentity() {
         XCTAssertEqual(NativeSubtitlePreferencePolicy.normalizedChoice(
             displayName: nil, languageTag: nil, isOff: true),
