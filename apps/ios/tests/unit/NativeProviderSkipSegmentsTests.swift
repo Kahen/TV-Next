@@ -13,7 +13,7 @@ final class NativeProviderSkipSegmentsTests: XCTestCase {
         XCTAssertNil(state.target(segments: [opening], current: 2, duration: 120, playing: true))
     }
 
-    func testAutomaticPolicyPreservesOverlapOrderAndEndingToEOF() {
+    func testReenableRebasesElapsedTimeWithoutConsumingUpcomingRange() {\n        let upcoming = NativeProviderSkipSegment(type: "middle", startMs: 20_000, endMs: 30_000)\n        var state = NativeAutomaticProviderSkipState()\n        XCTAssertNil(state.target(segments: [upcoming], current: 1, duration: 120, playing: true))\n        // Playback advances while automation is disabled; enabling must not\n        // interpret that gap as a user seek or suppress the next source range.\n        state.rebaseClock(to: 19.5, duration: 120)\n        XCTAssertNil(state.target(segments: [upcoming], current: 19.5, duration: 120, playing: true))\n        XCTAssertEqual(state.target(segments: [upcoming], current: 20, duration: 120, playing: true), 30)\n        state.rebaseClock(to: 20, duration: 120)\n        XCTAssertNil(state.target(segments: [upcoming], current: 20, duration: 120, playing: true),\n                     "Re-enabling must not re-arm an already consumed segment")\n    }\n\n    func testAutomaticPolicyPreservesOverlapOrderAndEndingToEOF() {
         let first = NativeProviderSkipSegment(type: "middle", startMs: 10_000, endMs: 20_000)
         let second = NativeProviderSkipSegment(type: "middle", startMs: 15_000, endMs: 25_000)
         let ending = NativeProviderSkipSegment(type: "ending", startMs: 25_000, endMs: nil)
