@@ -308,3 +308,9 @@ The “使用当前播放地址” control now uses the same bounded direct HTTP
 ### P2 native failed-only search boundary regression (#168)
 
 The iOS retry coordinator now intersects failure keys with the original selected-site snapshot and the same first-16-unique eligible-provider boundary used by initial search. It does not expand requests to a 17th, newly inserted or otherwise unsearched provider. Swift smoke/XCTest cover negative and positive cases, including actual request counts; existing iPhone/iPad XCUI and full integration CI must pass on the final PR HEAD before closing #168. Physical devices, permitted external providers and P2/P3/P6 acceptance remain separate.
+
+### 2026-11-09 — PR #188 provider-skip consent follow-up
+
+- Final-head CI on `22281d46` failed iPhone/iPad `testProviderAutomaticSkipRequiresExplicitToggleAndResetsForNextEpisode` at the post-tap accessibility value assertion; this is not a passing simulator gate. The existing test covers opt-in, feedback and same-URL next-episode reset; no assertions were removed.
+- Updated `NativeProviderSkipControls` to read `library.playbackGeneration` when the Toggle binding setter runs rather than capturing a generation from a prior SwiftUI render. This addresses a possible stale-generation consent rejection; the exact root cause and effectiveness require simulator verification.
+- Compose failed during locked Kotlin compiler download (HTTP 504) before browser tests; rerun required. Do not merge until the new HEAD passes iPhone/iPad, Compose and aggregate gate.
