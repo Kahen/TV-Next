@@ -14,6 +14,7 @@ export interface Channel {
   replay?: LiveReplaySession;
   subtitles?: PlaybackResource[];
   danmaku?: PlaybackResource[];
+  skipSegments?: import("./providerSkips").ProviderSkipSegment[];
 }
 export interface PlaylistResult {
   channels: Channel[];
@@ -77,7 +78,7 @@ export interface MediaDetail {
   item: MediaItem; description: string | null; director: string | null;
   actors: string | null; lines: MediaLine[]; provider: string;
 }
-export interface MediaPlayback { timeshift?: LiveTimeshift | null; url: string; name: string; lineName: string; provider: string; headers?: Record<string, string>; subtitles?: PlaybackResource[]; danmaku?: PlaybackResource[] }
+export interface MediaPlayback { timeshift?: LiveTimeshift | null; url: string; name: string; lineName: string; provider: string; headers?: Record<string, string>; subtitles?: PlaybackResource[]; danmaku?: PlaybackResource[]; skipSegments?: import("./providerSkips").ProviderSkipSegment[] }
 export interface MediaQuery {
   content: string; categoryId?: string; query?: string; vodId?: string;
   page?: number; pageSize?: number; lineIndex?: number; episodeIndex?: number;

@@ -93,18 +93,66 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertTrue(store.providerSkipSegments.isEmpty)
     }
 
+    func testAutomaticProviderSkipNeedsConsentAndPlayingAndDoesNotTrapRewatch() async throws {
+        let source = channel("Automatic owned fixture", url: "http://127.0.0.1:8765/fixture.mp4?auto-skip-test")
+        let segment = NativeProviderSkipSegment(type: "opening", startMs: 0, endMs: 15_250)
+        store.play(source, providerSkipSegments: [segment])
+        try await waitUntil { self.store.player.currentItem?.status == .readyToPlay }
+        XCTAssertTrue(store.handleSystemPlaybackCommand(.pause))
+        XCTAssertTrue(store.handleSystemPlaybackCommand(.seek(0)))
+        try await waitUntil { self.store.player.currentTime().seconds < 0.1 }
+        XCTAssertFalse(store.automaticProviderSkipEnabled)
+        XCTAssertEqual(store.automaticProviderSkipCount, 0)
+        let generation = store.playbackGeneration
+        XCTAssertTrue(store.setAutomaticProviderSkipEnabled(true, generation: generation))
+        try await Task.sleep(nanoseconds: 1_200_000_000)
+        XCTAssertLessThan(store.player.currentTime().seconds, 0.1, "Consent must not seek while paused")
+        XCTAssertTrue(store.handleSystemPlaybackCommand(.play))
+        try await waitUntil { self.store.automaticProviderSkipCount == 1 }
+        XCTAssertGreaterThanOrEqual(store.player.currentTime().seconds, 15.2)
+        XCTAssertTrue(store.handleSystemPlaybackCommand(.pause))
+        XCTAssertTrue(store.handleSystemPlaybackCommand(.seek(1)))
+        try await waitUntil { abs(self.store.player.currentTime().seconds - 1) < 0.1 }
+        // Toggle off/on cannot re-arm a consumed segment in this playback.
+        XCTAssertTrue(store.setAutomaticProviderSkipEnabled(false, generation: generation))
+        XCTAssertTrue(store.setAutomaticProviderSkipEnabled(true, generation: generation))
+        XCTAssertTrue(store.handleSystemPlaybackCommand(.play))
+        try await Task.sleep(nanoseconds: 1_200_000_000)
+        XCTAssertLessThan(store.player.currentTime().seconds, 5)
+        XCTAssertEqual(store.automaticProviderSkipCount, 1)
+        XCTAssertNil(store.introOutroMarkers, "Source automation must not create user markers")
+        let saved = try XCTUnwrap(defaults.data(forKey: "tv-next-library-v1"))
+        XCTAssertFalse(String(decoding: saved, as: UTF8.self).contains("automaticProvider"))
+
+        store.retryPlayback()
+        XCTAssertFalse(store.automaticProviderSkipEnabled, "Retry starts a new opt-in playback")
+        XCTAssertEqual(store.automaticProviderSkipCount, 0)
+        XCTAssertFalse(store.setAutomaticProviderSkipEnabled(true, generation: generation))
+        XCTAssertTrue(store.setAutomaticProviderSkipEnabled(true, generation: store.playbackGeneration))
+        store.play(source, providerSkipSegments: [segment])
+        XCTAssertFalse(store.automaticProviderSkipEnabled, "Same-URL next episode needs new consent")
+        XCTAssertTrue(store.setAutomaticProviderSkipEnabled(true, generation: store.playbackGeneration))
+        store.playLocalFile(try fixture(), name: "Local")
+        XCTAssertFalse(store.automaticProviderSkipEnabled)
+        XCTAssertFalse(store.setAutomaticProviderSkipEnabled(true, generation: store.playbackGeneration))
+        store.clear()
+        XCTAssertFalse(store.automaticProviderSkipEnabled)
+    }
+
     func testLiveAndReplayCannotAcquireProviderSkipControls() {
         let segment = NativeProviderSkipSegment(type: "opening", startMs: 0, endMs: 15_250)
         var live = channel()
         live.timeshift = NativeTimeshift(url: "https://example.invalid/seek?time={time}", start: 1, window: 1000)
         store.play(live, providerSkipSegments: [segment])
         XCTAssertTrue(store.providerSkipSegments.isEmpty)
+        XCTAssertFalse(store.setAutomaticProviderSkipEnabled(true, generation: store.playbackGeneration))
         XCTAssertFalse(store.skipProviderSegment(segment, generation: store.playbackGeneration))
         var replay = channel()
         replay.replay = NativeReplaySession(path: "/unavailable", expiresAt: Int64.max, hls: false, time: 1)
         store.play(replay, providerSkipSegments: [segment])
         XCTAssertTrue(store.providerSkipSegments.isEmpty)
         XCTAssertNil(store.activeProviderSkipSegment)
+        XCTAssertFalse(store.setAutomaticProviderSkipEnabled(true, generation: store.playbackGeneration))
         XCTAssertFalse(store.skipProviderSegment(segment, generation: store.playbackGeneration))
     }
 

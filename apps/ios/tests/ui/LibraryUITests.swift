@@ -157,7 +157,7 @@ final class LibraryUITests: XCTestCase {
         XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
     }
 
-    func testProviderSegmentsCanBeSkippedAndAreClearedForTheNextEpisode() {
+    private func loadProviderSkipFixture() {
         app.terminate()
         app.launchArguments += ["-tv-next-api-url", "http://127.0.0.1:8769"]
         app.launch()
@@ -177,6 +177,10 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(first.waitForExistence(timeout: 10))
         reveal(first); first.tap()
         jump("播放器")
+    }
+
+    func testProviderSegmentsCanBeSkippedAndAreClearedForTheNextEpisode() {
+        loadProviderSkipFixture()
         let count = app.staticTexts["provider-skip-count"]
         reveal(count)
         XCTAssertTrue(count.waitForExistence(timeout: 10))
@@ -196,6 +200,34 @@ final class LibraryUITests: XCTestCase {
         let removed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: count)
         XCTAssertEqual(XCTWaiter.wait(for: [removed], timeout: 5), .completed)
         XCTAssertFalse(skip.exists, "The same media URL in a new episode must not retain old source markers")
+    }
+
+    func testProviderAutomaticSkipRequiresExplicitToggleAndResetsForNextEpisode() {
+        loadProviderSkipFixture()
+        let toggle = app.switches["automatic-provider-skip"]
+        reveal(toggle)
+        XCTAssertTrue(toggle.waitForExistence(timeout: 10))
+        XCTAssertEqual(toggle.value as? String, "0")
+        XCTAssertFalse(app.staticTexts["automatic-provider-skip-feedback"].exists)
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            toggle.exists && toggle.isEnabled && toggle.isHittable
+        }, object: toggle)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 10), .completed)
+        toggle.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "value == %@", "1"), object: toggle)], timeout: 5), .completed)
+        let feedback = app.staticTexts["automatic-provider-skip-feedback"]
+        XCTAssertTrue(feedback.waitForExistence(timeout: 10))
+        reveal(feedback)
+        XCTAssertEqual(feedback.label, "已自动跳过 1 个来源片段。")
+        // Reload an episode using the same media URL: consent cannot transfer.
+        jump("TVBox 订阅")
+        let first = app.buttons["带来源标记"]
+        reveal(first); first.tap()
+        jump("播放器")
+        reveal(toggle)
+        XCTAssertEqual(toggle.value as? String, "0")
+        XCTAssertFalse(feedback.exists)
     }
 
     func testCrossSiteSuccessfulEmptySearchHasExplicitFeedback() async throws {

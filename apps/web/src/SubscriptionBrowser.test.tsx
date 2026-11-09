@@ -25,7 +25,7 @@ it("loads original subscription and resolves cloud episode with playback metadat
   request.mockResolvedValueOnce(doc)
     .mockResolvedValueOnce({categories:[],items:[{id:"1",name:"Movie"}],total:1,page:1,hasMore:false})
     .mockResolvedValueOnce({item:{id:"1",name:"Movie"},description:"own content",lines:[{name:"Cloud",episodes:[{name:"E1",playable:true}]}]})
-    .mockResolvedValueOnce({url:"https://example.org/video.mp4",name:"E1",lineName:"Cloud",headers:{Referer:"https://example.org/"},danmaku:[{name:"弹幕",url:"https://example.org/dm.xml"}],subtitles:[]});
+    .mockResolvedValueOnce({url:"https://example.org/video.mp4",name:"E1",lineName:"Cloud",headers:{Referer:"https://example.org/"},danmaku:[{name:"弹幕",url:"https://example.org/dm.xml"}],subtitles:[],skipSegments:[{type:"opening",startMs:0,endMs:15250}]});
   render(<SubscriptionBrowser onPlay={onPlay}/>);
   fireEvent.change(screen.getByLabelText("订阅配置"),{target:{value:'{"sites":[]}'}});
   fireEvent.click(screen.getByText("加载订阅"));
@@ -33,7 +33,7 @@ it("loads original subscription and resolves cloud episode with playback metadat
   expect((screen.getByRole("button",{name:/Android/}) as HTMLButtonElement).disabled).toBe(true);
   fireEvent.click(cloud);fireEvent.click(await screen.findByText("Movie"));
   fireEvent.click(await screen.findByText("E1"));
-  await waitFor(()=>expect(onPlay).toHaveBeenCalledWith(expect.objectContaining({url:"https://example.org/video.mp4",danmaku:[{name:"弹幕",url:"https://example.org/dm.xml"}]})));
+  await waitFor(()=>expect(onPlay).toHaveBeenCalledWith(expect.objectContaining({url:"https://example.org/video.mp4",danmaku:[{name:"弹幕",url:"https://example.org/dm.xml"}],skipSegments:[{type:"opening",startMs:0,endMs:15250}]})));
   expect(request.mock.calls[1][1]).toEqual(expect.objectContaining({content:doc.content,url:doc.url,siteKey:"cloud"}));
 });
 it("cloud navigation keeps tokens in requests and disconnect clears credentials",async()=>{

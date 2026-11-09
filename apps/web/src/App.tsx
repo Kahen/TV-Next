@@ -22,6 +22,7 @@ import type { DanmakuComment } from "./danmaku";
 import "./media-style.css";
 import EpgGuide from "./EpgGuide";
 import LiveReplayControls from "./LiveReplayControls";
+import ProviderSkipControls from "./ProviderSkipControls";
 import "./epg-style.css";
 
 type Tab = "playlist" | "config" | "media" | "epg" | "home";
@@ -83,7 +84,7 @@ export default function App() {
   useEffect(() => {
     const video = videoRef.current;
     if (video && subtitleUrl && video.textTracks.length) video.textTracks[0].mode = "showing";
-  }, [subtitleUrl]);
+  }, [subtitleUrl, playbackGeneration, relay.url]);
 
   useEffect(() => {
     const ok = saveLibrary(library);
@@ -210,7 +211,7 @@ export default function App() {
       video.removeAttribute("src");
       video.load();
     };
-  }, [selected, localVideo,relay.required,relay.url,relay.hls,relay.error]);
+  }, [selected, localVideo, playbackGeneration,relay.required,relay.url,relay.hls,relay.error]);
 
   function playLocalFile(file: File | undefined) {
     if (!file) return;
@@ -391,10 +392,10 @@ export default function App() {
         <section className="player-card">
           <div className="player-header"><span className="small-dot" /> {localVideo?.name || selected?.name || "尚未选择媒体"} <span className="player-type">{localVideo ? "LOCAL / NOT SAVED" : "HTTP(S) · HLS / MP4"}</span></div>
           <div className="video-stage">
-          <video ref={videoRef} controls playsInline preload="metadata" aria-label="视频播放器">
+          <video key={`${playbackGeneration}:${relay.url ?? ""}`} ref={videoRef} controls playsInline preload="metadata" aria-label="视频播放器">
             {subtitleUrl && <track key={subtitleUrl} kind="subtitles" label="外置字幕" srcLang="zh" src={subtitleUrl} default />}
           </video>
-          <DanmakuOverlay video={videoRef} comments={danmaku} settings={danmakuSettings}/>
+          <DanmakuOverlay key={`${playbackGeneration}:${relay.url ?? ""}`} video={videoRef} comments={danmaku} settings={danmakuSettings}/>
           </div>
           {playerError && <p className="player-error" role="alert">{playerError}</p>}
           {(selected || localVideo) && <div className="player-actions">
@@ -420,6 +421,9 @@ export default function App() {
             <button onClick={()=>setDanmaku([])}>清空弹幕</button>
           </details>}
           {selected && <LiveReplayControls channel={selected} session={homeSession} onPlay={playChannel} cancellationKey={playbackGeneration} />}
+          {selected && !localVideo && !selected.replay && !selected.timeshift && <ProviderSkipControls
+            key={`${playbackGeneration}:${relay.url ?? ""}`} video={videoRef} segments={selected.skipSegments}
+            mediaURL={relay.required ? relay.url ?? null : selected.url} />}
           {selected && <div className="player-actions">
             <button className="secondary" onClick={() => setLibrary((state) => toggleFavorite(state, selected.url))}>
               {library.favorites.includes(selected.url) ? "★ 取消收藏" : "☆ 收藏此频道"}

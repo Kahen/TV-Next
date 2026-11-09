@@ -17,6 +17,65 @@ async function select(page:Page,name:string){
 }
 test.beforeEach(async({page})=>{await page.goto("/");});
 
+test.describe("provider skip controls", () => {
+  test.use({serviceWorkers: "block"});
+
+  test("subscription source markers seek only on click and do not survive a same-URL episode change", async ({page}) => {
+    const item = {id: "fixture", name: "Owned skip movie"};
+    await page.route("**/api/v1/subscriptions/*", async route => {
+      const operation = new URL(route.request().url()).pathname.split("/").pop();
+      switch (operation) {
+        case "load":
+          await route.fulfill({json: {
+            content: '{"sites":[]}', sites: [{key: "skip", name: "Owned skip site", type: 4, support: "http-spider"}],
+            depots: [], warnings: [], liveCount: 0
+          }});
+          break;
+        case "home":
+          await route.fulfill({json: {categories: [], items: [item], total: 1, page: 1, hasMore: false}});
+          break;
+        case "detail":
+          await route.fulfill({json: {item, lines: [{name: "Owned", episodes: [
+            {name: "Marked episode", playable: true}, {name: "Unmarked episode", playable: true}
+          ]}]}});
+          break;
+        case "play": {
+          const first = route.request().postDataJSON().episodeIndex === 0;
+          await route.fulfill({json: {
+            url: media, name: first ? "Marked episode" : "Unmarked episode", lineName: "Owned",
+            skipSegments: first ? [{type: "opening", startMs: 0, endMs: 15250}] : []
+          }});
+          break;
+        }
+        default:
+          await route.fulfill({status: 404});
+      }
+    });
+    await page.getByRole("button", {name: /影视目录/}).click();
+    await page.getByLabel("订阅配置").fill('{"sites":[]}');
+    await page.getByRole("button", {name: "加载订阅"}).click();
+    await page.getByRole("button", {name: "Owned skip site"}).click();
+    await page.getByRole("button", {name: "Owned skip movie"}).click();
+    await page.getByRole("button", {name: "Marked episode", exact: true}).click();
+
+    const video = page.locator("video");
+    const skip = page.getByRole("button", {name: "跳过来源片头"});
+    await expect(skip).toBeEnabled();
+    expect(await video.evaluate(node => (node as HTMLVideoElement).currentTime)).toBe(0);
+    await skip.click();
+    await expect.poll(() => video.evaluate(node => {
+      const player = node as HTMLVideoElement;
+      return player.seeking ? 0 : player.currentTime;
+    })).toBeCloseTo(15.25, 1);
+    expect(await page.evaluate(key => localStorage.getItem(key), key)).not.toContain("skipSegments");
+
+    await page.getByRole("button", {name: "Unmarked episode", exact: true}).click();
+    await expect(page.locator(".player-header")).toContainText("Unmarked episode");
+    await expect(page.getByText("来源片段标记：1 个")).toHaveCount(0);
+    await expect.poll(() => video.evaluate(node => (node as HTMLVideoElement).currentSrc)).toBe(media);
+  });
+});
+
 test.describe("live replay controls",()=>{
   // Keep synthetic route fixtures independent of service-worker request ownership in WebKit.
   // The separate production PWA test below still exercises real service workers.

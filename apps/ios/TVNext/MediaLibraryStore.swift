@@ -51,11 +51,21 @@ final class MediaLibraryStore: ObservableObject {
     @Published private var providerSkipData: [NativeProviderSkipSegment] = []
     private var providerSkipGeneration = -1
     private var providerSkipURL: String?
+    @Published private(set) var automaticProviderSkipEnabled = false
+    @Published private(set) var automaticProviderSkipCount = 0
+    private var automaticProviderSkipState = NativeAutomaticProviderSkipState()
+    private var playbackSeekInFlight = false
+    private var playbackSeekID = UUID()
 
     private func resetProviderSkipContext() {
         providerSkipData = []
         providerSkipGeneration = -1
         providerSkipURL = nil
+        automaticProviderSkipEnabled = false
+        automaticProviderSkipCount = 0
+        automaticProviderSkipState = NativeAutomaticProviderSkipState()
+        playbackSeekInFlight = false
+        playbackSeekID = UUID()
     }
 
     var providerSkipSegments: [NativeProviderSkipSegment] {
@@ -79,6 +89,29 @@ final class MediaLibraryStore: ObservableObject {
               let item = player.currentItem, item.status == .readyToPlay,
               let target = segment.target(current: player.currentTime().seconds, duration: item.duration.seconds) else { return false }
         return handleSystemPlaybackCommand(.seek(target))
+    }
+
+    @discardableResult
+    func setAutomaticProviderSkipEnabled(_ enabled: Bool, generation: Int) -> Bool {
+        guard generation == playbackGeneration, !providerSkipSegments.isEmpty else { return false }
+        automaticProviderSkipEnabled = enabled
+        // Do not re-arm consumed ranges on an off/on toggle within one playback.
+        return true
+    }
+
+    private func tickAutomaticProviderSkip() {
+        guard automaticProviderSkipEnabled, !playbackSeekInFlight,
+              let item = player.currentItem, item.status == .readyToPlay else { return }
+        let segments = providerSkipSegments
+        guard !segments.isEmpty,
+              let target = automaticProviderSkipState.target(segments: segments,
+                  current: player.currentTime().seconds, duration: item.duration.seconds,
+                  playing: player.timeControlStatus == .playing) else { return }
+        let generation = playbackGeneration
+        _ = seekPlayback(to: target, automaticProvider: true) { [weak self] in
+            guard let self, self.playbackGeneration == generation else { return }
+            self.automaticProviderSkipCount += 1
+        }
     }
     @Published private(set) var channels: [TVChannel] = []
     @Published private(set) var favorites: [String] = []
@@ -490,7 +523,9 @@ final class MediaLibraryStore: ObservableObject {
         }
         mediaTimeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 1, preferredTimescale: 600), queue: .main) { [weak self] _ in
             Task { @MainActor [weak self] in
-                self?.tickAutomaticSkip()
+                // User-created markers take priority. Never submit competing
+                // marker/provider seeks on the same observer tick.
+                if self?.tickAutomaticSkip() != true { self?.tickAutomaticProviderSkip() }
                 self?.updateSystemMetadata()
             }
         }
@@ -565,6 +600,7 @@ final class MediaLibraryStore: ObservableObject {
         playbackError = nil
         guard MediaAddress.valid(channel.url), let url = URL(string: channel.url) else { return }
         playbackGeneration += 1
+        resetProviderSkipContext()
         providerSkipGeneration = playbackGeneration
         providerSkipURL = channel.url
         providerSkipData = channel.replay == nil && channel.timeshift == nil
@@ -830,11 +866,12 @@ final class MediaLibraryStore: ObservableObject {
         automaticSkipState = NativeAutomaticSkipState()
     }
 
-    private func tickAutomaticSkip() {
-        guard let context = introOutroContext(), let markers = introOutroMarkers,
+    private func tickAutomaticSkip() -> Bool {
+        guard !playbackSeekInFlight,
+              let context = introOutroContext(), let markers = introOutroMarkers,
               let target = automaticSkipState.target(markers: markers, current: context.time,
-                  duration: context.duration, playing: player.timeControlStatus == .playing) else { return }
-        _ = handleSystemPlaybackCommand(.seek(target))
+                  duration: context.duration, playing: player.timeControlStatus == .playing) else { return false }
+        return handleSystemPlaybackCommand(.seek(target))
     }
 
     func retryPlayback() {
@@ -959,14 +996,7 @@ final class MediaLibraryStore: ObservableObject {
         case .toggle:
             return handleSystemPlaybackCommand(player.rate > 0 || player.timeControlStatus == .waitingToPlayAtSpecifiedRate ? .pause : .play)
         case .seek(let value):
-            let duration=item.duration.seconds
-            guard value.isFinite,value >= 0,duration.isFinite,duration > 0,duration < 604_800,value <= duration else { return false }
-            player.seek(to:CMTime(seconds:value,preferredTimescale:600),toleranceBefore:.zero,toleranceAfter:.zero) { [weak self,weak item] finished in
-                Task { @MainActor [weak self,weak item] in
-                    guard finished,let self,let item,self.player.currentItem === item else { return }
-                    self.updateSystemMetadata()
-                }
-            }
+            return seekPlayback(to: value)
         case .skip(let interval):
             guard let target = NativePlaybackCommand.boundedSkipTarget(
                 current: player.currentTime().seconds, interval: interval, duration: item.duration.seconds
@@ -976,6 +1006,36 @@ final class MediaLibraryStore: ObservableObject {
             let duration=item.duration.seconds
             guard rate.isFinite,(0.75...2).contains(rate),duration.isFinite,duration>0,duration<604_800 else { return false }
             setPlaybackSpeed(rate)
+        }
+        updateSystemMetadata()
+        return true
+    }
+
+    /// Serializes seeks from app controls and both automatic policies. A late
+    /// completion cannot release a newer seek or report a skip on another item.
+    @discardableResult
+    private func seekPlayback(to value: Double, automaticProvider: Bool = false,
+                              completed: (@MainActor () -> Void)? = nil) -> Bool {
+        guard let item = player.currentItem, item.status != .failed else { return false }
+        let duration = item.duration.seconds
+        guard value.isFinite, value >= 0, duration.isFinite, duration > 0,
+              duration < 604_800, value <= duration else { return false }
+        if !automaticProvider && automaticProviderSkipEnabled {
+            automaticProviderSkipState.recordExplicitSeek(to: value,
+                segments: providerSkipSegments, duration: duration)
+        }
+        let seekID = UUID()
+        playbackSeekID = seekID
+        playbackSeekInFlight = true
+        player.seek(to: CMTime(seconds: value, preferredTimescale: 600),
+                    toleranceBefore: .zero, toleranceAfter: .zero) { [weak self, weak item] finished in
+            Task { @MainActor [weak self, weak item] in
+                guard let self, self.playbackSeekID == seekID else { return }
+                self.playbackSeekInFlight = false
+                guard finished, let item, self.player.currentItem === item else { return }
+                self.updateSystemMetadata()
+                completed?()
+            }
         }
         updateSystemMetadata()
         return true
