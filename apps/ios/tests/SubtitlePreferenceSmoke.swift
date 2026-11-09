@@ -18,6 +18,9 @@ import Foundation
         precondition(NativeSubtitlePreferencePolicy.normalizedChoice(displayName: nil, languageTag: nil, isOff: true) == NativeSubtitlePreferenceIdentity(displayName: nil, languageTag: nil, isOff: true))
         precondition(NativeSubtitlePreferencePolicy.normalizedChoice(displayName: "English", languageTag: nil, isOff: true) == nil)
         precondition(NativeSubtitlePreferencePolicy.normalizedChoice(displayName: nil, languageTag: "en", isOff: true) == nil)
+        precondition(NativeSubtitlePreferencePolicy.normalizedChoice(displayName: "A" + String(repeating: "\u{0301}", count: 200), languageTag: "en", isOff: false) == nil, "oversized UTF-8 track name must be rejected")
+        precondition(NativeSubtitlePreferencePolicy.normalizedChoice(displayName: "English", languageTag: "en" + String(repeating: "\u{0301}", count: 100), isOff: false) == nil, "oversized UTF-8 language tag must be rejected")
+        precondition(NativeSubtitlePreferencePolicy.normalizedChoice(displayName: String(repeating: "中", count: 80), languageTag: "zh-Hans", isOff: false) != nil, "valid CJK name at boundary must be accepted")
         print("Subtitle preference identity: valid/off/invalid/boundary cases passed")
     }
 }
