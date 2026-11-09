@@ -26,7 +26,10 @@ struct NativeProviderSkipControls: View {
                     let generation = library.playbackGeneration
                     Toggle("自动跳过本次播放的来源片段", isOn: Binding(
                         get: { library.automaticProviderSkipEnabled },
-                        set: { _ = library.setAutomaticProviderSkipEnabled($0, generation: generation) }
+                        set: { enabled in
+                            // Read the current generation when the user acts, not when SwiftUI renders.
+                            _ = library.setAutomaticProviderSkipEnabled(enabled, generation: library.playbackGeneration)
+                        }
                     ))
                     .accessibilityIdentifier("automatic-provider-skip")
                     Text("默认手动跳过。开启后仅在播放中自动跳过；拖回已跳过的片段可重看，换集或重试后需重新开启。")
