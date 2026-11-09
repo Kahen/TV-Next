@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
-import fixture from "../../../fixtures/fongmi-provider-skips-golden.json";
+import { readFileSync } from "node:fs";
 import { normalizeProviderSkips, providerSkipTarget } from "./providerSkips";
 import { addRecent, emptyLibrary, normalizeLibrary } from "./library";
+
+const fixture = JSON.parse(readFileSync(
+  new URL("../../../fixtures/fongmi-provider-skips-golden.json", import.meta.url), "utf8"
+)) as {
+  expected: unknown;
+  positions: { seconds: number; duration: number; type: string | null; target: number | null }[];
+};
 
 describe("normalized provider segments", () => {
   it("matches the JVM/Swift shared millisecond and EOF targets", () => {
