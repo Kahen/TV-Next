@@ -3,6 +3,7 @@ import SwiftUI
 struct NativeProviderSkipControls: View {
     @ObservedObject var library: MediaLibraryStore
     @State private var feedback: String?
+    @State private var consentFeedback: String?
 
     var body: some View {
         Group {
@@ -15,11 +16,18 @@ struct NativeProviderSkipControls: View {
                         get: { library.automaticProviderSkipEnabled },
                         set: { enabled in
                             // Read the current generation when the user acts, not when SwiftUI renders.
-                            _ = library.setAutomaticProviderSkipEnabled(enabled, generation: library.playbackGeneration)
+                            let accepted = library.setAutomaticProviderSkipEnabled(enabled, generation: library.playbackGeneration)
+                            consentFeedback = accepted ? (enabled ? "本次播放已允许自动跳过。" : "本次播放已关闭自动跳过。")
+                                : "播放内容已变化，无法修改自动跳过，请重新选择视频。"
                         }
                     ))
                     .toggleStyle(.switch)
                     .accessibilityIdentifier("automatic-provider-skip")
+                    if let consentFeedback {
+                        Text(consentFeedback)
+                            .font(.caption).foregroundStyle(.secondary)
+                            .accessibilityIdentifier("provider-skip-consent-status")
+                    }
                     TimelineView(.periodic(from: .now, by: 0.5)) { _ in
                         let segment = library.activeProviderSkipSegment
                         let generation = library.playbackGeneration
@@ -47,6 +55,9 @@ struct NativeProviderSkipControls: View {
                 }
             }
         }
-        .onChange(of: library.playbackGeneration) { _, _ in feedback = nil }
+        .onChange(of: library.playbackGeneration) { _, _ in
+            feedback = nil
+            consentFeedback = nil
+        }
     }
 }
