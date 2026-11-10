@@ -209,11 +209,16 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(toggle.waitForExistence(timeout: 10))
         XCTAssertEqual(toggle.value as? String, "0")
         XCTAssertFalse(app.staticTexts["automatic-provider-skip-feedback"].exists)
+        // SwiftUI exposes the row and the native switch as separate accessibility
+        // elements. Tapping the labeled row can miss the switch on a wide layout.
+        let switchControl = toggle.children(matching: .switch).firstMatch
+        reveal(switchControl)
         let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            toggle.exists && toggle.isEnabled && toggle.isHittable
-        }, object: toggle)
-        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 10), .completed)
-        toggle.tap()
+            switchControl.exists && switchControl.isEnabled && switchControl.isHittable
+        }, object: switchControl)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 10), .completed,
+                       "Native provider-skip switch never became interactable")
+        switchControl.tap()
         let enabled = XCTWaiter.wait(for: [XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "value == %@", "1"), object: toggle)], timeout: 5)
         if enabled != .completed {
@@ -233,13 +238,22 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(feedback.waitForExistence(timeout: 10))
         reveal(feedback)
         XCTAssertEqual(feedback.label, "已自动跳过 1 个来源片段。")
-        // Reload an episode using the same media URL: consent cannot transfer.
+        // The next episode has the same URL and markers, so it must show a
+        // fresh disabled switch even though the earlier episode was opted in.
         jump("TVBox 订阅")
-        let first = app.buttons["带来源标记"]
-        reveal(first); first.tap()
+        let next = app.buttons["下集也有来源标记"]
+        reveal(next)
+        next.tap()
         jump("播放器")
+        let currentMedia = app.staticTexts["current-media"]
+        let loadedNext = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label CONTAINS %@", "Owned next episode"),
+            object: currentMedia
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [loadedNext], timeout: 10), .completed)
         reveal(toggle)
         XCTAssertEqual(toggle.value as? String, "0")
+        XCTAssertFalse(consentStatus.exists)
         XCTAssertFalse(feedback.exists)
     }
 
