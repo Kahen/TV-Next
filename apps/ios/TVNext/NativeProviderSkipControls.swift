@@ -18,6 +18,7 @@ struct NativeProviderSkipControls: View {
                             _ = library.setAutomaticProviderSkipEnabled(enabled, generation: library.playbackGeneration)
                         }
                     ))
+                    .toggleStyle(.switch)
                     .accessibilityIdentifier("automatic-provider-skip")
                     TimelineView(.periodic(from: .now, by: 0.5)) { _ in
                         let segment = library.activeProviderSkipSegment
