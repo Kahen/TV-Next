@@ -111,12 +111,20 @@ class CrossSiteRetryFixtureTests(unittest.TestCase):
         page = self.post("/api/v1/subscriptions/home", request)
         self.assertEqual(page["items"][0]["id"], "owned-skip")
         detail = self.post("/api/v1/subscriptions/detail", request)
-        self.assertEqual(len(detail["lines"][0]["episodes"]), 2)
+        self.assertEqual([episode["name"] for episode in detail["lines"][0]["episodes"]],
+                         ["带来源标记", "无来源标记", "下集也有来源标记"])
         first = self.post("/api/v1/subscriptions/play", request)
         self.assertEqual(first["skipSegments"], [{"type": "opening", "startMs": 0, "endMs": 85000}])
         second = self.post("/api/v1/subscriptions/play", dict(request, episodeIndex=1))
         self.assertEqual(second["skipSegments"], [])
         self.assertEqual(first["url"], second["url"], "Same URL must not preserve previous episode hints")
+        third = self.post("/api/v1/subscriptions/play", dict(request, episodeIndex=2))
+        self.assertEqual(first["url"], third["url"])
+        self.assertEqual(first["skipSegments"], third["skipSegments"])
+        self.assertNotEqual(first["name"], third["name"])
+        with self.assertRaises(HTTPError) as error:
+            self.post("/api/v1/subscriptions/play", dict(request, episodeIndex=3))
+        self.assertEqual(error.exception.code, 400)
         with self.assertRaises(HTTPError) as error:
             self.post("/api/v1/subscriptions/play", dict(request, episodeIndex=True))
         self.assertEqual(error.exception.code, 400)

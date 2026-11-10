@@ -157,7 +157,7 @@ final class LibraryUITests: XCTestCase {
         XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
     }
 
-    func testProviderSegmentsCanBeSkippedAndAreClearedForTheNextEpisode() {
+    private func loadProviderSkipFixture() {
         app.terminate()
         app.launchArguments += ["-tv-next-api-url", "http://127.0.0.1:8769"]
         app.launch()
@@ -177,6 +177,10 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(first.waitForExistence(timeout: 10))
         reveal(first); first.tap()
         jump("播放器")
+    }
+
+    func testProviderSegmentsCanBeSkippedAndAreClearedForTheNextEpisode() {
+        loadProviderSkipFixture()
         let count = app.staticTexts["provider-skip-count"]
         reveal(count)
         XCTAssertTrue(count.waitForExistence(timeout: 10))
@@ -196,6 +200,61 @@ final class LibraryUITests: XCTestCase {
         let removed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: count)
         XCTAssertEqual(XCTWaiter.wait(for: [removed], timeout: 5), .completed)
         XCTAssertFalse(skip.exists, "The same media URL in a new episode must not retain old source markers")
+    }
+
+    func testProviderAutomaticSkipRequiresExplicitToggleAndResetsForNextEpisode() {
+        loadProviderSkipFixture()
+        let toggle = app.switches["automatic-provider-skip"]
+        reveal(toggle)
+        XCTAssertTrue(toggle.waitForExistence(timeout: 10))
+        XCTAssertEqual(toggle.value as? String, "0")
+        XCTAssertFalse(app.staticTexts["automatic-provider-skip-feedback"].exists)
+        // SwiftUI exposes the row and the native switch as separate accessibility
+        // elements. Tapping the labeled row can miss the switch on a wide layout.
+        let switchControl = toggle.children(matching: .switch).firstMatch
+        reveal(switchControl)
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            switchControl.exists && switchControl.isEnabled && switchControl.isHittable
+        }, object: switchControl)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 10), .completed,
+                       "Native provider-skip switch never became interactable")
+        switchControl.tap()
+        let enabled = XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "value == %@", "1"), object: toggle)], timeout: 5)
+        if enabled != .completed {
+            let attachment = XCTAttachment(screenshot: app.screenshot())
+            attachment.name = "Provider skip consent switch after tap"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
+        let consentStatus = app.staticTexts["provider-skip-consent-status"]
+        if enabled != .completed {
+            print("Provider skip consent diagnostic: status=\(consentStatus.exists ? consentStatus.label : "<setter not observed>")")
+        }
+        XCTAssertEqual(enabled, .completed, "Switch did not enable after one tap; value=\(String(describing: toggle.value)), UI=\(toggle.debugDescription)")
+        XCTAssertTrue(consentStatus.waitForExistence(timeout: 5), "Binding setter did not expose consent result")
+        XCTAssertEqual(consentStatus.label, "本次播放已允许自动跳过。")
+        let feedback = app.staticTexts["automatic-provider-skip-feedback"]
+        XCTAssertTrue(feedback.waitForExistence(timeout: 10))
+        reveal(feedback)
+        XCTAssertEqual(feedback.label, "已自动跳过 1 个来源片段。")
+        // The next episode has the same URL and markers, so it must show a
+        // fresh disabled switch even though the earlier episode was opted in.
+        jump("TVBox 订阅")
+        let next = app.buttons["下集也有来源标记"]
+        reveal(next)
+        next.tap()
+        jump("播放器")
+        let currentMedia = app.staticTexts["current-media"]
+        let loadedNext = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label CONTAINS %@", "Owned next episode"),
+            object: currentMedia
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [loadedNext], timeout: 10), .completed)
+        reveal(toggle)
+        XCTAssertEqual(toggle.value as? String, "0")
+        XCTAssertFalse(consentStatus.exists)
+        XCTAssertFalse(feedback.exists)
     }
 
     func testCrossSiteSuccessfulEmptySearchHasExplicitFeedback() async throws {

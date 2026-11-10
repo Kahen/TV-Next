@@ -158,16 +158,18 @@ class Handler(BaseHTTPRequestHandler):
         if self.path.endswith("/detail"):
             return self.respond(200, {"item": item, "description": None, "lines": [
                 {"name": "Owned", "episodes": [{"name": "带来源标记", "playable": True},
-                                                 {"name": "无来源标记", "playable": True}]}
+                                                 {"name": "无来源标记", "playable": True},
+                                                 {"name": "下集也有来源标记", "playable": True}]}
             ]})
         index = body.get("episodeIndex", 0)
-        if type(index) is not int or index not in (0, 1):
+        if type(index) is not int or index not in (0, 1, 2):
             return self.respond(400, {"error": "invalid fixture episode"})
         return self.respond(200, {
-            "url": "http://127.0.0.1:8765/fixture.mp4", "name": "Owned episode",
+            "url": "http://127.0.0.1:8765/fixture.mp4",
+            "name": "Owned next episode" if index == 2 else "Owned episode",
             "lineName": "Owned", "headers": {}, "subtitles": [], "danmaku": [],
             "timeshift": None,
-            "skipSegments": [{"type": "opening", "startMs": 0, "endMs": 85000}] if index == 0 else []
+            "skipSegments": [{"type": "opening", "startMs": 0, "endMs": 85000}] if index in (0, 2) else []
         })
 
 if __name__ == "__main__":

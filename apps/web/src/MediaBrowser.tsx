@@ -48,7 +48,9 @@ export default function MediaBrowser({ onPlay }: { onPlay: (media: Channel) => v
       onPlay({
         name: (detail?.item.name || "媒体") + " · " + result.name,
         url: result.url,
-        group: result.lineName
+        group: result.lineName,
+        skipSegments: result.skipSegments,
+        timeshift: result.timeshift
       });
     } catch (e) { setError(e instanceof Error ? e.message : "播放地址不可用"); }
     finally { setBusy(false); }

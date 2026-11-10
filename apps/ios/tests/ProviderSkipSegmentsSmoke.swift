@@ -31,6 +31,17 @@ import Foundation
         let late = "[" + Array(repeating: "null", count: 128).joined(separator: ",") + ",{\"type\":\"opening\",\"startMs\":0,\"endMs\":1}]"
         let clipped = try JSONDecoder().decode(NativeProviderSkipSegments.self, from: Data(late.utf8))
         precondition(clipped.values.isEmpty)
+        let intro = NativeProviderSkipSegment(type: "opening", startMs: 0, endMs: 5000)
+        let middle = NativeProviderSkipSegment(type: "middle", startMs: 5000, endMs: 10000)
+        var automatic = NativeAutomaticProviderSkipState()
+        precondition(automatic.target(segments: [intro, middle], current: 0, duration: 120, playing: false) == nil)
+        precondition(automatic.target(segments: [intro, middle], current: 0.5, duration: 120, playing: true) == 5)
+        precondition(automatic.target(segments: [intro, middle], current: 5, duration: 120, playing: true) == 10)
+        precondition(automatic.target(segments: [intro, middle], current: 1, duration: 120, playing: true) == nil)
+        precondition(automatic.target(segments: [intro, middle], current: 2, duration: 120, playing: true) == nil)
+        automatic = NativeAutomaticProviderSkipState()
+        automatic.recordExplicitSeek(to: 6, segments: [middle], duration: 120)
+        precondition(automatic.target(segments: [middle], current: 6, duration: 120, playing: true) == nil)
         print("Native provider skip millisecond bounds, order and shared targets passed")
     }
 }

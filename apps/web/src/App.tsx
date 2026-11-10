@@ -22,6 +22,7 @@ import type { DanmakuComment } from "./danmaku";
 import "./media-style.css";
 import EpgGuide from "./EpgGuide";
 import LiveReplayControls from "./LiveReplayControls";
+import ProviderSkipControls from "./ProviderSkipControls";
 import "./epg-style.css";
 
 type Tab = "playlist" | "config" | "media" | "epg" | "home";
@@ -230,7 +231,7 @@ export default function App() {
       video.removeAttribute("src");
       video.load();
     };
-  }, [selected, localVideo,relay.required,relay.url,relay.hls,relay.error]);
+  }, [selected, localVideo, playbackGeneration,relay.required,relay.url,relay.hls,relay.error]);
 
   function playLocalFile(file: File | undefined) {
     if (!file) return;
@@ -474,6 +475,9 @@ export default function App() {
             }}>清空弹幕</button>
           </details>}
           {selected && <LiveReplayControls channel={selected} session={homeSession} onPlay={playChannel} cancellationKey={playbackGeneration} />}
+          {selected && !localVideo && !selected.replay && !selected.timeshift && <ProviderSkipControls
+            key={`${playbackGeneration}:${relay.url ?? ""}`} video={videoRef} segments={selected.skipSegments}
+            mediaURL={relay.required ? relay.url ?? null : selected.url} />}
           {selected && <div className="player-actions">
             <button className="secondary" onClick={() => setLibrary((state) => toggleFavorite(state, selected.url))}>
               {library.favorites.includes(selected.url) ? "★ 取消收藏" : "☆ 收藏此频道"}
