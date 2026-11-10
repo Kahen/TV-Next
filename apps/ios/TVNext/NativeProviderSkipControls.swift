@@ -11,6 +11,14 @@ struct NativeProviderSkipControls: View {
                     Text("来源片段标记：\(library.providerSkipSegments.count) 个")
                         .font(.subheadline)
                         .accessibilityIdentifier("provider-skip-count")
+                    Toggle("自动跳过本次播放的来源片段", isOn: Binding(
+                        get: { library.automaticProviderSkipEnabled },
+                        set: { enabled in
+                            // Read the current generation when the user acts, not when SwiftUI renders.
+                            _ = library.setAutomaticProviderSkipEnabled(enabled, generation: library.playbackGeneration)
+                        }
+                    ))
+                    .accessibilityIdentifier("automatic-provider-skip")
                     TimelineView(.periodic(from: .now, by: 0.5)) { _ in
                         let segment = library.activeProviderSkipSegment
                         let generation = library.playbackGeneration
@@ -24,14 +32,6 @@ struct NativeProviderSkipControls: View {
                         .accessibilityIdentifier("skip-provider-segment")
                     }
                     let generation = library.playbackGeneration
-                    Toggle("自动跳过本次播放的来源片段", isOn: Binding(
-                        get: { library.automaticProviderSkipEnabled },
-                        set: { enabled in
-                            // Read the current generation when the user acts, not when SwiftUI renders.
-                            _ = library.setAutomaticProviderSkipEnabled(enabled, generation: library.playbackGeneration)
-                        }
-                    ))
-                    .accessibilityIdentifier("automatic-provider-skip")
                     Text("默认手动跳过。开启后仅在播放中自动跳过；拖回已跳过的片段可重看，换集或重试后需重新开启。")
                         .font(.caption).foregroundStyle(.secondary)
                     if library.automaticProviderSkipCount > 0 {
