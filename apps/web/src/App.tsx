@@ -26,6 +26,12 @@ import "./epg-style.css";
 
 type Tab = "playlist" | "config" | "media" | "epg" | "home";
 type Collection = "all" | "favorites" | "recent";
+type ResourceKind = "subtitle" | "danmaku";
+type ResourceRequests = Partial<Record<ResourceKind, AbortController>>;
+
+function cancelResourceRequests(requests: ResourceRequests) {
+  for (const request of Object.values(requests)) request.abort();
+}
 
 export default function App() {
   const [danmaku, setDanmaku] = useState<DanmakuComment[]>([]);
@@ -53,9 +59,8 @@ export default function App() {
   const [subtitleName, setSubtitleName] = useState("");
   const [storageWarning, setStorageWarning] = useState("");
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const resourceRequests = useRef<ResourceRequests>({});
   const relay=useMediaRelay(localVideo?null:selected,homeSession);
-  const mediaKey = selected?.url ?? localVideo?.url;
-  const mediaKeyRef = useRef(mediaKey); mediaKeyRef.current = mediaKey;
   const libraryRef = useRef(library);
   libraryRef.current = library;
   const channels = library.channels;
@@ -71,6 +76,7 @@ export default function App() {
   // Object URLs are deliberately ephemeral and never written to the media library.
   useEffect(() => () => { if (localVideo) URL.revokeObjectURL(localVideo.url); }, [localVideo]);
   useEffect(() => () => { if (subtitleUrl) URL.revokeObjectURL(subtitleUrl); }, [subtitleUrl]);
+  useEffect(() => () => cancelResourceRequests(resourceRequests.current), []);
   useEffect(() => {
     if (!subtitleOriginal) {
       setSubtitleUrl(null);
@@ -105,6 +111,20 @@ export default function App() {
     return items.filter((item) => (item.name + " " + item.group).toLowerCase().includes(query));
   }, [channels, library.favorites, library.recent, collection, filter]);
 
+  function beginResourceRequest(kind: ResourceKind): AbortSignal {
+    resourceRequests.current[kind]?.abort();
+    const request = new AbortController();
+    resourceRequests.current[kind] = request;
+    return request.signal;
+  }
+
+  function clearPlaybackResources() {
+    cancelResourceRequests(resourceRequests.current);
+    setDanmaku([]);
+    setSubtitleOriginal("");
+    setSubtitleName("");
+  }
+
   function playChannel(channel: Channel) {
     if (!validMediaUrl(channel.url)) {
       setError("媒体 URL 无效或包含不允许的凭据。");
@@ -115,7 +135,7 @@ export default function App() {
     setLocalVideo(null);
     setPlaybackGeneration(value=>value+1);
     setSelected(channel);
-    setDanmaku([]); setSubtitleOriginal(""); setSubtitleName("");
+    clearPlaybackResources();
     setLibrary((state) => addRecent(state, channel));
   }
 
@@ -221,41 +241,67 @@ export default function App() {
     setError("");
     setPlaybackGeneration(value=>value+1);
     setSelected(null);
-    setDanmaku([]); setSubtitleOriginal(""); setSubtitleName("");
+    clearPlaybackResources();
     setLocalVideo({ url: URL.createObjectURL(file), name: file.name });
     // Browser object URLs do not survive refresh, and must never appear in recent/favorites.
   }
 
   async function importSubtitle(file: File | undefined) {
     if (!file) return;
+    const signal = beginResourceRequest("subtitle");
     if (file.size > 1_048_576) {
       setError("字幕文件不可超过 1 MiB。");
       return;
     }
     try {
-      const vtt = toWebVtt(await file.text(), file.name);
+      const text = await file.text();
+      if (signal.aborted) return;
+      const vtt = toWebVtt(text, file.name);
       setSubtitleOffset(0);
       setSubtitleOriginal(vtt);
       setSubtitleName(file.name);
       setError("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "无法读取字幕");
+      if (!signal.aborted) setError(err instanceof Error ? err.message : "无法读取字幕");
     }
   }
 
   async function loadSubtitleSource(url: string, name: string) {
-    const key=mediaKey;
-    try { const result=await requestJson<{content:string}>("/api/v1/resources/text",{url});if(key!==mediaKeyRef.current)return;setSubtitleOriginal(toWebVtt(result.content, /\.(srt|vtt|ass|ssa)$/i.test(name) ? name : (/\.(srt|vtt|ass|ssa)$/i.test(new URL(url).pathname) ? new URL(url).pathname : "remote.srt")));setSubtitleOffset(0);setSubtitleName(name); }
-    catch(e){setError(e instanceof Error?e.message:"字幕加载失败");}
+    const signal = beginResourceRequest("subtitle");
+    try {
+      const result = await requestJson<{content: string}>("/api/v1/resources/text", {url}, signal);
+      if (signal.aborted) return;
+      const supported = /\.(srt|vtt|ass|ssa)$/i;
+      const filename = supported.test(name) ? name : new URL(url).pathname;
+      setSubtitleOriginal(toWebVtt(result.content, supported.test(filename) ? filename : "remote.srt"));
+      setSubtitleOffset(0);
+      setSubtitleName(name);
+    } catch (err) {
+      if (!signal.aborted) setError(err instanceof Error ? err.message : "字幕加载失败");
+    }
   }
+
   async function loadDanmakuFile(file: File) {
-    try { if(file.size>2097152)throw new Error("弹幕最多 2 MiB");setDanmaku(parseDanmaku(await file.text()));setError(""); }
-    catch(e) {setError(e instanceof Error?e.message:"弹幕导入失败");}
+    const signal = beginResourceRequest("danmaku");
+    try {
+      if (file.size > 2_097_152) throw new Error("弹幕最多 2 MiB");
+      const text = await file.text();
+      if (signal.aborted) return;
+      setDanmaku(parseDanmaku(text));
+      setError("");
+    } catch (err) {
+      if (!signal.aborted) setError(err instanceof Error ? err.message : "弹幕导入失败");
+    }
   }
+
   async function loadDanmakuSource(url: string) {
-    const key=mediaKey;
-    try { const result = await requestJson<{content:string}>("/api/v1/resources/text",{url});if(key!==mediaKeyRef.current)return;setDanmaku(parseDanmaku(result.content)); }
-    catch(e) {setError(e instanceof Error?e.message:"弹幕加载失败");}
+    const signal = beginResourceRequest("danmaku");
+    try {
+      const result = await requestJson<{content: string}>("/api/v1/resources/text", {url}, signal);
+      if (!signal.aborted) setDanmaku(parseDanmaku(result.content));
+    } catch (err) {
+      if (!signal.aborted) setError(err instanceof Error ? err.message : "弹幕加载失败");
+    }
   }
 
   async function enterFullscreen() {
@@ -290,6 +336,7 @@ export default function App() {
       if (decision.warning) setError(decision.warning);
       if (!decision.applied) return;
       setLibrary((state) => replacePlaylistChannels(state, parsed).state);
+      cancelResourceRequests(resourceRequests.current);
       setSelected(null);
       setCollection("all");
       setFilter("");
@@ -362,6 +409,7 @@ export default function App() {
 
   function resetLibrary() {
     if (!window.confirm("清空当前浏览器内的频道、收藏、最近播放及进度？此操作不可撤销。")) return;
+    cancelResourceRequests(resourceRequests.current);
     setSelected(null);
     setLibrary(emptyLibrary());
     setRawText("");
@@ -405,7 +453,10 @@ export default function App() {
             </label>
             {selected?.subtitles?.map((source,i)=><button key={i} onClick={()=>void loadSubtitleSource(source.url,source.name)}>{source.name}</button>)}
             {subtitleUrl && <label>字幕偏移（正值延后） <input aria-label="字幕偏移" type="range" min="-10" max="10" step="0.5" value={subtitleOffset} onChange={(e) => setSubtitleOffset(Number(e.target.value))} /> {subtitleOffset.toFixed(1)} 秒</label>}
-            {subtitleUrl && <button className="secondary" onClick={() => { setSubtitleOriginal(""); setSubtitleUrl(null); setSubtitleName(""); setSubtitleOffset(0); }} title={subtitleName}>移除字幕</button>}
+            {subtitleUrl && <button className="secondary" onClick={() => {
+              resourceRequests.current.subtitle?.abort();
+              setSubtitleOriginal(""); setSubtitleUrl(null); setSubtitleName(""); setSubtitleOffset(0);
+            }} title={subtitleName}>移除字幕</button>}
           </div>}
           {(selected || localVideo) && <details className="danmaku-controls"><summary>弹幕 · {danmaku.length} 条</summary>
             <label className="file-picker">导入弹幕 XML / JSON<input type="file" accept=".xml,.json" onChange={e=>{const f=e.target.files?.[0]; if(f)void loadDanmakuFile(f);e.target.value="";}}/></label>
@@ -417,7 +468,10 @@ export default function App() {
             <label>弹幕时长<input type="range" min="4" max="15" value={danmakuSettings.duration} onChange={e=>setDanmakuSettings(s=>({...s,duration:Number(e.target.value)}))}/></label>
             <label>偏移（秒）<input type="number" min="-120" max="120" value={danmakuSettings.offset} onChange={e=>setDanmakuSettings(s=>({...s,offset:Math.max(-120,Math.min(120,Number(e.target.value)||0))}))}/></label>
             <label>屏蔽词（逗号分隔）<input maxLength={1000} value={danmakuSettings.blocked} onChange={e=>setDanmakuSettings(s=>({...s,blocked:e.target.value}))}/></label>
-            <button onClick={()=>setDanmaku([])}>清空弹幕</button>
+            <button onClick={() => {
+              resourceRequests.current.danmaku?.abort();
+              setDanmaku([]);
+            }}>清空弹幕</button>
           </details>}
           {selected && <LiveReplayControls channel={selected} session={homeSession} onPlay={playChannel} cancellationKey={playbackGeneration} />}
           {selected && <div className="player-actions">
