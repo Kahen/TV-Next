@@ -69,6 +69,7 @@ private actor RequestCounter {
         precondition(NativeCrossSiteSearch.emptyState(resultCount: 1, failedCount: 2, selectedCount: 2) == nil)
         precondition(NativeCrossSiteSearch.emptyState(resultCount: 0, failedCount: 0, selectedCount: 0) == nil)
         precondition(NativeCrossSiteSearch.emptyState(resultCount: 0, failedCount: -1, selectedCount: 2) == nil)
+        precondition(NativeCrossSiteSearch.emptyState(resultCount: 0, failedCount: 3, selectedCount: 2) == nil)
         // Opening a search hit from B after browsing A must not leak A's
         // category filters into subsequent B requests. Same-site detail keeps them.
         var scope = NativeSiteBrowsingContext<String>(
