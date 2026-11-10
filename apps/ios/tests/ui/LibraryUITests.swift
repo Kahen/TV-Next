@@ -222,7 +222,13 @@ final class LibraryUITests: XCTestCase {
             attachment.lifetime = .keepAlways
             add(attachment)
         }
+        let consentStatus = app.staticTexts["provider-skip-consent-status"]
+        if enabled != .completed {
+            print("Provider skip consent diagnostic: status=\(consentStatus.exists ? consentStatus.label : "<setter not observed>")")
+        }
         XCTAssertEqual(enabled, .completed, "Switch did not enable after one tap; value=\(String(describing: toggle.value)), UI=\(toggle.debugDescription)")
+        XCTAssertTrue(consentStatus.waitForExistence(timeout: 5), "Binding setter did not expose consent result")
+        XCTAssertEqual(consentStatus.label, "本次播放已允许自动跳过。")
         let feedback = app.staticTexts["automatic-provider-skip-feedback"]
         XCTAssertTrue(feedback.waitForExistence(timeout: 10))
         reveal(feedback)
