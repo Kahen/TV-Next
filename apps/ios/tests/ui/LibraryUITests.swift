@@ -214,8 +214,15 @@ final class LibraryUITests: XCTestCase {
         }, object: toggle)
         XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 10), .completed)
         toggle.tap()
-        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "value == %@", "1"), object: toggle)], timeout: 5), .completed)
+        let enabled = XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "value == %@", "1"), object: toggle)], timeout: 5)
+        if enabled != .completed {
+            let attachment = XCTAttachment(screenshot: app.screenshot())
+            attachment.name = "Provider skip consent switch after tap"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
+        XCTAssertEqual(enabled, .completed, "Switch did not enable after one tap; value=\(String(describing: toggle.value)), UI=\(toggle.debugDescription)")
         let feedback = app.staticTexts["automatic-provider-skip-feedback"]
         XCTAssertTrue(feedback.waitForExistence(timeout: 10))
         reveal(feedback)
