@@ -85,14 +85,14 @@ enum NativeCrossSiteSearch {
     static let maxItemsPerPage = 40
     static let maxResults = 600
 
-    /// Match the coordinator's first-unique-provider selection, including
+    /// Control characters cannot be stable subscription provider identities.\n    private static func validProviderKey(_ key: String) -> Bool {\n        validProviderKey(key) &&\n            key.unicodeScalars.allSatisfy { !CharacterSet.controlCharacters.contains($0) }\n    }\n\n    /// Match the coordinator's first-unique-provider selection, including
     /// subscriptions that repeat a key before the 16-site boundary.
     static func selectedSources(_ sources: [NativeSearchSource]) -> [NativeSearchSource] {
         var seen = Set<String>()
         return Array(sources.filter { source in
             // Empty/whitespace-only provider keys cannot identify a retry target.
             // Reject them before they consume one of the bounded search slots.
-            !source.key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            validProviderKey(source.key) &&
                 seen.insert(source.key).inserted
         }.prefix(maxSites))
     }
@@ -135,7 +135,7 @@ enum NativeCrossSiteSearch {
     private static func validSourceOrder(_ keys: [String]) -> [String] {
         var seen = Set<String>()
         return Array(keys.filter { key in
-            !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            validProviderKey(key) &&
                 seen.insert(key).inserted
         }.prefix(maxSites))
     }
@@ -194,7 +194,7 @@ enum NativeCrossSiteSearch {
         try Task.checkCancellation()
         var seenSources = Set<String>()
         let eligible = sources.filter { source in
-            !source.key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            validProviderKey(source.key) &&
                 seenSources.insert(source.key).inserted
         }
         let selected = selectedSources(eligible)
