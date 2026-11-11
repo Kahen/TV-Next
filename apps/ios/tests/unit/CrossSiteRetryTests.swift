@@ -6,6 +6,32 @@ final class CrossSiteRetryTests: XCTestCase {
         let id: String
     }
 
+    func testInvisibleFormatProviderKeysCannotEnterSearchOrRetry() async throws {
+        let malformed = [
+            NativeSearchSource(key: "site\u{200B}hidden", name: "Zero width"),
+            NativeSearchSource(key: "site\u{202E}spoof", name: "Bidi override"),
+            NativeSearchSource(key: "\u{2060}", name: "Word joiner")
+        ]
+        let allowed = [
+            NativeSearchSource(key: "站点-合法", name: "Unicode"),
+            NativeSearchSource(key: "site-123", name: "ASCII")
+        ]
+        XCTAssertEqual(NativeCrossSiteSearch.selectedSourceKeys(malformed + allowed),
+                       allowed.map(\.key))
+        XCTAssertTrue(NativeCrossSiteSearch.failedOnlySources(
+            malformed + allowed, failedKeys: malformed.map(\.key),
+            searchedKeys: malformed.map(\.key) + allowed.map(\.key)
+        ).isEmpty)
+        let result = try await NativeCrossSiteSearch.search(
+            sources: malformed + allowed,
+            fetch: { source, _ in
+                XCTAssertTrue(allowed.contains(source))
+                return NativeSearchPage(items: [Item(id: source.key)], hasMore: false)
+            }, identity: { $0.id }
+        )
+        XCTAssertEqual(result.items.map(\.siteKey), allowed.map(\.key))
+    }
+
     func testControlCharacterProviderKeysCannotEnterSearchOrRetry() async throws {
         let malformed = [
             NativeSearchSource(key: "bad\u{0000}key", name: "NUL"),
