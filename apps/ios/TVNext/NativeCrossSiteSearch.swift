@@ -85,10 +85,15 @@ enum NativeCrossSiteSearch {
     static let maxItemsPerPage = 40
     static let maxResults = 600
 
-    /// Control characters cannot be stable subscription provider identities.
+    /// Control and invisible Unicode format characters cannot be stable provider identities.
+    /// Reject bidi overrides and zero-width format markers rather than silently normalizing
+    /// keys, which could alias distinct subscription providers during search/retry.
     private static func validProviderKey(_ key: String) -> Bool {
         !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-            key.unicodeScalars.allSatisfy { !CharacterSet.controlCharacters.contains($0) }
+            key.unicodeScalars.allSatisfy { scalar in
+                !CharacterSet.controlCharacters.contains(scalar) &&
+                    scalar.properties.generalCategory != .format
+            }
     }
 
     /// Match the coordinator's first-unique-provider selection, including

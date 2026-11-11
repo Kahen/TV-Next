@@ -12,6 +12,25 @@ private actor RequestCounter {
 @main struct CrossSiteSearchSmoke {
     struct Item { let id: String }
     static func main() async throws {
+        let invisible = [
+            NativeSearchSource(key: "site\u{200B}hidden", name: "Zero width"),
+            NativeSearchSource(key: "site\u{202E}spoof", name: "Bidi override"),
+            NativeSearchSource(key: "\u{2060}", name: "Word joiner")
+        ]
+        let unicodeSafe = NativeSearchSource(key: "站点-合法", name: "Unicode")
+        precondition(NativeCrossSiteSearch.selectedSourceKeys(invisible + [unicodeSafe]) == ["站点-合法"])
+        precondition(NativeCrossSiteSearch.failedOnlySources(
+            invisible + [unicodeSafe], failedKeys: invisible.map(\.key),
+            searchedKeys: invisible.map(\.key) + ["站点-合法"]
+        ).isEmpty)
+        let invisibleResult = try await NativeCrossSiteSearch.search(
+            sources: invisible + [unicodeSafe],
+            fetch: { source, _ in
+                precondition(source.key == "站点-合法")
+                return NativeSearchPage(items: [Item(id: "ok")], hasMore: false)
+            }, identity: { $0.id }
+        )
+        precondition(invisibleResult.items.map(\.siteKey) == ["站点-合法"])
         let malformed = [
             NativeSearchSource(key: "bad\u{0000}key", name: "NUL"),
             NativeSearchSource(key: "bad\nkey", name: "Newline"),
