@@ -8,15 +8,15 @@ final class CrossSiteRetryTests: XCTestCase {
 
     func testControlCharacterProviderKeysCannotEnterSearchOrRetry() async throws {
         let malformed = [
-            NativeSearchSource(key: "bad\\u{0000}key", name: "NUL"),
-            NativeSearchSource(key: "bad\\nkey", name: "Newline"),
-            NativeSearchSource(key: "\\u{001B}", name: "Escape")
+            NativeSearchSource(key: "bad\u{0000}key", name: "NUL"),
+            NativeSearchSource(key: "bad\nkey", name: "Newline"),
+            NativeSearchSource(key: "\u{001B}", name: "Escape")
         ]
         let allowed = NativeSearchSource(key: "valid", name: "Valid")
         XCTAssertEqual(NativeCrossSiteSearch.selectedSourceKeys(malformed + [allowed]), ["valid"])
         XCTAssertTrue(NativeCrossSiteSearch.failedOnlySources(
-            malformed + [allowed], failedKeys: malformed.map(\\.key),
-            searchedKeys: malformed.map(\\.key) + ["valid"]
+            malformed + [allowed], failedKeys: malformed.map(\.key),
+            searchedKeys: malformed.map(\.key) + ["valid"]
         ).isEmpty)
         let result = try await NativeCrossSiteSearch.search(
             sources: malformed + [allowed],
@@ -25,7 +25,7 @@ final class CrossSiteRetryTests: XCTestCase {
                 return NativeSearchPage(items: [Item(id: "ok")], hasMore: false)
             }, identity: { $0.id }
         )
-        XCTAssertEqual(result.items.map(\\.siteKey), ["valid"])
+        XCTAssertEqual(result.items.map(\.siteKey), ["valid"])
         XCTAssertTrue(result.failedKeys.isEmpty)
     }
 
