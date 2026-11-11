@@ -85,7 +85,13 @@ enum NativeCrossSiteSearch {
     static let maxItemsPerPage = 40
     static let maxResults = 600
 
-    /// Control characters cannot be stable subscription provider identities.\n    private static func validProviderKey(_ key: String) -> Bool {\n        validProviderKey(key) &&\n            key.unicodeScalars.allSatisfy { !CharacterSet.controlCharacters.contains($0) }\n    }\n\n    /// Match the coordinator's first-unique-provider selection, including
+    /// Control characters cannot be stable subscription provider identities.
+    private static func validProviderKey(_ key: String) -> Bool {
+        !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            key.unicodeScalars.allSatisfy { !CharacterSet.controlCharacters.contains($0) }
+    }
+
+    /// Match the coordinator's first-unique-provider selection, including
     /// subscriptions that repeat a key before the 16-site boundary.
     static func selectedSources(_ sources: [NativeSearchSource]) -> [NativeSearchSource] {
         var seen = Set<String>()
