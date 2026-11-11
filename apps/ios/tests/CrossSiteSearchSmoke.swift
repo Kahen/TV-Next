@@ -12,6 +12,25 @@ private actor RequestCounter {
 @main struct CrossSiteSearchSmoke {
     struct Item { let id: String }
     static func main() async throws {
+        let malformed = [
+            NativeSearchSource(key: "bad\u{0000}key", name: "NUL"),
+            NativeSearchSource(key: "bad\nkey", name: "Newline"),
+            NativeSearchSource(key: "\u{001B}", name: "Escape")
+        ]
+        let safe = NativeSearchSource(key: "safe", name: "Safe")
+        precondition(NativeCrossSiteSearch.selectedSourceKeys(malformed + [safe]) == ["safe"])
+        precondition(NativeCrossSiteSearch.failedOnlySources(
+            malformed + [safe], failedKeys: malformed.map(\.key),
+            searchedKeys: malformed.map(\.key) + ["safe"]
+        ).isEmpty)
+        let sanitized = try await NativeCrossSiteSearch.search(
+            sources: malformed + [safe],
+            fetch: { source, _ in
+                precondition(source.key == "safe")
+                return NativeSearchPage(items: [Item(id: "ok")], hasMore: false)
+            }, identity: { $0.id }
+        )
+        precondition(sanitized.items.map(\.siteKey) == ["safe"])
         let sources = (0..<6).map { NativeSearchSource(key: String($0), name: "Source \($0)") }
         let counter = RequestCounter()
         let result = try await NativeCrossSiteSearch.search(sources: sources, fetch: { source, page in
