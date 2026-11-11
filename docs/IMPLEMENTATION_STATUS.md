@@ -1,4 +1,7 @@
-# Implementation status — 2026-11-09
+# Implementation status — 2026-11-11
+
+> **2026-11-11 native search empty-state defensive fix (pending CI):** The iPhone/iPad search feedback helper now rejects an impossible failed-provider count greater than the selected-provider count, rather than incorrectly displaying an all-sites-failed message. Positive all-failed and partial-failed behavior remains unchanged. Added XCTest and standalone Swift smoke negative/boundary cases. This is a local result-state integrity guard, not new FongMi provider compatibility. Final-HEAD iPhone/iPad simulator and full integration checks are required before merge; physical-device acceptance remains #38.
+
 
 > **2026-11-10 PR #188 follow-up:** The prior final-head [full integration #42770168491](https://github.com/Kahen/TV-Next/actions/runs/42770168491) still failed iPhone/iPad consent-toggle XCUI after moving the toggle above TimelineView. This revision explicitly selects the native SwiftUI switch style and retains the one-tap positive consent assertion, adding a failure-only screenshot and accessibility debug description to distinguish hit-target and model-state failures. This is a hypothesis, not a confirmed root-cause fix. New final HEAD requires iPhone/iPad simulator, Web/API, Compose and complete integration success before merge; physical acceptance #38 remains separate.
 

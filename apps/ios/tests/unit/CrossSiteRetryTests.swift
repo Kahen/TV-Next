@@ -156,6 +156,8 @@ final class CrossSiteRetryTests: XCTestCase {
         XCTAssertNil(NativeCrossSiteSearch.emptyState(resultCount: 1, failedCount: 2, selectedCount: 2))
         XCTAssertNil(NativeCrossSiteSearch.emptyState(resultCount: 0, failedCount: 0, selectedCount: 0))
         XCTAssertNil(NativeCrossSiteSearch.emptyState(resultCount: 0, failedCount: -1, selectedCount: 2))
+        XCTAssertNil(NativeCrossSiteSearch.emptyState(resultCount: 0, failedCount: 3, selectedCount: 2))
+        XCTAssertEqual(NativeCrossSiteSearch.emptyState(resultCount: 0, failedCount: 2, selectedCount: 2), "所有站点搜索失败，请重试失败站点。")
     }
 
     func testRecoveredSiteReplacesPartialPageWithoutDiscardingOtherSites() {
