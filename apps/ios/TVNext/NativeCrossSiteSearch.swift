@@ -174,7 +174,7 @@ enum NativeCrossSiteSearch {
         // Apply the limit to distinct, valid identities rather than raw entries:
         // a malformed or duplicate leading page must not evict later valid hits.
         func retain(_ hit: NativeSearchHit<Item>) {
-            guard let id = identity(hit.item), !id.isEmpty,
+            guard let id = identity(hit.item), !id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                   grouped[hit.siteKey, default: []].count < maxHitsPerSource,
                   seenBySource[hit.siteKey, default: []].insert(id).inserted else { return }
             grouped[hit.siteKey, default: []].append(hit)
@@ -234,7 +234,7 @@ enum NativeCrossSiteSearch {
                                 // Report this separate truncation; it is not another page.
                                 clippedPage = clippedPage || response.items.count > maxItemsPerPage
                                 for item in response.items.prefix(maxItemsPerPage) {
-                                    guard let id = identity(item), !id.isEmpty, seenItems.insert(id).inserted else { continue }
+                                    guard let id = identity(item), !id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, seenItems.insert(id).inserted else { continue }
                                     hits.append(NativeSearchHit(siteKey: source.key, item: item))
                                 }
                                 if !response.hasMore { return NativeSearchOutcome(index: index, hits: hits, failed: false, truncated: false, clippedPage: clippedPage) }
