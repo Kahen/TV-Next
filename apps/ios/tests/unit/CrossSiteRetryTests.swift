@@ -412,4 +412,23 @@ final class CrossSiteRetryTests: XCTestCase {
         XCTAssertEqual(merged.map { $0.item.id }, ["old", "last"])
     }
 
+    func testControlAndInvisibleResultIdentitiesAreRejectedInSearchAndRetry() async throws {
+        let source = NativeSearchSource(key: "valid", name: "Valid")
+        let invalid = ["bad\u{0000}id", "bad\nidentity", "bad\u{200B}id", "bad\u{202E}id"]
+        let valid = ["合法", "id with spaces", "café"]
+        let result = try await NativeCrossSiteSearch.search(
+            sources: [source],
+            fetch: { _, _ in
+                NativeSearchPage(items: (invalid + valid).map { Item(id: $0) }, hasMore: false)
+            }, identity: { $0.id }
+        )
+        XCTAssertEqual(result.items.map(\.item.id), valid)
+        let merged = NativeCrossSiteSearch.mergeRetry(
+            previous: [NativeSearchHit(siteKey: "valid", item: Item(id: "old"))],
+            refreshed: (invalid + valid).map { NativeSearchHit(siteKey: "valid", item: Item(id: $0)) },
+            recoveredKeys: ["valid"], sourceOrder: ["valid"], identity: { $0.id }
+        )
+        XCTAssertEqual(merged.map(\.item.id), valid)
+    }
+
 }
