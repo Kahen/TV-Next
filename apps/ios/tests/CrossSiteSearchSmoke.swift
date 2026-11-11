@@ -19,7 +19,7 @@ private actor RequestCounter {
             }, identity: { $0.id }
         )
         precondition(blankIdentity.items.map(\.item.id) == ["valid", "合法"])
-        let reconciled = NativeCrossSiteSearch.mergeRetry(
+        let filteredRetry = NativeCrossSiteSearch.mergeRetry(
             previous: [NativeSearchHit(siteKey: "owned", item: Item(id: "old"))],
             refreshed: [
                 NativeSearchHit(siteKey: "owned", item: Item(id: "  ")),
@@ -27,7 +27,7 @@ private actor RequestCounter {
             ],
             recoveredKeys: ["owned"], sourceOrder: ["owned"], identity: { $0.id }
         )
-        precondition(reconciled.map(\.item.id) == ["valid"])
+        precondition(filteredRetry.map(\.item.id) == ["valid"])
         let invisible = [
             NativeSearchSource(key: "site\u{200B}hidden", name: "Zero width"),
             NativeSearchSource(key: "site\u{202E}spoof", name: "Bidi override"),
