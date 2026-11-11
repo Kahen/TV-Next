@@ -12,6 +12,22 @@ private actor RequestCounter {
 @main struct CrossSiteSearchSmoke {
     struct Item { let id: String }
     static func main() async throws {
+        let blankIdentity = try await NativeCrossSiteSearch.search(
+            sources: [NativeSearchSource(key: "owned", name: "Owned")],
+            fetch: { _, _ in
+                NativeSearchPage(items: [Item(id: " "), Item(id: "\n\t"), Item(id: "valid"), Item(id: "合法")], hasMore: false)
+            }, identity: { $0.id }
+        )
+        precondition(blankIdentity.items.map(\.item.id) == ["valid", "合法"])
+        let filteredRetry = NativeCrossSiteSearch.mergeRetry(
+            previous: [NativeSearchHit(siteKey: "owned", item: Item(id: "old"))],
+            refreshed: [
+                NativeSearchHit(siteKey: "owned", item: Item(id: "  ")),
+                NativeSearchHit(siteKey: "owned", item: Item(id: "valid"))
+            ],
+            recoveredKeys: ["owned"], sourceOrder: ["owned"], identity: { $0.id }
+        )
+        precondition(filteredRetry.map(\.item.id) == ["valid"])
         let invisible = [
             NativeSearchSource(key: "site\u{200B}hidden", name: "Zero width"),
             NativeSearchSource(key: "site\u{202E}spoof", name: "Bidi override"),

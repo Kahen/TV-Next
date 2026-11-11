@@ -6,6 +6,36 @@ final class CrossSiteRetryTests: XCTestCase {
         let id: String
     }
 
+    func testWhitespaceOnlyResultIdentitiesDoNotConsumeSearchOrRetrySlots() async throws {
+        let source = NativeSearchSource(key: "valid", name: "Valid")
+        let initial = try await NativeCrossSiteSearch.search(
+            sources: [source],
+            fetch: { _, _ in
+                NativeSearchPage(items: [
+                    Item(id: ""), Item(id: "   "), Item(id: "\n\t"),
+                    Item(id: "real"), Item(id: "real"), Item(id: "合法")
+                ], hasMore: false)
+            },
+            identity: { $0.id }
+        )
+        XCTAssertEqual(initial.items.map(\.item.id), ["real", "合法"])
+        XCTAssertTrue(initial.failedKeys.isEmpty)
+
+        let previous = [NativeSearchHit(siteKey: "valid", item: Item(id: "old"))]
+        let refreshed = [
+            NativeSearchHit(siteKey: "valid", item: Item(id: " \t ")),
+            NativeSearchHit(siteKey: "valid", item: Item(id: "real")),
+            NativeSearchHit(siteKey: "valid", item: Item(id: "real")),
+            NativeSearchHit(siteKey: "valid", item: Item(id: "合法"))
+        ]
+        let merged = NativeCrossSiteSearch.mergeRetry(
+            previous: previous, refreshed: refreshed,
+            recoveredKeys: ["valid"], sourceOrder: ["valid"],
+            identity: { $0.id }
+        )
+        XCTAssertEqual(merged.map(\.item.id), ["real", "合法"])
+    }
+
     func testInvisibleFormatProviderKeysCannotEnterSearchOrRetry() async throws {
         let malformed = [
             NativeSearchSource(key: "site\u{200B}hidden", name: "Zero width"),
