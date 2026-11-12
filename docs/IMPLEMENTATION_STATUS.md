@@ -1,4 +1,6 @@
-# Implementation status — 2026-11-11
+# Implementation status — 2026-11-12
+
+> **2026-11-12 native result identity hardening (PR pending):** Initial cross-site search and failed-provider retry reject result identities containing Unicode control (`Cc`) or format (`Cf`) scalars, including embedded NUL, newline, zero-width and bidi override characters. Exact meaningful Unicode IDs and spacing are preserved. XCTest and standalone Swift smoke cover positive/negative cases. Final-head iPhone/iPad simulator, Web/API and aggregate integration checks are required before merge. No physical-device, real-provider or release claim.
 
 > **2026-11-11 native result identity boundary (PR pending):** Cross-site search and failed-provider retry now reject empty or whitespace-only result identities before deduplication and per-provider limits. Nonblank Unicode identities remain unchanged. Added XCTest positive/negative cases and standalone Swift smoke. Await final-HEAD iPhone/iPad simulator and complete integration checks; no physical-provider compatibility or release claim.
 
