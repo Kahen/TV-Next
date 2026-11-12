@@ -22,6 +22,9 @@ on:
       - "compose.nas.yaml"
       - "scripts/**"
       - "packages/contracts/**"
+      # Acceptance status changes must receive the same final-head gate as code changes.
+      - "docs/IMPLEMENTATION_STATUS.md"
+      - "docs/ACCEPTANCE.md"
       - ".github/workflows/full-integration.yml"
       - ".github/workflows/ci.yml"
       - ".github/workflows/ios.yml"
