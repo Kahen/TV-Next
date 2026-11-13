@@ -93,6 +93,33 @@ final class NativeOfflineMediaTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: orphan), Data([1, 2, 3]))
     }
 
+    func testStartupRejectsRedirectedOrNonRegularManifestWithoutTouchingOutsideFile() throws {
+        let root = temporaryDirectory()
+        let outside = temporaryDirectory()
+        defer {
+            try? FileManager.default.removeItem(at: root)
+            try? FileManager.default.removeItem(at: outside)
+        }
+        let fm = FileManager.default
+        try fm.createDirectory(at: root, withIntermediateDirectories: true)
+        let manifest = root.appendingPathComponent("catalog.json")
+        let payload = Data(#"{"version":1,"entries":[]}"#.utf8)
+        try payload.write(to: outside)
+        try fm.createSymbolicLink(at: manifest, withDestinationURL: outside)
+
+        XCTAssertThrowsError(try NativeOfflineMediaCatalog(directory: root))
+        XCTAssertEqual(try Data(contentsOf: outside), payload)
+        XCTAssertEqual(try fm.destinationOfSymbolicLink(atPath: manifest.path), outside.path)
+
+        try fm.removeItem(at: manifest)
+        try fm.createDirectory(at: manifest, withIntermediateDirectories: true)
+        XCTAssertThrowsError(try NativeOfflineMediaCatalog(directory: root))
+
+        try fm.removeItem(at: manifest)
+        try payload.write(to: manifest)
+        XCTAssertTrue(try NativeOfflineMediaCatalog(directory: root).entries.isEmpty)
+    }
+
     func testSourcesExcludeHLSLiveUserinfoFragmentsAndUnsupportedSchemes() {
         XCTAssertNotNil(NativeOfflineMediaCatalog.sourceURL("https://example.test/Owned.MP4?signature=private"))
         for raw in ["file:///tmp/owned.mp4", "https://u:p@example.test/a.mp4", "https://example.test/live.m3u8",
