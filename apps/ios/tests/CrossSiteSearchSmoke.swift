@@ -27,6 +27,30 @@ private actor RequestCounter {
             recoveredKeys: ["owned"], sourceOrder: ["owned"], identity: { $0.id }
         )
         precondition(identityRetry.map(\.item.id) == safeResultIds)
+        let separators = [
+            NativeSearchSource(key: "bad\u{2028}key", name: "Line"),
+            NativeSearchSource(key: "bad\u{2029}key", name: "Paragraph")
+        ]
+        precondition(NativeCrossSiteSearch.selectedSourceKeys(
+            separators + [NativeSearchSource(key: "合法", name: "Allowed")]
+        ) == ["合法"])
+        let separatorResult = try await NativeCrossSiteSearch.search(
+            sources: [NativeSearchSource(key: "合法", name: "Allowed")],
+            fetch: { _, _ in
+                NativeSearchPage(items: [
+                    Item(id: "bad\u{2028}id"), Item(id: "bad\u{2029}id"),
+                    Item(id: "café")
+                ], hasMore: false)
+            }, identity: { $0.id }
+        )
+        precondition(separatorResult.items.map(\.item.id) == ["café"])
+        let separatorRetry = NativeCrossSiteSearch.mergeRetry(
+            previous: [], refreshed: [
+                NativeSearchHit(siteKey: "合法", item: Item(id: "bad\u{2029}id")),
+                NativeSearchHit(siteKey: "合法", item: Item(id: "café"))
+            ], recoveredKeys: ["合法"], sourceOrder: ["合法"], identity: { $0.id }
+        )
+        precondition(separatorRetry.map(\.item.id) == ["café"])
         let blankIdentity = try await NativeCrossSiteSearch.search(
             sources: [NativeSearchSource(key: "owned", name: "Owned")],
             fetch: { _, _ in

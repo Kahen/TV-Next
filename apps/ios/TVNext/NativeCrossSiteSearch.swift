@@ -92,7 +92,9 @@ enum NativeCrossSiteSearch {
         !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
             key.unicodeScalars.allSatisfy { scalar in
                 !CharacterSet.controlCharacters.contains(scalar) &&
-                    scalar.properties.generalCategory != .format
+                    scalar.properties.generalCategory != .format &&
+                    scalar.properties.generalCategory != .lineSeparator &&
+                    scalar.properties.generalCategory != .paragraphSeparator
             }
     }
 
@@ -102,7 +104,9 @@ enum NativeCrossSiteSearch {
         !id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
             id.unicodeScalars.allSatisfy { scalar in
                 !CharacterSet.controlCharacters.contains(scalar) &&
-                    scalar.properties.generalCategory != .format
+                    scalar.properties.generalCategory != .format &&
+                    scalar.properties.generalCategory != .lineSeparator &&
+                    scalar.properties.generalCategory != .paragraphSeparator
             }
     }
 
