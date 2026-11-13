@@ -12,6 +12,15 @@ private actor RequestCounter {
 @main struct CrossSiteSearchSmoke {
     struct Item { let id: String }
     static func main() async throws {
+        let pageCap = try await NativeCrossSiteSearch.search(
+            sources: [NativeSearchSource(key: "owned", name: "Owned")],
+            fetch: { _, _ in
+                NativeSearchPage(items: Array(repeating: Item(id: "duplicate"), count: 40) +
+                    [Item(id: "bad\u{200B}id"), Item(id: "later"), Item(id: "合法")], hasMore: false)
+            }, identity: { $0.id }
+        )
+        precondition(pageCap.items.map(\.item.id) == ["duplicate", "later", "合法"])
+        precondition(pageCap.warningState.clippedPageKeys == ["owned"])
         let malformedResultIds = ["bad\u{0000}id", "bad\u{200B}id", "bad\u{202E}id"]
         let safeResultIds = ["合法", "id with spaces", "café"]
         let identityBoundary = try await NativeCrossSiteSearch.search(
