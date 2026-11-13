@@ -247,9 +247,16 @@ enum NativeCrossSiteSearch {
                                 // A provider can return >40 entries even with hasMore=false.
                                 // Report this separate truncation; it is not another page.
                                 clippedPage = clippedPage || response.items.count > maxItemsPerPage
-                                for item in response.items.prefix(maxItemsPerPage) {
-                                    guard let id = identity(item), validResultIdentity(id), seenItems.insert(id).inserted else { continue }
+                                // Count valid, distinct results rather than raw positions:
+                                // malformed/duplicate leading entries must not hide later hits.
+                                var retainedOnPage = 0
+                                for item in response.items {
+                                    guard let id = identity(item), validResultIdentity(id),
+                                          !seenItems.contains(id) else { continue }
+                                    if retainedOnPage == maxItemsPerPage { break }
+                                    seenItems.insert(id)
                                     hits.append(NativeSearchHit(siteKey: source.key, item: item))
+                                    retainedOnPage += 1
                                 }
                                 if !response.hasMore { return NativeSearchOutcome(index: index, hits: hits, failed: false, truncated: false, clippedPage: clippedPage) }
                                 if number == maxPages { return NativeSearchOutcome(index: index, hits: hits, failed: false, truncated: true, clippedPage: clippedPage) }
