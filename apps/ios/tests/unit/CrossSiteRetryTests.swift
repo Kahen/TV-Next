@@ -62,6 +62,40 @@ final class CrossSiteRetryTests: XCTestCase {
         XCTAssertEqual(result.items.map(\.siteKey), allowed.map(\.key))
     }
 
+    func testUnicodeSeparatorsCannotEnterProviderSearchOrResultRetry() async throws {
+        let bad = [
+            NativeSearchSource(key: "site\u{2028}one", name: "Line separator"),
+            NativeSearchSource(key: "site\u{2029}two", name: "Paragraph separator")
+        ]
+        let good = NativeSearchSource(key: "站点-合法", name: "Unicode")
+        XCTAssertEqual(NativeCrossSiteSearch.selectedSourceKeys(bad + [good]), [good.key])
+        XCTAssertTrue(NativeCrossSiteSearch.failedOnlySources(
+            bad + [good], failedKeys: bad.map(\.key),
+            searchedKeys: bad.map(\.key) + [good.key]
+        ).isEmpty)
+        let result = try await NativeCrossSiteSearch.search(
+            sources: bad + [good],
+            fetch: { source, _ in
+                XCTAssertEqual(source.key, good.key)
+                return NativeSearchPage(items: [
+                    Item(id: "bad\u{2028}id"), Item(id: "bad\u{2029}id"),
+                    Item(id: "合法 标题"), Item(id: "café")
+                ], hasMore: false)
+            }, identity: { $0.id }
+        )
+        XCTAssertEqual(result.items.map(\.item.id), ["合法 标题", "café"])
+        let retry = NativeCrossSiteSearch.mergeRetry(
+            previous: [NativeSearchHit(siteKey: good.key, item: Item(id: "old"))],
+            refreshed: [
+                NativeSearchHit(siteKey: good.key, item: Item(id: "bad\u{2028}id")),
+                NativeSearchHit(siteKey: good.key, item: Item(id: "bad\u{2029}id")),
+                NativeSearchHit(siteKey: good.key, item: Item(id: "合法 标题"))
+            ],
+            recoveredKeys: [good.key], sourceOrder: [good.key], identity: { $0.id }
+        )
+        XCTAssertEqual(retry.map(\.item.id), ["合法 标题"])
+    }
+
     func testControlCharacterProviderKeysCannotEnterSearchOrRetry() async throws {
         let malformed = [
             NativeSearchSource(key: "bad\u{0000}key", name: "NUL"),
