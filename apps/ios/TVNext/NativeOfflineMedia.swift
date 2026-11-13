@@ -61,6 +61,12 @@ final class NativeOfflineMediaCatalog {
         var values = URLResourceValues()
         values.isExcludedFromBackup = true
         try resource.setResourceValues(values)
+        // Never read an externally redirected manifest, even when its target is small
+        // and decodes as a valid catalog. Refuse non-regular manifest nodes as well.
+        if let manifestValues = try? manifest.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]),
+           manifestValues.isSymbolicLink == true || manifestValues.isRegularFile != true {
+            throw NativeOfflineError.storage
+        }
         if let size = try? fm.attributesOfItem(atPath: manifest.path)[.size] as? NSNumber,
            size.intValue <= 65_536,
            let data = try? Data(contentsOf: manifest),
