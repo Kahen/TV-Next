@@ -62,6 +62,46 @@ final class NativeCaptionTests: XCTestCase {
         XCTAssertEqual(CaptionParser.activeText(cues, at: 1.5, offset: -1), "First language\nSecond language")
     }
 
+    func testSRTAndWebVTTLiteralEventsTextDoesNotSwitchToASS() throws {
+        let srt = """
+        1
+        00:00:01,000 --> 00:00:02,000
+        First line
+        [Events]
+        Final line
+        """
+        XCTAssertEqual(try CaptionParser.parse(Data(srt.utf8)).first?.text,
+                       "First line\n[Events]\nFinal line")
+        let vtt = """
+        WEBVTT
+
+        00:00:01.000 --> 00:00:02.000
+        [Events]
+        """
+        XCTAssertEqual(try CaptionParser.parse(Data(vtt.utf8)).first?.text, "[Events]")
+    }
+
+    func testASSHeaderDetectionAcceptsScriptInfoAndRejectsInvalidDialogue() throws {
+        let ass = """
+        [Script Info]
+        Title: Owned captions
+        [Events]
+        Format: Start, End, Text
+        Dialogue: 0:00:01.00,0:00:02.00,Working
+        """
+        XCTAssertEqual(try CaptionParser.parse(Data(ass.utf8)).first?.text, "Working")
+        let invalid = """
+        [Events]
+        Format: Start, End, Text
+        Dialogue: bad,bad,Invalid
+        """
+        XCTAssertThrowsError(try CaptionParser.parse(Data(invalid.utf8))) { error in
+            guard case CaptionError.invalidTimeline = error else {
+                return XCTFail("Expected invalid ASS timeline: \(error)")
+            }
+        }
+    }
+
     func testOverlappingASSDialogueUsesTheSameBoundedTextOverlay() throws {
         let text = """
         [Events]
