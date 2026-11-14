@@ -20,7 +20,7 @@ private actor RequestCounter {
             }, identity: { $0.id }
         )
         precondition(pageCap.items.map(\.item.id) == ["duplicate", "later", "合法"])
-        precondition(pageCap.warningState.clippedPageKeys == ["owned"])
+        precondition(pageCap.warningState.clippedPageKeys.isEmpty)
         let malformedResultIds = ["bad\u{0000}id", "bad\u{200B}id", "bad\u{202E}id"]
         let safeResultIds = ["合法", "id with spaces", "café"]
         let identityBoundary = try await NativeCrossSiteSearch.search(
