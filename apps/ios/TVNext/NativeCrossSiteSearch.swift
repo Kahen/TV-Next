@@ -38,7 +38,7 @@ struct NativeSearchWarningState: Sendable {
             warnings.append("\(pageLimitKeys.count) 个站点仍有更多结果；每站最多检索 \(NativeCrossSiteSearch.maxPages) 页。")
         }
         if !clippedPageKeys.isEmpty {
-            warnings.append("\(clippedPageKeys.count) 个站点单页超过 \(NativeCrossSiteSearch.maxItemsPerPage) 条，仅保留每页前 \(NativeCrossSiteSearch.maxItemsPerPage) 条。")
+            warnings.append("\(clippedPageKeys.count) 个站点单页有效去重结果超过 \(NativeCrossSiteSearch.maxItemsPerPage) 条，仅保留前 \(NativeCrossSiteSearch.maxItemsPerPage) 条。")
         }
         if globalResultCapReached {
             warnings.append("仅显示前 \(NativeCrossSiteSearch.maxResults) 条结果。")
@@ -246,14 +246,16 @@ enum NativeCrossSiteSearch {
                                 if Task.isCancelled { return NativeSearchOutcome(index: index, hits: [], failed: false, truncated: false, clippedPage: false) }
                                 // A provider can return >40 entries even with hasMore=false.
                                 // Report this separate truncation; it is not another page.
-                                clippedPage = clippedPage || response.items.count > maxItemsPerPage
                                 // Count valid, distinct results rather than raw positions:
                                 // malformed/duplicate leading entries must not hide later hits.
                                 var retainedOnPage = 0
                                 for item in response.items {
                                     guard let id = identity(item), validResultIdentity(id),
                                           !seenItems.contains(id) else { continue }
-                                    if retainedOnPage == maxItemsPerPage { break }
+                                    if retainedOnPage == maxItemsPerPage {
+                                        clippedPage = true
+                                        break
+                                    }
                                     seenItems.insert(id)
                                     hits.append(NativeSearchHit(siteKey: source.key, item: item))
                                     retainedOnPage += 1

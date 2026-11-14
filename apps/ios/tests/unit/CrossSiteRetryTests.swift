@@ -18,8 +18,20 @@ final class CrossSiteRetryTests: XCTestCase {
             }, identity: { $0.id }
         )
         XCTAssertEqual(result.items.map(\.item.id), ["duplicate", "later", "合法"])
-        XCTAssertEqual(result.warningState.clippedPageKeys, ["owned"])
+        XCTAssertTrue(result.warningState.clippedPageKeys.isEmpty)
         XCTAssertTrue(result.failedKeys.isEmpty)
+    }
+
+    func testPageClippingWarningRequiresMoreThanFortyDistinctValidResults() async throws {
+        let source = NativeSearchSource(key: "owned", name: "Owned")
+        let result = try await NativeCrossSiteSearch.search(
+            sources: [source],
+            fetch: { _, _ in
+                NativeSearchPage(items: (0..<41).map { Item(id: "valid-\($0)") }, hasMore: false)
+            }, identity: { $0.id }
+        )
+        XCTAssertEqual(result.items.count, 40)
+        XCTAssertEqual(result.warningState.clippedPageKeys, ["owned"])
     }
 
     func testWhitespaceOnlyResultIdentitiesDoNotConsumeSearchOrRetrySlots() async throws {
@@ -176,7 +188,7 @@ final class CrossSiteRetryTests: XCTestCase {
         XCTAssertEqual(merged.omittedSiteCount, 3)
         XCTAssertTrue(merged.globalResultCapReached)
         XCTAssertEqual(merged.messages.count, 4)
-        XCTAssertEqual(merged.messages[2], "1 个站点单页超过 40 条，仅保留每页前 40 条。")
+        XCTAssertEqual(merged.messages[2], "1 个站点单页有效去重结果超过 40 条，仅保留前 40 条。")
         // A failed-again provider retains its old partial hits and warnings.
         XCTAssertEqual(initial.replacingRecoveredProviders(with: .empty, recoveredKeys: []).messages,
                        initial.messages)
@@ -196,7 +208,7 @@ final class CrossSiteRetryTests: XCTestCase {
         )
         let combined = original.replacingRecoveredProviders(with: retried, recoveredKeys: ["b"])
         XCTAssertEqual(combined.clippedPageKeys, ["a", "b"])
-        XCTAssertEqual(combined.messages, ["2 个站点单页超过 40 条，仅保留每页前 40 条。"])
+        XCTAssertEqual(combined.messages, ["2 个站点单页有效去重结果超过 40 条，仅保留前 40 条。"])
     }
 
     func testFailureKeysAreDistinctFromDuplicateDisplayNames() async throws {
@@ -366,7 +378,7 @@ final class CrossSiteRetryTests: XCTestCase {
         )
         XCTAssertEqual(result.items.count, 40)
         XCTAssertEqual(result.items.last?.item.id, "39")
-        XCTAssertEqual(result.warnings, ["1 个站点单页超过 40 条，仅保留每页前 40 条。"])
+        XCTAssertEqual(result.warnings, ["1 个站点单页有效去重结果超过 40 条，仅保留前 40 条。"])
         XCTAssertTrue(result.failedKeys.isEmpty)
     }
 
@@ -391,7 +403,7 @@ final class CrossSiteRetryTests: XCTestCase {
         XCTAssertEqual(result.items.count, 80)
         XCTAssertEqual(result.warnings.count, 2)
         XCTAssertTrue(result.warnings.contains { $0.contains("仍有更多结果") })
-        XCTAssertTrue(result.warnings.contains { $0.contains("单页超过 40") })
+        XCTAssertTrue(result.warnings.contains { $0.contains("单页有效去重结果超过 40") })
     }
 
     func testPartialFailurePreservesClippedPageWarning() async throws {
@@ -404,7 +416,7 @@ final class CrossSiteRetryTests: XCTestCase {
         )
         XCTAssertEqual(result.items.count, 40)
         XCTAssertEqual(result.failedKeys, ["a"])
-        XCTAssertEqual(result.warnings, ["1 个站点单页超过 40 条，仅保留每页前 40 条。"])
+        XCTAssertEqual(result.warnings, ["1 个站点单页有效去重结果超过 40 条，仅保留前 40 条。"])
         XCTAssertFalse(result.warnings.joined().contains("private"))
     }
 

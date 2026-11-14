@@ -1,5 +1,8 @@
 # Implementation status — 2026-11-14
 
+> **Native page warning correctness (PR pending):** A raw provider page with more than 40 entries but at most 40 valid distinct IDs no longer claims visible results were clipped. The warning is emitted only when the 41st valid distinct ID is encountered. XCTest covers duplicate-heavy pages and true clipping. Final-head simulator and full integration verification required; no physical-device claim.
+
+
 > **2026-11-14 native search page-cap correctness (PR pending):** A single provider page now counts up to 40 valid distinct result identities instead of blindly taking the first 40 raw entries. Invalid or repeated entries no longer hide later valid results. The existing raw-page clipping warning remains conservative. Added XCTest and standalone Swift positive/negative regression. Final HEAD iPhone/iPad simulators and full integration gate required; real providers and physical devices remain unverified.\n\n
 > **2026-11-14 native search Unicode separator boundary (pending CI):** Native provider keys and opaque result IDs now reject Unicode U+2028 line separator and U+2029 paragraph separator as well as existing controls/format markers, preventing visually split provider/result identities in initial search and failed-only retry. Meaningful Unicode and ordinary spaces remain unchanged. Added positive/negative XCTest and standalone Swift smoke. Final source HEAD iPhone/iPad simulator, Web/API and complete integration gates are required before merge. No real-provider, physical-device, independent security review or Apple distribution claim.
 
