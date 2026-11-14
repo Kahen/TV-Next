@@ -6,6 +6,22 @@ final class CrossSiteRetryTests: XCTestCase {
         let id: String
     }
 
+    func testPageCapCountsOnlyValidDistinctHits() async throws {
+        let source = NativeSearchSource(key: "owned", name: "Owned")
+        let result = try await NativeCrossSiteSearch.search(
+            sources: [source],
+            fetch: { _, _ in
+                NativeSearchPage(items:
+                    Array(repeating: Item(id: "duplicate"), count: 40) +
+                    [Item(id: "bad\u{200B}id"), Item(id: "later"), Item(id: "合法")],
+                    hasMore: false)
+            }, identity: { $0.id }
+        )
+        XCTAssertEqual(result.items.map(\.item.id), ["duplicate", "later", "合法"])
+        XCTAssertEqual(result.warningState.clippedPageKeys, ["owned"])
+        XCTAssertTrue(result.failedKeys.isEmpty)
+    }
+
     func testWhitespaceOnlyResultIdentitiesDoNotConsumeSearchOrRetrySlots() async throws {
         let source = NativeSearchSource(key: "valid", name: "Valid")
         let initial = try await NativeCrossSiteSearch.search(
