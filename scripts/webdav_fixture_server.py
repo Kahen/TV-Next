@@ -12,6 +12,64 @@ XML = b'''<?xml version="1.0" encoding="utf-8"?>
 </d:multistatus>'''
 
 class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        name = self.path.removeprefix('/captions/')
+        if not self.path.startswith('/captions/'):
+            self.send_error(404)
+            return
+        # Anonymous loopback requests must never inherit draft credentials.
+        if self.headers.get('Authorization') or self.headers.get('Cookie'):
+            self.send_error(403)
+            return
+        srt = '1\n00:00:01,000 --> 00:00:03,000\nOwned captions\n'
+        bodies = {
+            'Owned.srt': srt.encode(),
+            'Unicode.vtt': b'WEBVTT\n\n00:01.000 --> 00:03.000\nOwned captions\n',
+            'Utf16.srt': srt.encode('utf-16'),
+            'Legacy.srt': srt.replace('Owned captions', '中文字幕').encode('gb18030'),
+            'Styled.ass': b'[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\nDialogue: 0,0:00:01.00,0:00:03.00,Default,,0,0,0,,Owned captions\n',
+            'Invalid.srt': b'<html>not a subtitle</html>',
+            'Large.srt': b'x' * 1_048_577,
+            'Slow.srt': srt.encode(),
+        }
+        if name in ('Redirect.srt', 'Redirect-local.srt'):
+            self.send_response(302)
+            self.send_header('Location', 'https://foreign.example/captions/Owned.srt' if name == 'Redirect.srt' else '/captions/Owned.srt')
+            self.send_header('Content-Length', '0')
+            self.end_headers()
+        elif name in ('Unauthorized.srt', 'Partial.srt'):
+            self.send_response(401 if name == 'Unauthorized.srt' else 206)
+            self.send_header('Content-Length', '0')
+            self.end_headers()
+        elif name == 'Streamed.srt':
+            self.protocol_version = 'HTTP/1.1'
+            self.send_response(200)
+            self.send_header('Transfer-Encoding', 'chunked')
+            self.end_headers()
+            try:
+                for chunk in ([b'x' * 8192] * 128 + [b'x']):
+                    self.wfile.write(f'{len(chunk):X}\r\n'.encode() + chunk + b'\r\n')
+                    self.wfile.flush()
+                    sleep(0.004)
+                self.wfile.write(b'0\r\n\r\n')
+                self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+        elif name in bodies:
+            body = bodies[name]
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/plain')
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            if name == 'Slow.srt':
+                sleep(3)
+            try:
+                self.wfile.write(body)
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+        else:
+            self.send_error(404)
+
     def do_PROPFIND(self):
         # Consume the entity before replying/closing. Closing a TCP connection
         # with unread request bytes can send RST; CFNetwork then loses the last
@@ -27,7 +85,15 @@ class Handler(BaseHTTPRequestHandler):
         if len(self.rfile.read(size)) != size:
             self.send_error(400)
             return
-        if self.path == '/dav/':
+        if self.path == '/captions/':
+            names = ['Owned.srt', 'Invalid.srt', 'Slow.srt']
+            records = ''.join(f'<d:response><d:href>/captions/{name}</d:href><d:propstat><d:prop><d:resourcetype/></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>' for name in names)
+            body = ('<?xml version="1.0" encoding="utf-8"?><d:multistatus xmlns:d="DAV:">' + records + '</d:multistatus>').encode()
+            self.send_response(207)
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        elif self.path == '/dav/':
             if self.headers.get('Depth') != '1':
                 self.send_error(400)
                 return

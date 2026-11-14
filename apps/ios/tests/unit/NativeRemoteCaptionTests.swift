@@ -6,6 +6,52 @@ import XCTest
 final class NativeRemoteCaptionTests: XCTestCase {
     private let srt = "1\n00:00:01,000 --> 00:00:03,000\nOwned captions\n"
 
+    func testWebDAVChoiceSupersedesSubscriptionAndCancellationPreservesCaptions() async throws {
+        var pending: CheckedContinuation<String, Error>?
+        let started = expectation(description: "Subscription request started")
+        let loader = NativeRemoteCaptionLoader { _, _ in
+            try await withCheckedThrowingContinuation { continuation in
+                pending = continuation
+                started.fulfill()
+            }
+        }
+        let api = TVNextAPI(server: URL(string: "https://api.example")!)
+        var applied: [String] = []
+        let old = loader.load(NativePlaybackResource(name: "Old subscription", url: "old"), api: api,
+                              isCurrent: { true }) { _, name in applied.append(name) }
+        await fulfillment(of: [started], timeout: 3)
+        let cues = try CaptionParser.parse(Data(srt.utf8))
+        await loader.load(name: "Selected WebDAV.srt", isCurrent: { true }, read: { cues }) { loaded, name in
+            XCTAssertEqual(loaded, cues)
+            applied.append(name)
+        }.value
+        pending?.resume(returning: srt)
+        await old.value
+        XCTAssertEqual(applied, ["Selected WebDAV.srt"])
+
+        var delayed: CheckedContinuation<[CaptionCue], Error>?
+        let delayedStarted = expectation(description: "WebDAV read started")
+        let cancelled = loader.load(name: "Late WebDAV.srt", isCurrent: { true }, read: {
+            try await withCheckedThrowingContinuation { continuation in
+                delayed = continuation
+                delayedStarted.fulfill()
+            }
+        }) { _, name in applied.append(name) }
+        await fulfillment(of: [delayedStarted], timeout: 3)
+        loader.cancel() // Used by disconnect, remove, Files choice and playback change.
+        delayed?.resume(returning: cues)
+        await cancelled.value
+        XCTAssertEqual(applied, ["Selected WebDAV.srt"])
+        XCTAssertFalse(loader.busy)
+        XCTAssertNil(loader.error)
+
+        await loader.load(name: "Denied.srt", isCurrent: { true }, read: {
+            throw NativeWebDAVError.unauthorized
+        }) { _, name in applied.append(name) }.value
+        XCTAssertEqual(loader.error, NativeWebDAVError.unauthorized.localizedDescription)
+        XCTAssertEqual(applied, ["Selected WebDAV.srt"], "A failed replacement must preserve previous captions")
+    }
+
     func testNewerSubtitleChoiceWinsEvenIfCancelledFetchReturnsLast() async {
         var pending: [String: CheckedContinuation<String, Error>] = [:]
         let oldStarted = expectation(description: "Old request started")

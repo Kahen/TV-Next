@@ -4,6 +4,11 @@ import SwiftUI
 struct NativeWebDAVSection: View {
     let onPlay: (TVChannel) -> Void
     let onDisconnect: (URL) -> Void
+    let canLoadCaption: Bool
+    let captionName: String?
+    @ObservedObject var captions: NativeRemoteCaptionLoader
+    let onCaption: (NativeWebDAVItem, NativeWebDAVConnection, CaptionTextEncoding) -> Void
+    @State private var captionEncoding: CaptionTextEncoding = .unicode
     @State private var address = ""
     @State private var username = ""
     @State private var password = ""
@@ -83,12 +88,17 @@ struct NativeWebDAVSection: View {
                     ForEach(visible) { entry in
                         HStack(spacing: 8) {
                             Button {
-                                if entry.isDirectory { open(entry.url) } else { play(entry) }
+                                if entry.isDirectory { open(entry.url) }
+                                else if NativeWebDAVCaptionReader.supported(entry), let connection {
+                                    onCaption(entry, connection, captionEncoding)
+                                } else { play(entry) }
                             } label: {
-                                Label(entry.name, systemImage: entry.isDirectory ? "folder" : "play.circle")
+                                Label(NativeWebDAVCaptionReader.supported(entry) ? "加载字幕：" + entry.name : entry.name,
+                                      systemImage: entry.isDirectory ? "folder" : NativeWebDAVCaptionReader.supported(entry) ? "captions.bubble" : "play.circle")
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
-                            .disabled(busy || (!entry.isDirectory && !NativeWebDAV.playable(entry)))
+                            .disabled(busy || (!entry.isDirectory && !NativeWebDAV.playable(entry) &&
+                                !(canLoadCaption && NativeWebDAVCaptionReader.supported(entry))))
                             if !entry.isDirectory, let bytes = entry.sizeBytes {
                                 Text(ByteCountFormatter.string(fromByteCount: bytes, countStyle: .binary))
                                     .font(.caption).foregroundStyle(.secondary)
@@ -106,6 +116,28 @@ struct NativeWebDAVSection: View {
                         .font(.caption2).foregroundStyle(.secondary)
                     Text("最多读取并显示前 200 项；筛选不向服务器发送查询。")
                         .font(.caption2).foregroundStyle(.secondary)
+                    if entries.contains(where: NativeWebDAVCaptionReader.supported) {
+                        Picker("WebDAV 字幕编码", selection: $captionEncoding) {
+                            Text("Unicode（默认）").tag(CaptionTextEncoding.unicode)
+                            Text("GB18030（手动）").tag(CaptionTextEncoding.gb18030)
+                        }
+                        .accessibilityIdentifier("webdav-caption-encoding")
+                        Text("先选择媒体，再点选字幕。支持 SRT/VTT/ASS/SSA 文本，最大 1 MiB；开启仅媒体筛选会隐藏字幕。")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    if captions.busy {
+                        ProgressView("加载字幕…")
+                        Button("取消字幕加载") { captions.cancel() }
+                            .accessibilityIdentifier("webdav-caption-cancel")
+                    }
+                    if let error = captions.error {
+                        Text(error).font(.caption).foregroundStyle(.red)
+                            .accessibilityIdentifier("webdav-caption-error")
+                    }
+                    if let captionName {
+                        Text("当前字幕：" + captionName).font(.caption)
+                            .accessibilityIdentifier("webdav-caption-current")
+                    }
                 }
             }
         }
@@ -113,6 +145,7 @@ struct NativeWebDAVSection: View {
     }
 
     private func connect() {
+        captions.cancel()
         // Changing servers also revokes any credentials retained by the player.
         if let root { onDisconnect(root) }
         task?.cancel()
@@ -171,6 +204,8 @@ struct NativeWebDAVSection: View {
     }
 
     private func disconnect() {
+        captions.cancel()
+        captionEncoding = .unicode
         if let root { onDisconnect(root) }
         task?.cancel()
         task = nil

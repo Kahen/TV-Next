@@ -56,7 +56,7 @@ enum NativeWebDAVError: LocalizedError {
         case .insecureCredentials: return "使用用户名或密码时必须连接 HTTPS WebDAV 服务。"
         case .invalidFolder: return "目录地址超出已连接的 WebDAV 根目录。"
         case .invalidResponse: return "WebDAV 目录响应无效或包含不安全的路径。"
-        case .responseTooLarge: return "WebDAV 目录响应超过 1 MiB。"
+        case .responseTooLarge: return "WebDAV 响应超过 1 MiB。"
         case .unauthorized: return "WebDAV 认证失败或没有访问权限。"
         case .httpStatus(let code): return "WebDAV 服务器返回 HTTP \(code)。"
         }
@@ -174,9 +174,10 @@ enum NativeWebDAV {
     // URLSession implementations complete without a separate didReceive(response:)
     // callback. Never interpret that as a successful PROPFIND without validating
     // the final HTTP status and advertised body length.
-    static func responseError(statusCode: Int, expectedLength: Int64, maxBytes: Int = 1_048_576) -> NativeWebDAVError? {
+    static func responseError(statusCode: Int, expectedLength: Int64, maxBytes: Int = 1_048_576,
+                              expectedStatus: Int = 207) -> NativeWebDAVError? {
         if statusCode == 401 || statusCode == 403 { return .unauthorized }
-        if statusCode != 207 { return .httpStatus(statusCode) }
+        if statusCode != expectedStatus { return .httpStatus(statusCode) }
         if expectedLength > Int64(maxBytes) { return .responseTooLarge }
         return nil
     }
@@ -278,22 +279,33 @@ enum NativeWebDAV {
 /// buffering an entire server response or iterating a million async bytes.
 /// The URLSession delegate queue is serial; finish() is idempotent because
 /// cancel/error callbacks may follow a rejected oversized response.
-private final class WebDAVBoundedTransport: NSObject, URLSessionDataDelegate, @unchecked Sendable {
+final class WebDAVBoundedTransport: NSObject, URLSessionDataDelegate, @unchecked Sendable {
     private let maxBytes: Int
+    private let expectedStatus: Int
     private var received = Data()
     private var continuation: CheckedContinuation<Data, Error>?
     private var finished = false
     private var acceptedResponse = false
 
-    private init(maxBytes: Int) { self.maxBytes = maxBytes }
+    private init(maxBytes: Int, expectedStatus: Int) {
+        self.maxBytes = maxBytes
+        self.expectedStatus = expectedStatus
+    }
 
-    static func load(_ request: URLRequest, maxBytes: Int) async throws -> Data {
-        let transport = WebDAVBoundedTransport(maxBytes: maxBytes)
+    static func load(_ request: URLRequest, maxBytes: Int, expectedStatus: Int = 207) async throws -> Data {
+        try Task<Never, Never>.checkCancellation()
+        let transport = WebDAVBoundedTransport(maxBytes: maxBytes, expectedStatus: expectedStatus)
         return try await transport.perform(request)
     }
 
     private func perform(_ request: URLRequest) async throws -> Data {
-        let session = URLSession(configuration: .ephemeral, delegate: self, delegateQueue: nil)
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.httpCookieStorage = nil
+        configuration.httpShouldSetCookies = false
+        configuration.urlCredentialStorage = nil
+        configuration.urlCache = nil
+        configuration.timeoutIntervalForResource = 20
+        let session = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
         defer { session.invalidateAndCancel() }
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
@@ -324,7 +336,7 @@ private final class WebDAVBoundedTransport: NSObject, URLSessionDataDelegate, @u
         let failure = NativeWebDAV.responseError(
             statusCode: http.statusCode,
             expectedLength: response.expectedContentLength,
-            maxBytes: maxBytes
+            maxBytes: maxBytes, expectedStatus: expectedStatus
         )
         if let failure {
             completionHandler(.cancel)
@@ -355,7 +367,7 @@ private final class WebDAVBoundedTransport: NSObject, URLSessionDataDelegate, @u
             if let failure = NativeWebDAV.responseError(
                 statusCode: http.statusCode,
                 expectedLength: http.expectedContentLength,
-                maxBytes: maxBytes
+                maxBytes: maxBytes, expectedStatus: expectedStatus
             ) {
                 finish(.failure(failure))
                 return
