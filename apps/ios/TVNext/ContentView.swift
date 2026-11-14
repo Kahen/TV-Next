@@ -472,7 +472,7 @@ struct ContentView: View {
                         .disabled(library.current?.url != remoteResourceKey)
                         .accessibilityIdentifier("subscription-subtitle-" + source.name)
                 }
-                if remoteCaptions.busy { ProgressView("加载订阅字幕…") }
+                if remoteCaptions.busy { ProgressView("加载外部字幕…") }
                 if let error = remoteCaptions.error { Text(error).font(.caption).foregroundStyle(.red) }
                 if !library.audioTracks.isEmpty {
                     Menu {
@@ -1006,6 +1006,9 @@ struct ContentView: View {
             return
         }
         cancelCaptionImport()
+        // A confirmed Files choice supersedes pending network captions now,
+        // even if the coordinated local read later fails or is cancelled.
+        remoteCaptions.cancel()
         let generation = UUID()
         captionImportGeneration = generation
         isLoadingCaption = true
