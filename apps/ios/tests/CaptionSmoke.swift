@@ -73,7 +73,8 @@ struct CaptionSmoke {
 
         // A literal ASS section marker in a timed cue is not an ASS document.
         let literalEvents = "1\n00:00:01,000 --> 00:00:02,000\n[Events]\n"
-        precondition(try CaptionParser.parse(Data(literalEvents.utf8)).first?.text == "[Events]")
+        let literalCues = try CaptionParser.parse(Data(literalEvents.utf8))
+        precondition(literalCues.first?.text == "[Events]")
 
         let ass = """
         [Script Info]
