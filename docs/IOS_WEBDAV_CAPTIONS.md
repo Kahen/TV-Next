@@ -54,3 +54,18 @@ Local Python fixture tests pass. Final-head iPhone/iPad simulator and complete
 integration checks are required before merge. HTTPS authentication is covered by
 request-policy assertions, not a live TLS NAS test. Real WebDAV server, physical
 Apple device and release acceptance remain separate in #5 and #38.
+
+## ASS detection regression (2026-11-14)
+
+The shared iOS text-caption parser now selects ASS/SSA parsing only when the
+first nonempty line is a recognized ASS section header (`[Script Info]`,
+`[Events]`, `[V4 Styles]` or `[V4+ Styles]`). Previously, an SRT/WebVTT
+dialogue containing a literal `[Events]` line was misclassified as ASS and
+failed to load. This affects Files, SMB, subscription and WebDAV subtitle
+selection equally; no new formats or remote fetching permissions are added.
+
+Positive XCTest and standalone Swift smoke cover literal SRT/WebVTT dialogue,
+and existing valid ASS headers. Negative XCTest checks malformed ASS timelines.
+The final branch HEAD still requires both iPhone/iPad simulators and complete
+integration CI before merging. No physical device or real NAS compatibility
+is inferred from these fixtures.
