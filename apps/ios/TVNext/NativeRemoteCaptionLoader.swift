@@ -21,22 +21,35 @@ final class NativeRemoteCaptionLoader: ObservableObject {
     func load(_ source: NativePlaybackResource, api: TVNextAPI,
               isCurrent: @escaping @MainActor () -> Bool,
               apply: @escaping @MainActor ([CaptionCue], String) -> Void) -> Task<Void, Never> {
+        let fetch = self.fetch
+        return load(name: source.name, isCurrent: isCurrent, read: {
+            let text = try await fetch(api, source.url)
+            return try CaptionParser.parse(Data(text.utf8))
+        }, apply: apply)
+    }
+
+    /// Subscription and WebDAV choices share one request lifetime, so either
+    /// choice supersedes the other even if a cancelled transport completes late.
+    @discardableResult
+    func load(name: String, isCurrent: @escaping @MainActor () -> Bool,
+              read: @escaping @MainActor () async throws -> [CaptionCue],
+              apply: @escaping @MainActor ([CaptionCue], String) -> Void) -> Task<Void, Never> {
         cancel()
         let id = request
         busy = true
-        let fetch = self.fetch
         let pending = Task { @MainActor [weak self] in
             defer {
                 if let self, self.request == id { self.busy = false; self.task = nil }
             }
             do {
-                let text = try await fetch(api, source.url)
+                let cues = try await read()
                 guard let self, !Task.isCancelled, self.request == id, isCurrent() else { return }
-                let cues = try CaptionParser.parse(Data(text.utf8))
-                apply(cues, source.name)
+                apply(cues, name)
             } catch {
                 if let self, !Task.isCancelled, self.request == id, isCurrent() {
-                    self.error = (error as? CaptionError)?.localizedDescription ?? "字幕加载失败，请重试或选择其他字幕。"
+                    self.error = (error as? CaptionError)?.localizedDescription
+                        ?? (error as? NativeWebDAVError)?.localizedDescription
+                        ?? "字幕加载失败，请重试或选择其他字幕。"
                 }
             }
         }

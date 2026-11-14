@@ -1,7 +1,7 @@
 import Foundation
 import CoreFoundation
 
-/// Explicit local-file charset choice. Never infer legacy encodings from arbitrary bytes.
+/// Explicit selected-file charset choice. Never infer legacy encodings from arbitrary bytes.
 enum CaptionTextEncoding: String, Sendable {
     case unicode
     case gb18030
@@ -42,8 +42,8 @@ enum CaptionParser {
     static func parse(_ data: Data, encoding: CaptionTextEncoding = .unicode) throws -> [CaptionCue] {
         guard !data.isEmpty else { throw CaptionError.empty }
         guard data.count <= 1_048_576 else { throw CaptionError.tooLarge }
-        // Unicode is the default. GB18030 is opt-in for a user-selected local
-        // file only; never guess a legacy charset or reinterpret BOM input.
+        // Unicode is the default. GB18030 is opt-in for a user-selected Files
+        // or WebDAV subtitle; never guess a legacy charset or reinterpret BOM input.
         let littleEndian = data.starts(with: [0xFF, 0xFE])
         let bigEndian = data.starts(with: [0xFE, 0xFF])
         let decoded: String?

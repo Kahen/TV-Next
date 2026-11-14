@@ -492,6 +492,50 @@ final class LibraryUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["webdav-error"].exists)
     }
 
+    func testWebDAVSubtitleSelectionPreservesPriorCaptionOnFailureAndResetsOnReplay() {
+        jump("WebDAV 文件")
+        enter(app.textFields["webdav-url"], "http://127.0.0.1:8767/captions/")
+        let connect = app.buttons["webdav-connect"]
+        reveal(connect)
+        connect.tap()
+        let subtitle = app.buttons["加载字幕：Owned.srt"]
+        XCTAssertTrue(subtitle.waitForExistence(timeout: 15))
+        XCTAssertFalse(subtitle.isEnabled, "A subtitle cannot be attached before choosing media")
+
+        jump("快速播放")
+        enter(app.textFields["manual-url"], "http://127.0.0.1:8765/fixture.mp4")
+        reveal(app.buttons["play-url"])
+        app.buttons["play-url"].tap()
+        jump("WebDAV 文件")
+        reveal(subtitle)
+        XCTAssertTrue(subtitle.isEnabled)
+        subtitle.tap()
+        let current = app.staticTexts["webdav-caption-current"]
+        let selected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", "当前字幕：Owned.srt"), object: current)
+        XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 15), .completed)
+        let invalid = app.buttons["加载字幕：Invalid.srt"]
+        reveal(invalid)
+        invalid.tap()
+        XCTAssertTrue(app.staticTexts["webdav-caption-error"].waitForExistence(timeout: 15))
+        XCTAssertEqual(current.label, "当前字幕：Owned.srt", "A failed replacement erased the selected subtitle")
+        jump("播放器")
+        XCTAssertTrue(app.staticTexts["字幕：Owned.srt"].exists, "WebDAV must use the production player's external subtitle controls")
+        XCTAssertTrue(app.buttons["移除字幕"].exists)
+
+        jump("快速播放")
+        reveal(app.buttons["play-url"])
+        app.buttons["play-url"].tap() // Same URL, new playback generation.
+        jump("WebDAV 文件")
+        let cleared = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            !current.exists && !self.app.staticTexts["webdav-caption-error"].exists
+        }, object: current)
+        XCTAssertEqual(XCTWaiter.wait(for: [cleared], timeout: 10), .completed)
+        reveal(app.buttons["webdav-disconnect"])
+        app.buttons["webdav-disconnect"].tap()
+        let disconnected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: subtitle)
+        XCTAssertEqual(XCTWaiter.wait(for: [disconnected], timeout: 10), .completed)
+    }
+
     func testWebDAVFilterAndRefreshAreConnectionScoped() {
         jump("WebDAV 文件")
         let connect = app.buttons["webdav-connect"]

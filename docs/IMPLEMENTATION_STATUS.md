@@ -347,3 +347,8 @@ The final `098cb400` gate [#42801835526](https://github.com/Kahen/TV-Next/action
 ### 2026-11-11 — PR #188 native switch interaction
 
 [Gate #42838355433](https://github.com/Kahen/TV-Next/actions/runs/42838355433) on `833fd8e4` passed all non-iOS jobs and 158 unit tests on each simulator. Both XCUI runs reported no consent result after tapping the labeled row. Each accessibility hierarchy exposed a distinct native switch inside that row. The updated test taps the child switch once and still asserts the row value, consent response and completed automatic seek. It then selects a distinct episode with the same URL and markers and checks that consent and feedback reset. The binding uses its playback generation so a stale control cannot grant consent to a newer playback. Final-head simulator and aggregate results are pending.
+
+
+### 2026-11-14 — WebDAV external subtitles (pending final-head verification)
+
+Native iPhone/iPad now offers explicit SRT/VTT/ASS/SSA selection from the connected WebDAV directory. Bounded device-local GET reuses the active account, rejects redirects, limits received bytes to 1 MiB, and supports Unicode plus explicit GB18030. New choices, disconnect and playback changes cancel stale loads; failures retain previous captions. The existing player offset/remove controls are reused. Request-policy XCTest, shared-loader race/error tests, real loopback HTTP smoke and production SwiftUI selection/failure/same-URL replay tests are included. Local Python fixture checks pass; final-head iPhone/iPad and full integration remain required. See [IOS_WEBDAV_CAPTIONS.md](IOS_WEBDAV_CAPTIONS.md). P4 #5 and physical acceptance #38 remain open.

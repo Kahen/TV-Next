@@ -95,7 +95,10 @@ struct ContentView: View {
                         .id(serverURL+"|"+(homeSession?.token ?? ""))
                     ConfigPreviewSection().id("config")
                     CloudSection(serverURL: serverURL) { library.play($0) }.id("cloud")
-                    NativeWebDAVSection(onPlay: { library.play($0) }, onDisconnect: { library.revokeWebDAV(root: $0) }).id("webdav")
+                    NativeWebDAVSection(onPlay: { library.play($0) }, onDisconnect: { library.revokeWebDAV(root: $0) },
+                                        canLoadCaption: library.player.currentItem != nil,
+                                        captionName: captionFileName, captions: remoteCaptions,
+                                        onCaption: loadWebDAVCaption).id("webdav")
                     NativeDLNASection(library: library, navigationRequest: navigationRequest,
                                       navigationDestination: scrollDestination).id("dlna")
                     SubscriptionSection(serverURL: serverURL, session:homeSession, onPlay: { playback, title in
@@ -469,7 +472,7 @@ struct ContentView: View {
                         .disabled(library.current?.url != remoteResourceKey)
                         .accessibilityIdentifier("subscription-subtitle-" + source.name)
                 }
-                if remoteCaptions.busy { ProgressView("加载订阅字幕…") }
+                if remoteCaptions.busy { ProgressView("加载外部字幕…") }
                 if let error = remoteCaptions.error { Text(error).font(.caption).foregroundStyle(.red) }
                 if !library.audioTracks.isEmpty {
                     Menu {
@@ -707,6 +710,23 @@ struct ContentView: View {
                     .background(.regularMaterial)
             }
             .presentationDetents([.large])
+        }
+    }
+
+    @MainActor
+    private func loadWebDAVCaption(_ entry: NativeWebDAVItem, connection: NativeWebDAVConnection,
+                                   encoding: CaptionTextEncoding) {
+        guard let item = library.player.currentItem else { return }
+        cancelCaptionImport()
+        let generation = library.playbackGeneration
+        remoteCaptions.load(name: entry.name, isCurrent: {
+            library.playbackGeneration == generation && library.player.currentItem === item
+        }, read: {
+            try await NativeWebDAVCaptionReader.load(entry, connection: connection, encoding: encoding)
+        }) { cues, name in
+            library.setCaptions(cues)
+            captionFileName = name
+            captionOffsetSeconds = 0
         }
     }
 
@@ -986,6 +1006,9 @@ struct ContentView: View {
             return
         }
         cancelCaptionImport()
+        // A confirmed Files choice supersedes pending network captions now,
+        // even if the coordinated local read later fails or is cancelled.
+        remoteCaptions.cancel()
         let generation = UUID()
         captionImportGeneration = generation
         isLoadingCaption = true

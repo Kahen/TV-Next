@@ -112,6 +112,8 @@ jobs:
           PYTHON
           swiftc -warnings-as-errors TVNext/NativeWebDAV.swift tests/WebDAVNetworkSmoke.swift -o /tmp/tvnext-webdav-network-tests
           /tmp/tvnext-webdav-network-tests
+          swiftc -warnings-as-errors TVNext/NativeWebDAV.swift TVNext/CaptionParser.swift TVNext/NativeWebDAVCaptionReader.swift tests/WebDAVCaptionNetworkSmoke.swift -o /tmp/tvnext-webdav-caption-tests
+          /tmp/tvnext-webdav-caption-tests
       - name: Verify bounded native DLNA SOAP and owned loopback transport
         working-directory: apps/ios
         run: |
