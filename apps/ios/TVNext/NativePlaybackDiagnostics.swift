@@ -78,6 +78,20 @@ struct NativePlaybackTimeline: Equatable {
         return domain + " (\(value.code))"
     }
 
+    /// Report only playable buffered seconds at the current position. A malformed
+    /// or out-of-duration range must not imply that media is ready to play.
+    static func bufferedLead(current: Double, duration: Double, ranges: [(Double, Double)]) -> Double? {
+        guard current.isFinite, current >= 0 else { return nil }
+        let validDuration = duration.isFinite && duration >= 0 ? duration : nil
+        guard validDuration.map({ current <= $0 }) ?? true else { return nil }
+        let ends = ranges.prefix(32).compactMap { start, end -> Double? in
+            guard start.isFinite, end.isFinite, start >= 0, end >= start,
+                  start <= current, end >= current else { return nil }
+            return validDuration.map { min(end, $0) } ?? end
+        }
+        return ends.max().map { min(86_400, max(0, $0 - current)) }
+    }
+
     @MainActor
     static func capture(_ player: AVPlayer) -> NativePlaybackTimeline {
         guard let item = player.currentItem else {
@@ -94,12 +108,11 @@ struct NativePlaybackTimeline: Equatable {
             }
         }
         let current = player.currentTime().seconds
-        let ends = item.loadedTimeRanges.prefix(32).compactMap { value -> Double? in
-            let range = value.timeRangeValue
-            let start = range.start.seconds, end = CMTimeRangeGetEnd(range).seconds
-            return current.isFinite && start.isFinite && end.isFinite && start <= current && end >= current ? end : nil
-        }
-        let lead = ends.max().map { min(86_400, max(0, $0 - current)) }
+        let lead = bufferedLead(current: current, duration: item.duration.seconds,
+            ranges: item.loadedTimeRanges.prefix(32).map { value in
+                let range = value.timeRangeValue
+                return (range.start.seconds, CMTimeRangeGetEnd(range).seconds)
+            })
         return NativePlaybackTimeline(state: state, position: seconds(current), duration: seconds(item.duration.seconds),
             buffered: lead.map(seconds) ?? "未报告", error: errorCode(item.error))
     }
