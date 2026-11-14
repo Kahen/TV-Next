@@ -88,7 +88,11 @@ enum CaptionParser {
             .replacingOccurrences(of: "\r\n", with: "\n")
             .replacingOccurrences(of: "\r", with: "\n")
 
-        if input.range(of: #"(?im)^\[Events\]\s*$"#, options: .regularExpression) != nil {
+        // An SRT/WebVTT cue may literally contain "[Events]". Only dispatch to
+        // ASS when the document begins with an ASS section header.
+        let firstLine = input.split(separator: "\n", omittingEmptySubsequences: true)
+            .first.map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+        if ["[events]", "[script info]", "[v4 styles]", "[v4+ styles]"].contains(firstLine ?? "") {
             return try parseAss(input)
         }
         var result: [CaptionCue] = []
