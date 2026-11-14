@@ -332,7 +332,7 @@ private actor RequestCounter {
         precondition(clippedTerminal.items.count == 40)
         precondition(clippedTerminal.items.last?.item.id == "39")
         precondition(clippedTerminal.failedKeys.isEmpty)
-        precondition(clippedTerminal.warnings == ["1 个站点单页超过 40 条，仅保留每页前 40 条。"])
+        precondition(clippedTerminal.warnings == ["1 个站点单页有效去重结果超过 40 条，仅保留前 40 条。"])
 
         let exactBoundary = try await NativeCrossSiteSearch.search(
             sources: [NativeSearchSource(key: "exact", name: "Exact")],
@@ -362,7 +362,7 @@ private actor RequestCounter {
         )
         precondition(clippedThenFailed.items.count == 40)
         precondition(clippedThenFailed.failedKeys == ["partial"])
-        precondition(clippedThenFailed.warnings == ["1 个站点单页超过 40 条，仅保留每页前 40 条。"])
+        precondition(clippedThenFailed.warnings == ["1 个站点单页有效去重结果超过 40 条，仅保留前 40 条。"])
 
         let initialWarnings = NativeSearchWarningState(
             omittedSiteCount: 2, pageLimitKeys: ["a", "b"],
@@ -379,7 +379,7 @@ private actor RequestCounter {
             omittedSiteCount: 0, pageLimitKeys: [],
             clippedPageKeys: ["a", "b"], globalResultCapReached: false
         )
-        precondition(twoClipped.messages == ["2 个站点单页超过 40 条，仅保留每页前 40 条。"])
+        precondition(twoClipped.messages == ["2 个站点单页有效去重结果超过 40 条，仅保留前 40 条。"])
         print("Native cross-provider search: ordering, concurrency, bounds, failed-key retries, warning reconciliation and cancellation passed")
     }
 }
