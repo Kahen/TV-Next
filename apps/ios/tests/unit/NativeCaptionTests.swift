@@ -81,6 +81,20 @@ final class NativeCaptionTests: XCTestCase {
         XCTAssertEqual(try CaptionParser.parse(Data(vtt.utf8)).first?.text, "[Events]")
     }
 
+    func testASSHeaderAfterWhitespaceOnlyLinesStillParses() throws {
+        let ass = """
+         
+
+        \t
+        [Script Info]
+        Title: whitespace header
+        [Events]
+        Format: Start, End, Text
+        Dialogue: 0:00:01.00,0:00:02.00,Working
+        """
+        XCTAssertEqual(try CaptionParser.parse(Data(ass.utf8)).first?.text, "Working")
+    }
+
     func testASSHeaderDetectionAcceptsScriptInfoAndRejectsInvalidDialogue() throws {
         let ass = """
         [Script Info]
