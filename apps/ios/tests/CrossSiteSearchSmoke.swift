@@ -351,7 +351,7 @@ private actor RequestCounter {
         precondition(clippedAndMore.items.count == 80)
         precondition(clippedAndMore.warnings.count == 2)
         precondition(clippedAndMore.warnings.contains { $0.contains("仍有更多结果") })
-        precondition(clippedAndMore.warnings.contains { $0.contains("单页超过 40") })
+        precondition(clippedAndMore.warnings.contains { $0.contains("单页有效去重结果超过 40") })
 
         let clippedThenFailed = try await NativeCrossSiteSearch.search(
             sources: [NativeSearchSource(key: "partial", name: "Partial")],
