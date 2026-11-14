@@ -20,7 +20,7 @@ private actor RequestCounter {
             }, identity: { $0.id }
         )
         precondition(pageCap.items.map(\.item.id) == ["duplicate", "later", "合法"])
-        precondition(pageCap.warningState.clippedPageKeys == ["owned"])
+        precondition(pageCap.warningState.clippedPageKeys.isEmpty)
         let malformedResultIds = ["bad\u{0000}id", "bad\u{200B}id", "bad\u{202E}id"]
         let safeResultIds = ["合法", "id with spaces", "café"]
         let identityBoundary = try await NativeCrossSiteSearch.search(
@@ -332,7 +332,7 @@ private actor RequestCounter {
         precondition(clippedTerminal.items.count == 40)
         precondition(clippedTerminal.items.last?.item.id == "39")
         precondition(clippedTerminal.failedKeys.isEmpty)
-        precondition(clippedTerminal.warnings == ["1 个站点单页超过 40 条，仅保留每页前 40 条。"])
+        precondition(clippedTerminal.warnings == ["1 个站点单页有效去重结果超过 40 条，仅保留前 40 条。"])
 
         let exactBoundary = try await NativeCrossSiteSearch.search(
             sources: [NativeSearchSource(key: "exact", name: "Exact")],
@@ -351,7 +351,7 @@ private actor RequestCounter {
         precondition(clippedAndMore.items.count == 80)
         precondition(clippedAndMore.warnings.count == 2)
         precondition(clippedAndMore.warnings.contains { $0.contains("仍有更多结果") })
-        precondition(clippedAndMore.warnings.contains { $0.contains("单页超过 40") })
+        precondition(clippedAndMore.warnings.contains { $0.contains("单页有效去重结果超过 40") })
 
         let clippedThenFailed = try await NativeCrossSiteSearch.search(
             sources: [NativeSearchSource(key: "partial", name: "Partial")],
@@ -362,7 +362,7 @@ private actor RequestCounter {
         )
         precondition(clippedThenFailed.items.count == 40)
         precondition(clippedThenFailed.failedKeys == ["partial"])
-        precondition(clippedThenFailed.warnings == ["1 个站点单页超过 40 条，仅保留每页前 40 条。"])
+        precondition(clippedThenFailed.warnings == ["1 个站点单页有效去重结果超过 40 条，仅保留前 40 条。"])
 
         let initialWarnings = NativeSearchWarningState(
             omittedSiteCount: 2, pageLimitKeys: ["a", "b"],
@@ -379,7 +379,7 @@ private actor RequestCounter {
             omittedSiteCount: 0, pageLimitKeys: [],
             clippedPageKeys: ["a", "b"], globalResultCapReached: false
         )
-        precondition(twoClipped.messages == ["2 个站点单页超过 40 条，仅保留每页前 40 条。"])
+        precondition(twoClipped.messages == ["2 个站点单页有效去重结果超过 40 条，仅保留前 40 条。"])
         print("Native cross-provider search: ordering, concurrency, bounds, failed-key retries, warning reconciliation and cancellation passed")
     }
 }

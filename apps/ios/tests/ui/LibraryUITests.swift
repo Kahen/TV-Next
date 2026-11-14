@@ -310,7 +310,7 @@ final class LibraryUITests: XCTestCase {
         let warning = app.staticTexts["cross-site-warning"]
         XCTAssertTrue(warning.waitForExistence(timeout: 15),
                       "The provider returned 41 items with hasMore=false; clipping must be disclosed")
-        XCTAssertEqual(warning.label, "1 个站点单页超过 40 条，仅保留每页前 40 条。")
+        XCTAssertEqual(warning.label, "1 个站点单页有效去重结果超过 40 条，仅保留前 40 条。")
         XCTAssertFalse(warning.label.contains("仍有更多结果"))
         XCTAssertFalse(app.buttons["retry-failed-cross-site-search"].exists)
         XCTAssertTrue(app.staticTexts["跨站搜索结果"].exists)
@@ -338,7 +338,7 @@ final class LibraryUITests: XCTestCase {
         let retry = app.buttons["retry-failed-cross-site-search"]
         XCTAssertTrue(retry.waitForExistence(timeout: 15))
         XCTAssertTrue(warning.waitForExistence(timeout: 15))
-        XCTAssertEqual(warning.label, "1 个站点单页超过 40 条，仅保留每页前 40 条。")
+        XCTAssertEqual(warning.label, "1 个站点单页有效去重结果超过 40 条，仅保留前 40 条。")
         reveal(retry)
         retry.tap()
         let dismissed = XCTNSPredicateExpectation(
