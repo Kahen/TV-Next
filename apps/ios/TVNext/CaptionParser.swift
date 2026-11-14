@@ -91,7 +91,8 @@ enum CaptionParser {
         // An SRT/WebVTT cue may literally contain "[Events]". Only dispatch to
         // ASS when the document begins with an ASS section header.
         let firstLine = input.split(separator: "\n", omittingEmptySubsequences: true)
-            .first.map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+            .first(where: { !$0.isEmpty })
         if ["[events]", "[script info]", "[v4 styles]", "[v4+ styles]"].contains(firstLine ?? "") {
             return try parseAss(input)
         }
