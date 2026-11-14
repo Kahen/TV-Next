@@ -39,7 +39,7 @@ Synthetic validation includes pure Swift smoke/XCTest boundaries, an owned local
 
 ## Oversized terminal-page visibility (#156)
 
-A FongMi-compatible provider may return more than 40 entries in a single search response while declaring `hasMore=false`. Previously the native coordinator kept the first 40 silently, because its warning only described additional pages beyond the second. The iOS UI now reports **单页超过 40 条，仅保留每页前 40 条** for each affected provider. This is distinct from **仍有更多结果**, which is emitted only if the second page still advertises another page. Both warnings may coexist. Provider failures preserve any earlier clipping warning, but upstream exception text and credentials are never surfaced.
+A FongMi-compatible provider may return more than 40 entries in a single search response while declaring `hasMore=false`. Previously the native coordinator kept the first 40 silently, because its warning only described additional pages beyond the second. The iOS UI now reports **单页有效去重结果超过 40 条，仅保留前 40 条** for each affected provider. This is distinct from **仍有更多结果**, which is emitted only if the second page still advertises another page. Both warnings may coexist. Provider failures preserve any earlier clipping warning, but upstream exception text and credentials are never surfaced.
 
 The original 16-unique-site, 4-concurrent, 2-page/site, 40-item/page and 600-visible-item limits are unchanged. The warning does not fetch additional pages or infer whether a provider omitted results on its own. Synthetic 40/41-item, `hasMore`, second-page failure and owned loopback 41-item terminal-page tests run in Swift smoke/XCTest, Python and production iPhone/iPad XCUI. Merge only after final-HEAD full integration success; physical devices and authorized external provider behavior remain unverified.
 
@@ -56,3 +56,7 @@ Swift smoke/XCTest, a localhost page-1-clipped/page-2-failed/retry-success fixtu
 Failed-only retry is now restricted to the **originally searched provider keys** and to the first 16 distinct entries of the current authorized/visible list. A stale or foreign failure key, including an eligible 17th provider, cannot cause a new search request. A newly inserted eligible site cannot enter a retry simply because the current list shifted; a displaced old site also fails closed. Duplicate keys retain the first eligible provider identity. The original submitted keyword, healthy-site results and existing partial-failure reconciliation are unchanged.
 
 Swift smoke and XCTest exercise 16/17 boundaries, changed eligible lists, duplicate keys, stale keys and actual retry request counts. Existing production SwiftUI iPhone/iPad XCUI, unsigned simulator build and full cross-platform gate remain required on final HEAD. These are synthetic checks, not physical-device or real-provider acceptance.
+
+### Valid-distinct clipping clarification (PR #200)
+
+The warning now indicates actual truncation of valid distinct identities, not simply more than 40 raw entries. Duplicate-heavy or malformed raw pages can exceed 40 entries without losing any valid result. A 41st valid distinct identity still triggers clipping. This remains a bounded owned-fixture behavior, not a claim of real-provider acceptance.
