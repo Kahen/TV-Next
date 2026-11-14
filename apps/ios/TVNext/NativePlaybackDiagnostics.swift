@@ -84,7 +84,8 @@ struct NativePlaybackTimeline: Equatable {
         guard current.isFinite, current >= 0 else { return nil }
         let validDuration = duration.isFinite && duration >= 0 ? duration : nil
         guard validDuration.map({ current <= $0 }) ?? true else { return nil }
-        let ends = ranges.prefix(32).compactMap { start, end -> Double? in
+        let ends = ranges.prefix(32).compactMap { pair -> Double? in
+            let (start, end) = pair
             guard start.isFinite, end.isFinite, start >= 0, end >= start,
                   start <= current, end >= current else { return nil }
             return validDuration.map { min(end, $0) } ?? end
