@@ -27,7 +27,7 @@ final class CrossSiteRetryTests: XCTestCase {
         let result = try await NativeCrossSiteSearch.search(
             sources: [source],
             fetch: { _, _ in
-                NativeSearchPage(items: (0..<41).map { Item(id: "valid-\\($0)") }, hasMore: false)
+                NativeSearchPage(items: (0..<41).map { Item(id: "valid-\($0)") }, hasMore: false)
             }, identity: { $0.id }
         )
         XCTAssertEqual(result.items.count, 40)
