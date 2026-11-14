@@ -403,7 +403,7 @@ final class CrossSiteRetryTests: XCTestCase {
         XCTAssertEqual(result.items.count, 80)
         XCTAssertEqual(result.warnings.count, 2)
         XCTAssertTrue(result.warnings.contains { $0.contains("仍有更多结果") })
-        XCTAssertTrue(result.warnings.contains { $0.contains("单页超过 40") })
+        XCTAssertTrue(result.warnings.contains { $0.contains("单页有效去重结果超过 40") })
     }
 
     func testPartialFailurePreservesClippedPageWarning() async throws {
