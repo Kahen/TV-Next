@@ -242,6 +242,25 @@ final class CrossSiteRetryTests: XCTestCase {
         XCTAssertEqual(combined.messages, ["2 个站点单页有效去重结果超过 40 条，仅保留前 40 条。"])
     }
 
+    func testBlankProviderNamesFallbackToStableKeyInFailureAndSnapshot() async throws {
+        let sources = [
+            NativeSearchSource(key: "owned-blank", name: "  \t "),
+            NativeSearchSource(key: "owned-unicode", name: "合法站点"),
+            NativeSearchSource(key: "owned-spaced", name: " Name ")
+        ]
+        let names = NativeCrossSiteSearch.selectedSourceNames(sources)
+        XCTAssertEqual(names["owned-blank"], "owned-blank")
+        XCTAssertEqual(names["owned-unicode"], "合法站点")
+        XCTAssertEqual(names["owned-spaced"], " Name ")
+        let result = try await NativeCrossSiteSearch.search(
+            sources: sources,
+            fetch: { _, _ in throw NSError(domain: "fixture", code: 1) },
+            identity: { (item: Item) in item.id }
+        )
+        XCTAssertEqual(result.failed, ["owned-blank", "合法站点", " Name "])
+        XCTAssertEqual(result.failedKeys, sources.map(\.key))
+    }
+
     func testFailureKeysAreDistinctFromDuplicateDisplayNames() async throws {
         let sources = [
             NativeSearchSource(key: "first", name: "Mirror"),

@@ -141,8 +141,15 @@ enum NativeCrossSiteSearch {
         selectedSources(sources).map(\.key)
     }
 
+    /// Imported providers may omit a display name. Preserve the opaque key
+    /// for retry identity and use it as a visible fallback for blank labels.
+    private static func displayName(_ source: NativeSearchSource) -> String {
+        source.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? source.key : source.name
+    }
+
     static func selectedSourceNames(_ sources: [NativeSearchSource]) -> [String: String] {
-        Dictionary(uniqueKeysWithValues: selectedSources(sources).map { ($0.key, $0.name) })
+        Dictionary(uniqueKeysWithValues: selectedSources(sources).map { ($0.key, displayName($0)) })
     }
 
     /// Retry only keys that actually participated in the original bounded
@@ -295,7 +302,7 @@ enum NativeCrossSiteSearch {
             globalResultCapReached: all.count > maxResults
         )
         return NativeSearchResult(items: Array(all.prefix(maxResults)),
-                                  failed: selected.enumerated().compactMap { failures.contains($0.offset) ? $0.element.name : nil },
+                                  failed: selected.enumerated().compactMap { failures.contains($0.offset) ? displayName($0.element) : nil },
                                   failedKeys: selected.enumerated().compactMap { failures.contains($0.offset) ? $0.element.key : nil },
                                   warningState: warningState)
     }
