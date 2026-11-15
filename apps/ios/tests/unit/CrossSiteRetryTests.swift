@@ -6,6 +6,37 @@ final class CrossSiteRetryTests: XCTestCase {
         let id: String
     }
 
+    func testOversizedUtf8IdentitiesCannotConsumeSearchOrRetrySlots() async throws {
+        let oversizedKey = String(repeating: "界", count: 342) // 1026 bytes
+        let acceptedKey = String(repeating: "界", count: 341) // 1023 bytes
+        let oversizedId = String(repeating: "界", count: 1366) // 4098 bytes
+        let acceptedId = String(repeating: "界", count: 1365) // 4095 bytes
+        XCTAssertEqual(NativeCrossSiteSearch.selectedSourceKeys([
+            NativeSearchSource(key: oversizedKey, name: "Too long"),
+            NativeSearchSource(key: acceptedKey, name: "Allowed")
+        ]), [acceptedKey])
+        XCTAssertTrue(NativeCrossSiteSearch.failedOnlySources(
+            [NativeSearchSource(key: oversizedKey, name: "Too long")],
+            failedKeys: [oversizedKey], searchedKeys: [oversizedKey]
+        ).isEmpty)
+        let result = try await NativeCrossSiteSearch.search(
+            sources: [NativeSearchSource(key: acceptedKey, name: "Allowed")],
+            fetch: { _, _ in NativeSearchPage(items: [
+                Item(id: oversizedId), Item(id: acceptedId), Item(id: "normal")
+            ], hasMore: false) },
+            identity: { $0.id }
+        )
+        XCTAssertEqual(result.items.map(\.item.id), [acceptedId, "normal"])
+        let retry = NativeCrossSiteSearch.mergeRetry(
+            previous: [], refreshed: [
+                NativeSearchHit(siteKey: acceptedKey, item: Item(id: oversizedId)),
+                NativeSearchHit(siteKey: acceptedKey, item: Item(id: acceptedId))
+            ], recoveredKeys: [acceptedKey], sourceOrder: [acceptedKey],
+            identity: { $0.id }
+        )
+        XCTAssertEqual(retry.map(\.item.id), [acceptedId])
+    }
+
     func testPageCapCountsOnlyValidDistinctHits() async throws {
         let source = NativeSearchSource(key: "owned", name: "Owned")
         let result = try await NativeCrossSiteSearch.search(

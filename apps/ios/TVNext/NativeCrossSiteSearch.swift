@@ -84,12 +84,16 @@ enum NativeCrossSiteSearch {
     static let maxPages = 2
     static let maxItemsPerPage = 40
     static let maxResults = 600
+    // Reject oversized opaque identifiers before deduplication or retry snapshots.
+    static let maxProviderKeyBytes = 1_024
+    static let maxResultIdBytes = 4_096
 
     /// Control and invisible Unicode format characters cannot be stable provider identities.
     /// Reject bidi overrides and zero-width format markers rather than silently normalizing
     /// keys, which could alias distinct subscription providers during search/retry.
     private static func validProviderKey(_ key: String) -> Bool {
-        !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        key.utf8.count <= maxProviderKeyBytes &&
+            !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
             key.unicodeScalars.allSatisfy { scalar in
                 !CharacterSet.controlCharacters.contains(scalar) &&
                     scalar.properties.generalCategory != .format &&
@@ -101,7 +105,8 @@ enum NativeCrossSiteSearch {
     /// Opaque result IDs must not contain control or invisible formatting scalars.
     /// Keep valid Unicode and meaningful spacing intact for exact deduplication.
     private static func validResultIdentity(_ id: String) -> Bool {
-        !id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        id.utf8.count <= maxResultIdBytes &&
+            !id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
             id.unicodeScalars.allSatisfy { scalar in
                 !CharacterSet.controlCharacters.contains(scalar) &&
                     scalar.properties.generalCategory != .format &&

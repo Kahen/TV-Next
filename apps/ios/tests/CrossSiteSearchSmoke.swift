@@ -12,6 +12,28 @@ private actor RequestCounter {
 @main struct CrossSiteSearchSmoke {
     struct Item { let id: String }
     static func main() async throws {
+        let longKey = String(repeating: "界", count: 342)
+        let allowedKey = String(repeating: "界", count: 341)
+        precondition(NativeCrossSiteSearch.selectedSourceKeys([
+            NativeSearchSource(key: longKey, name: "Rejected"),
+            NativeSearchSource(key: allowedKey, name: "Allowed")
+        ]) == [allowedKey])
+        let longId = String(repeating: "界", count: 1366)
+        let allowedId = String(repeating: "界", count: 1365)
+        let byteBounded = try await NativeCrossSiteSearch.search(
+            sources: [NativeSearchSource(key: allowedKey, name: "Allowed")],
+            fetch: { _, _ in NativeSearchPage(items: [
+                Item(id: longId), Item(id: allowedId)
+            ], hasMore: false) }, identity: { $0.id }
+        )
+        precondition(byteBounded.items.map { $0.item.id } == [allowedId])
+        precondition(NativeCrossSiteSearch.mergeRetry(
+            previous: [], refreshed: [
+                NativeSearchHit(siteKey: allowedKey, item: Item(id: longId)),
+                NativeSearchHit(siteKey: allowedKey, item: Item(id: allowedId))
+            ], recoveredKeys: [allowedKey], sourceOrder: [allowedKey],
+            identity: { $0.id }
+        ).map { $0.item.id } == [allowedId])
         let pageCap = try await NativeCrossSiteSearch.search(
             sources: [NativeSearchSource(key: "owned", name: "Owned")],
             fetch: { _, _ in
