@@ -24,7 +24,7 @@ struct DanmakuOptionsSmoke {
         precondition(bounded.utf8.count == 4_095)
         precondition(!bounded.contains("�"))
         // Preserve complete user-perceived characters, not merely valid UTF-8 scalars.
-        let combined = String(repeating: "a", count: 4_094) + "e\\u{301}" + "z"
+        let combined = String(repeating: "a", count: 4_094) + "e\u{301}" + "z"
         precondition(DanmakuOptionsStore.boundedBlocked(combined) == String(repeating: "a", count: 4_094))
         let family = "👨‍👩‍👧‍👦"
         let emojiInput = String(repeating: "a", count: 4_090) + family + "tail"
