@@ -24,18 +24,19 @@ enum DanmakuOptionsStore {
         options.blocked.utf8.count <= 4_096
     }
 
-    /// Limit editable blocked words on Unicode scalar boundaries, never splitting UTF-8.
+    /// Limit editable blocked words at extended grapheme-cluster boundaries.
+    /// Never persist a partial emoji sequence or a detached combining mark.
     static func boundedBlocked(_ raw: String) -> String {
         guard raw.utf8.count > 4_096 else { return raw }
         var remaining = 4_096
-        var scalars = String.UnicodeScalarView()
-        for scalar in raw.unicodeScalars {
-            let bytes = scalar.utf8.count
+        var result = String()
+        for character in raw {
+            let bytes = String(character).utf8.count
             if bytes > remaining { break }
-            scalars.append(scalar)
+            result.append(character)
             remaining -= bytes
         }
-        return String(scalars)
+        return result
     }
 
     static func load(from defaults: UserDefaults = .standard) -> DanmakuOptions {
