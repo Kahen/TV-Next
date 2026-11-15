@@ -12,7 +12,7 @@ private actor RequestCounter {
 @main struct CrossSiteSearchSmoke {
     struct Item { let id: String }
     static func main() async throws {
-        let unsafeLabel = NativeSearchSource(key: "stable-key", name: "spoof\\u{202E}name")
+        let unsafeLabel = NativeSearchSource(key: "stable-key", name: "spoof\u{202E}name")
         precondition(NativeCrossSiteSearch.selectedSourceNames([unsafeLabel])["stable-key"] == "stable-key")
         let unsafeFailure = try await NativeCrossSiteSearch.search(
             sources: [unsafeLabel],
