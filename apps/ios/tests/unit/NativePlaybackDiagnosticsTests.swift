@@ -68,4 +68,28 @@ final class NativePlaybackDiagnosticsTests: XCTestCase {
         XCTAssertEqual(value.position, "—")
         XCTAssertNil(value.error)
     }
+    func testBufferedLeadClampsToFiniteMediaDuration() {
+        XCTAssertEqual(NativePlaybackTimeline.bufferedLead(current: 20, duration: 30,
+            ranges: [(0, 120)]), 10)
+        XCTAssertEqual(NativePlaybackTimeline.bufferedLead(current: 20, duration: .infinity,
+            ranges: [(0, 120)]), 100)
+        XCTAssertEqual(NativePlaybackTimeline.bufferedLead(current: 20, duration: 30,
+            ranges: [(0, 21), (10, 28)]), 8)
+    }
+
+    func testBufferedLeadRejectsInvalidOrUnplayableRanges() {
+        XCTAssertNil(NativePlaybackTimeline.bufferedLead(current: 31, duration: 30,
+            ranges: [(0, 120)]))
+        XCTAssertNil(NativePlaybackTimeline.bufferedLead(current: -1, duration: 30,
+            ranges: [(0, 20)]))
+        XCTAssertNil(NativePlaybackTimeline.bufferedLead(current: .nan, duration: 30,
+            ranges: [(0, 20)]))
+        XCTAssertNil(NativePlaybackTimeline.bufferedLead(current: 10, duration: 30,
+            ranges: [(-1, 20), (20, 10), (.nan, 20), (0, .infinity)]))
+        XCTAssertNil(NativePlaybackTimeline.bufferedLead(current: 10, duration: 30,
+            ranges: [(11, 20)]))
+        XCTAssertEqual(NativePlaybackTimeline.bufferedLead(current: 30, duration: 30,
+            ranges: [(0, 60)]), 0)
+    }
+
 }
