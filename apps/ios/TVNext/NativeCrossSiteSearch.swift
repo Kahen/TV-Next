@@ -144,8 +144,17 @@ enum NativeCrossSiteSearch {
     /// Imported providers may omit a display name. Preserve the opaque key
     /// for retry identity and use it as a visible fallback for blank labels.
     private static func displayName(_ source: NativeSearchSource) -> String {
-        source.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            ? source.key : source.name
+        // Imported labels are untrusted presentation text, never provider identity.
+        // Reject line breaks, controls and invisible formatting rather than allowing
+        // spoofed/multiline failure messages. Keep legitimate Unicode and spacing.
+        let safe = source.name.unicodeScalars.allSatisfy { scalar in
+            !CharacterSet.controlCharacters.contains(scalar) &&
+                scalar.properties.generalCategory != .format &&
+                scalar.properties.generalCategory != .lineSeparator &&
+                scalar.properties.generalCategory != .paragraphSeparator
+        }
+        return safe && !source.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? source.name : source.key
     }
 
     static func selectedSourceNames(_ sources: [NativeSearchSource]) -> [String: String] {

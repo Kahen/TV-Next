@@ -2,6 +2,30 @@ import XCTest
 @testable import TVNext
 
 final class CrossSiteRetryTests: XCTestCase {
+    func testUntrustedProviderDisplayNamesFallbackWithoutChangingRetryIdentity() async throws {
+        let badLabels = ["fake\nsecond provider", "spoof\u{202E}name", "line\u{2028}break", "para\u{2029}break", "\u{200B}"]
+        let sources = badLabels.enumerated().map {
+            NativeSearchSource(key: "provider-\($0.offset)", name: $0.element)
+        }
+        let good = NativeSearchSource(key: "provider-good", name: "合法 Café")
+        let padded = NativeSearchSource(key: "provider-padded", name: "  Normal name  ")
+        let all = sources + [good, padded]
+        let labels = NativeCrossSiteSearch.selectedSourceNames(all)
+        for source in sources { XCTAssertEqual(labels[source.key], source.key) }
+        XCTAssertEqual(labels[good.key], good.name)
+        XCTAssertEqual(labels[padded.key], padded.name)
+        let result = try await NativeCrossSiteSearch.search(
+            sources: all,
+            fetch: { _, _ in throw NSError(domain: "owned-fixture", code: 1) },
+            identity: { (item: Item) in item.id }
+        )
+        XCTAssertEqual(result.failedKeys, all.map(\.key))
+        XCTAssertEqual(result.failed, all.map { labels[$0.key]! })
+        XCTAssertEqual(NativeCrossSiteSearch.failedOnlySources(
+            all, failedKeys: result.failedKeys, searchedKeys: all.map(\.key)
+        ).map(\.key), all.map(\.key))
+    }
+
     private struct Item {
         let id: String
     }
