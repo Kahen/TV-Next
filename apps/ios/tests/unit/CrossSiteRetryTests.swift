@@ -19,11 +19,11 @@ final class CrossSiteRetryTests: XCTestCase {
             fetch: { _, _ in throw NSError(domain: "owned-fixture", code: 1) },
             identity: { (item: Item) in item.id }
         )
-        XCTAssertEqual(result.failedKeys, all.map(\\.key))
+        XCTAssertEqual(result.failedKeys, all.map(\.key))
         XCTAssertEqual(result.failed, all.map { labels[$0.key]! })
         XCTAssertEqual(NativeCrossSiteSearch.failedOnlySources(
-            all, failedKeys: result.failedKeys, searchedKeys: all.map(\\.key)
-        ).map(\\.key), all.map(\\.key))
+            all, failedKeys: result.failedKeys, searchedKeys: all.map(\.key)
+        ).map(\.key), all.map(\.key))
     }
 
     private struct Item {
