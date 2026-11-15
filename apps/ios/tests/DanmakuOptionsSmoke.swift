@@ -23,6 +23,15 @@ struct DanmakuOptionsSmoke {
         let bounded = DanmakuOptionsStore.boundedBlocked(String(repeating: "剧", count: 2_000))
         precondition(bounded.utf8.count == 4_095)
         precondition(!bounded.contains("�"))
+        // Preserve complete user-perceived characters, not merely valid UTF-8 scalars.
+        let combined = String(repeating: "a", count: 4_094) + "e\u{301}" + "z"
+        precondition(DanmakuOptionsStore.boundedBlocked(combined) == String(repeating: "a", count: 4_094))
+        let family = "👨‍👩‍👧‍👦"
+        let emojiInput = String(repeating: "a", count: 4_090) + family + "tail"
+        precondition(DanmakuOptionsStore.boundedBlocked(emojiInput) == String(repeating: "a", count: 4_090))
+        let exact = String(repeating: "a", count: 4_092) + "😀"
+        precondition(DanmakuOptionsStore.boundedBlocked(exact) == exact)
+        precondition(DanmakuOptionsStore.boundedBlocked("hello,剧透") == "hello,剧透")
         DanmakuOptionsStore.clear(from: defaults)
         precondition(defaults.data(forKey: DanmakuOptionsStore.key) == nil)
         print("Native danmaku preferences smoke passed")
