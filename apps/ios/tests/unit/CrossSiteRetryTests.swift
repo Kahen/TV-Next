@@ -3,7 +3,7 @@ import XCTest
 
 final class CrossSiteRetryTests: XCTestCase {
     func testUntrustedProviderDisplayNamesFallbackWithoutChangingRetryIdentity() async throws {
-        let badLabels = ["fake\\nsecond provider", "spoof\\u{202E}name", "line\\u{2028}break", "para\\u{2029}break", "\\u{200B}"]
+        let badLabels = ["fake\nsecond provider", "spoof\u{202E}name", "line\u{2028}break", "para\u{2029}break", "\u{200B}"]
         let sources = badLabels.enumerated().map {
             NativeSearchSource(key: "provider-\\($0.offset)", name: $0.element)
         }
