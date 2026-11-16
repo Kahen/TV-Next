@@ -97,6 +97,19 @@ final class NativePlaybackDiagnosticsTests: XCTestCase {
             ranges: [(0, 9), (11, 90)]))
     }
 
+    func testBufferedLeadRejectsInvalidDurationInsteadOfTreatingItAsLive() {
+        XCTAssertNil(NativePlaybackTimeline.bufferedLead(current: 10, duration: -1,
+            ranges: [(0, 30)]))
+        XCTAssertNil(NativePlaybackTimeline.bufferedLead(current: 10, duration: -.infinity,
+            ranges: [(0, 30)]))
+        XCTAssertNil(NativePlaybackTimeline.bufferedLead(current: 10, duration: .nan,
+            ranges: [(0, 30)]))
+        XCTAssertEqual(NativePlaybackTimeline.bufferedLead(current: 10, duration: .infinity,
+            ranges: [(0, 30)]), 20)
+        XCTAssertEqual(NativePlaybackTimeline.bufferedLead(current: 0, duration: 0,
+            ranges: [(0, 30)]), 0)
+    }
+
     func testBufferedLeadRejectsInvalidOrUnplayableRanges() {
         XCTAssertNil(NativePlaybackTimeline.bufferedLead(current: 31, duration: 30,
             ranges: [(0, 120)]))
