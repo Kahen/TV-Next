@@ -81,7 +81,7 @@ struct NativePlaybackTimeline: Equatable {
     /// Report only playable buffered seconds at the current position. A malformed
     /// or out-of-duration range must not imply that media is ready to play.
     static func bufferedLead(current: Double, duration: Double, ranges: [(Double, Double)]) -> Double? {
-        guard current.isFinite, current >= 0 else { return nil }
+        guard current.isFinite, current >= 0, !duration.isNaN, duration >= 0 else { return nil }
         let validDuration = duration.isFinite && duration >= 0 ? duration : nil
         guard validDuration.map({ current <= $0 }) ?? true else { return nil }
         // AVPlayer can report adjacent/overlapping loaded ranges separately.
