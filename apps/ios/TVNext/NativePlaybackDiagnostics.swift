@@ -84,13 +84,25 @@ struct NativePlaybackTimeline: Equatable {
         guard current.isFinite, current >= 0 else { return nil }
         let validDuration = duration.isFinite && duration >= 0 ? duration : nil
         guard validDuration.map({ current <= $0 }) ?? true else { return nil }
-        let ends = ranges.prefix(32).compactMap { pair -> Double? in
+        // AVPlayer can report adjacent/overlapping loaded ranges separately.
+        // Only merge intervals continuously reachable from the playhead; a gap
+        // must not inflate the playable buffer lead.
+        let intervals = ranges.prefix(32).compactMap { pair -> (Double, Double)? in
             let (start, end) = pair
-            guard start.isFinite, end.isFinite, start >= 0, end >= start,
-                  start <= current, end >= current else { return nil }
-            return validDuration.map { min(end, $0) } ?? end
+            guard start.isFinite, end.isFinite, start >= 0, end >= start else { return nil }
+            let boundedEnd = validDuration.map { min(end, $0) } ?? end
+            guard start <= boundedEnd else { return nil }
+            return (start, boundedEnd)
+        }.sorted { $0.0 < $1.0 }
+        guard let first = intervals.first(where: { $0.0 <= current && current <= $0.1 }) else {
+            return nil
         }
-        return ends.max().map { min(86_400, max(0, $0 - current)) }
+        var reachableEnd = first.1
+        for (start, end) in intervals {
+            if start > reachableEnd { break }
+            if end > reachableEnd { reachableEnd = end }
+        }
+        return min(86_400, max(0, reachableEnd - current))
     }
 
     @MainActor

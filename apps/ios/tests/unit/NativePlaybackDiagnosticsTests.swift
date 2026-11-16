@@ -77,6 +77,26 @@ final class NativePlaybackDiagnosticsTests: XCTestCase {
             ranges: [(0, 21), (10, 28)]), 8)
     }
 
+    func testBufferedLeadMergesContiguousAndOverlappingIntervals() {
+        XCTAssertEqual(NativePlaybackTimeline.bufferedLead(current: 10, duration: 100,
+            ranges: [(20, 30), (0, 12), (12, 20)]), 20)
+        XCTAssertEqual(NativePlaybackTimeline.bufferedLead(current: 10, duration: 100,
+            ranges: [(0, 15), (14, 18), (18, 23)]), 13)
+        XCTAssertEqual(NativePlaybackTimeline.bufferedLead(current: 10, duration: 100,
+            ranges: [(0, 12), (13, 90)]), 2)
+        XCTAssertEqual(NativePlaybackTimeline.bufferedLead(current: 10, duration: 16,
+            ranges: [(0, 12), (12, 50)]), 6)
+    }
+
+    func testBufferedLeadIgnoresMalformedIntervalsAndCapsScan() {
+        XCTAssertEqual(NativePlaybackTimeline.bufferedLead(current: 10, duration: 100,
+            ranges: [(-1, 99), (.nan, 99), (0, 12), (12, 15), (20, 99)]), 5)
+        XCTAssertEqual(NativePlaybackTimeline.bufferedLead(current: 10, duration: 100,
+            ranges: [(0, 11)] + Array(repeating: (11.0, 12.0), count: 31) + [(12, 90)]), 2)
+        XCTAssertNil(NativePlaybackTimeline.bufferedLead(current: 10, duration: 100,
+            ranges: [(0, 9), (11, 90)]))
+    }
+
     func testBufferedLeadRejectsInvalidOrUnplayableRanges() {
         XCTAssertNil(NativePlaybackTimeline.bufferedLead(current: 31, duration: 30,
             ranges: [(0, 120)]))
