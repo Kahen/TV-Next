@@ -8,7 +8,8 @@ enum NativePlaybackCommand {
     /// report a different timestamp at EOF (some codecs reset to zero).
     static func boundedSkipTarget(current: TimeInterval, interval: TimeInterval, duration: TimeInterval) -> TimeInterval? {
         guard current.isFinite, current >= 0, interval.isFinite, abs(interval) <= 60,
-              duration.isFinite, duration > 0, duration < 604_800 else { return nil }
+              duration.isFinite, duration > 0, duration < 604_800,
+              current <= duration else { return nil }
         return min(duration, max(0, current + interval))
     }
 }
