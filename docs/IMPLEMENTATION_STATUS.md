@@ -1,4 +1,6 @@
-# Implementation status — 2026-11-14
+# Implementation status — 2026-11-17
+
+> **2026-11-17 main evidence:** [PR #209](https://github.com/Kahen/TV-Next/pull/209) is merged at `29edca4e`; its final source-head [full integration run 43836200950](https://github.com/Kahen/TV-Next/actions/runs/43836200950) passed 9/9 jobs after an iPhone simulator retry. This validates the PR's AVPlayer invalid-duration fix, not physical devices, external provider compatibility, independent security review or signed distribution. No open PR was found at reconciliation. Historical `pending CI` paragraphs below describe their pre-merge state, not currently open PRs. This documentation branch requires its own final-head checks before merge.
 
 > **Native page warning correctness (PR pending):** A raw provider page with more than 40 entries but at most 40 valid distinct IDs no longer claims visible results were clipped. The warning is emitted only when the 41st valid distinct ID is encountered. XCTest covers duplicate-heavy pages and true clipping. Final-head simulator and full integration verification required; no physical-device claim.
 
