@@ -352,6 +352,13 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertNil(NativePlaybackCommand.boundedSkipTarget(current: -1, interval: 1, duration: 3))
         XCTAssertNil(NativePlaybackCommand.boundedSkipTarget(current: 1, interval: 1, duration: .infinity))
         XCTAssertNil(NativePlaybackCommand.boundedSkipTarget(current: 1, interval: 1, duration: 604_800))
+        // A stale AVPlayer clock beyond the reported VOD duration must not
+        // turn a system skip into an apparently successful seek to EOF.
+        XCTAssertNil(NativePlaybackCommand.boundedSkipTarget(current: 4, interval: -1, duration: 3))
+        XCTAssertNil(NativePlaybackCommand.boundedSkipTarget(current: 4, interval: 1, duration: 3))
+        XCTAssertNil(NativePlaybackCommand.boundedSkipTarget(current: .greatestFiniteMagnitude, interval: -15, duration: 3))
+        XCTAssertEqual(NativePlaybackCommand.boundedSkipTarget(current: 3, interval: -1, duration: 3), 2)
+        XCTAssertEqual(NativePlaybackCommand.boundedSkipTarget(current: 3, interval: 1, duration: 3), 3)
     }
 
     func testNowPlayingSnapshotBoundsAndOldStoreCannotOverwriteNewOwner() async throws {
