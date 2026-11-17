@@ -28,7 +28,7 @@ struct NativeNowPlayingSnapshot {
         let containsURL = title.range(of: "://") != nil
         let bounded = String(title.unicodeScalars.filter {
             !CharacterSet.controlCharacters.contains($0) &&
-            !CharacterSet.formatCharacters.contains($0) &&
+            $0.properties.generalCategory != .format &&
             $0.value != 0x2028 && $0.value != 0x2029
         }.prefix(160))
         let safeTitle = bounded.trimmingCharacters(in: .whitespacesAndNewlines)
