@@ -361,6 +361,18 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertEqual(NativePlaybackCommand.boundedSkipTarget(current: 3, interval: 1, duration: 3), 3)
     }
 
+    func testNowPlayingTitleDoesNotExposeHiddenURLOrFormatCharacters() {
+        func published(_ title: String) -> String {
+            NativeNowPlayingSnapshot(title: title, elapsed: 0, duration: 10, rate: 1, defaultRate: 1)
+                .info[MPMediaItemPropertyTitle] as? String ?? ""
+        }
+        XCTAssertEqual(published(String(repeating: "A", count: 170) + "://private-token"), "TV-Next 媒体")
+        XCTAssertEqual(published(" \u{202E}Visible\u{200B} title\u{2029} "), "Visible title")
+        XCTAssertEqual(published("\u{200B}\u{202E}\n"), "TV-Next 媒体")
+        XCTAssertEqual(published("合法影片 标题"), "合法影片 标题")
+        XCTAssertEqual(published(String(repeating: "X", count: 200)).count, 160)
+    }
+
     func testNowPlayingSnapshotBoundsAndOldStoreCannotOverwriteNewOwner() async throws {
         let live=NativeNowPlayingSnapshot(title:"https://example.invalid/private?token=secret",elapsed:.nan,duration:.infinity,rate:.infinity,defaultRate:.nan)
         XCTAssertFalse(live.seekable)
