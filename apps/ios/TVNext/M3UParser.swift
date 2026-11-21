@@ -32,7 +32,7 @@ enum MediaAddress {
 /// Offline parser for a safe, well-defined M3U subset; no network requests or code execution.
 enum M3UParser {
     private static let attributeRegex = try! NSRegularExpression(
-        pattern: #"([A-Za-z0-9_-]+)\s*=\s*"([^"]*)""#,
+        pattern: #"([A-Za-z0-9_-]+)\s*=\s*(["\u0027])(.*?)\2"#,
         options: []
     )
 
@@ -96,7 +96,7 @@ enum M3UParser {
 
     /// EXTINF metadata ends at the first comma outside quoted attributes.
     private static func title(in line: String) -> String? {
-        var quoted = false
+        var quote: Character?
         for index in line.indices {
             let character = line[index]
             if character == "\"" {
@@ -114,7 +114,7 @@ enum M3UParser {
         var result: [String: String] = [:]
         for match in attributeRegex.matches(in: line, range: range) {
             guard let keyRange = Range(match.range(at: 1), in: line),
-                  let valueRange = Range(match.range(at: 2), in: line) else {
+                  let valueRange = Range(match.range(at: 3), in: line) else {
                 continue
             }
             result[line[keyRange].lowercased()] = String(line[valueRange])
