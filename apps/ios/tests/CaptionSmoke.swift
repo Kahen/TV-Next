@@ -71,6 +71,19 @@ struct CaptionSmoke {
         let vttCues = try CaptionParser.parse(Data(vtt.utf8))
         precondition(vttCues.count == 1 && vttCues[0].text == "VTT caption")
 
+        // Exporters sometimes omit the empty line after the WEBVTT header.
+        // The first cue must not disappear merely because it shares a block.
+        let compactVtt = "WEBVTT\n00:00:01.000 --> 00:00:02.000\nFirst cue\n"
+        let compactCues = try CaptionParser.parse(Data(compactVtt.utf8))
+        precondition(compactCues.count == 1 && compactCues[0].text == "First cue")
+        let titledVtt = "WEBVTT - exported\nfirst-cue\n00:00:03.000 --> 00:00:04.000\nSecond cue"
+        let titledCues = try CaptionParser.parse(Data(titledVtt.utf8))
+        precondition(titledCues.count == 1 && titledCues[0].text == "Second cue")
+        do {
+            _ = try CaptionParser.parse(Data("WEBVTT".utf8))
+            fatalError("Header-only WebVTT accepted as a cue")
+        } catch CaptionError.invalidTimeline {}
+
         // A literal ASS section marker in a timed cue is not an ASS document.
         let literalEvents = "1\n00:00:01,000 --> 00:00:02,000\n[Events]\n"
         let literalCues = try CaptionParser.parse(Data(literalEvents.utf8))
