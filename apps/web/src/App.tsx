@@ -22,7 +22,7 @@ import type { DanmakuComment } from "./danmaku";
 import "./media-style.css";
 import EpgGuide from "./EpgGuide";
 import LiveReplayControls from "./LiveReplayControls";
-import ProviderSkipControls from "./ProviderSkipControls";
+import ProviderSkipControls, {type HlsSkipSource} from "./ProviderSkipControls";
 import "./epg-style.css";
 
 type Tab = "playlist" | "config" | "media" | "epg" | "home";
@@ -61,6 +61,7 @@ export default function App() {
   const [subtitleName, setSubtitleName] = useState("");
   const [storageWarning, setStorageWarning] = useState("");
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const hlsSkipSource = useRef<HlsSkipSource | null>(null);
   const resourceRequests = useRef<ResourceRequests>({});
   const relay=useMediaRelay(localVideo?null:selected,homeSession);
   const libraryRef = useRef(library);
@@ -207,6 +208,15 @@ export default function App() {
       video.src = url;
     } else if (isHls && Hls.isSupported()) {
       hls = new Hls({ enableWorker: true, xhrSetup: (xhr) => { for (const [key, value] of Object.entries(playbackHeaders)) xhr.setRequestHeader(key, value); } });
+      hls.on(Hls.Events.MEDIA_ATTACHED, (_, {media}) => {
+        if (media.currentSrc.startsWith("blob:")) {
+          hlsSkipSource.current = {url: new URL(url, document.baseURI).href, objectURL: media.currentSrc,
+            live: hls?.latestLevelDetails?.live ?? null};
+        }
+      });
+      hls.on(Hls.Events.LEVEL_LOADED, (_, {details}) => {
+        if (hlsSkipSource.current) hlsSkipSource.current.live = details.live;
+      });
       hls.loadSource(url);
       hls.attachMedia(video);
       hls.on(Hls.Events.ERROR, (_, detail) => {
@@ -228,6 +238,7 @@ export default function App() {
       video.removeEventListener("pause", onPause);
       video.removeEventListener("ended", onEnded);
       if (hls) hls.destroy();
+      hlsSkipSource.current = null;
       video.pause();
       video.removeAttribute("src");
       video.load();
@@ -490,7 +501,7 @@ export default function App() {
           </details>}
           {selected && <LiveReplayControls channel={selected} session={homeSession} onPlay={playChannel} cancellationKey={playbackGeneration} />}
           {selected && !localVideo && !selected.replay && !selected.timeshift && <ProviderSkipControls
-            key={`${playbackGeneration}:${relay.url ?? ""}`} video={videoRef} segments={selected.skipSegments}
+            key={`${playbackGeneration}:${relay.url ?? ""}`} video={videoRef} segments={selected.skipSegments} hlsSource={hlsSkipSource}
             mediaURL={relay.required ? relay.url ?? null : selected.url} />}
           {selected && <div className="player-actions">
             <button className="secondary" onClick={() => setLibrary((state) => toggleFavorite(state, selected.url))}>
