@@ -32,8 +32,10 @@ the main actor even if the system invokes the handler on another thread.
 `MPNowPlayingInfoCenter` publishes bounded title/local filename, elapsed time,
 duration when known, live flag and current/default rate. It does not receive
 media URLs, local file URLs, cookies, headers, relay capabilities or account
-tokens. URL-shaped titles are replaced with a generic label; artwork is not
-fetched. A single active controls owner prevents old stores/timers from replacing
+tokens. URL-shaped titles are replaced with a generic label even if the URL
+marker falls beyond the 160-character display limit. Unicode format/bidi
+markers and line separators are stripped, whitespace is trimmed, and an
+invisible-only title becomes a generic label. Artwork is not fetched. A single active controls owner prevents old stores/timers from replacing
 the current player's metadata or clearing another store's commands. Clearing
 the active library removes its command targets and Now Playing metadata.
 
