@@ -30,10 +30,14 @@ struct CloudSection: View {
     }
     @ViewBuilder private func listing(_ p: NativeCloudPage) -> some View {
         Text(p.path).font(.caption)
-        Button("上级目录") { open((p.path as NSString).deletingLastPathComponent) }.disabled(busy || p.path == "/")
+        Button("上级目录") { open(NativeCloudPage.parentPath(p.path)) }.disabled(busy || p.path == "/")
         ForEach(p.entries) { item in
             Button((item.directory ? "📁 " : "▶ ") + item.name) {
-                open((p.path == "/" ? "" : p.path) + "/" + item.name,play:!item.directory)
+                if let child = NativeCloudPage.childPath(parent: p.path, name: item.name) {
+                    open(child, play: !item.directory)
+                } else {
+                    error = "网盘返回了无效的文件名"
+                }
             }.disabled(busy)
         }
         HStack {
