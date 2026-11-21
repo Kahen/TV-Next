@@ -99,7 +99,7 @@ enum M3UParser {
         var quote: Character?
         for index in line.indices {
             let character = line[index]
-            if character == "\\\"" || character == "'" {
+            if character == "\"" || character == "'" {
                 if quote == nil { quote = character }
                 else if quote == character { quote = nil }
             } else if character == "," && quote == nil {
