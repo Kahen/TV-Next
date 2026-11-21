@@ -99,11 +99,19 @@ enum CaptionParser {
         var result: [CaptionCue] = []
         let blocks = input.components(separatedBy: "\n\n")
         for block in blocks.prefix(12_000) {
-            let lines = block.split(separator: "\n", omittingEmptySubsequences: true)
+            var lines = block.split(separator: "\n", omittingEmptySubsequences: true)
                 .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
             guard !lines.isEmpty else { continue }
-            if lines[0].hasPrefix("WEBVTT") || lines[0].hasPrefix("NOTE") ||
-                lines[0] == "STYLE" || lines[0] == "REGION" { continue }
+            // Some exported WebVTT files omit the blank line after WEBVTT.
+            // Keep the cue that follows the header in the same block, while
+            // still ignoring a header-only block and metadata-only blocks.
+            if lines[0] == "WEBVTT" || lines[0].hasPrefix("WEBVTT ") ||
+                lines[0].hasPrefix("WEBVTT\t") {
+                lines.removeFirst()
+                guard !lines.isEmpty else { continue }
+            }
+            if lines[0].hasPrefix("NOTE") || lines[0] == "STYLE" ||
+                lines[0] == "REGION" { continue }
             let timingIndex = lines.firstIndex(where: { $0.contains("-->") })
             guard let index = timingIndex, index <= 1, lines.count > index + 1 else { continue }
 
