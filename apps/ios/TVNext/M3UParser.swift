@@ -32,7 +32,7 @@ enum MediaAddress {
 /// Offline parser for a safe, well-defined M3U subset; no network requests or code execution.
 enum M3UParser {
     private static let attributeRegex = try! NSRegularExpression(
-        pattern: #"([A-Za-z0-9_-]+)\s*=\s*(["\u0027])(.*?)\2"#,
+        pattern: #"([A-Za-z0-9_-]+)\s*=\s*(["'])(.*?)\2"#,
         options: []
     )
 
@@ -99,9 +99,10 @@ enum M3UParser {
         var quote: Character?
         for index in line.indices {
             let character = line[index]
-            if character == "\"" {
-                quoted.toggle()
-            } else if character == "," && !quoted {
+            if character == "\\\"" || character == "'" {
+                if quote == nil { quote = character }
+                else if quote == character { quote = nil }
+            } else if character == "," && quote == nil {
                 return String(line[line.index(after: index)...])
                     .trimmingCharacters(in: .whitespacesAndNewlines)
             }
