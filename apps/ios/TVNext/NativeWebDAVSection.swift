@@ -4,6 +4,7 @@ import SwiftUI
 struct NativeWebDAVSection: View {
     let onPlay: (TVChannel) -> Void
     let onDisconnect: (URL) -> Void
+    let playingMedia: String?
     let canLoadCaption: Bool
     let captionName: String?
     @ObservedObject var captions: NativeRemoteCaptionLoader
@@ -73,6 +74,7 @@ struct NativeWebDAVSection: View {
                             .disabled(busy)
                             .accessibilityIdentifier("webdav-refresh")
                     }
+                    sidecarMenu
                     TextField("筛选当前目录文件名", text: $filter)
                         .textFieldStyle(.roundedBorder)
                         .accessibilityIdentifier("webdav-filter")
@@ -122,7 +124,7 @@ struct NativeWebDAVSection: View {
                             Text("GB18030（手动）").tag(CaptionTextEncoding.gb18030)
                         }
                         .accessibilityIdentifier("webdav-caption-encoding")
-                        Text("先选择媒体，再点选字幕。支持 SRT/VTT/ASS/SSA 文本，最大 1 MiB；开启仅媒体筛选会隐藏字幕。")
+                        Text("先选择媒体，再点选字幕。支持 SRT/VTT/ASS/SSA 文本，最大 1 MiB；也可从「选择随片字幕」按片名选用。")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     if captions.busy {
@@ -142,6 +144,24 @@ struct NativeWebDAVSection: View {
             }
         }
         .onDisappear { disconnect() }
+    }
+
+    @ViewBuilder
+    private var sidecarMenu: some View {
+        if let connection, canLoadCaption,
+           let media = entries.first(where: { $0.url.absoluteString == playingMedia && NativeWebDAV.playable($0) }) {
+            let choices = CaptionFileSelection.candidates(for: media.url.lastPathComponent,
+                in: entries.filter(NativeWebDAVCaptionReader.supported), filename: { $0.url.lastPathComponent })
+            if !choices.isEmpty {
+                Menu("选择随片字幕") {
+                    ForEach(choices) { entry in
+                        Button(entry.url.lastPathComponent) { onCaption(entry, connection, captionEncoding) }
+                    }
+                }
+                .disabled(busy)
+                .accessibilityIdentifier("webdav-sidecar-captions")
+            }
+        }
     }
 
     private func connect() {

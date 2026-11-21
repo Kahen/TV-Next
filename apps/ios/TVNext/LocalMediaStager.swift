@@ -29,6 +29,10 @@ enum LocalMediaStager {
     // preflight, not a guarantee that the volume cannot fill during a copy.
     static let freeSpaceReserveBytes: Int64 = 64 * 1_048_576
 
+    static func supports(_ url: URL) -> Bool {
+        url.isFileURL && extensions.contains(url.pathExtension.lowercased())
+    }
+
     static func hasCapacity(availableBytes: Int64, expectedBytes: Int64?) -> Bool {
         guard availableBytes >= freeSpaceReserveBytes else { return false }
         guard let expectedBytes, expectedBytes > 0 else { return true }
@@ -77,7 +81,7 @@ enum LocalMediaStager {
     }
 
     private static func copyFile(_ source: URL, onProgress: (@Sendable (Int64, Int64?) -> Void)?) throws -> URL {
-        guard source.isFileURL, extensions.contains(source.pathExtension.lowercased()) else {
+        guard supports(source) else {
             throw LocalMediaError.unsupportedFormat
         }
         try Task<Never, Never>.checkCancellation()

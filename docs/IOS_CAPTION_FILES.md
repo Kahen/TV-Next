@@ -6,6 +6,15 @@ In **本机文件与字幕**, select **导入 SRT / VTT / ASS / SSA 字幕**. Th
 
 The import button is disabled while the read is in progress. **取消字幕导入** cancels the worker and invalidates its completion; changing playback, selecting a newer subscription subtitle, clearing the library, removing captions, backgrounding the app or leaving the view also invalidates the read. A failed or cancelled import retains the existing cues rather than replacing them with partial data. Only actual user cancellation is silent; Files picker/provider errors are shown to the user. Only a successful, still-current result replaces captions and resets the offset.
 
+The media picker also accepts one media file and multiple subtitles in one
+selection. **选择随片字幕** ranks their names using FongMi’s
+[LocalSubtitleScanner](https://github.com/FongMi/TV/blob/5bf18d6ae8b0ccd9b753ef98f932838de2eb7254/app/src/main/java/com/fongmi/android/tv/player/media/LocalSubtitleScanner.java)
+rules. Exact stems come first, dotted language or edition variants follow,
+and all selected subtitles are offered when none matches. Only the chosen
+subtitle is read. Switching playback clears the choices. The Web local media
+picker follows the same rules and also offers Unicode or explicit GB18030/GBK
+decoding for local subtitle files.
+
 ## Safety and resource limits
 
 - Only user-selected **file:** URLs with SRT/VTT/ASS/SSA extensions are eligible. Directories and other formats are rejected; no scripts, plugins or remote URLs execute.

@@ -7,7 +7,7 @@ import {
   replacePlaylistChannels, setPosition, toggleFavorite, validMediaUrl
 } from "./library";
 import type { LibraryState } from "./library";
-import { isPlayableLocalMedia, shiftWebVtt, toWebVtt } from "./subtitles";
+import { type CaptionFileEncoding, decodeCaptionFile, localPlaybackFiles, shiftWebVtt, toWebVtt } from "./subtitles";
 import { exportM3u } from "./playlistExport";
 import MediaBrowser from "./MediaBrowser";
 import HomeServerPanel from "./HomeServerPanel";
@@ -53,9 +53,10 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [playerError, setPlayerError] = useState("");
-  const [localVideo, setLocalVideo] = useState<{ url: string; name: string } | null>(null);
+  const [localVideo, setLocalVideo] = useState<{ url: string; name: string; subtitles: File[] } | null>(null);
   const [subtitleUrl, setSubtitleUrl] = useState<string | null>(null);
   const [subtitleOriginal, setSubtitleOriginal] = useState("");
+  const [captionEncoding, setCaptionEncoding] = useState<CaptionFileEncoding>("unicode");
   const [subtitleOffset, setSubtitleOffset] = useState(0);
   const [subtitleName, setSubtitleName] = useState("");
   const [storageWarning, setStorageWarning] = useState("");
@@ -233,17 +234,19 @@ export default function App() {
     };
   }, [selected, localVideo, playbackGeneration,relay.required,relay.url,relay.hls,relay.error]);
 
-  function playLocalFile(file: File | undefined) {
-    if (!file) return;
-    if (!isPlayableLocalMedia(file)) {
-      setError("请选择可由浏览器支持的本地 MP4 / MOV / WebM / OGG / 音频文件；本地 HLS、MKV 等格式可能不被支持。");
-      return;
+  function playLocalFiles(files: FileList | null) {
+    if (!files?.length) return;
+    try {
+      const {media, subtitles} = localPlaybackFiles(Array.from(files));
+      const url = URL.createObjectURL(media);
+      setError("");
+      setPlaybackGeneration(value => value + 1);
+      setSelected(null);
+      clearPlaybackResources();
+      setLocalVideo({url, name: media.name, subtitles});
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "无法打开本地媒体。");
     }
-    setError("");
-    setPlaybackGeneration(value=>value+1);
-    setSelected(null);
-    clearPlaybackResources();
-    setLocalVideo({ url: URL.createObjectURL(file), name: file.name });
     // Browser object URLs do not survive refresh, and must never appear in recent/favorites.
   }
 
@@ -255,9 +258,9 @@ export default function App() {
       return;
     }
     try {
-      const text = await file.text();
+      const bytes = await file.arrayBuffer();
       if (signal.aborted) return;
-      const vtt = toWebVtt(text, file.name);
+      const vtt = toWebVtt(decodeCaptionFile(new Uint8Array(bytes), captionEncoding), file.name);
       setSubtitleOffset(0);
       setSubtitleOriginal(vtt);
       setSubtitleName(file.name);
@@ -449,9 +452,20 @@ export default function App() {
           {(selected || localVideo) && <div className="player-actions">
             <button className="secondary" onClick={() => void enterFullscreen()}>⛶ 全屏</button>
             <button className="secondary" onClick={() => void enterPictureInPicture()}>▣ 画中画</button>
+            <label>本地字幕编码 <select value={captionEncoding} onChange={event =>
+              setCaptionEncoding(event.target.value === "gb18030" ? "gb18030" : "unicode")}>
+              <option value="unicode">Unicode（UTF-8 / 带 BOM 的 UTF-16）</option>
+              <option value="gb18030">GB18030 / GBK</option>
+            </select></label>
             <label className="file-picker">加载 SRT / VTT / ASS / SSA
               <input type="file" accept=".srt,.vtt,.ass,.ssa,text/vtt,application/x-subrip" onChange={(e) => { void importSubtitle(e.target.files?.[0]); e.target.value = ""; }} />
             </label>
+            {!!localVideo?.subtitles.length && <details>
+              <summary>选择随片字幕</summary>
+              {localVideo.subtitles.map((file, index) => <button key={index} onClick={() => void importSubtitle(file)}>
+                {file.name}
+              </button>)}
+            </details>}
             {selected?.subtitles?.map((source,i)=><button key={i} onClick={()=>void loadSubtitleSource(source.url,source.name)}>{source.name}</button>)}
             {subtitleUrl && <label>字幕偏移（正值延后） <input aria-label="字幕偏移" type="range" min="-10" max="10" step="0.5" value={subtitleOffset} onChange={(e) => setSubtitleOffset(Number(e.target.value))} /> {subtitleOffset.toFixed(1)} 秒</label>}
             {subtitleUrl && <button className="secondary" onClick={() => {
@@ -491,9 +505,9 @@ export default function App() {
         <div className="quick-play"><label htmlFor="manual-url">快速播放</label><div className="inline-controls"><input id="manual-url" type="url" placeholder="https://example.org/video.m3u8" value={manualUrl} onChange={(e) => setManualUrl(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") openManual(); }}/><button className="primary" onClick={openManual}>播放 URL →</button></div>
           <div className="local-file-actions">
             <label className="file-picker">从本机播放视频 / 音频
-              <input type="file" accept="video/mp4,video/quicktime,video/webm,video/ogg,audio/*,.m4v,.mov,.mp4,.webm,.ogv,.ogg" onChange={(e) => { playLocalFile(e.target.files?.[0]); e.target.value = ""; }}/>
+              <input type="file" multiple accept="video/mp4,video/quicktime,video/webm,video/ogg,audio/*,.m4v,.mov,.mp4,.webm,.ogv,.ogg,.mp3,.m4a,.aac,.srt,.vtt,.ass,.ssa" onChange={(e) => { playLocalFiles(e.target.files); e.target.value = ""; }}/>
             </label>
-            <span className="hint">本地文件不会上传，也不会保存到播放历史；能否播放取决于浏览器编解码能力。</span>
+            <span className="hint">可同时选择一个媒体文件和多份字幕。文件仅在本机使用。</span>
           </div>
         </div>
         {tab === "home" ? <HomeServerPanel library={library} onRestore={setLibrary} session={homeSession} onSessionChange={setHomeSession} remoteState={remoteState}/> : tab === "media" ? <><SubscriptionBrowser session={homeSession} onPlay={playChannel} onImport={channels=>setLibrary(state=>({...state,channels:channels.slice(0,1500)}))}/><CloudBrowser onPlay={playChannel}/><MediaBrowser onPlay={playChannel} /></> : tab === "epg" ? <EpgGuide channels={channels} onPlay={playChannel} session={homeSession} cancellationKey={playbackGeneration} /> : tab === "config" ? <>

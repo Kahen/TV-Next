@@ -46,6 +46,8 @@ struct ContentView: View {
     @State private var isLoadingCaption = false
     @State private var stagedMediaBytes: Int64 = 0
     @State private var stagedMediaTotal: Int64?
+    @State private var localCaptionChoices: [URL] = []
+    @State private var localCaptionGeneration: Int?
     @State private var captionFileName: String?
     @State private var captionImportEncoding: CaptionTextEncoding = .unicode
     @State private var captionOffsetSeconds: Double = 0
@@ -96,6 +98,7 @@ struct ContentView: View {
                     ConfigPreviewSection().id("config")
                     CloudSection(serverURL: serverURL) { library.play($0) }.id("cloud")
                     NativeWebDAVSection(onPlay: { library.play($0) }, onDisconnect: { library.revokeWebDAV(root: $0) },
+                                        playingMedia: library.current?.group == "WebDAV" ? library.current?.url : nil,
                                         canLoadCaption: library.player.currentItem != nil,
                                         captionName: captionFileName, captions: remoteCaptions,
                                         onCaption: loadWebDAVCaption).id("webdav")
@@ -263,6 +266,10 @@ struct ContentView: View {
                 } catch { errorMessage = error.localizedDescription }
             }
             .onChange(of: library.playbackGeneration) { _, generation in
+                if generation != localCaptionGeneration {
+                    localCaptionChoices = []
+                    localCaptionGeneration = nil
+                }
                 cancelCaptionImport()
                 remoteCaptions.cancel()
                 remoteDanmakuRequest = UUID()
@@ -621,8 +628,16 @@ struct ContentView: View {
                             .accessibilityIdentifier("cancel-smb-import")
                     }
                 }
-                Text("先在 iOS「文件」App 中通过「连接服务器」加入 SMB 共享，再在系统选择器中选取媒体。文件会复制到本机临时缓存；不保存 SMB 凭据，也不直接通过 SMB 流式播放。")
+                Text("可同时选择一个媒体和多份字幕，再按文件名选用字幕。使用 SMB 时，先在「文件」App 中连接共享。")
                     .font(.caption).foregroundStyle(.secondary)
+                if localCaptionGeneration == library.playbackGeneration, !localCaptionChoices.isEmpty {
+                    Menu("选择随片字幕") {
+                        ForEach(localCaptionChoices, id: \.self) { file in
+                            Button(file.lastPathComponent) { beginCaptionImport(.success([file])) }
+                        }
+                    }
+                    .accessibilityIdentifier("local-sidecar-captions")
+                }
                 HStack {
                     Button {
                         isShowingCaptionPicker = true
@@ -946,11 +961,12 @@ struct ContentView: View {
         let generation = UUID()
         mediaGeneration = generation
         isLoadingMedia = true
-        mediaImportTask = Task { await importLocalMedia(result, generation: generation) }
+        let playback = library.playbackGeneration
+        mediaImportTask = Task { await importLocalMedia(result, generation: generation, playback: playback) }
     }
 
     @MainActor
-    private func importLocalMedia(_ result: Result<[URL], Error>, generation: UUID) async {
+    private func importLocalMedia(_ result: Result<[URL], Error>, generation: UUID, playback: Int) async {
         defer {
             if mediaGeneration == generation {
                 isLoadingMedia = false
@@ -958,25 +974,29 @@ struct ContentView: View {
             }
         }
         do {
-            guard let source = try result.get().first else { return }
-            let localFile = try await LocalMediaStager.stage(source) { copied, total in
+            let urls = try result.get()
+            guard !urls.isEmpty else { return }
+            let selection = try LocalPlaybackFiles(urls)
+            let localFile = try await LocalMediaStager.stage(selection.media) { copied, total in
                 Task { @MainActor in
                     guard mediaGeneration == generation, isLoadingMedia else { return }
                     stagedMediaBytes = copied
                     stagedMediaTotal = total
                 }
             }
-            guard mediaGeneration == generation, !Task.isCancelled else {
+            guard mediaGeneration == generation, library.playbackGeneration == playback, !Task.isCancelled else {
                 LocalMediaStager.discard(localFile)
                 return
             }
-            library.playLocalFile(localFile, name: source.lastPathComponent)
+            library.playLocalFile(localFile, name: selection.media.lastPathComponent)
+            localCaptionGeneration = library.playbackGeneration
+            localCaptionChoices = selection.captions
             captionFileName = nil
             errorMessage = nil
         } catch is CancellationError {
             // User cancellation is not a playback error.
         } catch {
-            if mediaGeneration == generation { errorMessage = error.localizedDescription }
+            if mediaGeneration == generation, library.playbackGeneration == playback { errorMessage = error.localizedDescription }
         }
     }
 
@@ -1013,11 +1033,12 @@ struct ContentView: View {
         captionImportGeneration = generation
         isLoadingCaption = true
         let encoding = captionImportEncoding
-        captionImportTask = Task { await importCaption(source, encoding: encoding, generation: generation) }
+        let playback = library.playbackGeneration
+        captionImportTask = Task { await importCaption(source, encoding: encoding, generation: generation, playback: playback) }
     }
 
     @MainActor
-    private func importCaption(_ source: URL, encoding: CaptionTextEncoding, generation: UUID) async {
+    private func importCaption(_ source: URL, encoding: CaptionTextEncoding, generation: UUID, playback: Int) async {
         defer {
             if captionImportGeneration == generation {
                 isLoadingCaption = false
@@ -1026,7 +1047,7 @@ struct ContentView: View {
         }
         do {
             let cues = try await LocalCaptionReader.load(source, encoding: encoding)
-            guard !Task.isCancelled, captionImportGeneration == generation else { return }
+            guard !Task.isCancelled, captionImportGeneration == generation, library.playbackGeneration == playback else { return }
             remoteCaptions.cancel()
             library.setCaptions(cues)
             captionOffsetSeconds = 0
@@ -1035,7 +1056,7 @@ struct ContentView: View {
         } catch is CancellationError {
             // A cancelled or superseded read must not replace existing cues.
         } catch {
-            if captionImportGeneration == generation { errorMessage = error.localizedDescription }
+            if captionImportGeneration == generation, library.playbackGeneration == playback { errorMessage = error.localizedDescription }
         }
     }
 
@@ -1068,7 +1089,7 @@ private struct NativeMediaDocumentPicker: UIViewControllerRepresentable {
         // Open in place: LocalMediaStager obtains the scoped URL and stages a
         // bounded local copy before AVPlayer ever reads the provider resource.
         let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.item], asCopy: false)
-        picker.allowsMultipleSelection = false
+        picker.allowsMultipleSelection = true
         picker.delegate = context.coordinator
         return picker
     }

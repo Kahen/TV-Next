@@ -5,8 +5,12 @@ WebDAV directory and attach it to the selected playback. The player uses its
 existing external-caption text overlay, offset and remove controls. The browser
 shows the current subtitle, loading state, a cancel action and sanitized errors.
 A failed or cancelled replacement retains the preceding subtitle. No media
-selection means subtitle actions are disabled. The media-only filter intentionally
-hides subtitle files; disable it to select one.
+selection means subtitle actions are disabled. When the current directory contains the playing WebDAV media, **选择随片字幕**
+offers nearby subtitle files even with the media-only filter enabled. It uses
+the filenames from validated directory URLs. An exact stem sorts first,
+followed by dotted variants such as `Movie.zh-Hans.srt`. If none matches,
+the menu lists every supported subtitle in that directory. Selecting an entry
+uses the existing authenticated reader and the chosen encoding.
 
 ## Source and compatibility
 
@@ -15,7 +19,7 @@ Reference FongMi/TV commit `097917c1c5eb6c94a14b2ede3f371a681dbb751f`,
 explicit external subtitle selection, case-insensitive supported extensions and
 bounded downloads. This increment supports the four existing TV-Next text formats.
 It does not implement FongMi's ZIP extraction, TTML, styled ASS, font loading,
-karaoke, automatic filename matching or cloud login.
+karaoke or cloud login.
 
 ## Transport and lifetime
 
