@@ -84,6 +84,26 @@ struct NativeCloudRequest: Encodable { let server: String; let token: String; le
 struct NativeCloudPage: Decodable {
     struct Entry: Decodable, Identifiable { let name: String; let directory: Bool; let size: Int64; var id: String { name } }
     let path: String; let entries: [Entry]; let page: Int; let hasMore: Bool
+
+    /// Never interpret untrusted listing names as path components supplied by the server.
+    /// The API accepts slash-delimited absolute paths, not URL-encoded path fragments.
+    static func childPath(parent: String, name: String) -> String? {
+        guard parent.hasPrefix("/"), !parent.contains("\\"),
+              !parent.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }),
+              !name.isEmpty, name != ".", name != "..",
+              !name.contains("/"), !name.contains("\\"),
+              !name.unicodeScalars.contains(where: {
+                  CharacterSet.controlCharacters.contains($0) ||
+                  $0.properties.generalCategory == .format
+              }) else { return nil }
+        let components = parent.split(separator: "/", omittingEmptySubsequences: true)
+        guard !components.contains(where: { $0 == "." || $0 == ".." }) else { return nil }
+        return (components.isEmpty ? "" : "/" + components.joined(separator: "/")) + "/" + name
+    }
+    static func parentPath(_ path: String) -> String {
+        let parts = path.split(separator: "/", omittingEmptySubsequences: true)
+        return parts.count <= 1 ? "/" : "/" + parts.dropLast().joined(separator: "/")
+    }
 }
 struct NativeCloudPlayback: Decodable { let url: String; let name: String; let headers: [String:String] }
 
