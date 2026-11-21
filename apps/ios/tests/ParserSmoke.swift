@@ -39,6 +39,29 @@ struct ParserSmoke {
             // Expected.
         }
 
+        // Some IPTV exports put EXTGRP before EXTINF instead of after it.
+        let grouped = try M3UParser.parse("""
+        #EXTM3U
+        #EXTGRP:Documentaries
+        #EXTINF:-1,First
+        https://example.org/first.m3u8
+        #EXTINF:-1,Second
+        https://example.org/second.m3u8
+        #EXTGRP:Fallback
+        #EXTINF:-1 group-title="Explicit",Third
+        https://example.org/third.m3u8
+        #EXTGRP:Pending
+        #EXTINF:-1,Invalid
+        javascript:alert(1)
+        #EXTINF:-1,After Invalid
+        https://example.org/fourth.m3u8
+        """)
+        precondition(grouped.count == 4)
+        precondition(grouped[0].group == "Documentaries", "EXTGRP before EXTINF must apply")
+        precondition(grouped[1].group == "Uncategorized", "Group must not leak into next channel")
+        precondition(grouped[2].group == "Explicit", "Explicit group-title must override EXTGRP")
+        precondition(grouped[3].group == "Uncategorized", "Invalid media line must clear pending group")
+
         let exported = M3UEncoder.serialize(channels)
         precondition(exported.hasPrefix("#EXTM3U\n"))
         let roundTrip = try M3UParser.parse(exported)
