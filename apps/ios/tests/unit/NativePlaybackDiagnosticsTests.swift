@@ -26,6 +26,19 @@ final class NativePlaybackDiagnosticsTests: XCTestCase {
         XCTAssertEqual(NativeMediaMetadata.codec(0x00000000), "0x00000000")
     }
 
+    func testModernPlaybackCodecLabelsAndUnknownFallback() {
+        XCTAssertEqual(NativeMediaMetadata.codec(0x61763031), "AV1 (av01)")
+        XCTAssertEqual(NativeMediaMetadata.codec(0x76703039), "VP9 (vp09)")
+        XCTAssertEqual(NativeMediaMetadata.codec(0x4F707573), "Opus")
+        XCTAssertEqual(NativeMediaMetadata.codec(0x6F707573), "Opus")
+        XCTAssertEqual(NativeMediaMetadata.codec(0x664C6143), "FLAC")
+        XCTAssertEqual(NativeMediaMetadata.codec(0x666C6163), "FLAC")
+        // An unfamiliar printable FourCC is preserved, never misidentified.
+        XCTAssertEqual(NativeMediaMetadata.codec(0x7A7A7A7A), "zzzz")
+        // Non-printable bytes are rendered as hex rather than leaking control characters.
+        XCTAssertEqual(NativeMediaMetadata.codec(0x000A0001), "0x000A0001")
+    }
+
     func testOwnedPCMAudioReportsSampleRateAndChannelCount() async throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".caf")
         defer { try? FileManager.default.removeItem(at: url) }
