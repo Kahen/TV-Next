@@ -26,6 +26,36 @@ final class CrossSiteRetryTests: XCTestCase {
         ).map(\.key), all.map(\.key))
     }
 
+    func testOversizedProviderLabelsFallbackToBoundedStableKeys() async throws {
+        let maxBytes = NativeCrossSiteSearch.maxProviderDisplayNameBytes
+        let allowed = String(repeating: "a", count: maxBytes)
+        let oversized = allowed + "b"
+        let unicodeAllowed = String(repeating: "界", count: 85) // 255 UTF-8 bytes
+        let unicodeOversized = unicodeAllowed + "界" // 258 UTF-8 bytes
+        let sources = [
+            NativeSearchSource(key: "short-key", name: oversized),
+            NativeSearchSource(key: "unicode-key", name: unicodeOversized),
+            NativeSearchSource(key: "allowed-key", name: allowed),
+            NativeSearchSource(key: "allowed-unicode", name: unicodeAllowed)
+        ]
+        let labels = NativeCrossSiteSearch.selectedSourceNames(sources)
+        XCTAssertEqual(labels["short-key"], "short-key")
+        XCTAssertEqual(labels["unicode-key"], "unicode-key")
+        XCTAssertEqual(labels["allowed-key"], allowed)
+        XCTAssertEqual(labels["allowed-unicode"], unicodeAllowed)
+
+        let result = try await NativeCrossSiteSearch.search(
+            sources: sources,
+            fetch: { _, _ in throw NSError(domain: "fixture", code: 1) },
+            identity: { (item: Item) in item.id }
+        )
+        XCTAssertEqual(result.failedKeys, sources.map(\\.key))
+        XCTAssertEqual(result.failed, ["short-key", "unicode-key", allowed, unicodeAllowed])
+        XCTAssertEqual(NativeCrossSiteSearch.failedOnlySources(
+            sources, failedKeys: result.failedKeys, searchedKeys: sources.map(\\.key)
+        ).map(\\.key), sources.map(\\.key))
+    }
+
     private struct Item {
         let id: String
     }
