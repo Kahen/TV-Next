@@ -47,7 +47,8 @@ struct ParserSmoke {
         precondition(bomChannels[0].catchup?.source == "https://example.org/replay/{start}")
         // An embedded BOM is not a valid URL prefix and must not be silently removed.
         let embeddedBOM = "#EXTM3U\n#EXTINF:-1,Invalid\n\u{FEFF}https://example.org/live.m3u8"
-        precondition(try M3UParser.parse(embeddedBOM).isEmpty)
+        let embeddedChannels = try M3UParser.parse(embeddedBOM)
+        precondition(embeddedChannels.isEmpty)
 
         let exported = M3UEncoder.serialize(channels)
         precondition(exported.hasPrefix("#EXTM3U\n"))
