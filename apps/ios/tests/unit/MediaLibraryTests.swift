@@ -348,7 +348,7 @@ final class MediaLibraryTests: XCTestCase {
         for rate in NativePlaybackCommand.supportedRemoteRates {
             XCTAssertTrue(NativePlaybackCommand.acceptsRemoteRate(rate))
         }
-        for rate: Float in [0, -1, 0.5, 1.1, 1.75, 2.01, .nan, .infinity, -.infinity] {
+        for rate in [Float(0), -1, 0.5, 1.1, 1.75, 2.01, .nan, .infinity, -.infinity] {
             XCTAssertFalse(NativePlaybackCommand.acceptsRemoteRate(rate))
         }
     }
