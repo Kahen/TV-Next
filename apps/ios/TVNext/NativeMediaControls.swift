@@ -23,16 +23,14 @@ struct NativeNowPlayingSnapshot {
 
     var seekable: Bool { duration.isFinite && duration > 0 && duration < 604_800 }
     var info: [String: Any] {
-        // Never expose URL-shaped or invisible/bidirectional metadata in Control Center.
-        // Check the complete source before truncation: a URL suffix must not be hidden past 160 characters.
-        let containsURL = title.range(of: "://") != nil
-        let bounded = String(title.unicodeScalars.filter {
+        // Check the same text that Control Center will display, before truncation.
+        let cleaned = String(title.unicodeScalars.filter {
             !CharacterSet.controlCharacters.contains($0) &&
             $0.properties.generalCategory != .format &&
             $0.value != 0x2028 && $0.value != 0x2029
-        }.prefix(160))
-        let safeTitle = bounded.trimmingCharacters(in: .whitespacesAndNewlines)
-        let publishedTitle = safeTitle.isEmpty || containsURL ? "TV-Next 媒体" : safeTitle
+        })
+        let bounded = String(cleaned.unicodeScalars.prefix(160)).trimmingCharacters(in: .whitespacesAndNewlines)
+        let publishedTitle = bounded.isEmpty || cleaned.range(of: "://", options: .literal) != nil ? "TV-Next 媒体" : bounded
         var value: [String: Any] = [MPMediaItemPropertyTitle: publishedTitle,
             MPNowPlayingInfoPropertyIsLiveStream: !seekable,
             MPNowPlayingInfoPropertyPlaybackRate: NSNumber(value: rate.isFinite ? rate : Float(0)),

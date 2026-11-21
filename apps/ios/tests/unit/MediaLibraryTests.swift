@@ -369,6 +369,8 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertEqual(published(String(repeating: "A", count: 170) + "://private-token"), "TV-Next 媒体")
         XCTAssertEqual(published(" \u{202E}Visible\u{200B} title\u{2029} "), "Visible title")
         XCTAssertEqual(published("\u{200B}\u{202E}\n"), "TV-Next 媒体")
+        XCTAssertEqual(published("https:/\u{200B}/example.invalid"), "TV-Next 媒体")
+        XCTAssertEqual(published(String(repeating: "片", count: 170) + ":\u{2029}//example.invalid"), "TV-Next 媒体")
         XCTAssertEqual(published("合法影片 标题"), "合法影片 标题")
         XCTAssertEqual(published(String(repeating: "X", count: 200)).count, 160)
     }
