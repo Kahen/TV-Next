@@ -38,6 +38,25 @@ enum CaptionParser {
         pattern: #"^(\d{2,3}:\d{2}:\d{2}[.,]\d{3}|\d{2}:\d{2}[.,]\d{3})\s+-->\s+(\d{2,3}:\d{2}:\d{2}[.,]\d{3}|\d{2}:\d{2}[.,]\d{3})(?:\s+.*)?$"#
     )
     private static let tags = try! NSRegularExpression(pattern: #"<[^>]*>"#)
+    private static let numericEntity = try! NSRegularExpression(pattern: #"&#(x[0-9a-fA-F]{1,6}|[0-9]{1,7});"#)
+
+    /// Decode numeric subtitle entities without interpreting markup or loading URLs.
+    /// Invalid scalars and control characters remain literal.
+    private static func decodeNumericEntities(_ input: String) -> String {
+        var output = input
+        let matches = numericEntity.matches(in: input, range: NSRange(input.startIndex..<input.endIndex, in: input))
+        for match in matches.reversed() {
+            guard let digits = Range(match.range(at: 1), in: input),
+                  let full = Range(match.range, in: output) else { continue }
+            let token = String(input[digits])
+            let isHex = token.hasPrefix("x")
+            guard let value = UInt32(isHex ? String(token.dropFirst()) : token, radix: isHex ? 16 : 10),
+                  let scalar = Unicode.Scalar(value),
+                  !CharacterSet.controlCharacters.contains(scalar) else { continue }
+            output.replaceSubrange(full, with: String(scalar))
+        }
+        return output
+    }
 
     static func parse(_ data: Data, encoding: CaptionTextEncoding = .unicode) throws -> [CaptionCue] {
         guard !data.isEmpty else { throw CaptionError.empty }
@@ -122,9 +141,13 @@ enum CaptionParser {
             ).replacingOccurrences(of: "&amp;", with: "&")
                 .replacingOccurrences(of: "&lt;", with: "<")
                 .replacingOccurrences(of: "&gt;", with: ">")
+                .replacingOccurrences(of: "&quot;", with: "\"")
+                .replacingOccurrences(of: "&apos;", with: "'")
+                .replacingOccurrences(of: "&nbsp;", with: "\u{00A0}")
+            let decodedCaption = decodeNumericEntities(stripped)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
-            if stripped.isEmpty { continue }
-            result.append(CaptionCue(start: start, end: end, text: String(stripped.prefix(2_000))))
+            if decodedCaption.isEmpty { continue }
+            result.append(CaptionCue(start: start, end: end, text: String(decodedCaption.prefix(2_000))))
             if result.count >= 5_000 { break }
         }
         guard !result.isEmpty else { throw CaptionError.invalidTimeline }
