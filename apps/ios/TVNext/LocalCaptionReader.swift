@@ -8,6 +8,10 @@ enum LocalCaptionReader {
     private static let chunkBytes = 65_536
     private static let supportedExtensions: Set<String> = ["srt", "vtt", "ass", "ssa"]
 
+    static func supports(_ url: URL) -> Bool {
+        url.isFileURL && supportedExtensions.contains(url.pathExtension.lowercased())
+    }
+
     /// The system picker can report a user dismissal as a Cocoa error.
     /// A File Provider failure is not equivalent to a user cancellation.
     static func isUserCancellation(_ error: Error) -> Bool {
@@ -29,7 +33,7 @@ enum LocalCaptionReader {
     }
 
     private static func readAndParse(_ source: URL, encoding: CaptionTextEncoding) throws -> [CaptionCue] {
-        guard source.isFileURL, supportedExtensions.contains(source.pathExtension.lowercased()) else {
+        guard supports(source) else {
             throw CaptionError.invalidTimeline
         }
         try Task<Never, Never>.checkCancellation()

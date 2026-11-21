@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { shiftWebVtt, toWebVtt } from "./subtitles";
+import { decodeCaptionFile, localPlaybackFiles, shiftWebVtt, toWebVtt } from "./subtitles";
 
 describe("text subtitle conversion", () => {
   it("converts SRT with BOM and CRLF", () => {
@@ -54,6 +54,36 @@ describe("external subtitle offset", () => {
     expect(shiftWebVtt(input, 0)).toBe(input);
     for (const offset of [NaN, Infinity, -11, 11]) {
       expect(() => shiftWebVtt(input, offset)).toThrow("范围");
+    }
+  });
+});
+
+describe("local media and subtitle selection", () => {
+  const file = (name: string) => new File(["x"], name);
+  it("keeps exact and dotted matches in order, including tagged multilingual names", () => {
+    const files = ["剧.S01E010.srt", "剧.s01e01.zh-Hans.ass", "剧.S01E01.MP4", "剧.s01e01.SRT", "剧.S01E01.en.vtt"].map(file);
+    const picked = localPlaybackFiles(files);
+    expect(picked.media).toBe(files[2]);
+    expect(picked.subtitles).toEqual([files[3], files[4], files[1]]);
+  });
+  it("offers other selected subtitles when none matches and rejects ambiguous media", () => {
+    const files = ["Movie.mov", "中文.ssa", "English.vtt"].map(file);
+    expect(localPlaybackFiles(files).subtitles).toEqual([files[2], files[1]]);
+    expect(localPlaybackFiles([files[0]]).subtitles).toEqual([]);
+    for (const names of [["only.srt"], ["a.mp4", "b.mov"], ["a.mp4", "a.zip"]]) {
+      expect(() => localPlaybackFiles(names.map(file))).toThrow();
+    }
+  });
+  it("decodes UTF-8, BOM UTF-16 and explicit GB18030 with strict error handling", () => {
+    expect(decodeCaptionFile(new TextEncoder().encode("字幕"), "unicode")).toBe("字幕");
+    for (const bytes of [[0xff, 0xfe, 0x57, 0x5b], [0xfe, 0xff, 0x5b, 0x57]]) {
+      expect(decodeCaptionFile(Uint8Array.from(bytes), "unicode")).toBe("字");
+      expect(() => decodeCaptionFile(Uint8Array.from(bytes), "gb18030")).toThrow();
+    }
+    const legacy = Uint8Array.of(0xd7, 0xd6, 0xc4, 0xbb);
+    expect(decodeCaptionFile(legacy, "gb18030")).toBe("字幕");
+    for (const bytes of [legacy, Uint8Array.of(0xff, 0xfe, 0x00, 0xd8), Uint8Array.of(0x61, 0x00)]) {
+      expect(() => decodeCaptionFile(bytes, "unicode")).toThrow();
     }
   });
 });

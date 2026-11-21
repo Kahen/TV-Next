@@ -102,3 +102,27 @@ it("discards late subtitle and danmaku outcomes after switching to an episode at
   expect(screen.queryByText("Old episode failed")).toBeNull();
   expect(cancelledOnEpisodeChange).toEqual([true, true]);
 });
+
+it("loads a picked sidecar on demand and discards it when local playback changes", async () => {
+  render(<App />);
+  const picker = screen.getByLabelText("从本机播放视频 / 音频");
+  const video = new File(["media"], "电影.mp4");
+  const caption = new File(["caption"], "电影.zh-Hans.srt");
+  const unrelated = new File(["caption"], "另一集.srt");
+  const read = vi.fn(async () => new TextEncoder().encode(subtitle.content).buffer);
+  Object.defineProperty(caption, "arrayBuffer", {value: read});
+  fireEvent.change(picker, {target: {files: [unrelated, caption, video]}});
+  expect(read).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByText("选择随片字幕"));
+  expect(screen.queryByText(unrelated.name)).toBeNull();
+  fireEvent.click(screen.getByRole("button", {name: caption.name}));
+  expect((await screen.findByRole("button", {name: "移除字幕"})).getAttribute("title")).toBe(caption.name);
+  expect(read).toHaveBeenCalledOnce();
+  fireEvent.change(picker, {target: {files: [video, new File(["media"], "另一集.mp4")]}});
+  expect(screen.getByRole("alert").textContent).toContain("一次只能打开一个媒体");
+  expect(screen.getByRole("button", {name: "移除字幕"})).toBeTruthy();
+  fireEvent.change(picker, {target: {files: [new File(["next"], video.name)]}});
+  expect(screen.queryByText("选择随片字幕")).toBeNull();
+  expect(screen.queryByRole("button", {name: "移除字幕"})).toBeNull();
+  expect(requestJson).not.toHaveBeenCalled();
+});
