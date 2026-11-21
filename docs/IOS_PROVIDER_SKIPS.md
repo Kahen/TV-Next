@@ -17,7 +17,7 @@ When a native subscription playback includes valid segments, **播放器 → 来
 
 Receiving source metadata alone never seeks automatically. Existing manually created intro/outro markers and their explicit automatic preference remain independent. Known timeshift/live declarations, replay sessions, local files, unknown durations and stale requests cannot activate these source controls. At button invocation, the current generation, source URL, segment membership, item readiness and current range are checked again; a delayed button cannot skip a replacement episode, including one using the same URL. A retry of the same request retains its hints; an ordinary new play without metadata clears them.
 
-Segments stay in the current in-memory playback context. They do not enter TVChannel snapshots, favorites/history, home-server sync, UserDefaults or the manual marker store. Older server responses without the new field still decode. A malformed optional array/member is ignored by the native decoder. Web UI parity remains follow-up work; native opt-in automatic behavior is described below.
+Segments stay in the current in-memory playback context. They do not enter TVChannel snapshots, favorites/history, home-server sync, UserDefaults or the manual marker store. Older server responses without the new field still decode. A malformed optional array/member is ignored by the native decoder. The Web controls and native opt-in automatic behavior are described below.
 
 The native normalization loop now stops immediately after retaining 32 unique valid entries (rather than filtering all 128 candidates first). The first 128 source entries remain the only eligible input, and original provider order and duplicate precedence are unchanged. XCTest covers invalid/duplicate entries, the 32-entry cap, and both sides of the 128-entry boundary. This is a bounded-processing improvement, not automatic skipping or new provider compatibility.
 
@@ -45,8 +45,13 @@ User-created automatic markers take precedence on a tick. App automatic/manual s
 
 Validation added: pure Swift smoke/XCTest for playing/paused states, source ordering, overlap/adjacency, milliseconds, EOF, seek/rewatch and invalid bounds; AVPlayer fixture tests for real automatic seeking, consent, pause, off/on, retry, same-URL/local cleanup and snapshot exclusion; production SwiftUI toggle/reset coverage on iPhone/iPad. These new cases require successful final-head native/full integration before merge. Physical-device/provider acceptance remains separate.
 
-## Web manual controls (2026-11-07, pending integration)
+## Web manual and automatic controls
 
-The Web subscription player forwards normalized `skipSegments` to playback-local manual controls. It shares the JVM/Swift golden fixture, milliseconds, nullable ending-to-EOF, provider ordering and 128-inspected/32-retained bounds. Unknown duration, loading/seeking media, local files and known timeshift/replay are excluded. The player reuses one video element. Controls are recreated for each playback generation or relay URL, and a click rechecks the bound element, source and actual clock. The controls support hls.js MediaSource. Library normalization drops hints from saved history, playlists and sync. Web automatic skipping remains unimplemented.
+The Web subscription player forwards normalized `skipSegments` to playback-local manual controls. It shares the JVM/Swift golden fixture, milliseconds, nullable ending-to-EOF, provider ordering and 128-inspected/32-retained bounds. Unknown duration, loading/seeking media, local files and known timeshift/replay are excluded. The player reuses one video element. Controls are recreated for each playback generation or relay URL, and a click rechecks the bound element, source and actual clock. The controls support hls.js MediaSource. Library normalization drops hints from saved history, playlists and sync. The optional **自动跳过本次播放的来源片段** switch starts off for each
+playback. While the video plays, the first eligible marked range seeks to its
+end once the destination is seekable. Seeking into a range manually allows
+rewatching it. Turning the switch off and on preserves consumed ranges until
+the playback is replaced. HLS MediaSource playback checks the exact attached
+blob URL and waits for a VOD playlist before automatically seeking.
 
 Validation: local Vitest tests and TypeScript/Vite production build. Browser decoding and full integration must run after push; the native automatic increment also awaits remote Xcode/simulator validation.
