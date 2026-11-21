@@ -156,6 +156,22 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertFalse(store.skipProviderSegment(segment, generation: store.playbackGeneration))
     }
 
+    func testCloudListingNavigationPreservesValidNamesAndRoot() {
+        XCTAssertEqual(NativeCloudPage.childPath(parent: "/", name: "电影 中文.mkv"), "/电影 中文.mkv")
+        XCTAssertEqual(NativeCloudPage.childPath(parent: "/media/2026/", name: "episode 01.mp4"), "/media/2026/episode 01.mp4")
+        XCTAssertEqual(NativeCloudPage.parentPath("/media/2026/"), "/media")
+        XCTAssertEqual(NativeCloudPage.parentPath("/media"), "/")
+        XCTAssertEqual(NativeCloudPage.parentPath("/"), "/")
+    }
+
+    func testCloudListingRejectsTraversalAndControlNames() {
+        for name in ["", ".", "..", "../secret", "a/b", "a\\\\b", "bad\\nname", "invisible\\u{200B}"] {
+            XCTAssertNil(NativeCloudPage.childPath(parent: "/media", name: name), "Accepted unsafe name: \\(name)")
+        }
+        XCTAssertNil(NativeCloudPage.childPath(parent: "/media/../private", name: "video.mp4"))
+        XCTAssertNil(NativeCloudPage.childPath(parent: "relative", name: "video.mp4"))
+    }
+
     func testSystemAirPlayIsAllowedForAVPlayer() {
         // A simulator may not advertise any actual AirPlay destination.
         // Verify only that the production player permits the system route.
