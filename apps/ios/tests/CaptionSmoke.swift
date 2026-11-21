@@ -73,12 +73,10 @@ struct CaptionSmoke {
 
         // Exporters sometimes omit the empty line after the WEBVTT header.
         // The first cue must not disappear merely because it shares a block.
-        let compactVtt = "WEBVTT\\n00:00:01.000 --> 00:00:02.000\\nFirst cue\\n"
-            .replacingOccurrences(of: "\\\\n", with: "\\n")
+        let compactVtt = "WEBVTT\n00:00:01.000 --> 00:00:02.000\nFirst cue\n"
         let compactCues = try CaptionParser.parse(Data(compactVtt.utf8))
         precondition(compactCues.count == 1 && compactCues[0].text == "First cue")
-        let titledVtt = "WEBVTT - exported\\nfirst-cue\\n00:00:03.000 --> 00:00:04.000\\nSecond cue"
-            .replacingOccurrences(of: "\\\\n", with: "\\n")
+        let titledVtt = "WEBVTT - exported\nfirst-cue\n00:00:03.000 --> 00:00:04.000\nSecond cue"
         let titledCues = try CaptionParser.parse(Data(titledVtt.utf8))
         precondition(titledCues.count == 1 && titledCues[0].text == "Second cue")
         do {
