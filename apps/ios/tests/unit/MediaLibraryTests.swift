@@ -165,8 +165,8 @@ final class MediaLibraryTests: XCTestCase {
     }
 
     func testCloudListingRejectsTraversalAndControlNames() {
-        for name in ["", ".", "..", "../secret", "a/b", "a\\\\b", "bad\\nname", "invisible\\u{200B}"] {
-            XCTAssertNil(NativeCloudPage.childPath(parent: "/media", name: name), "Accepted unsafe name: \\(name)")
+        for name in ["", ".", "..", "../secret", "a/b", "a\\\\b", "bad\nname", "invisible\u{200B}"] {
+            XCTAssertNil(NativeCloudPage.childPath(parent: "/media", name: name), "Accepted unsafe name: \(name)")
         }
         XCTAssertNil(NativeCloudPage.childPath(parent: "/media/../private", name: "video.mp4"))
         XCTAssertNil(NativeCloudPage.childPath(parent: "relative", name: "video.mp4"))
