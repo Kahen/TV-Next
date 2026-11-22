@@ -127,12 +127,7 @@ struct SubscriptionSection: View {
         }
     }
     private var filteredCrossSiteResults: [NativeSearchHit<NativeMediaItem>] {
-        let needle = crossSiteResultQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !needle.isEmpty else { return crossSiteResults }
-        return crossSiteResults.filter { hit in
-            hit.item.name.localizedStandardContains(needle) ||
-            (crossSiteSourceNames[hit.siteKey] ?? hit.siteKey).localizedStandardContains(needle)
-        }
+        NativeCrossSiteResultFilter.apply(crossSiteResults, query: crossSiteResultQuery, names: crossSiteSourceNames)
     }
     private func clearCrossSiteSearch() {
         crossSiteResultQuery = ""
@@ -382,6 +377,19 @@ struct SubscriptionSection: View {
                 let episode = detail.lines[line].episodes[i]
                 Button(episode.name) { play(i) }.disabled(busy || !episode.playable)
             }
+        }
+    }
+}
+
+
+/// Local-only view filtering. Provider keys and original hit identity are unchanged.
+enum NativeCrossSiteResultFilter {
+    static func apply(_ hits: [NativeSearchHit<NativeMediaItem>], query: String, names: [String: String]) -> [NativeSearchHit<NativeMediaItem>] {
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !needle.isEmpty else { return hits }
+        return hits.filter { hit in
+            hit.item.name.localizedStandardContains(needle) ||
+            (names[hit.siteKey] ?? hit.siteKey).localizedStandardContains(needle)
         }
     }
 }
