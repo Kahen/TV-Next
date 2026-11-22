@@ -7,6 +7,7 @@ struct CloudSection: View {
     @State private var token = ""
     @State private var password = ""
     @State private var page: NativeCloudPage?
+    @State private var listingQuery = ""
     @State private var busy = false
     @State private var error: String?
     @State private var task: Task<Void,Never>?
@@ -30,8 +31,14 @@ struct CloudSection: View {
     }
     @ViewBuilder private func listing(_ p: NativeCloudPage) -> some View {
         Text(p.path).font(.caption)
+        TextField("筛选当前页文件和文件夹", text: $listingQuery)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .textFieldStyle(.roundedBorder)
+        Text("当前页显示 \(NativeCloudListingFilter.entries(p.entries, query: listingQuery).count) / \(p.entries.count) 项 · 仅筛选已加载页")
+            .font(.caption).foregroundStyle(.secondary)
         Button("上级目录") { open((p.path as NSString).deletingLastPathComponent) }.disabled(busy || p.path == "/")
-        ForEach(p.entries) { item in
+        ForEach(NativeCloudListingFilter.entries(p.entries, query: listingQuery)) { item in
             Button((item.directory ? "📁 " : "▶ ") + item.name) {
                 open((p.path == "/" ? "" : p.path) + "/" + item.name,play:!item.directory)
             }.disabled(busy)
@@ -56,10 +63,28 @@ struct CloudSection: View {
                 } else {
                     let result: NativeCloudPage = try await api.request("cloud/list",body:payload)
                     guard revision == id, !Task.isCancelled else { return }
+                    if result.path != page?.path { listingQuery = "" }
                     page = result
                 }
             } catch { if revision == id && !Task.isCancelled { self.error = error.localizedDescription } }
             if revision == id { busy = false }
+        }
+    }
+}
+
+    
+/// Local-only filtering: never sends the query or credentials to a provider.
+enum NativeCloudListingFilter {
+    static func entries(_ entries: [NativeCloudPage.Entry], query: String) -> [NativeCloudPage.Entry] {
+        let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let matches = term.isEmpty ? entries : entries.filter {
+            $0.name.localizedStandardContains(term)
+        }
+        return matches.sorted {
+            if $0.directory != $1.directory { return $0.directory }
+            let order = $0.name.localizedStandardCompare($1.name)
+            if order != .orderedSame { return order == .orderedAscending }
+            return $0.name < $1.name
         }
     }
 }
