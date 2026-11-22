@@ -29,7 +29,24 @@ struct CloudSection: View {
         }.onDisappear { task?.cancel(); token = ""; password = "" }
     }
     @ViewBuilder private func listing(_ p: NativeCloudPage) -> some View {
-        Text(p.path).font(.caption)
+        ScrollView(.horizontal) {
+            HStack(spacing: 6) {
+                let crumbs = NativeCloudBreadcrumbs.make(p.path)
+                ForEach(crumbs) { crumb in
+                    if crumb.path == p.path {
+                        Text(crumb.title).font(.caption).bold()
+                    } else {
+                        Button(crumb.title) { open(crumb.path) }
+                            .font(.caption)
+                            .disabled(busy)
+                    }
+                    if crumb.id != crumbs.last?.id {
+                        Image(systemName: "chevron.right")
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
         Button("上级目录") { open((p.path as NSString).deletingLastPathComponent) }.disabled(busy || p.path == "/")
         ForEach(p.entries) { item in
             Button((item.directory ? "📁 " : "▶ ") + item.name) {
