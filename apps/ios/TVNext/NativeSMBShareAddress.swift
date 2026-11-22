@@ -18,7 +18,7 @@ struct NativeSMBShareAddress: Equatable {
               let host = url.host, !host.isEmpty,
               host.utf8.count <= 253,
               !host.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) || $0.properties.generalCategory == .format }),
-              let port = url.port.map({ $0 }) ?? 445 as Int?,
+              let port = Optional(url.port ?? 445),
               (1...65535).contains(port) else { return nil }
 
         let raw = url.percentEncodedPath
