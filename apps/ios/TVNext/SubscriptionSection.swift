@@ -20,6 +20,7 @@ struct SubscriptionSection: View {
     @State private var actionResult: NativeSubscriptionAction?
     @State private var detail: NativeMediaDetail?
     @State private var crossSiteResults: [NativeSearchHit<NativeMediaItem>] = []
+    @State private var crossSiteResultQuery = ""
     @State private var crossSiteFailures: [String] = []
     @State private var crossSiteFailedKeys: [String] = []
     @State private var crossSiteSearchKeyword: String?
@@ -88,8 +89,13 @@ struct SubscriptionSection: View {
                 if !crossSiteResults.isEmpty {
                     LazyVStack(alignment: .leading) {
                         Text("跨站搜索结果").font(.headline)
-                        ForEach(crossSiteResults.indices, id: \.self) { index in
-                            let hit = crossSiteResults[index]
+                        TextField("筛选已加载的跨站结果", text: $crossSiteResultQuery)
+                            .textFieldStyle(.roundedBorder)
+                            .accessibilityIdentifier("cross-site-result-filter")
+                        Text("显示 \(filteredCrossSiteResults.count) / \(crossSiteResults.count) 条")
+                            .font(.caption).foregroundStyle(.secondary)
+                        ForEach(filteredCrossSiteResults.indices, id: \.self) { index in
+                            let hit = filteredCrossSiteResults[index]
                             Button(hit.item.name + " · " + (crossSiteSourceNames[hit.siteKey] ?? hit.siteKey)) {
                                 inspect(hit.item, from: hit.siteKey)
                             }.disabled(busy).padding(.vertical, 4)
@@ -120,7 +126,16 @@ struct SubscriptionSection: View {
             if generation == id { busy = false }
         }
     }
+    private var filteredCrossSiteResults: [NativeSearchHit<NativeMediaItem>] {
+        let needle = crossSiteResultQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !needle.isEmpty else { return crossSiteResults }
+        return crossSiteResults.filter { hit in
+            hit.item.name.localizedStandardContains(needle) ||
+            (crossSiteSourceNames[hit.siteKey] ?? hit.siteKey).localizedStandardContains(needle)
+        }
+    }
     private func clearCrossSiteSearch() {
+        crossSiteResultQuery = ""
         crossSiteResults = []; crossSiteFailures = []; crossSiteFailedKeys = []
         crossSiteSearchKeyword = nil; crossSiteSourceOrder = []; crossSiteSourceNames = [:]; crossSiteWarnings = []; crossSiteWarningState = .empty; crossSiteCompleted = false
     }
