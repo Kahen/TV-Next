@@ -29,6 +29,7 @@ struct SubscriptionSection: View {
     @State private var crossSiteWarningState = NativeSearchWarningState.empty
     @State private var crossSiteCompleted = false
     @State private var line = 0
+    @State private var lastPlayedEpisode: Int?
     @State private var error: String?
     @State private var busy = false
     @State private var pending: Task<Void,Never>?
@@ -106,7 +107,7 @@ struct SubscriptionSection: View {
             }
         }
         .onDisappear { pending?.cancel(); actionResult = nil; clearCrossSiteSearch() }
-        .onChange(of:serverURL) { _,_ in pending?.cancel();generation=UUID();busy=false;document=nil;page=nil;detail=nil;actionResult=nil;filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;siteKey="";clearCrossSiteSearch() }
+        .onChange(of:serverURL) { _,_ in pending?.cancel();generation=UUID();busy=false;document=nil;page=nil;detail=nil;lastPlayedEpisode=nil;actionResult=nil;filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;siteKey="";clearCrossSiteSearch() }
         .onChange(of:session?.token) { _,_ in pending?.cancel();generation=UUID();busy=false;actionResult=nil;clearCrossSiteSearch() }
     }
     private func run(_ operation: @escaping (TVNextAPI, UUID) async throws -> Void) {
@@ -142,7 +143,7 @@ struct SubscriptionSection: View {
         run { api, id in
             let result: NativeSubscription = try await api.request("subscriptions/load", body: NativeSubscriptionRequest(content: inlineContent, url: targetURL))
             guard generation == id, !Task.isCancelled else { return }
-            document = result; page = nil; detail = nil; siteKey = "";filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;clearCrossSiteSearch()
+            document = result; page = nil; detail = nil; lastPlayedEpisode = nil; siteKey = "";filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;clearCrossSiteSearch()
             // URL is only saved after a successful, current-generation remote load.
             // Never save pasted configurations or a URL on a failed/canceled request.
             if shouldSaveURL && rememberURL && !NativeSubscriptionURLStore().save(targetURL) {
@@ -278,7 +279,7 @@ struct SubscriptionSection: View {
             let result: NativeMediaDetail = try await api.request("subscriptions/detail",body:r)
             guard generation == id, !Task.isCancelled else { return }
             switchDetailSite(targetKey)
-            detail = result; line = 0
+            detail = result; line = 0; lastPlayedEpisode = nil
         }
     }
     private func play(_ index: Int) {
@@ -287,6 +288,7 @@ struct SubscriptionSection: View {
         run { api, id in
             let result: NativeMediaPlayback = try await api.request("subscriptions/play",body:r)
             guard generation == id, !Task.isCancelled else { return }
+            lastPlayedEpisode = index
             onPlay(result, detail.item.name)
         }
     }
@@ -360,7 +362,7 @@ struct SubscriptionSection: View {
         Text(detail.item.name).font(.headline)
         if let text = detail.description { Text(text).font(.caption) }
         ScrollView(.horizontal) { HStack { ForEach(detail.lines.indices,id:\.self) { i in
-            Button(detail.lines[i].name) { line = i }.buttonStyle(.bordered)
+            Button(detail.lines[i].name) { line = i; lastPlayedEpisode = nil }.buttonStyle(.bordered)
         } } }
         if detail.lines.indices.contains(line) {
             ForEach(detail.lines[line].episodes.indices,id:\.self) { i in
