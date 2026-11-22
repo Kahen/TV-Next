@@ -365,6 +365,20 @@ struct SubscriptionSection: View {
             Button(detail.lines[i].name) { line = i; lastPlayedEpisode = nil }.buttonStyle(.bordered)
         } } }
         if detail.lines.indices.contains(line) {
+            let playable = detail.lines[line].episodes.map(\.playable)
+            HStack {
+                Button("上一集") {
+                    if let index = NativeEpisodeNavigation.adjacent(to: lastPlayedEpisode, playable: playable, direction: -1) { play(index) }
+                }
+                .disabled(busy || NativeEpisodeNavigation.adjacent(to: lastPlayedEpisode, playable: playable, direction: -1) == nil)
+                .accessibilityIdentifier("previous-subscription-episode")
+                if let lastPlayedEpisode { Text("已播放第 \(lastPlayedEpisode + 1) 集").font(.caption) }
+                Button("下一集") {
+                    if let index = NativeEpisodeNavigation.adjacent(to: lastPlayedEpisode, playable: playable, direction: 1) { play(index) }
+                }
+                .disabled(busy || NativeEpisodeNavigation.adjacent(to: lastPlayedEpisode, playable: playable, direction: 1) == nil)
+                .accessibilityIdentifier("next-subscription-episode")
+            }
             ForEach(detail.lines[line].episodes.indices,id:\.self) { i in
                 let episode = detail.lines[line].episodes[i]
                 Button(episode.name) { play(i) }.disabled(busy || !episode.playable)
