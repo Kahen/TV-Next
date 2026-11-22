@@ -18,6 +18,7 @@ struct SubscriptionSection: View {
     @State private var filters: [String:String]=[:]
     @State private var appliedFilters: [String:String]=[:]
     @State private var actionResult: NativeSubscriptionAction?
+    @State private var retryAction: NativeActionRetryContext?
     @State private var detail: NativeMediaDetail?
     @State private var crossSiteResults: [NativeSearchHit<NativeMediaItem>] = []
     @State private var crossSiteFailures: [String] = []
@@ -105,9 +106,9 @@ struct SubscriptionSection: View {
                 rememberURL = true
             }
         }
-        .onDisappear { pending?.cancel(); actionResult = nil; clearCrossSiteSearch() }
-        .onChange(of:serverURL) { _,_ in pending?.cancel();generation=UUID();busy=false;document=nil;page=nil;detail=nil;actionResult=nil;filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;siteKey="";clearCrossSiteSearch() }
-        .onChange(of:session?.token) { _,_ in pending?.cancel();generation=UUID();busy=false;actionResult=nil;clearCrossSiteSearch() }
+        .onDisappear { pending?.cancel(); actionResult = nil; retryAction = nil; clearCrossSiteSearch() }
+        .onChange(of:serverURL) { _,_ in pending?.cancel();generation=UUID();busy=false;document=nil;page=nil;detail=nil;actionResult=nil;retryAction=nil;filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;siteKey="";clearCrossSiteSearch() }
+        .onChange(of:session?.token) { _,_ in pending?.cancel();generation=UUID();busy=false;actionResult=nil;retryAction=nil;clearCrossSiteSearch() }
     }
     private func run(_ operation: @escaping (TVNextAPI, UUID) async throws -> Void) {
         pending?.cancel()
@@ -142,7 +143,7 @@ struct SubscriptionSection: View {
         run { api, id in
             let result: NativeSubscription = try await api.request("subscriptions/load", body: NativeSubscriptionRequest(content: inlineContent, url: targetURL))
             guard generation == id, !Task.isCancelled else { return }
-            document = result; page = nil; detail = nil; siteKey = "";filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;clearCrossSiteSearch()
+            document = result; page = nil; detail = nil; retryAction = nil; siteKey = "";filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;clearCrossSiteSearch()
             // URL is only saved after a successful, current-generation remote load.
             // Never save pasted configurations or a URL on a failed/canceled request.
             if shouldSaveURL && rememberURL && !NativeSubscriptionURLStore().save(targetURL) {
@@ -164,7 +165,7 @@ struct SubscriptionSection: View {
         run { api, id in
             let result: NativeMediaPage = try await api.request("subscriptions/" + operation, body: r)
             guard generation == id, !Task.isCancelled else { return }
-            page = result; detail = nil; siteKey = key; mode = operation; category = operation=="home" ? nil:r.categoryId;clearCrossSiteSearch()
+            page = result; detail = nil; retryAction = nil; siteKey = key; mode = operation; category = operation=="home" ? nil:r.categoryId;clearCrossSiteSearch()
             filterCatalog=same ? filterCatalog.merging(result.filters ?? [:],uniquingKeysWith:{ _,new in new }):result.filters ?? [:]
             appliedFilters=operation=="category" ? choices:[:]
             // Keep unsaved Picker edits local; paging uses only the last applied values.
@@ -264,13 +265,7 @@ struct SubscriptionSection: View {
         let targetKey = key ?? siteKey
         if item.folder == true { browse(targetKey,operation:"category",type:item.id); return }
         if let action = item.action, !action.isEmpty {
-            var r = request(targetKey); r.action = action
-            run { api, id in
-                let result: NativeSubscriptionAction = try await api.request("subscriptions/action",body:r)
-                guard generation == id, !Task.isCancelled else { return }
-                switchDetailSite(targetKey)
-                detail = nil; actionResult = result
-            }
+            performAction(site: targetKey, action: action)
             return
         }
         var r = request(targetKey); r.vodId = item.id
@@ -280,6 +275,30 @@ struct SubscriptionSection: View {
             switchDetailSite(targetKey)
             detail = result; line = 0
         }
+    }
+    private func performAction(site: String, action: String) {
+        guard let document, let context = NativeActionRetryContext(
+            siteKey: site, action: action, subscriptionContent: document.content,
+            subscriptionURL: document.url
+        ) else { return }
+        var r = request(site); r.action = action
+        run { api, id in
+            let result: NativeSubscriptionAction = try await api.request("subscriptions/action", body: r)
+            guard generation == id, !Task.isCancelled else { return }
+            switchDetailSite(site)
+            detail = nil
+            actionResult = result
+            retryAction = result.link != nil ? context : nil
+        }
+    }
+    private func retryBrowserAction() {
+        guard let context = retryAction, let document,
+              context.matches(siteKey: siteKey, subscriptionContent: document.content,
+                              subscriptionURL: document.url) else {
+            retryAction = nil
+            return
+        }
+        performAction(site: context.siteKey, action: context.action)
     }
     private func play(_ index: Int) {
         guard let detail else { return }
@@ -296,6 +315,13 @@ struct SubscriptionSection: View {
             if let link = result.link {
                 Link("在外部浏览器打开站点网页", destination: link)
                     .accessibilityHint("会离开当前应用，不会自动登录或同步 Cookie")
+                if retryAction != nil {
+                    Button("完成网页操作后重新请求") { retryBrowserAction() }
+                        .buttonStyle(.bordered).disabled(busy)
+                        .accessibilityIdentifier("retry-subscription-web-action")
+                    Text("仅在返回应用后手动重试当前操作；不会读取浏览器 Cookie 或自动提交登录信息。")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
             if result.limitedBrowserFeatures {
                 Text("原版内嵌视图或 Cookie 自动关闭尚未支持；仅手动打开外部浏览器，不同步凭据。")
