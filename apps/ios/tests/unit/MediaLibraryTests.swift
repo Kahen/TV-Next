@@ -1167,13 +1167,13 @@ final class NativeCloudPlaybackValidationTests: XCTestCase {
     func testRejectsUnsafeSchemesAndEmbeddedCredentials() {
         for url in ["file:///etc/passwd", "javascript:alert(1)", "smb://nas/video.mp4",
                     "https://user:secret@example.org/video.mp4", "https://example.org/video.mp4#secret",
-                    "https://example.org/video.mp4\\nInjected", "https://"] {
+                    "https://example.org/video.mp4\nInjected", "https://"] {
             XCTAssertNil(NativeCloudPlaybackValidation.validated(playback(url)), url)
         }
     }
 
     func testRejectsMalformedHeadersAndPreservesValidValues() {
-        for headers in [["X-Unsafe\\nName": "value"], ["Authorization": "abc\\r\\nInjected: true"],
+        for headers in [["X-Unsafe\nName": "value"], ["Authorization": "abc\r\nInjected: true"],
                         ["Bad Header": "value"], ["X-Large": String(repeating: "x", count: 4097)]] {
             XCTAssertNil(NativeCloudPlaybackValidation.validated(playback("https://example.org/video.mp4", headers: headers)))
         }
