@@ -110,7 +110,7 @@ struct ContentView: View {
                         remoteDanmaku = playback.danmaku
                         remoteSubtitles = playback.subtitles
                         remoteResourceGeneration = library.playbackGeneration
-                    }, onImport: { library.importChannels($0) }).id("subscription")
+                    }, activePlayerItem: { library.player.currentItem }, onImport: { library.importChannels($0) }).id("subscription")
                     MediaCatalogSection { channel in
                         errorMessage = nil
                         captionFileName = nil
