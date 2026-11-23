@@ -123,8 +123,8 @@ struct SubscriptionSection: View {
             }
         }
         .onDisappear { pending?.cancel(); ownedPlayerItem = nil; actionResult = nil; clearCrossSiteSearch() }
-        .onChange(of:serverURL) { _,_ in pending?.cancel();generation=UUID();busy=false;document=nil;page=nil;detail=nil;lastPlayedEpisode=nil;actionResult=nil;filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;siteKey="";clearCrossSiteSearch() }
-        .onChange(of:session?.token) { _,_ in pending?.cancel();generation=UUID();busy=false;actionResult=nil;clearCrossSiteSearch() }
+        .onChange(of:serverURL) { _,_ in pending?.cancel();generation=UUID();busy=false;ownedPlayerItem=nil;lastPlayedEpisode=nil;document=nil;page=nil;detail=nil;lastPlayedEpisode=nil;actionResult=nil;filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;siteKey="";clearCrossSiteSearch() }
+        .onChange(of:session?.token) { _,_ in pending?.cancel();generation=UUID();busy=false;ownedPlayerItem=nil;lastPlayedEpisode=nil;actionResult=nil;clearCrossSiteSearch() }
     }
     private func run(_ operation: @escaping (TVNextAPI, UUID) async throws -> Void) {
         pending?.cancel()
