@@ -175,8 +175,10 @@ struct SubscriptionSection: View {
     }
     private func searchAll() {
         guard let document else { return }
-        let keyword = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !keyword.isEmpty else { return }
+        guard let keyword = NativeFongMiSearchInput.validated(query) else {
+            error = "搜索词不能为空、包含控制字符或超过 256 个字符。"
+            return
+        }
         let sources = document.sites.filter { $0.searchable && !$0.hidden && $0.supported && ($0.type != 3 || session != nil) }
             .map { NativeSearchSource(key: $0.key, name: $0.name) }
         clearCrossSiteSearch(); page = nil; detail = nil
@@ -321,8 +323,8 @@ struct SubscriptionSection: View {
         }
         HStack {
             TextField("搜索当前站点",text:$query).textFieldStyle(.roundedBorder)
-            Button("搜索") { browse(siteKey,operation:"search") }.disabled(busy || siteKey.isEmpty || query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            Button("跨站搜索") { searchAll() }.disabled(busy || query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            Button("搜索") { browse(siteKey,operation:"search") }.disabled(busy || siteKey.isEmpty || NativeFongMiSearchInput.validated(query) == nil)
+            Button("跨站搜索") { searchAll() }.disabled(busy || NativeFongMiSearchInput.validated(query) == nil)
         }
     }
     @ViewBuilder private func pageView(_ page: NativeMediaPage) -> some View {
