@@ -156,7 +156,7 @@ struct SubscriptionSection: View {
         r.siteKey = key ?? siteKey; r.categoryId = category; r.query = query;r.filters=appliedFilters
         return r
     }
-    private func browse(_ key: String, operation: String = "home", number: Int = 1, type: String? = nil, selectedFilters: [String:String]? = nil,bypassCache: Bool=false) {
+    private func browse(_ key: String, operation: String = "home", number: Int = 1, type: String? = nil, selectedFilters: [String:String]? = nil,bypassCache: Bool=false,reuseSearchQuery: Bool=false) {
         let same=key==siteKey
         let wasSameCategory = same && (type ?? category)==category && mode=="category"
         let nextCategory=type ?? category
@@ -164,7 +164,7 @@ struct SubscriptionSection: View {
         var r = request(key); r.page = number; r.categoryId = nextCategory;r.filters=choices;r.bypassCache=bypassCache
         // Paging and refresh must use the submitted search, not later edits to the text field.
         if operation == "search" {
-            r.query = NativeSearchQuerySnapshot.resolve(draft: query, committed: appliedSearchQuery, page: number, sameSite: same && mode == "search")
+            r.query = NativeSearchQuerySnapshot.resolve(draft: query, committed: appliedSearchQuery, reuseCommitted: reuseSearchQuery && same && mode == "search")
         }
         run { api, id in
             let result: NativeMediaPage = try await api.request("subscriptions/" + operation, body: r)
@@ -355,11 +355,11 @@ struct SubscriptionSection: View {
         LazyVStack(alignment: .leading) { ForEach(page.items) { item in
             Button(item.name + (item.remarks.map { " · " + $0 } ?? "")) { inspect(item) }.disabled(busy).padding(.vertical,5)
         } }
-        if mode=="search",session != nil { Button("刷新搜索结果") { browse(siteKey,operation:"search",number:page.page,bypassCache:true) }.disabled(busy) }
+        if mode=="search",session != nil { Button("刷新搜索结果") { browse(siteKey,operation:"search",number:page.page,bypassCache:true,reuseSearchQuery:true) }.disabled(busy) }
         HStack {
-            Button("上一页") { browse(siteKey,operation:mode,number:page.page-1) }.disabled(busy || page.page <= 1)
+            Button("上一页") { browse(siteKey,operation:mode,number:page.page-1,reuseSearchQuery:true) }.disabled(busy || page.page <= 1)
             Spacer(); Text("第 \(page.page) 页").font(.caption); Spacer()
-            Button("下一页") { browse(siteKey,operation:mode,number:page.page+1) }.disabled(busy || !page.hasMore)
+            Button("下一页") { browse(siteKey,operation:mode,number:page.page+1,reuseSearchQuery:true) }.disabled(busy || !page.hasMore)
         }
     }
     @ViewBuilder private func detailView(_ detail: NativeMediaDetail) -> some View {
