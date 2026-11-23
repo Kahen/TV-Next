@@ -18,6 +18,7 @@ struct SubscriptionSection: View {
     @State private var filters: [String:String]=[:]
     @State private var appliedFilters: [String:String]=[:]
     @State private var actionResult: NativeSubscriptionAction?
+    @State private var actionBrowser: NativeActionBrowserPage?
     @State private var detail: NativeMediaDetail?
     @State private var crossSiteResults: [NativeSearchHit<NativeMediaItem>] = []
     @State private var crossSiteFailures: [String] = []
@@ -104,6 +105,10 @@ struct SubscriptionSection: View {
                 address = stored
                 rememberURL = true
             }
+        }
+        .sheet(item: $actionBrowser) { browser in
+            NativeActionBrowser(url: browser.url)
+                .ignoresSafeArea()
         }
         .onDisappear { pending?.cancel(); actionResult = nil; clearCrossSiteSearch() }
         .onChange(of:serverURL) { _,_ in pending?.cancel();generation=UUID();busy=false;document=nil;page=nil;detail=nil;actionResult=nil;filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;siteKey="";clearCrossSiteSearch() }
@@ -294,11 +299,18 @@ struct SubscriptionSection: View {
         VStack(alignment: .leading, spacing: 6) {
             if let message = result.message { Text(message).font(.callout) }
             if let link = result.link {
+                if let safeURL = NativeActionBrowserPolicy.approvedURL(link) {
+                    Button("在应用内打开站点登录/操作页面") {
+                        actionBrowser = NativeActionBrowserPage(url: safeURL)
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier("open-native-action-browser")
+                }
                 Link("在外部浏览器打开站点网页", destination: link)
                     .accessibilityHint("会离开当前应用，不会自动登录或同步 Cookie")
             }
             if result.limitedBrowserFeatures {
-                Text("原版内嵌视图或 Cookie 自动关闭尚未支持；仅手动打开外部浏览器，不同步凭据。")
+                Text("内嵌 Safari 可手动完成网页交互，但尚不支持原版 Cookie 回传、自动关闭或登录状态同步。")
                     .font(.caption).foregroundStyle(.secondary)
             }
             if result.unsupported {
