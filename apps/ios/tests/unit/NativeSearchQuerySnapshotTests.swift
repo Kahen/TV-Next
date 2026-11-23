@@ -3,22 +3,26 @@ import XCTest
 
 final class NativeSearchQuerySnapshotTests: XCTestCase {
     func testPagingPreservesCommittedQueryDespiteDraftEdits() {
-        XCTAssertEqual(NativeSearchQuerySnapshot.resolve(draft: "new term", committed: "old term", page: 2, sameSite: true), "old term")
+        XCTAssertEqual(NativeSearchQuerySnapshot.resolve(draft: "new term", committed: "old term", reuseCommitted: true), "old term")
     }
 
     func testFreshSearchUsesTrimmedDraft() {
-        XCTAssertEqual(NativeSearchQuerySnapshot.resolve(draft: "  新搜索  ", committed: "old", page: 1, sameSite: true), "新搜索")
+        XCTAssertEqual(NativeSearchQuerySnapshot.resolve(draft: "  新搜索  ", committed: "old", reuseCommitted: false), "新搜索")
     }
 
     func testDifferentSiteNeverReusesOldQuery() {
-        XCTAssertEqual(NativeSearchQuerySnapshot.resolve(draft: "other", committed: "private", page: 3, sameSite: false), "other")
+        XCTAssertEqual(NativeSearchQuerySnapshot.resolve(draft: "other", committed: "private", reuseCommitted: false), "other")
+    }
+
+    func testPreviousPageToFirstPageKeepsSubmittedQuery() {
+        XCTAssertEqual(NativeSearchQuerySnapshot.resolve(draft: "edited", committed: "original", reuseCommitted: true), "original")
     }
 
     func testNoSnapshotFallsBackToDraft() {
-        XCTAssertEqual(NativeSearchQuerySnapshot.resolve(draft: "fallback", committed: nil, page: 2, sameSite: true), "fallback")
+        XCTAssertEqual(NativeSearchQuerySnapshot.resolve(draft: "fallback", committed: nil, reuseCommitted: true), "fallback")
     }
 
     func testEmptyCommittedQueryIsNotReplacedByNewDraft() {
-        XCTAssertEqual(NativeSearchQuerySnapshot.resolve(draft: "changed", committed: "", page: 2, sameSite: true), "")
+        XCTAssertEqual(NativeSearchQuerySnapshot.resolve(draft: "changed", committed: "", reuseCommitted: true), "")
     }
 }
