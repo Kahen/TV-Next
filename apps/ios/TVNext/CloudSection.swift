@@ -30,11 +30,11 @@ struct CloudSection: View {
     }
     @ViewBuilder private func listing(_ p: NativeCloudPage) -> some View {
         Text(p.path).font(.caption)
-        Button("上级目录") { open((p.path as NSString).deletingLastPathComponent) }.disabled(busy || p.path == "/")
+        Button("上级目录") { open(NativeCloudPath.parent(of: p.path)) }.disabled(busy || p.path == "/")
         ForEach(p.entries) { item in
             Button((item.directory ? "📁 " : "▶ ") + item.name) {
-                open((p.path == "/" ? "" : p.path) + "/" + item.name,play:!item.directory)
-            }.disabled(busy)
+                if let path = NativeCloudPath.child(named: item.name, in: p.path) { open(path,play:!item.directory) }
+            }.disabled(busy || NativeCloudPath.child(named: item.name, in: p.path) == nil)
         }
         HStack {
             Button("上一页") { open(p.path,number:p.page-1) }.disabled(busy || p.page <= 1)
