@@ -28,6 +28,7 @@ struct SubscriptionSection: View {
     @State private var crossSiteWarnings: [String] = []
     @State private var crossSiteWarningState = NativeSearchWarningState.empty
     @State private var crossSiteCompleted = false
+    @State private var crossSiteSelectedProvider = ""
     @State private var line = 0
     @State private var error: String?
     @State private var busy = false
@@ -88,8 +89,19 @@ struct SubscriptionSection: View {
                 if !crossSiteResults.isEmpty {
                     LazyVStack(alignment: .leading) {
                         Text("跨站搜索结果").font(.headline)
-                        ForEach(crossSiteResults.indices, id: \.self) { index in
-                            let hit = crossSiteResults[index]
+                        Picker("结果站点", selection: $crossSiteSelectedProvider) {
+                            Text("全部站点").tag("")
+                            ForEach(crossSiteSourceOrder, id: \.self) { key in
+                                Text((crossSiteSourceNames[key] ?? key) + " · " + key).tag(key)
+                            }
+                        }.accessibilityIdentifier("cross-site-provider-filter")
+                        let visibleHits = NativeCrossSiteResultFilter.visible(
+                            crossSiteResults, selectedKey: crossSiteSelectedProvider,
+                            searchedKeys: crossSiteSourceOrder
+                        )
+                        Text("显示 \(visibleHits.count) / \(crossSiteResults.count) 条").font(.caption).foregroundStyle(.secondary)
+                        ForEach(visibleHits.indices, id: \.self) { index in
+                            let hit = visibleHits[index]
                             Button(hit.item.name + " · " + (crossSiteSourceNames[hit.siteKey] ?? hit.siteKey)) {
                                 inspect(hit.item, from: hit.siteKey)
                             }.disabled(busy).padding(.vertical, 4)
@@ -122,7 +134,7 @@ struct SubscriptionSection: View {
     }
     private func clearCrossSiteSearch() {
         crossSiteResults = []; crossSiteFailures = []; crossSiteFailedKeys = []
-        crossSiteSearchKeyword = nil; crossSiteSourceOrder = []; crossSiteSourceNames = [:]; crossSiteWarnings = []; crossSiteWarningState = .empty; crossSiteCompleted = false
+        crossSiteSelectedProvider = ""; crossSiteSearchKeyword = nil; crossSiteSourceOrder = []; crossSiteSourceNames = [:]; crossSiteWarnings = []; crossSiteWarningState = .empty; crossSiteCompleted = false
     }
     private func switchDetailSite(_ key: String) {
         var scope = NativeSiteBrowsingContext(
