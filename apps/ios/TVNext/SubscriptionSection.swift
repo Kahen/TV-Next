@@ -1,9 +1,12 @@
 import SwiftUI
+import AVFoundation
 
 struct SubscriptionSection: View {
     let serverURL: String
     var session: NativeHomeSession? = nil
     let onPlay: (NativeMediaPlayback, String) -> Void
+    /// Read the actual active player item after onPlay has installed it.
+    var activePlayerItem: () -> AVPlayerItem? = { nil }
     var onImport: (([TVChannel]) -> Void)? = nil
     @State private var address = ""
     @State private var content = ""
@@ -30,6 +33,8 @@ struct SubscriptionSection: View {
     @State private var crossSiteCompleted = false
     @State private var line = 0
     @State private var lastPlayedEpisode: Int?
+    @State private var autoAdvance = false
+    @State private var ownedPlayerItem: AVPlayerItem?
     @State private var error: String?
     @State private var busy = false
     @State private var pending: Task<Void,Never>?
@@ -106,7 +111,18 @@ struct SubscriptionSection: View {
                 rememberURL = true
             }
         }
-        .onDisappear { pending?.cancel(); actionResult = nil; clearCrossSiteSearch() }
+        .onReceive(NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime)) { event in
+            guard autoAdvance, !busy, let finished = event.object as? AVPlayerItem,
+                  finished === ownedPlayerItem, finished === activePlayerItem(),
+                  let detail, detail.lines.indices.contains(line) else { return }
+            let playable = detail.lines[line].episodes.map(\.playable)
+            if let next = NativeEpisodeNavigation.adjacent(to: lastPlayedEpisode, playable: playable, direction: 1) {
+                // Invalidate before the asynchronous request to avoid duplicate EOF events.
+                ownedPlayerItem = nil
+                play(next)
+            }
+        }
+        .onDisappear { pending?.cancel(); ownedPlayerItem = nil; actionResult = nil; clearCrossSiteSearch() }
         .onChange(of:serverURL) { _,_ in pending?.cancel();generation=UUID();busy=false;document=nil;page=nil;detail=nil;lastPlayedEpisode=nil;actionResult=nil;filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;siteKey="";clearCrossSiteSearch() }
         .onChange(of:session?.token) { _,_ in pending?.cancel();generation=UUID();busy=false;actionResult=nil;clearCrossSiteSearch() }
     }
@@ -143,7 +159,7 @@ struct SubscriptionSection: View {
         run { api, id in
             let result: NativeSubscription = try await api.request("subscriptions/load", body: NativeSubscriptionRequest(content: inlineContent, url: targetURL))
             guard generation == id, !Task.isCancelled else { return }
-            document = result; page = nil; detail = nil; lastPlayedEpisode = nil; siteKey = "";filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;clearCrossSiteSearch()
+            document = result; page = nil; detail = nil; lastPlayedEpisode = nil; ownedPlayerItem = nil; siteKey = "";filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;clearCrossSiteSearch()
             // URL is only saved after a successful, current-generation remote load.
             // Never save pasted configurations or a URL on a failed/canceled request.
             if shouldSaveURL && rememberURL && !NativeSubscriptionURLStore().save(targetURL) {
@@ -165,7 +181,7 @@ struct SubscriptionSection: View {
         run { api, id in
             let result: NativeMediaPage = try await api.request("subscriptions/" + operation, body: r)
             guard generation == id, !Task.isCancelled else { return }
-            page = result; detail = nil; siteKey = key; mode = operation; category = operation=="home" ? nil:r.categoryId;clearCrossSiteSearch()
+            page = result; detail = nil; ownedPlayerItem = nil; siteKey = key; mode = operation; category = operation=="home" ? nil:r.categoryId;clearCrossSiteSearch()
             filterCatalog=same ? filterCatalog.merging(result.filters ?? [:],uniquingKeysWith:{ _,new in new }):result.filters ?? [:]
             appliedFilters=operation=="category" ? choices:[:]
             // Keep unsaved Picker edits local; paging uses only the last applied values.
@@ -270,7 +286,7 @@ struct SubscriptionSection: View {
                 let result: NativeSubscriptionAction = try await api.request("subscriptions/action",body:r)
                 guard generation == id, !Task.isCancelled else { return }
                 switchDetailSite(targetKey)
-                detail = nil; actionResult = result
+                detail = nil; ownedPlayerItem = nil; actionResult = result
             }
             return
         }
@@ -279,7 +295,7 @@ struct SubscriptionSection: View {
             let result: NativeMediaDetail = try await api.request("subscriptions/detail",body:r)
             guard generation == id, !Task.isCancelled else { return }
             switchDetailSite(targetKey)
-            detail = result; line = 0; lastPlayedEpisode = nil
+            detail = result; line = 0; lastPlayedEpisode = nil; ownedPlayerItem = nil
         }
     }
     private func play(_ index: Int) {
@@ -290,6 +306,7 @@ struct SubscriptionSection: View {
             guard generation == id, !Task.isCancelled else { return }
             lastPlayedEpisode = index
             onPlay(result, detail.item.name)
+            ownedPlayerItem = activePlayerItem()
         }
     }
     @ViewBuilder private func actionView(_ result: NativeSubscriptionAction) -> some View {
@@ -362,10 +379,12 @@ struct SubscriptionSection: View {
         Text(detail.item.name).font(.headline)
         if let text = detail.description { Text(text).font(.caption) }
         ScrollView(.horizontal) { HStack { ForEach(detail.lines.indices,id:\.self) { i in
-            Button(detail.lines[i].name) { line = i; lastPlayedEpisode = nil }.buttonStyle(.bordered)
+            Button(detail.lines[i].name) { line = i; lastPlayedEpisode = nil; ownedPlayerItem = nil }.buttonStyle(.bordered)
         } } }
         if detail.lines.indices.contains(line) {
             let playable = detail.lines[line].episodes.map(\.playable)
+            Toggle("播放结束自动下一集", isOn: $autoAdvance)
+                .accessibilityIdentifier("subscription-auto-next")
             HStack {
                 Button("上一集") {
                     if let index = NativeEpisodeNavigation.adjacent(to: lastPlayedEpisode, playable: playable, direction: -1) { play(index) }
