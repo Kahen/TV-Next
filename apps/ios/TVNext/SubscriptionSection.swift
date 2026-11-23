@@ -19,6 +19,7 @@ struct SubscriptionSection: View {
     @State private var appliedFilters: [String:String]=[:]
     @State private var actionResult: NativeSubscriptionAction?
     @State private var detail: NativeMediaDetail?
+    @State private var searchTargetKey = NativeSearchTarget.all
     @State private var crossSiteResults: [NativeSearchHit<NativeMediaItem>] = []
     @State private var crossSiteFailures: [String] = []
     @State private var crossSiteFailedKeys: [String] = []
@@ -142,7 +143,7 @@ struct SubscriptionSection: View {
         run { api, id in
             let result: NativeSubscription = try await api.request("subscriptions/load", body: NativeSubscriptionRequest(content: inlineContent, url: targetURL))
             guard generation == id, !Task.isCancelled else { return }
-            document = result; page = nil; detail = nil; siteKey = "";filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;clearCrossSiteSearch()
+            document = result; searchTargetKey = NativeSearchTarget.all; page = nil; detail = nil; siteKey = "";filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;clearCrossSiteSearch()
             // URL is only saved after a successful, current-generation remote load.
             // Never save pasted configurations or a URL on a failed/canceled request.
             if shouldSaveURL && rememberURL && !NativeSubscriptionURLStore().save(targetURL) {
@@ -179,19 +180,20 @@ struct SubscriptionSection: View {
         guard !keyword.isEmpty else { return }
         let sources = document.sites.filter { $0.searchable && !$0.hidden && $0.supported && ($0.type != 3 || session != nil) }
             .map { NativeSearchSource(key: $0.key, name: $0.name) }
+        let scopedSources = NativeSearchTarget.resolve(sources, selectedKey: searchTargetKey)
         clearCrossSiteSearch(); page = nil; detail = nil
-        guard !sources.isEmpty else {
+        guard !scopedSources.isEmpty else {
             crossSiteWarnings = ["当前订阅没有可搜索的已授权站点。"]
             return
         }
         crossSiteSearchKeyword = keyword
-        let selected = NativeCrossSiteSearch.selectedSources(sources)
+        let selected = NativeCrossSiteSearch.selectedSources(scopedSources)
         crossSiteSourceOrder = selected.map(\.key)
         // Bind displayed provenance to the actual eligible providers, not
         // an earlier hidden/unsupported duplicate in the raw subscription.
         crossSiteSourceNames = NativeCrossSiteSearch.selectedSourceNames(selected)
         run { api, id in
-            let result = try await NativeCrossSiteSearch.search(sources: sources, concurrency: document.sites.contains { $0.type == 3 && $0.supported } ? 2 : 4, fetch: { source, number in
+            let result = try await NativeCrossSiteSearch.search(sources: scopedSources, concurrency: document.sites.contains { $0.type == 3 && $0.supported } ? 2 : 4, fetch: { source, number in
                 var r = NativeSiteRequest()
                 r.content = document.content; r.url = document.url
                 r.siteKey = source.key; r.query = keyword; r.page = number
@@ -319,6 +321,15 @@ struct SubscriptionSection: View {
                     .buttonStyle(.bordered).disabled(busy || !site.supported || (site.type == 3 && session == nil))
             } }
         }
+        let eligibleSearchSites = NativeSearchTarget.eligible(doc.sites.filter {
+            $0.searchable && !$0.hidden && $0.supported && ($0.type != 3 || session != nil)
+        }.map { NativeSearchSource(key: $0.key, name: $0.name) })
+        Picker("跨站搜索范围", selection: $searchTargetKey) {
+            Text("全部可用站点（最多 16 个）").tag(NativeSearchTarget.all)
+            ForEach(eligibleSearchSites, id: \.key) { source in
+                Text(source.name.isEmpty ? source.key : source.name + " · " + source.key).tag(source.key)
+            }
+        }.disabled(busy)
         HStack {
             TextField("搜索当前站点",text:$query).textFieldStyle(.roundedBorder)
             Button("搜索") { browse(siteKey,operation:"search") }.disabled(busy || siteKey.isEmpty || query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
