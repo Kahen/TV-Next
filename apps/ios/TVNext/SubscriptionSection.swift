@@ -11,6 +11,7 @@ struct SubscriptionSection: View {
     @State private var document: NativeSubscription?
     @State private var siteKey = ""
     @State private var query = ""
+    @State private var appliedSearchQuery: String?
     @State private var page: NativeMediaPage?
     @State private var mode = "home"
     @State private var category: String?
@@ -106,7 +107,7 @@ struct SubscriptionSection: View {
             }
         }
         .onDisappear { pending?.cancel(); actionResult = nil; clearCrossSiteSearch() }
-        .onChange(of:serverURL) { _,_ in pending?.cancel();generation=UUID();busy=false;document=nil;page=nil;detail=nil;actionResult=nil;filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;siteKey="";clearCrossSiteSearch() }
+        .onChange(of:serverURL) { _,_ in pending?.cancel();generation=UUID();busy=false;document=nil;page=nil;detail=nil;actionResult=nil;filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;siteKey="";appliedSearchQuery=nil;clearCrossSiteSearch() }
         .onChange(of:session?.token) { _,_ in pending?.cancel();generation=UUID();busy=false;actionResult=nil;clearCrossSiteSearch() }
     }
     private func run(_ operation: @escaping (TVNextAPI, UUID) async throws -> Void) {
@@ -142,7 +143,7 @@ struct SubscriptionSection: View {
         run { api, id in
             let result: NativeSubscription = try await api.request("subscriptions/load", body: NativeSubscriptionRequest(content: inlineContent, url: targetURL))
             guard generation == id, !Task.isCancelled else { return }
-            document = result; page = nil; detail = nil; siteKey = "";filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;clearCrossSiteSearch()
+            document = result; page = nil; detail = nil; siteKey = "";filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;appliedSearchQuery=nil;clearCrossSiteSearch()
             // URL is only saved after a successful, current-generation remote load.
             // Never save pasted configurations or a URL on a failed/canceled request.
             if shouldSaveURL && rememberURL && !NativeSubscriptionURLStore().save(targetURL) {
@@ -161,10 +162,15 @@ struct SubscriptionSection: View {
         let nextCategory=type ?? category
         let choices=operation != "category" ? [:] : selectedFilters ?? (same && nextCategory==category && mode=="category" ? appliedFilters : NativeSiteFilter.defaults((same ? filterCatalog:[:])[nextCategory ?? ""] ?? []))
         var r = request(key); r.page = number; r.categoryId = nextCategory;r.filters=choices;r.bypassCache=bypassCache
+        // Paging and refresh must use the submitted search, not later edits to the text field.
+        if operation == "search" {
+            r.query = NativeSearchQuerySnapshot.resolve(draft: query, committed: appliedSearchQuery, page: number, sameSite: same && mode == "search")
+        }
         run { api, id in
             let result: NativeMediaPage = try await api.request("subscriptions/" + operation, body: r)
             guard generation == id, !Task.isCancelled else { return }
             page = result; detail = nil; siteKey = key; mode = operation; category = operation=="home" ? nil:r.categoryId;clearCrossSiteSearch()
+            appliedSearchQuery = operation == "search" ? r.query : nil
             filterCatalog=same ? filterCatalog.merging(result.filters ?? [:],uniquingKeysWith:{ _,new in new }):result.filters ?? [:]
             appliedFilters=operation=="category" ? choices:[:]
             // Keep unsaved Picker edits local; paging uses only the last applied values.
@@ -321,7 +327,7 @@ struct SubscriptionSection: View {
         }
         HStack {
             TextField("搜索当前站点",text:$query).textFieldStyle(.roundedBorder)
-            Button("搜索") { browse(siteKey,operation:"search") }.disabled(busy || siteKey.isEmpty || query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            Button("搜索") { browse(siteKey,operation:"search",number:1) }.disabled(busy || siteKey.isEmpty || query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             Button("跨站搜索") { searchAll() }.disabled(busy || query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
     }
