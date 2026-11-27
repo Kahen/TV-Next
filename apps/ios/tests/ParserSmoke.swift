@@ -39,6 +39,17 @@ struct ParserSmoke {
             // Expected.
         }
 
+        // A leading UTF-8 BOM must not hide playlist-wide catchup defaults.
+        let bomPlaylist = "\u{FEFF}#EXTM3U catchup=\"append\" catchup-source=\"https://example.org/replay/{start}\"\n#EXTINF:-1,News\nhttps://example.org/live.m3u8"
+        let bomChannels = try M3UParser.parse(bomPlaylist)
+        precondition(bomChannels.count == 1)
+        precondition(bomChannels[0].name == "News")
+        precondition(bomChannels[0].catchup?.source == "https://example.org/replay/{start}")
+        // An embedded BOM is not a valid URL prefix and must not be silently removed.
+        let embeddedBOM = "#EXTM3U\n#EXTINF:-1,Invalid\n\u{FEFF}https://example.org/live.m3u8"
+        let embeddedChannels = try M3UParser.parse(embeddedBOM)
+        precondition(embeddedChannels.isEmpty)
+
         let exported = M3UEncoder.serialize(channels)
         precondition(exported.hasPrefix("#EXTM3U\n"))
         let roundTrip = try M3UParser.parse(exported)
