@@ -38,24 +38,27 @@ enum CaptionParser {
         pattern: #"^(\d{2,3}:\d{2}:\d{2}[.,]\d{3}|\d{2}:\d{2}[.,]\d{3})\s+-->\s+(\d{2,3}:\d{2}:\d{2}[.,]\d{3}|\d{2}:\d{2}[.,]\d{3})(?:\s+.*)?$"#
     )
     private static let tags = try! NSRegularExpression(pattern: #"<[^>]*>"#)
-    private static let numericEntity = try! NSRegularExpression(pattern: #"&#(x[0-9a-fA-F]{1,6}|[0-9]{1,7});"#)
+    private static let numericEntity = try! NSRegularExpression(pattern: #"&#([xX][0-9a-fA-F]{1,6}|[0-9]{1,7});"#)
 
-    /// Decode numeric subtitle entities without interpreting markup or loading URLs.
-    /// Invalid scalars and control characters remain literal.
+    /// Decode numeric references in one pass. Keep invalid references literal.
     private static func decodeNumericEntities(_ input: String) -> String {
-        var output = input
-        let matches = numericEntity.matches(in: input, range: NSRange(input.startIndex..<input.endIndex, in: input))
-        for match in matches.reversed() {
-            guard let digits = Range(match.range(at: 1), in: input),
-                  let full = Range(match.range, in: output) else { continue }
-            let token = String(input[digits])
-            let isHex = token.hasPrefix("x")
+        let source = input as NSString
+        var result = ""
+        var cursor = 0
+        let fullRange = NSRange(location: 0, length: source.length)
+        numericEntity.enumerateMatches(in: input, range: fullRange) { match, _, _ in
+            guard let match else { return }
+            let token = source.substring(with: match.range(at: 1))
+            let isHex = token.hasPrefix("x") || token.hasPrefix("X")
             guard let value = UInt32(isHex ? String(token.dropFirst()) : token, radix: isHex ? 16 : 10),
                   let scalar = Unicode.Scalar(value),
-                  !CharacterSet.controlCharacters.contains(scalar) else { continue }
-            output.replaceSubrange(full, with: String(scalar))
+                  !CharacterSet.controlCharacters.contains(scalar) else { return }
+            result += source.substring(with: NSRange(location: cursor, length: match.range.location - cursor))
+            result.unicodeScalars.append(scalar)
+            cursor = NSMaxRange(match.range)
         }
-        return output
+        result += source.substring(from: cursor)
+        return result
     }
 
     static func parse(_ data: Data, encoding: CaptionTextEncoding = .unicode) throws -> [CaptionCue] {
@@ -118,11 +121,19 @@ enum CaptionParser {
         var result: [CaptionCue] = []
         let blocks = input.components(separatedBy: "\n\n")
         for block in blocks.prefix(12_000) {
-            let lines = block.split(separator: "\n", omittingEmptySubsequences: true)
+            var lines = block.split(separator: "\n", omittingEmptySubsequences: true)
                 .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
             guard !lines.isEmpty else { continue }
-            if lines[0].hasPrefix("WEBVTT") || lines[0].hasPrefix("NOTE") ||
-                lines[0] == "STYLE" || lines[0] == "REGION" { continue }
+            // Some exported WebVTT files omit the blank line after WEBVTT.
+            // Keep the cue that follows the header in the same block, while
+            // still ignoring a header-only block and metadata-only blocks.
+            if lines[0] == "WEBVTT" || lines[0].hasPrefix("WEBVTT ") ||
+                lines[0].hasPrefix("WEBVTT\t") {
+                lines.removeFirst()
+                guard !lines.isEmpty else { continue }
+            }
+            if lines[0].hasPrefix("NOTE") || lines[0] == "STYLE" ||
+                lines[0] == "REGION" { continue }
             let timingIndex = lines.firstIndex(where: { $0.contains("-->") })
             guard let index = timingIndex, index <= 1, lines.count > index + 1 else { continue }
 
