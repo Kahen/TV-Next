@@ -398,6 +398,18 @@ struct SubscriptionSection: View {
             Toggle("播放结束自动下一集", isOn: $autoAdvance)
                 .accessibilityIdentifier("subscription-auto-next")
             HStack {
+                Button("从本线路第一集播放") {
+                    if let index = NativeEpisodeNavigation.firstPlayable(playable) { play(index) }
+                }
+                .disabled(busy || NativeEpisodeNavigation.firstPlayable(playable) == nil)
+                .accessibilityIdentifier("restart-subscription-line")
+                Button("重播当前集") {
+                    if let index = NativeEpisodeNavigation.replayIndex(lastPlayedEpisode, playable: playable) { play(index) }
+                }
+                .disabled(busy || NativeEpisodeNavigation.replayIndex(lastPlayedEpisode, playable: playable) == nil)
+                .accessibilityIdentifier("replay-subscription-episode")
+            }
+            HStack {
                 Button("上一集") {
                     if let index = NativeEpisodeNavigation.adjacent(to: lastPlayedEpisode, playable: playable, direction: -1) { play(index) }
                 }
