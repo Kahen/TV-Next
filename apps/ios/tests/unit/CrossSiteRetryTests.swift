@@ -49,11 +49,11 @@ final class CrossSiteRetryTests: XCTestCase {
             fetch: { _, _ in throw NSError(domain: "fixture", code: 1) },
             identity: { (item: Item) in item.id }
         )
-        XCTAssertEqual(result.failedKeys, sources.map(\\.key))
+        XCTAssertEqual(result.failedKeys, sources.map(\.key))
         XCTAssertEqual(result.failed, ["short-key", "unicode-key", allowed, unicodeAllowed])
         XCTAssertEqual(NativeCrossSiteSearch.failedOnlySources(
-            sources, failedKeys: result.failedKeys, searchedKeys: sources.map(\\.key)
-        ).map(\\.key), sources.map(\\.key))
+            sources, failedKeys: result.failedKeys, searchedKeys: sources.map(\.key)
+        ).map(\.key), sources.map(\.key))
     }
 
     private struct Item {
