@@ -23,6 +23,7 @@ struct SubscriptionSection: View {
     @State private var actionResult: NativeSubscriptionAction?
     @State private var detail: NativeMediaDetail?
     @State private var crossSiteResults: [NativeSearchHit<NativeMediaItem>] = []
+    @State private var crossSiteResultQuery = ""
     @State private var crossSiteFailures: [String] = []
     @State private var crossSiteFailedKeys: [String] = []
     @State private var crossSiteSearchKeyword: String?
@@ -94,8 +95,13 @@ struct SubscriptionSection: View {
                 if !crossSiteResults.isEmpty {
                     LazyVStack(alignment: .leading) {
                         Text("跨站搜索结果").font(.headline)
-                        ForEach(crossSiteResults.indices, id: \.self) { index in
-                            let hit = crossSiteResults[index]
+                        TextField("筛选已加载的跨站结果", text: $crossSiteResultQuery)
+                            .textFieldStyle(.roundedBorder)
+                            .accessibilityIdentifier("cross-site-result-filter")
+                        Text("显示 \(filteredCrossSiteResults.count) / \(crossSiteResults.count) 条")
+                            .font(.caption).foregroundStyle(.secondary)
+                        ForEach(filteredCrossSiteResults.indices, id: \.self) { index in
+                            let hit = filteredCrossSiteResults[index]
                             Button(hit.item.name + " · " + (crossSiteSourceNames[hit.siteKey] ?? hit.siteKey)) {
                                 inspect(hit.item, from: hit.siteKey)
                             }.disabled(busy).padding(.vertical, 4)
@@ -137,7 +143,11 @@ struct SubscriptionSection: View {
             if generation == id { busy = false }
         }
     }
+    private var filteredCrossSiteResults: [NativeSearchHit<NativeMediaItem>] {
+        NativeCrossSiteResultFilter.apply(crossSiteResults, query: crossSiteResultQuery, names: crossSiteSourceNames)
+    }
     private func clearCrossSiteSearch() {
+        crossSiteResultQuery = ""
         crossSiteResults = []; crossSiteFailures = []; crossSiteFailedKeys = []
         crossSiteSearchKeyword = nil; crossSiteSourceOrder = []; crossSiteSourceNames = [:]; crossSiteWarnings = []; crossSiteWarningState = .empty; crossSiteCompleted = false
     }
@@ -192,8 +202,10 @@ struct SubscriptionSection: View {
     }
     private func searchAll() {
         guard let document else { return }
-        let keyword = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !keyword.isEmpty else { return }
+        guard let keyword = NativeFongMiSearchInput.validated(query) else {
+            error = "搜索词不能为空、包含控制字符或超过 256 个字符。"
+            return
+        }
         let sources = document.sites.filter { $0.searchable && !$0.hidden && $0.supported && ($0.type != 3 || session != nil) }
             .map { NativeSearchSource(key: $0.key, name: $0.name) }
         clearCrossSiteSearch(); page = nil; detail = nil
@@ -340,8 +352,8 @@ struct SubscriptionSection: View {
         }
         HStack {
             TextField("搜索当前站点",text:$query).textFieldStyle(.roundedBorder)
-            Button("搜索") { browse(siteKey,operation:"search") }.disabled(busy || siteKey.isEmpty || query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            Button("跨站搜索") { searchAll() }.disabled(busy || query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            Button("搜索") { browse(siteKey,operation:"search") }.disabled(busy || siteKey.isEmpty || NativeFongMiSearchInput.validated(query) == nil)
+            Button("跨站搜索") { searchAll() }.disabled(busy || NativeFongMiSearchInput.validated(query) == nil)
         }
     }
     @ViewBuilder private func pageView(_ page: NativeMediaPage) -> some View {
@@ -414,6 +426,19 @@ struct SubscriptionSection: View {
                 let episode = detail.lines[line].episodes[i]
                 Button(episode.name) { play(i) }.disabled(busy || !episode.playable)
             }
+        }
+    }
+}
+
+
+/// Local-only view filtering. Provider keys and original hit identity are unchanged.
+enum NativeCrossSiteResultFilter {
+    static func apply(_ hits: [NativeSearchHit<NativeMediaItem>], query: String, names: [String: String]) -> [NativeSearchHit<NativeMediaItem>] {
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !needle.isEmpty else { return hits }
+        return hits.filter { hit in
+            hit.item.name.localizedStandardContains(needle) ||
+            (names[hit.siteKey] ?? hit.siteKey).localizedStandardContains(needle)
         }
     }
 }
