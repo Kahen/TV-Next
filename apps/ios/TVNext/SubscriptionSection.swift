@@ -14,6 +14,7 @@ struct SubscriptionSection: View {
     @State private var document: NativeSubscription?
     @State private var siteKey = ""
     @State private var query = ""
+    @State private var appliedSearchQuery: String?
     @State private var page: NativeMediaPage?
     @State private var mode = "home"
     @State private var category: String?
@@ -130,7 +131,7 @@ struct SubscriptionSection: View {
             }
         }
         .onDisappear { pending?.cancel(); ownedPlayerItem = nil; actionResult = nil; clearCrossSiteSearch() }
-        .onChange(of:serverURL) { _,_ in pending?.cancel();generation=UUID();busy=false;ownedPlayerItem=nil;lastPlayedEpisode=nil;document=nil;page=nil;detail=nil;lastPlayedEpisode=nil;actionResult=nil;filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;siteKey="";clearCrossSiteSearch() }
+        .onChange(of:serverURL) { _,_ in pending?.cancel();generation=UUID();busy=false;ownedPlayerItem=nil;lastPlayedEpisode=nil;document=nil;page=nil;detail=nil;lastPlayedEpisode=nil;actionResult=nil;filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;siteKey="";appliedSearchQuery=nil;clearCrossSiteSearch() }
         .onChange(of:session?.token) { _,_ in pending?.cancel();generation=UUID();busy=false;ownedPlayerItem=nil;lastPlayedEpisode=nil;actionResult=nil;clearCrossSiteSearch() }
     }
     private func run(_ operation: @escaping (TVNextAPI, UUID) async throws -> Void) {
@@ -170,7 +171,7 @@ struct SubscriptionSection: View {
         run { api, id in
             let result: NativeSubscription = try await api.request("subscriptions/load", body: NativeSubscriptionRequest(content: inlineContent, url: targetURL))
             guard generation == id, !Task.isCancelled else { return }
-            document = result; page = nil; detail = nil; lastPlayedEpisode = nil; ownedPlayerItem = nil; siteKey = "";filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;clearCrossSiteSearch()
+            document = result; page = nil; detail = nil; lastPlayedEpisode = nil; ownedPlayerItem = nil; siteKey = "";filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;appliedSearchQuery=nil;clearCrossSiteSearch()
             // URL is only saved after a successful, current-generation remote load.
             // Never save pasted configurations or a URL on a failed/canceled request.
             if shouldSaveURL && rememberURL && !NativeSubscriptionURLStore().save(targetURL) {
@@ -183,16 +184,23 @@ struct SubscriptionSection: View {
         r.siteKey = key ?? siteKey; r.categoryId = category; r.query = query;r.filters=appliedFilters
         return r
     }
-    private func browse(_ key: String, operation: String = "home", number: Int = 1, type: String? = nil, selectedFilters: [String:String]? = nil,bypassCache: Bool=false) {
+    private func browse(_ key: String, operation: String = "home", number: Int = 1, type: String? = nil, selectedFilters: [String:String]? = nil,bypassCache: Bool=false,reuseSearchQuery: Bool=false) {
         let same=key==siteKey
         let wasSameCategory = same && (type ?? category)==category && mode=="category"
         let nextCategory=type ?? category
         let choices=operation != "category" ? [:] : selectedFilters ?? (same && nextCategory==category && mode=="category" ? appliedFilters : NativeSiteFilter.defaults((same ? filterCatalog:[:])[nextCategory ?? ""] ?? []))
         var r = request(key); r.page = number; r.categoryId = nextCategory;r.filters=choices;r.bypassCache=bypassCache
+        // Paging and refresh must use the submitted search, not later edits to the text field.
+        if operation == "search" {
+            let snapshot = NativeSearchQuerySnapshot.resolve(draft: query, committed: appliedSearchQuery, reuseCommitted: reuseSearchQuery && same && mode == "search")
+            guard let keyword = NativeFongMiSearchInput.validated(snapshot) else { return }
+            r.query = keyword
+        }
         run { api, id in
             let result: NativeMediaPage = try await api.request("subscriptions/" + operation, body: r)
             guard generation == id, !Task.isCancelled else { return }
             page = result; pageJump = String(result.page); detail = nil; ownedPlayerItem = nil; siteKey = key; mode = operation; category = operation=="home" ? nil:r.categoryId;clearCrossSiteSearch()
+            appliedSearchQuery = operation == "search" ? r.query : nil
             filterCatalog=same ? filterCatalog.merging(result.filters ?? [:],uniquingKeysWith:{ _,new in new }):result.filters ?? [:]
             appliedFilters=operation=="category" ? choices:[:]
             // Keep unsaved Picker edits local; paging uses only the last applied values.
@@ -353,7 +361,7 @@ struct SubscriptionSection: View {
         }
         HStack {
             TextField("搜索当前站点",text:$query).textFieldStyle(.roundedBorder)
-            Button("搜索") { browse(siteKey,operation:"search") }.disabled(busy || siteKey.isEmpty || NativeFongMiSearchInput.validated(query) == nil)
+            Button("搜索") { browse(siteKey,operation:"search",number:1) }.disabled(busy || siteKey.isEmpty || NativeFongMiSearchInput.validated(query) == nil)
             Button("跨站搜索") { searchAll() }.disabled(busy || NativeFongMiSearchInput.validated(query) == nil)
         }
     }
@@ -381,12 +389,12 @@ struct SubscriptionSection: View {
         LazyVStack(alignment: .leading) { ForEach(page.items) { item in
             Button(item.name + (item.remarks.map { " · " + $0 } ?? "")) { inspect(item) }.disabled(busy).padding(.vertical,5)
         } }
-        if mode=="search",session != nil { Button("刷新搜索结果") { browse(siteKey,operation:"search",number:page.page,bypassCache:true) }.disabled(busy) }
+        if mode=="search",session != nil { Button("刷新搜索结果") { browse(siteKey,operation:"search",number:page.page,bypassCache:true,reuseSearchQuery:true) }.disabled(busy) }
         pageJumpView(page)
         HStack {
-            Button("上一页") { browse(siteKey,operation:mode,number:page.page-1) }.disabled(busy || page.page <= 1)
+            Button("上一页") { browse(siteKey,operation:mode,number:page.page-1,reuseSearchQuery:true) }.disabled(busy || page.page <= 1)
             Spacer(); Text("第 \(page.page) 页").font(.caption); Spacer()
-            Button("下一页") { browse(siteKey,operation:mode,number:page.page+1) }.disabled(busy || !page.hasMore || page.page >= NativeFongMiPageJump.maximumPage)
+            Button("下一页") { browse(siteKey,operation:mode,number:page.page+1,reuseSearchQuery:true) }.disabled(busy || !page.hasMore || page.page >= NativeFongMiPageJump.maximumPage)
         }
     }
     @ViewBuilder private func pageJumpView(_ page: NativeMediaPage) -> some View {
@@ -397,7 +405,7 @@ struct SubscriptionSection: View {
                 .accessibilityIdentifier("fongmi-page-jump-input")
             Button("跳转") {
                 guard let target = NativeFongMiPageJump.parse(pageJump), target != page.page else { return }
-                browse(siteKey, operation: mode, number: target)
+                browse(siteKey, operation: mode, number: target, reuseSearchQuery: true)
             }
             .disabled(busy || NativeFongMiPageJump.parse(pageJump) == nil || NativeFongMiPageJump.parse(pageJump) == page.page)
             .accessibilityIdentifier("fongmi-page-jump-submit")
