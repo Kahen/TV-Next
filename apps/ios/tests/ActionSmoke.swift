@@ -50,6 +50,33 @@ import Foundation
             precondition(result.message == item.message, "Message mismatch: \(item.name)")
             precondition((result.unsupported || result.limitedBrowserFeatures) == item.warning, "Warning mismatch: \(item.name)")
         }
+        // Providers also emit a bare web URL instead of a nested object.
+        let compact = try JSONDecoder().decode(
+            NativeSubscriptionAction.self,
+            from: Data(#"{"msg":"请登录","web":"https://login.example.org/verify?state=abc"}"#.utf8)
+        )
+        precondition(compact.link?.absoluteString == "https://login.example.org/verify?state=abc")
+        precondition(compact.message == "请登录")
+        precondition(!compact.unsupported && !compact.limitedBrowserFeatures)
+
+        // The compact form must obey the same navigation and credential policy.
+        for forbidden in [
+            #"{"web":"javascript:alert(1)"}"#,
+            #"{"web":"https://user:password@example.org/"}"#,
+            #"{"web":"https://example.org/\\\\evil"}"#,
+            #"{"web":"https://example.org/\\nother"}"#,
+            #"{"web":""}"#
+        ] {
+            let action = try JSONDecoder().decode(
+                NativeSubscriptionAction.self, from: Data(forbidden.utf8)
+            )
+            precondition(action.link == nil && action.unsupported, "Unsafe compact action accepted")
+        }
+        let object = try JSONDecoder().decode(
+            NativeSubscriptionAction.self,
+            from: Data(#"{"web":{"url":"https://login.example.org/verify","mode":"view"}}"#.utf8)
+        )
+        precondition(object.link != nil && object.limitedBrowserFeatures)
         print("Native/Web FongMi action web contract passed")
     }
 }
