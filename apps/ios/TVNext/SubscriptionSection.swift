@@ -333,13 +333,19 @@ struct SubscriptionSection: View {
         }
     }
     private func play(_ index: Int) {
-        guard let detail else { return }
-        var r = request(); r.vodId = detail.item.id; r.lineIndex = line; r.episodeIndex = index
+        guard let detail, detail.lines.indices.contains(line),
+              detail.lines[line].episodes.indices.contains(index),
+              detail.lines[line].episodes[index].playable else { return }
+        let selectedLine = line
+        let selectedEpisode = detail.lines[selectedLine].episodes[index]
+        let playbackTitle = NativeFongMiEpisodeTitle.compose(
+            series: detail.item.name, episode: selectedEpisode.name)
+        var r = request(); r.vodId = detail.item.id; r.lineIndex = selectedLine; r.episodeIndex = index
         run { api, id in
             let result: NativeMediaPlayback = try await api.request("subscriptions/play",body:r)
-            guard generation == id, !Task.isCancelled else { return }
+            guard generation == id, !Task.isCancelled, line == selectedLine else { return }
             lastPlayedEpisode = index
-            onPlay(result, detail.item.name)
+            onPlay(result, playbackTitle)
             ownedPlayerItem = activePlayerItem()
         }
     }
