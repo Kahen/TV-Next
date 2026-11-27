@@ -73,6 +73,25 @@ struct ParserSmoke {
         precondition(grouped[2].group == "Explicit", "Explicit group-title must override EXTGRP")
         precondition(grouped[3].group == "Uncategorized", "Invalid media line must clear pending group")
 
+        // Some authorized IPTV exports use single-quoted EXTINF metadata.
+        // A comma inside either quote style must not become the channel title.
+        let quoted = try M3UParser.parse("""
+        #EXTM3U
+        #EXTINF:-1 group-title='Sports, HD' tvg-id='station-1' tvg-logo='https://example.org/logo.png',Match One
+        https://example.org/one.m3u8
+        #EXTINF:-1 group-title="News, Live" tvg-name='Fallback Station'
+        https://example.org/two.m3u8
+        #EXTINF:-1 group-title='Invalid',Bad
+        javascript:alert(1)
+        """)
+        precondition(quoted.count == 2)
+        precondition(quoted[0].name == "Match One")
+        precondition(quoted[0].group == "Sports, HD")
+        precondition(quoted[0].tvgId == "station-1")
+        precondition(quoted[0].logo == "https://example.org/logo.png")
+        precondition(quoted[1].name == "Fallback Station")
+        precondition(quoted[1].group == "News, Live")
+
         let exported = M3UEncoder.serialize(channels)
         precondition(exported.hasPrefix("#EXTM3U\n"))
         let roundTrip = try M3UParser.parse(exported)
