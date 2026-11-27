@@ -343,6 +343,16 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertNil(state.target(markers: markers, current: .nan, duration: 1200, playing: true))
     }
 
+    func testRemotePlaybackRateMatchesAdvertisedOptions() {
+        XCTAssertEqual(NativePlaybackCommand.supportedRemoteRates, [0.75, 1, 1.25, 1.5, 2])
+        for rate in NativePlaybackCommand.supportedRemoteRates {
+            XCTAssertTrue(NativePlaybackCommand.acceptsRemoteRate(rate))
+        }
+        for rate in [Float(0), -1, 0.5, 1.1, 1.75, 2.01, .nan, .infinity, -.infinity] {
+            XCTAssertFalse(NativePlaybackCommand.acceptsRemoteRate(rate))
+        }
+    }
+
     func testBoundedSkipTargetRejectsInvalidAndClampsBothDirections() {
         XCTAssertEqual(NativePlaybackCommand.boundedSkipTarget(current: 1, interval: -15, duration: 3), 0)
         XCTAssertEqual(NativePlaybackCommand.boundedSkipTarget(current: 1, interval: 15, duration: 3), 3)

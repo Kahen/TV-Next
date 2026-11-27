@@ -14,6 +14,7 @@ struct SubscriptionSection: View {
     @State private var document: NativeSubscription?
     @State private var siteKey = ""
     @State private var query = ""
+    @State private var appliedSearchQuery: String?
     @State private var page: NativeMediaPage?
     @State private var mode = "home"
     @State private var category: String?
@@ -23,6 +24,7 @@ struct SubscriptionSection: View {
     @State private var actionResult: NativeSubscriptionAction?
     @State private var retryAction: NativeActionRetryContext?
     @State private var detail: NativeMediaDetail?
+    @State private var searchTargetKey = NativeSearchTarget.all
     @State private var crossSiteResults: [NativeSearchHit<NativeMediaItem>] = []
     @State private var crossSiteResultQuery = ""
     @State private var crossSiteFailures: [String] = []
@@ -33,10 +35,13 @@ struct SubscriptionSection: View {
     @State private var crossSiteWarnings: [String] = []
     @State private var crossSiteWarningState = NativeSearchWarningState.empty
     @State private var crossSiteCompleted = false
+    @State private var pageJump = ""
+    @State private var crossSiteSelectedProvider = ""
     @State private var line = 0
     @State private var lastPlayedEpisode: Int?
     @State private var autoAdvance = false
     @State private var ownedPlayerItem: AVPlayerItem?
+    @State private var episodeQuery = ""
     @State private var error: String?
     @State private var busy = false
     @State private var pending: Task<Void,Never>?
@@ -99,10 +104,19 @@ struct SubscriptionSection: View {
                         TextField("筛选已加载的跨站结果", text: $crossSiteResultQuery)
                             .textFieldStyle(.roundedBorder)
                             .accessibilityIdentifier("cross-site-result-filter")
-                        Text("显示 \(filteredCrossSiteResults.count) / \(crossSiteResults.count) 条")
-                            .font(.caption).foregroundStyle(.secondary)
-                        ForEach(filteredCrossSiteResults.indices, id: \.self) { index in
-                            let hit = filteredCrossSiteResults[index]
+                        Picker("结果站点", selection: $crossSiteSelectedProvider) {
+                            Text("全部站点").tag("")
+                            ForEach(crossSiteSourceOrder, id: \.self) { key in
+                                Text((crossSiteSourceNames[key] ?? key) + " · " + key).tag(key)
+                            }
+                        }.accessibilityIdentifier("cross-site-provider-filter")
+                        let visibleHits = NativeCrossSiteResultFilter.visible(
+                            filteredCrossSiteResults, selectedKey: crossSiteSelectedProvider,
+                            searchedKeys: crossSiteSourceOrder
+                        )
+                        Text("显示 \(visibleHits.count) / \(crossSiteResults.count) 条").font(.caption).foregroundStyle(.secondary)
+                        ForEach(visibleHits.indices, id: \.self) { index in
+                            let hit = visibleHits[index]
                             Button(hit.item.name + " · " + (crossSiteSourceNames[hit.siteKey] ?? hit.siteKey)) {
                                 inspect(hit.item, from: hit.siteKey)
                             }.disabled(busy).padding(.vertical, 4)
@@ -130,7 +144,7 @@ struct SubscriptionSection: View {
             }
         }
         .onDisappear { pending?.cancel(); ownedPlayerItem = nil; actionResult = nil; retryAction = nil; clearCrossSiteSearch() }
-        .onChange(of:serverURL) { _,_ in pending?.cancel();generation=UUID();busy=false;ownedPlayerItem=nil;lastPlayedEpisode=nil;document=nil;page=nil;detail=nil;actionResult=nil;retryAction=nil;filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;siteKey="";clearCrossSiteSearch() }
+        .onChange(of:serverURL) { _,_ in pending?.cancel();generation=UUID();busy=false;ownedPlayerItem=nil;lastPlayedEpisode=nil;document=nil;page=nil;detail=nil;lastPlayedEpisode=nil;actionResult=nil;retryAction=nil;filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;siteKey="";searchTargetKey=NativeSearchTarget.all;appliedSearchQuery=nil;clearCrossSiteSearch() }
         .onChange(of:session?.token) { _,_ in pending?.cancel();generation=UUID();busy=false;ownedPlayerItem=nil;lastPlayedEpisode=nil;actionResult=nil;retryAction=nil;clearCrossSiteSearch() }
     }
     private func run(_ operation: @escaping (TVNextAPI, UUID) async throws -> Void) {
@@ -150,7 +164,7 @@ struct SubscriptionSection: View {
     private func clearCrossSiteSearch() {
         crossSiteResultQuery = ""
         crossSiteResults = []; crossSiteFailures = []; crossSiteFailedKeys = []
-        crossSiteSearchKeyword = nil; crossSiteSourceOrder = []; crossSiteSourceNames = [:]; crossSiteWarnings = []; crossSiteWarningState = .empty; crossSiteCompleted = false
+        crossSiteSelectedProvider = ""; crossSiteSearchKeyword = nil; crossSiteSourceOrder = []; crossSiteSourceNames = [:]; crossSiteWarnings = []; crossSiteWarningState = .empty; crossSiteCompleted = false
     }
     private func switchDetailSite(_ key: String) {
         var scope = NativeSiteBrowsingContext(
@@ -170,7 +184,7 @@ struct SubscriptionSection: View {
         run { api, id in
             let result: NativeSubscription = try await api.request("subscriptions/load", body: NativeSubscriptionRequest(content: inlineContent, url: targetURL))
             guard generation == id, !Task.isCancelled else { return }
-            document = result; page = nil; detail = nil; actionResult = nil; retryAction = nil; lastPlayedEpisode = nil; ownedPlayerItem = nil; siteKey = "";filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;clearCrossSiteSearch()
+            document = result; searchTargetKey = NativeSearchTarget.all; page = nil; detail = nil; actionResult = nil; retryAction = nil; lastPlayedEpisode = nil; ownedPlayerItem = nil; siteKey = "";filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;appliedSearchQuery=nil;clearCrossSiteSearch()
             // URL is only saved after a successful, current-generation remote load.
             // Never save pasted configurations or a URL on a failed/canceled request.
             if shouldSaveURL && rememberURL && !NativeSubscriptionURLStore().save(targetURL) {
@@ -183,16 +197,23 @@ struct SubscriptionSection: View {
         r.siteKey = key ?? siteKey; r.categoryId = category; r.query = query;r.filters=appliedFilters
         return r
     }
-    private func browse(_ key: String, operation: String = "home", number: Int = 1, type: String? = nil, selectedFilters: [String:String]? = nil,bypassCache: Bool=false) {
+    private func browse(_ key: String, operation: String = "home", number: Int = 1, type: String? = nil, selectedFilters: [String:String]? = nil,bypassCache: Bool=false,reuseSearchQuery: Bool=false) {
         let same=key==siteKey
         let wasSameCategory = same && (type ?? category)==category && mode=="category"
         let nextCategory=type ?? category
         let choices=operation != "category" ? [:] : selectedFilters ?? (same && nextCategory==category && mode=="category" ? appliedFilters : NativeSiteFilter.defaults((same ? filterCatalog:[:])[nextCategory ?? ""] ?? []))
         var r = request(key); r.page = number; r.categoryId = nextCategory;r.filters=choices;r.bypassCache=bypassCache
+        // Paging and refresh must use the submitted search, not later edits to the text field.
+        if operation == "search" {
+            let snapshot = NativeSearchQuerySnapshot.resolve(draft: query, committed: appliedSearchQuery, reuseCommitted: reuseSearchQuery && same && mode == "search")
+            guard let keyword = NativeFongMiSearchInput.validated(snapshot) else { return }
+            r.query = keyword
+        }
         run { api, id in
             let result: NativeMediaPage = try await api.request("subscriptions/" + operation, body: r)
             guard generation == id, !Task.isCancelled else { return }
-            page = result; detail = nil; actionResult = nil; retryAction = nil; ownedPlayerItem = nil; siteKey = key; mode = operation; category = operation=="home" ? nil:r.categoryId;clearCrossSiteSearch()
+            page = result; pageJump = String(result.page); detail = nil; actionResult = nil; retryAction = nil; ownedPlayerItem = nil; siteKey = key; mode = operation; category = operation=="home" ? nil:r.categoryId;clearCrossSiteSearch()
+            appliedSearchQuery = operation == "search" ? r.query : nil
             filterCatalog=same ? filterCatalog.merging(result.filters ?? [:],uniquingKeysWith:{ _,new in new }):result.filters ?? [:]
             appliedFilters=operation=="category" ? choices:[:]
             // Keep unsaved Picker edits local; paging uses only the last applied values.
@@ -209,19 +230,20 @@ struct SubscriptionSection: View {
         }
         let sources = document.sites.filter { $0.searchable && !$0.hidden && $0.supported && ($0.type != 3 || session != nil) }
             .map { NativeSearchSource(key: $0.key, name: $0.name) }
+        let scopedSources = NativeSearchTarget.resolve(sources, selectedKey: searchTargetKey)
         clearCrossSiteSearch(); page = nil; detail = nil
-        guard !sources.isEmpty else {
+        guard !scopedSources.isEmpty else {
             crossSiteWarnings = ["当前订阅没有可搜索的已授权站点。"]
             return
         }
         crossSiteSearchKeyword = keyword
-        let selected = NativeCrossSiteSearch.selectedSources(sources)
+        let selected = NativeCrossSiteSearch.selectedSources(scopedSources)
         crossSiteSourceOrder = selected.map(\.key)
         // Bind displayed provenance to the actual eligible providers, not
         // an earlier hidden/unsupported duplicate in the raw subscription.
         crossSiteSourceNames = NativeCrossSiteSearch.selectedSourceNames(selected)
         run { api, id in
-            let result = try await NativeCrossSiteSearch.search(sources: sources, concurrency: document.sites.contains { $0.type == 3 && $0.supported } ? 2 : 4, fetch: { source, number in
+            let result = try await NativeCrossSiteSearch.search(sources: scopedSources, concurrency: document.sites.contains { $0.type == 3 && $0.supported } ? 2 : 4, fetch: { source, number in
                 var r = NativeSiteRequest()
                 r.content = document.content; r.url = document.url
                 r.siteKey = source.key; r.query = keyword; r.page = number
@@ -302,7 +324,7 @@ struct SubscriptionSection: View {
             let result: NativeMediaDetail = try await api.request("subscriptions/detail",body:r)
             guard generation == id, !Task.isCancelled else { return }
             switchDetailSite(targetKey)
-            detail = result; line = 0; lastPlayedEpisode = nil; ownedPlayerItem = nil
+            detail = result; line = 0; lastPlayedEpisode = nil; ownedPlayerItem = nil; episodeQuery = ""
             retryAction = nil
             actionResult = nil
         }
@@ -334,13 +356,19 @@ struct SubscriptionSection: View {
         performAction(site: context.siteKey, action: context.action)
     }
     private func play(_ index: Int) {
-        guard let detail else { return }
-        var r = request(); r.vodId = detail.item.id; r.lineIndex = line; r.episodeIndex = index
+        guard let detail, detail.lines.indices.contains(line),
+              detail.lines[line].episodes.indices.contains(index),
+              detail.lines[line].episodes[index].playable else { return }
+        let selectedLine = line
+        let selectedEpisode = detail.lines[selectedLine].episodes[index]
+        let playbackTitle = NativeFongMiEpisodeTitle.compose(
+            series: detail.item.name, episode: selectedEpisode.name)
+        var r = request(); r.vodId = detail.item.id; r.lineIndex = selectedLine; r.episodeIndex = index
         run { api, id in
             let result: NativeMediaPlayback = try await api.request("subscriptions/play",body:r)
-            guard generation == id, !Task.isCancelled else { return }
+            guard generation == id, !Task.isCancelled, line == selectedLine else { return }
             lastPlayedEpisode = index
-            onPlay(result, detail.item.name)
+            onPlay(result, playbackTitle)
             ownedPlayerItem = activePlayerItem()
         }
     }
@@ -380,9 +408,19 @@ struct SubscriptionSection: View {
                     .buttonStyle(.bordered).disabled(busy || !site.supported || (site.type == 3 && session == nil))
             } }
         }
+        let eligibleSearchSites = NativeSearchTarget.eligible(doc.sites.filter {
+            $0.searchable && !$0.hidden && $0.supported && ($0.type != 3 || session != nil)
+        }.map { NativeSearchSource(key: $0.key, name: $0.name) })
+        Picker("跨站搜索范围", selection: $searchTargetKey) {
+            Text("全部可用站点（最多 16 个）").tag(NativeSearchTarget.all)
+            ForEach(eligibleSearchSites, id: \.key) { source in
+                let label = NativeCrossSiteSearch.displayName(source)
+                Text(label == source.key ? label : label + " · " + source.key).tag(source.key)
+            }
+        }.disabled(busy)
         HStack {
             TextField("搜索当前站点",text:$query).textFieldStyle(.roundedBorder)
-            Button("搜索") { browse(siteKey,operation:"search") }.disabled(busy || siteKey.isEmpty || NativeFongMiSearchInput.validated(query) == nil)
+            Button("搜索") { browse(siteKey,operation:"search",number:1) }.disabled(busy || siteKey.isEmpty || NativeFongMiSearchInput.validated(query) == nil)
             Button("跨站搜索") { searchAll() }.disabled(busy || NativeFongMiSearchInput.validated(query) == nil)
         }
     }
@@ -410,23 +448,50 @@ struct SubscriptionSection: View {
         LazyVStack(alignment: .leading) { ForEach(page.items) { item in
             Button(item.name + (item.remarks.map { " · " + $0 } ?? "")) { inspect(item) }.disabled(busy).padding(.vertical,5)
         } }
-        if mode=="search",session != nil { Button("刷新搜索结果") { browse(siteKey,operation:"search",number:page.page,bypassCache:true) }.disabled(busy) }
+        if mode=="search",session != nil { Button("刷新搜索结果") { browse(siteKey,operation:"search",number:page.page,bypassCache:true,reuseSearchQuery:true) }.disabled(busy) }
+        pageJumpView(page)
         HStack {
-            Button("上一页") { browse(siteKey,operation:mode,number:page.page-1) }.disabled(busy || page.page <= 1)
+            Button("上一页") { browse(siteKey,operation:mode,number:page.page-1,reuseSearchQuery:true) }.disabled(busy || page.page <= 1)
             Spacer(); Text("第 \(page.page) 页").font(.caption); Spacer()
-            Button("下一页") { browse(siteKey,operation:mode,number:page.page+1) }.disabled(busy || !page.hasMore)
+            Button("下一页") { browse(siteKey,operation:mode,number:page.page+1,reuseSearchQuery:true) }.disabled(busy || !page.hasMore || page.page >= NativeFongMiPageJump.maximumPage)
+        }
+    }
+    @ViewBuilder private func pageJumpView(_ page: NativeMediaPage) -> some View {
+        HStack {
+            TextField("跳转页码", text: $pageJump)
+                .keyboardType(.numberPad)
+                .textFieldStyle(.roundedBorder)
+                .accessibilityIdentifier("fongmi-page-jump-input")
+            Button("跳转") {
+                guard let target = NativeFongMiPageJump.parse(pageJump), target != page.page else { return }
+                browse(siteKey, operation: mode, number: target, reuseSearchQuery: true)
+            }
+            .disabled(busy || NativeFongMiPageJump.parse(pageJump) == nil || NativeFongMiPageJump.parse(pageJump) == page.page)
+            .accessibilityIdentifier("fongmi-page-jump-submit")
         }
     }
     @ViewBuilder private func detailView(_ detail: NativeMediaDetail) -> some View {
         Text(detail.item.name).font(.headline)
         if let text = detail.description { Text(text).font(.caption) }
         ScrollView(.horizontal) { HStack { ForEach(detail.lines.indices,id:\.self) { i in
-            Button(detail.lines[i].name) { line = i; lastPlayedEpisode = nil; ownedPlayerItem = nil }.buttonStyle(.bordered)
+            Button(detail.lines[i].name) { line = i; lastPlayedEpisode = nil; ownedPlayerItem = nil; episodeQuery = "" }.buttonStyle(.bordered).disabled(busy)
         } } }
         if detail.lines.indices.contains(line) {
             let playable = detail.lines[line].episodes.map(\.playable)
             Toggle("播放结束自动下一集", isOn: $autoAdvance)
                 .accessibilityIdentifier("subscription-auto-next")
+            HStack {
+                Button("从本线路第一集播放") {
+                    if let index = NativeEpisodeNavigation.firstPlayable(playable) { play(index) }
+                }
+                .disabled(busy || NativeEpisodeNavigation.firstPlayable(playable) == nil)
+                .accessibilityIdentifier("restart-subscription-line")
+                Button("重播当前集") {
+                    if let index = NativeEpisodeNavigation.replayIndex(lastPlayedEpisode, playable: playable) { play(index) }
+                }
+                .disabled(busy || NativeEpisodeNavigation.replayIndex(lastPlayedEpisode, playable: playable) == nil)
+                .accessibilityIdentifier("replay-subscription-episode")
+            }
             HStack {
                 Button("上一集") {
                     if let index = NativeEpisodeNavigation.adjacent(to: lastPlayedEpisode, playable: playable, direction: -1) { play(index) }
@@ -440,8 +505,18 @@ struct SubscriptionSection: View {
                 .disabled(busy || NativeEpisodeNavigation.adjacent(to: lastPlayedEpisode, playable: playable, direction: 1) == nil)
                 .accessibilityIdentifier("next-subscription-episode")
             }
-            ForEach(detail.lines[line].episodes.indices,id:\.self) { i in
-                let episode = detail.lines[line].episodes[i]
+            let episodes = detail.lines[line].episodes
+            TextField("筛选当前线路的剧集", text: $episodeQuery)
+                .textFieldStyle(.roundedBorder)
+                .accessibilityIdentifier("fongmi-episode-filter")
+            let matching = NativeEpisodeFilter.indices(names: episodes.map(\.name), query: episodeQuery)
+            Text("显示 \(matching.count) / \(episodes.count) 集")
+                .font(.caption).foregroundStyle(.secondary)
+            if matching.isEmpty {
+                Text("当前线路没有匹配的剧集").font(.caption).foregroundStyle(.secondary)
+            }
+            ForEach(matching, id: \.self) { i in
+                let episode = episodes[i]
                 Button(episode.name) { play(i) }.disabled(busy || !episode.playable)
             }
         }
@@ -457,6 +532,17 @@ enum NativeCrossSiteResultFilter {
         return hits.filter { hit in
             hit.item.name.localizedStandardContains(needle) ||
             (names[hit.siteKey] ?? hit.siteKey).localizedStandardContains(needle)
+        }
+    }
+}
+
+enum NativeEpisodeFilter {
+    /// Preserve original indices used by the FongMi play endpoint.
+    static func indices(names: [String], query: String) -> [Int] {
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !needle.isEmpty else { return Array(names.indices) }
+        return names.indices.filter {
+            names[$0].range(of: needle, options: [.caseInsensitive, .diacriticInsensitive]) != nil
         }
     }
 }
