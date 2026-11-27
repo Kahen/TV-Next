@@ -34,4 +34,10 @@ final class NativeSMBShareAddressTests: XCTestCase {
             XCTAssertNil(NativeSMBShareAddress.parse(value), value)
         }
     }
+
+    func testInvalidDecodedHostCharacters() {
+        for host in ["file%20server", "file%2Fserver", "file%5Cserver", "file%40server"] {
+            XCTAssertNil(NativeSMBShareAddress.parse("smb://\(host)/share"))
+        }
+    }
 }
