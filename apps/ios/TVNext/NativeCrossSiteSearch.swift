@@ -143,7 +143,7 @@ enum NativeCrossSiteSearch {
 
     /// Imported providers may omit a display name. Preserve the opaque key
     /// for retry identity and use it as a visible fallback for blank labels.
-    private static func displayName(_ source: NativeSearchSource) -> String {
+    static func displayName(_ source: NativeSearchSource) -> String {
         // Imported labels are untrusted presentation text, never provider identity.
         // Reject line breaks, controls and invisible formatting rather than allowing
         // spoofed/multiline failure messages. Keep legitimate Unicode and spacing.

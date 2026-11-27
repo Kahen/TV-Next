@@ -358,7 +358,8 @@ struct SubscriptionSection: View {
         Picker("跨站搜索范围", selection: $searchTargetKey) {
             Text("全部可用站点（最多 16 个）").tag(NativeSearchTarget.all)
             ForEach(eligibleSearchSites, id: \.key) { source in
-                Text(source.name.isEmpty ? source.key : source.name + " · " + source.key).tag(source.key)
+                let label = NativeCrossSiteSearch.displayName(source)
+                Text(label == source.key ? label : label + " · " + source.key).tag(source.key)
             }
         }.disabled(busy)
         HStack {
