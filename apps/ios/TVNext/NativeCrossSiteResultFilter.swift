@@ -8,9 +8,8 @@ extension NativeCrossSiteResultFilter {
         selectedKey: String,
         searchedKeys: [String]
     ) -> [NativeSearchHit<Item>] {
-        guard !selectedKey.isEmpty else { return hits }
-        guard searchedKeys.contains(selectedKey) else { return hits }
-        return hits.filter { $0.siteKey == selectedKey }
+        let key = reconciledSelection(selectedKey, searchedKeys: searchedKeys)
+        return key.isEmpty ? hits : hits.filter { $0.siteKey == key }
     }
 
     static func reconciledSelection(_ selectedKey: String, searchedKeys: [String]) -> String {

@@ -38,6 +38,42 @@ enum CaptionParser {
         pattern: #"^(\d{2,3}:\d{2}:\d{2}[.,]\d{3}|\d{2}:\d{2}[.,]\d{3})\s+-->\s+(\d{2,3}:\d{2}:\d{2}[.,]\d{3}|\d{2}:\d{2}[.,]\d{3})(?:\s+.*)?$"#
     )
     private static let tags = try! NSRegularExpression(pattern: #"<[^>]*>"#)
+    private static let cueEntity = try! NSRegularExpression(
+        pattern: #"&(amp|lt|gt|quot|apos|nbsp|#[xX][0-9a-fA-F]{1,6}|#[0-9]{1,7});"#
+    )
+
+    /// Decode cue text without interpreting the result as markup or entities.
+    private static func decodeCueEntities(_ input: String) -> String {
+        let source = input as NSString
+        var result = ""
+        var cursor = 0
+        let fullRange = NSRange(location: 0, length: source.length)
+        cueEntity.enumerateMatches(in: input, range: fullRange) { match, _, _ in
+            guard let match else { return }
+            let token = source.substring(with: match.range(at: 1))
+            let replacement: String
+            switch token {
+            case "amp": replacement = "&"
+            case "lt": replacement = "<"
+            case "gt": replacement = ">"
+            case "quot": replacement = "\""
+            case "apos": replacement = "'"
+            case "nbsp": replacement = "\u{00A0}"
+            default:
+                let digits = token.dropFirst()
+                let isHex = digits.first == "x" || digits.first == "X"
+                guard let value = UInt32(isHex ? digits.dropFirst() : digits, radix: isHex ? 16 : 10),
+                      let scalar = Unicode.Scalar(value),
+                      !CharacterSet.controlCharacters.contains(scalar) else { return }
+                replacement = String(scalar)
+            }
+            result += source.substring(with: NSRange(location: cursor, length: match.range.location - cursor))
+            result += replacement
+            cursor = NSMaxRange(match.range)
+        }
+        result += source.substring(from: cursor)
+        return result
+    }
 
     static func parse(_ data: Data, encoding: CaptionTextEncoding = .unicode) throws -> [CaptionCue] {
         guard !data.isEmpty else { throw CaptionError.empty }
@@ -127,12 +163,11 @@ enum CaptionParser {
             let rangeForTags = NSRange(caption.startIndex..<caption.endIndex, in: caption)
             let stripped = tags.stringByReplacingMatches(
                 in: caption, range: rangeForTags, withTemplate: ""
-            ).replacingOccurrences(of: "&amp;", with: "&")
-                .replacingOccurrences(of: "&lt;", with: "<")
-                .replacingOccurrences(of: "&gt;", with: ">")
+            )
+            let decodedCaption = decodeCueEntities(stripped)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
-            if stripped.isEmpty { continue }
-            result.append(CaptionCue(start: start, end: end, text: String(stripped.prefix(2_000))))
+            if decodedCaption.isEmpty { continue }
+            result.append(CaptionCue(start: start, end: end, text: String(decodedCaption.prefix(2_000))))
             if result.count >= 5_000 { break }
         }
         guard !result.isEmpty else { throw CaptionError.invalidTimeline }
