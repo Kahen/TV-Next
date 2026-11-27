@@ -38,6 +38,7 @@ struct SubscriptionSection: View {
     @State private var lastPlayedEpisode: Int?
     @State private var autoAdvance = false
     @State private var ownedPlayerItem: AVPlayerItem?
+    @State private var episodeQuery = ""
     @State private var error: String?
     @State private var busy = false
     @State private var pending: Task<Void,Never>?
@@ -316,7 +317,7 @@ struct SubscriptionSection: View {
             let result: NativeMediaDetail = try await api.request("subscriptions/detail",body:r)
             guard generation == id, !Task.isCancelled else { return }
             switchDetailSite(targetKey)
-            detail = result; line = 0; lastPlayedEpisode = nil; ownedPlayerItem = nil
+            detail = result; line = 0; lastPlayedEpisode = nil; ownedPlayerItem = nil; episodeQuery = ""
         }
     }
     private func play(_ index: Int) {
@@ -415,7 +416,7 @@ struct SubscriptionSection: View {
         Text(detail.item.name).font(.headline)
         if let text = detail.description { Text(text).font(.caption) }
         ScrollView(.horizontal) { HStack { ForEach(detail.lines.indices,id:\.self) { i in
-            Button(detail.lines[i].name) { line = i; lastPlayedEpisode = nil; ownedPlayerItem = nil }.buttonStyle(.bordered)
+            Button(detail.lines[i].name) { line = i; lastPlayedEpisode = nil; ownedPlayerItem = nil; episodeQuery = "" }.buttonStyle(.bordered).disabled(busy)
         } } }
         if detail.lines.indices.contains(line) {
             let playable = detail.lines[line].episodes.map(\.playable)
@@ -446,8 +447,18 @@ struct SubscriptionSection: View {
                 .disabled(busy || NativeEpisodeNavigation.adjacent(to: lastPlayedEpisode, playable: playable, direction: 1) == nil)
                 .accessibilityIdentifier("next-subscription-episode")
             }
-            ForEach(detail.lines[line].episodes.indices,id:\.self) { i in
-                let episode = detail.lines[line].episodes[i]
+            let episodes = detail.lines[line].episodes
+            TextField("筛选当前线路的剧集", text: $episodeQuery)
+                .textFieldStyle(.roundedBorder)
+                .accessibilityIdentifier("fongmi-episode-filter")
+            let matching = NativeEpisodeFilter.indices(names: episodes.map(\.name), query: episodeQuery)
+            Text("显示 \(matching.count) / \(episodes.count) 集")
+                .font(.caption).foregroundStyle(.secondary)
+            if matching.isEmpty {
+                Text("当前线路没有匹配的剧集").font(.caption).foregroundStyle(.secondary)
+            }
+            ForEach(matching, id: \.self) { i in
+                let episode = episodes[i]
                 Button(episode.name) { play(i) }.disabled(busy || !episode.playable)
             }
         }
@@ -463,6 +474,17 @@ enum NativeCrossSiteResultFilter {
         return hits.filter { hit in
             hit.item.name.localizedStandardContains(needle) ||
             (names[hit.siteKey] ?? hit.siteKey).localizedStandardContains(needle)
+        }
+    }
+}
+
+enum NativeEpisodeFilter {
+    /// Preserve original indices used by the FongMi play endpoint.
+    static func indices(names: [String], query: String) -> [Int] {
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !needle.isEmpty else { return Array(names.indices) }
+        return names.indices.filter {
+            names[$0].range(of: needle, options: [.caseInsensitive, .diacriticInsensitive]) != nil
         }
     }
 }
