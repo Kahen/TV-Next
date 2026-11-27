@@ -12,7 +12,13 @@ enum NativeCloudPath {
         guard !name.isEmpty, name != ".", name != "..",
               !name.contains("/"), !name.contains("\\"),
               !name.unicodeScalars.contains(where: {
-                  CharacterSet.controlCharacters.contains($0) || $0.value == 0x2028 || $0.value == 0x2029
+                  CharacterSet.controlCharacters.contains($0) || $0.properties.generalCategory == .format || $0.value == 0x2028 || $0.value == 0x2029
+              }) else { return nil }
+        guard directory.hasPrefix("/"), !directory.contains("\\"),
+              !directory.split(separator: "/").contains(where: { $0 == "." || $0 == ".." }),
+              !directory.unicodeScalars.contains(where: {
+                  CharacterSet.controlCharacters.contains($0) || $0.properties.generalCategory == .format ||
+                      $0.value == 0x2028 || $0.value == 0x2029
               }) else { return nil }
         let base = directory == "/" ? "" : directory.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         return base.isEmpty ? "/" + name : "/" + base + "/" + name
