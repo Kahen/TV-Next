@@ -34,7 +34,25 @@ struct CloudSection: View {
          .onDisappear { disconnect(clearCredentials: true) }
     }
     @ViewBuilder private func listing(_ p: NativeCloudPage) -> some View {
-        Text(p.path + " · 第 \(p.page) 页").font(.caption)
+        ScrollView(.horizontal) {
+            HStack(spacing: 6) {
+                let crumbs = NativeCloudBreadcrumbs.make(p.path)
+                ForEach(crumbs) { crumb in
+                    if crumb.path == p.path {
+                        Text(crumb.title).font(.caption).bold()
+                    } else {
+                        Button(crumb.title) { open(crumb.path) }
+                            .font(.caption)
+                            .disabled(busy)
+                    }
+                    if crumb.id != crumbs.last?.id {
+                        Image(systemName: "chevron.right")
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        Text("第 \(p.page) 页").font(.caption)
         TextField("筛选当前页文件和文件夹", text: $listingQuery)
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
