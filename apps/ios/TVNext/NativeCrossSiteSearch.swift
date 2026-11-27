@@ -87,6 +87,7 @@ enum NativeCrossSiteSearch {
     // Reject oversized opaque identifiers before deduplication or retry snapshots.
     static let maxProviderKeyBytes = 1_024
     static let maxResultIdBytes = 4_096
+    static let maxProviderDisplayNameBytes = 256
 
     /// Control and invisible Unicode format characters cannot be stable provider identities.
     /// Reject bidi overrides and zero-width format markers rather than silently normalizing
@@ -147,7 +148,8 @@ enum NativeCrossSiteSearch {
         // Imported labels are untrusted presentation text, never provider identity.
         // Reject line breaks, controls and invisible formatting rather than allowing
         // spoofed/multiline failure messages. Keep legitimate Unicode and spacing.
-        let safe = source.name.unicodeScalars.allSatisfy { scalar in
+        let safe = source.name.utf8.count <= maxProviderDisplayNameBytes &&
+            source.name.unicodeScalars.allSatisfy { scalar in
             !CharacterSet.controlCharacters.contains(scalar) &&
                 scalar.properties.generalCategory != .format &&
                 scalar.properties.generalCategory != .lineSeparator &&
