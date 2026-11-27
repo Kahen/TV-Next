@@ -11,7 +11,7 @@ enum NativeActionBrowserPolicy {
               let host = url.host, !host.isEmpty,
               url.user == nil, url.password == nil,
               !host.unicodeScalars.contains(where: { CharacterSet.whitespacesAndNewlines.contains($0) }),
-              url.port == nil || (1...65535).contains(url.port!) else { return nil }
+              url.port.map({ (1...65535).contains($0) }) ?? true else { return nil }
         return url
     }
 }
