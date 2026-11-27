@@ -34,6 +34,7 @@ struct SubscriptionSection: View {
     @State private var crossSiteWarningState = NativeSearchWarningState.empty
     @State private var crossSiteCompleted = false
     @State private var pageJump = ""
+    @State private var crossSiteSelectedProvider = ""
     @State private var line = 0
     @State private var lastPlayedEpisode: Int?
     @State private var autoAdvance = false
@@ -101,10 +102,19 @@ struct SubscriptionSection: View {
                         TextField("筛选已加载的跨站结果", text: $crossSiteResultQuery)
                             .textFieldStyle(.roundedBorder)
                             .accessibilityIdentifier("cross-site-result-filter")
-                        Text("显示 \(filteredCrossSiteResults.count) / \(crossSiteResults.count) 条")
-                            .font(.caption).foregroundStyle(.secondary)
-                        ForEach(filteredCrossSiteResults.indices, id: \.self) { index in
-                            let hit = filteredCrossSiteResults[index]
+                        Picker("结果站点", selection: $crossSiteSelectedProvider) {
+                            Text("全部站点").tag("")
+                            ForEach(crossSiteSourceOrder, id: \.self) { key in
+                                Text((crossSiteSourceNames[key] ?? key) + " · " + key).tag(key)
+                            }
+                        }.accessibilityIdentifier("cross-site-provider-filter")
+                        let visibleHits = NativeCrossSiteResultFilter.visible(
+                            filteredCrossSiteResults, selectedKey: crossSiteSelectedProvider,
+                            searchedKeys: crossSiteSourceOrder
+                        )
+                        Text("显示 \(visibleHits.count) / \(crossSiteResults.count) 条").font(.caption).foregroundStyle(.secondary)
+                        ForEach(visibleHits.indices, id: \.self) { index in
+                            let hit = visibleHits[index]
                             Button(hit.item.name + " · " + (crossSiteSourceNames[hit.siteKey] ?? hit.siteKey)) {
                                 inspect(hit.item, from: hit.siteKey)
                             }.disabled(busy).padding(.vertical, 4)
@@ -152,7 +162,7 @@ struct SubscriptionSection: View {
     private func clearCrossSiteSearch() {
         crossSiteResultQuery = ""
         crossSiteResults = []; crossSiteFailures = []; crossSiteFailedKeys = []
-        crossSiteSearchKeyword = nil; crossSiteSourceOrder = []; crossSiteSourceNames = [:]; crossSiteWarnings = []; crossSiteWarningState = .empty; crossSiteCompleted = false
+        crossSiteSelectedProvider = ""; crossSiteSearchKeyword = nil; crossSiteSourceOrder = []; crossSiteSourceNames = [:]; crossSiteWarnings = []; crossSiteWarningState = .empty; crossSiteCompleted = false
     }
     private func switchDetailSite(_ key: String) {
         var scope = NativeSiteBrowsingContext(
