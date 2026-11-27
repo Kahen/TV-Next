@@ -36,7 +36,7 @@ enum NativeSMBDirectoryPage {
         guard entries.count <= maximumEntries else { return nil }
         var seen = Set<String>()
         for entry in entries {
-            guard seen.insert(entry.name.folding(options: [.caseInsensitive, .diacriticInsensitive],
+            guard seen.insert(entry.name.folding(options: [.caseInsensitive],
                                                 locale: Locale(identifier: "en_US_POSIX"))).inserted else {
                 return nil
             }

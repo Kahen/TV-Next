@@ -31,5 +31,9 @@ final class NativeSMBDirectoryPageTests: XCTestCase {
         XCTAssertNil(NativeSMBDirectoryPage.normalize([a, b]))
         XCTAssertNil(NativeSMBDirectoryPage.normalize(Array(repeating: a, count: 513)))
         XCTAssertEqual(NativeSMBDirectoryPage.normalize([]), [])
+
+        let plain = NativeSMBDirectoryEntry(name: "Resume.mkv", isDirectory: false, size: 1)!
+        let accented = NativeSMBDirectoryEntry(name: "Résumé.mkv", isDirectory: false, size: 2)!
+        XCTAssertEqual(NativeSMBDirectoryPage.normalize([plain, accented])?.count, 2)
     }
 }
