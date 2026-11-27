@@ -32,7 +32,7 @@ enum MediaAddress {
 /// Offline parser for a safe, well-defined M3U subset; no network requests or code execution.
 enum M3UParser {
     private static let attributeRegex = try! NSRegularExpression(
-        pattern: #"([A-Za-z0-9_-]+)\s*=\s*"([^"]*)""#,
+        pattern: #"([A-Za-z0-9_-]+)\s*=\s*(["'])(.*?)\2"#,
         options: []
     )
 
@@ -66,7 +66,8 @@ enum M3UParser {
                 nextName = title(in: line).flatMap { $0.isEmpty ? nil : $0 }
                     ?? attrs["tvg-name"].flatMap { $0.isEmpty ? nil : $0 }
                     ?? "Unnamed"
-                group = attrs["group-title"].flatMap { $0.isEmpty ? nil : $0 } ?? "Uncategorized"
+                // EXTGRP may precede EXTINF; only an explicit group-title overrides it.
+                group = attrs["group-title"].flatMap { $0.isEmpty ? nil : $0 } ?? group
                 logo = attrs["tvg-logo"]
                 tvgId = attrs["tvg-id"].flatMap { $0.isEmpty ? nil : $0 }
             } else if line.lowercased().hasPrefix("#extgrp:") {
@@ -100,12 +101,13 @@ enum M3UParser {
 
     /// EXTINF metadata ends at the first comma outside quoted attributes.
     private static func title(in line: String) -> String? {
-        var quoted = false
+        var quote: Character?
         for index in line.indices {
             let character = line[index]
-            if character == "\"" {
-                quoted.toggle()
-            } else if character == "," && !quoted {
+            if character == "\"" || character == "'" {
+                if quote == nil { quote = character }
+                else if quote == character { quote = nil }
+            } else if character == "," && quote == nil {
                 return String(line[line.index(after: index)...])
                     .trimmingCharacters(in: .whitespacesAndNewlines)
             }
@@ -118,7 +120,7 @@ enum M3UParser {
         var result: [String: String] = [:]
         for match in attributeRegex.matches(in: line, range: range) {
             guard let keyRange = Range(match.range(at: 1), in: line),
-                  let valueRange = Range(match.range(at: 2), in: line) else {
+                  let valueRange = Range(match.range(at: 3), in: line) else {
                 continue
             }
             result[line[keyRange].lowercased()] = String(line[valueRange])

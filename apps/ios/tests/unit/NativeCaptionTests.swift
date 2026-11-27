@@ -3,6 +3,30 @@ import XCTest
 @testable import TVNext
 
 final class NativeCaptionTests: XCTestCase {
+    func testNumericAndNamedEntitiesInWebVTTAndSRT() throws {
+        let vtt = """
+        WEBVTT
+
+        00:00:01.000 --> 00:00:03.000
+        &#20013;&#x6587; &quot;Hi&quot; &apos;ok&apos; &nbsp; &#x1F600;
+        """
+        XCTAssertEqual(try CaptionParser.parse(Data(vtt.utf8)).first?.text,
+                       "中文 \"Hi\" 'ok' \u{00A0} 😀")
+        let srt = "1\n00:00:01,000 --> 00:00:03,000\n&#65; &amp; &#x42;\n"
+        XCTAssertEqual(try CaptionParser.parse(Data(srt.utf8)).first?.text, "A & B")
+    }
+
+    func testMalformedNumericEntitiesRemainLiteralAndCannotInjectControls() throws {
+        let text = """
+        WEBVTT
+
+        00:00:01.000 --> 00:00:03.000
+        &#0; &#xD800; &#99999999; &#xZZ; &#10; &#x110000;
+        """
+        XCTAssertEqual(try CaptionParser.parse(Data(text.utf8)).first?.text,
+                       "&#0; &#xD800; &#99999999; &#xZZ; &#10; &#x110000;")
+    }
+
     func testBOMMarkedUTF16BothEndiannessesAndMalformedSurrogates() throws {
         let srt = "1\n00:00:01,000 --> 00:00:02,000\n中文字幕\n"
         for (bom, encoding) in [([UInt8]([0xFF, 0xFE]), String.Encoding.utf16LittleEndian),
