@@ -53,7 +53,11 @@ enum M3UParser {
         for raw in text.components(separatedBy: .newlines) {
             lineCount += 1
             if lineCount > 20_000 { throw PlaylistError.tooManyLines }
-            let line = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            // A UTF-8 BOM is valid only at the start of the playlist, before #EXTM3U.
+            // Do not strip BOMs from later lines or stream URLs.
+            let normalized = lineCount == 1 && raw.hasPrefix("\u{FEFF}")
+                ? String(raw.dropFirst()) : raw
+            let line = normalized.trimmingCharacters(in: .whitespacesAndNewlines)
             if line.lowercased().hasPrefix("#extm3u") {
                 defaultCatchup = parseCatchup(attributes(in:line))
             } else if line.lowercased().hasPrefix("#extinf") {
