@@ -22,6 +22,7 @@ struct SubscriptionSection: View {
     @State private var filters: [String:String]=[:]
     @State private var appliedFilters: [String:String]=[:]
     @State private var actionResult: NativeSubscriptionAction?
+    @State private var actionBrowser: NativeActionBrowserPage?
     @State private var retryAction: NativeActionRetryContext?
     @State private var detail: NativeMediaDetail?
     @State private var searchTargetKey = NativeSearchTarget.all
@@ -132,6 +133,10 @@ struct SubscriptionSection: View {
                 rememberURL = true
             }
         }
+        .sheet(item: $actionBrowser) { browser in
+            NativeActionBrowser(url: browser.url)
+                .ignoresSafeArea()
+        }
         .onReceive(NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime)) { event in
             guard autoAdvance, !busy, let finished = event.object as? AVPlayerItem,
                   finished === ownedPlayerItem, finished === activePlayerItem(),
@@ -143,9 +148,9 @@ struct SubscriptionSection: View {
                 play(next)
             }
         }
-        .onDisappear { pending?.cancel(); ownedPlayerItem = nil; actionResult = nil; retryAction = nil; clearCrossSiteSearch() }
-        .onChange(of:serverURL) { _,_ in pending?.cancel();generation=UUID();busy=false;ownedPlayerItem=nil;lastPlayedEpisode=nil;document=nil;page=nil;detail=nil;lastPlayedEpisode=nil;actionResult=nil;retryAction=nil;filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;siteKey="";searchTargetKey=NativeSearchTarget.all;appliedSearchQuery=nil;clearCrossSiteSearch() }
-        .onChange(of:session?.token) { _,_ in pending?.cancel();generation=UUID();busy=false;ownedPlayerItem=nil;lastPlayedEpisode=nil;actionResult=nil;retryAction=nil;clearCrossSiteSearch() }
+        .onDisappear { pending?.cancel(); ownedPlayerItem = nil; actionResult = nil; actionBrowser = nil; retryAction = nil; clearCrossSiteSearch() }
+        .onChange(of:serverURL) { _,_ in pending?.cancel();generation=UUID();busy=false;ownedPlayerItem=nil;lastPlayedEpisode=nil;document=nil;page=nil;detail=nil;lastPlayedEpisode=nil;actionResult=nil;actionBrowser=nil;retryAction=nil;filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;siteKey="";searchTargetKey=NativeSearchTarget.all;appliedSearchQuery=nil;clearCrossSiteSearch() }
+        .onChange(of:session?.token) { _,_ in pending?.cancel();generation=UUID();busy=false;ownedPlayerItem=nil;lastPlayedEpisode=nil;actionResult=nil;actionBrowser=nil;retryAction=nil;clearCrossSiteSearch() }
     }
     private func run(_ operation: @escaping (TVNextAPI, UUID) async throws -> Void) {
         pending?.cancel()
@@ -376,6 +381,13 @@ struct SubscriptionSection: View {
         VStack(alignment: .leading, spacing: 6) {
             if let message = result.message { Text(message).font(.callout) }
             if let link = result.link {
+                if let safeURL = NativeActionBrowserPolicy.approvedURL(link) {
+                    Button("在应用内打开站点登录/操作页面") {
+                        actionBrowser = NativeActionBrowserPage(url: safeURL)
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier("open-native-action-browser")
+                }
                 Link("在外部浏览器打开站点网页", destination: link)
                     .accessibilityHint("会离开当前应用，不会自动登录或同步 Cookie")
                 if retryAction != nil {
@@ -387,7 +399,7 @@ struct SubscriptionSection: View {
                 }
             }
             if result.limitedBrowserFeatures {
-                Text("原版内嵌视图或 Cookie 自动关闭尚未支持；仅手动打开外部浏览器，不同步凭据。")
+                Text("站点网页支持手动操作，登录状态不会同步到应用。")
                     .font(.caption).foregroundStyle(.secondary)
             }
             if result.unsupported {
