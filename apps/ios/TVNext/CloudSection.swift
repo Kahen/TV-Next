@@ -7,6 +7,7 @@ struct CloudSection: View {
     @State private var token = ""
     @State private var password = ""
     @State private var page: NativeCloudPage?
+    @State private var listingQuery = ""
     @State private var busy = false
     @State private var error: String?
     @State private var task: Task<Void,Never>?
@@ -21,30 +22,58 @@ struct CloudSection: View {
                 SecureField("目录密码（可选）",text:$password).textFieldStyle(.roundedBorder)
                 HStack {
                     Button("打开网盘") { open("/") }.disabled(busy || server.isEmpty)
-                    Button("断开并清除凭据") { task?.cancel(); revision = UUID(); token = ""; password = ""; page = nil; busy = false }
+                    Button("刷新当前目录") { if let page { open(page.path, number: page.page) } }.disabled(busy || page == nil)
+                    Button("断开并清除凭据") { disconnect(clearCredentials: true) }
                 }.buttonStyle(.bordered)
                 if let error { Text(error).font(.caption).foregroundStyle(.red) }
                 if let page { listing(page) }
             }
-        }.onDisappear { task?.cancel(); token = ""; password = "" }
+        }.onChange(of: server) { _, _ in disconnect(clearCredentials: false) }
+         .onChange(of: token) { _, _ in disconnect(clearCredentials: false) }
+         .onChange(of: password) { _, _ in disconnect(clearCredentials: false) }
+         .onDisappear { disconnect(clearCredentials: true) }
     }
     @ViewBuilder private func listing(_ p: NativeCloudPage) -> some View {
-        Text(p.path).font(.caption)
-        Button("上级目录") { open(NativeCloudPage.parentPath(p.path)) }.disabled(busy || p.path == "/")
-        ForEach(p.entries) { item in
-            Button((item.directory ? "📁 " : "▶ ") + item.name) {
-                if let child = NativeCloudPage.childPath(parent: p.path, name: item.name) {
-                    open(child, play: !item.directory)
-                } else {
-                    error = "网盘返回了无效的文件名"
+        ScrollView(.horizontal) {
+            HStack(spacing: 6) {
+                let crumbs = NativeCloudBreadcrumbs.make(p.path)
+                ForEach(crumbs) { crumb in
+                    if crumb.path == p.path {
+                        Text(crumb.title).font(.caption).bold()
+                    } else {
+                        Button(crumb.title) { open(crumb.path) }
+                            .font(.caption)
+                            .disabled(busy)
+                    }
+                    if crumb.id != crumbs.last?.id {
+                        Image(systemName: "chevron.right")
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
                 }
-            }.disabled(busy)
+            }
+        }
+        Text("第 \(p.page) 页").font(.caption)
+        TextField("筛选当前页文件和文件夹", text: $listingQuery)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .textFieldStyle(.roundedBorder)
+        Text("当前页显示 \(NativeCloudListingFilter.entries(p.entries, query: listingQuery).count) / \(p.entries.count) 项 · 仅筛选已加载页")
+            .font(.caption).foregroundStyle(.secondary)
+        Button("上级目录") { open(NativeCloudPath.parent(of: p.path)) }.disabled(busy || p.path == "/")
+        ForEach(NativeCloudListingFilter.entries(p.entries, query: listingQuery)) { item in
+            Button((item.directory ? "📁 " : "▶ ") + item.name) {
+                if let path = NativeCloudPath.child(named: item.name, in: p.path) { open(path,play:!item.directory) }
+            }.disabled(busy || NativeCloudPath.child(named: item.name, in: p.path) == nil)
         }
         HStack {
-            Button("上一页") { open(p.path,number:p.page-1) }.disabled(busy || p.page <= 1)
+            Button("上一页") { if let number = NativeCloudPageNavigation.previous(p.page) { open(p.path,number:number) } }.disabled(busy || NativeCloudPageNavigation.previous(p.page) == nil)
             Spacer()
-            Button("下一页") { open(p.path,number:p.page+1) }.disabled(busy || !p.hasMore)
+            Button("下一页") { if let number = NativeCloudPageNavigation.next(p.page, hasMore:p.hasMore) { open(p.path,number:number) } }.disabled(busy || NativeCloudPageNavigation.next(p.page, hasMore:p.hasMore) == nil)
         }
+    }
+    private func disconnect(clearCredentials: Bool) {
+        task?.cancel(); task = nil; revision = UUID(); page = nil; listingQuery = ""; error = nil; busy = false
+        if clearCredentials { token = ""; password = "" }
     }
     private func open(_ path: String, number: Int = 1, play: Bool = false) {
         task?.cancel(); let id = UUID(); revision = id; busy = true; error = nil
@@ -56,14 +85,38 @@ struct CloudSection: View {
                 if play {
                     let result: NativeCloudPlayback = try await api.request("cloud/play",body:payload)
                     guard revision == id, !Task.isCancelled else { return }
-                    onPlay(TVChannel(name:result.name,url:result.url,group:"网盘",logo:nil,tvgId:nil,headers:result.headers))
+                    guard let safe = NativeCloudPlaybackValidation.validated(result) else {
+                        throw NativeRequestError.message("网盘返回了不安全的播放地址或 HTTP 请求头")
+                    }
+                    onPlay(TVChannel(name:safe.name,url:safe.url,group:"网盘",logo:nil,tvgId:nil,headers:safe.headers))
                 } else {
                     let result: NativeCloudPage = try await api.request("cloud/list",body:payload)
                     guard revision == id, !Task.isCancelled else { return }
-                    page = result
+                    guard let path = NativeCloudPath.normalizedDirectory(result.path) else {
+                        throw NativeRequestError.message("网盘返回了无效的目录路径")
+                    }
+                    if path != page?.path { listingQuery = "" }
+                    page = NativeCloudPage(path: path, entries: result.entries, page: result.page, hasMore: result.hasMore)
                 }
             } catch { if revision == id && !Task.isCancelled { self.error = error.localizedDescription } }
             if revision == id { busy = false }
+        }
+    }
+}
+
+    
+/// Local-only filtering: never sends the query or credentials to a provider.
+enum NativeCloudListingFilter {
+    static func entries(_ entries: [NativeCloudPage.Entry], query: String) -> [NativeCloudPage.Entry] {
+        let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let matches = term.isEmpty ? entries : entries.filter {
+            $0.name.localizedStandardContains(term)
+        }
+        return matches.sorted {
+            if $0.directory != $1.directory { return $0.directory }
+            let order = $0.name.localizedStandardCompare($1.name)
+            if order != .orderedSame { return order == .orderedAscending }
+            return $0.name < $1.name
         }
     }
 }

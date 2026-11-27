@@ -84,28 +84,31 @@ struct NativeCloudRequest: Encodable { let server: String; let token: String; le
 struct NativeCloudPage: Decodable {
     struct Entry: Decodable, Identifiable { let name: String; let directory: Bool; let size: Int64; var id: String { name } }
     let path: String; let entries: [Entry]; let page: Int; let hasMore: Bool
-
-    /// Never interpret untrusted listing names as path components supplied by the server.
-    /// The API accepts slash-delimited absolute paths, not URL-encoded path fragments.
-    static func childPath(parent: String, name: String) -> String? {
-        guard parent.hasPrefix("/"), !parent.contains("\\"),
-              !parent.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }),
-              !name.isEmpty, name != ".", name != "..",
-              !name.contains("/"), !name.contains("\\"),
-              !name.unicodeScalars.contains(where: {
-                  CharacterSet.controlCharacters.contains($0) ||
-                  $0.properties.generalCategory == .format
-              }) else { return nil }
-        let components = parent.split(separator: "/", omittingEmptySubsequences: true)
-        guard !components.contains(where: { $0 == "." || $0 == ".." }) else { return nil }
-        return (components.isEmpty ? "" : "/" + components.joined(separator: "/")) + "/" + name
-    }
-    static func parentPath(_ path: String) -> String {
-        let parts = path.split(separator: "/", omittingEmptySubsequences: true)
-        return parts.count <= 1 ? "/" : "/" + parts.dropLast().joined(separator: "/")
-    }
 }
 struct NativeCloudPlayback: Decodable { let url: String; let name: String; let headers: [String:String] }
 
 struct NativeLiveRequest: Encodable { let content: String; let url: String; let liveIndex: Int }
 struct NativeLiveResponse: Decodable { let channels: [TVChannel]; let warnings: [String] }
+
+enum NativeCloudPlaybackValidation {
+    /// Cloud URLs are returned by a self-hosted service, not by the user-facing URL field.
+    /// Reject non-network schemes and URL-embedded credentials before handing them to AVPlayer.
+    static func validated(_ playback: NativeCloudPlayback) -> NativeCloudPlayback? {
+        let raw = playback.url
+        guard !raw.isEmpty, raw.utf8.count <= 8192,
+              !raw.unicodeScalars.contains(where: { CharacterSet.whitespacesAndNewlines.contains($0) || CharacterSet.controlCharacters.contains($0) }),
+              let url = URLComponents(string: raw),
+              let scheme = url.scheme?.lowercased(), ["http", "https"].contains(scheme),
+              let host = url.host, !host.isEmpty,
+              url.user == nil, url.password == nil, url.fragment == nil,
+              playback.headers.count <= 32 else { return nil }
+        let tokenCharacters = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!#$%&'*+-.^_`|~")
+        for (name, value) in playback.headers {
+            guard !name.isEmpty, name.utf8.count <= 128,
+                  name.unicodeScalars.allSatisfy({ tokenCharacters.contains($0) }),
+                  value.utf8.count <= 4096,
+                  !value.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else { return nil }
+        }
+        return playback
+    }
+}

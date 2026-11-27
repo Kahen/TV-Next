@@ -156,22 +156,6 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertFalse(store.skipProviderSegment(segment, generation: store.playbackGeneration))
     }
 
-    func testCloudListingNavigationPreservesValidNamesAndRoot() {
-        XCTAssertEqual(NativeCloudPage.childPath(parent: "/", name: "电影 中文.mkv"), "/电影 中文.mkv")
-        XCTAssertEqual(NativeCloudPage.childPath(parent: "/media/2026/", name: "episode 01.mp4"), "/media/2026/episode 01.mp4")
-        XCTAssertEqual(NativeCloudPage.parentPath("/media/2026/"), "/media")
-        XCTAssertEqual(NativeCloudPage.parentPath("/media"), "/")
-        XCTAssertEqual(NativeCloudPage.parentPath("/"), "/")
-    }
-
-    func testCloudListingRejectsTraversalAndControlNames() {
-        for name in ["", ".", "..", "../secret", "a/b", "a\\\\b", "bad\nname", "invisible\u{200B}"] {
-            XCTAssertNil(NativeCloudPage.childPath(parent: "/media", name: name), "Accepted unsafe name: \(name)")
-        }
-        XCTAssertNil(NativeCloudPage.childPath(parent: "/media/../private", name: "video.mp4"))
-        XCTAssertNil(NativeCloudPage.childPath(parent: "relative", name: "video.mp4"))
-    }
-
     func testSystemAirPlayIsAllowedForAVPlayer() {
         // A simulator may not advertise any actual AirPlay destination.
         // Verify only that the production player permits the system route.
@@ -1164,4 +1148,37 @@ final class MediaLibraryTests: XCTestCase {
         XCTAssertNotNil(store.playbackError)
     }
 
+}
+
+
+final class NativeCloudPlaybackValidationTests: XCTestCase {
+    private func playback(_ url: String, headers: [String: String] = [:]) -> NativeCloudPlayback {
+        NativeCloudPlayback(url: url, name: "Authorized media", headers: headers)
+    }
+
+    func testAcceptsNetworkMediaAndAuthorizedHeaders() {
+        XCTAssertNotNil(NativeCloudPlaybackValidation.validated(playback(
+            "https://media.example.org:8443/video.m3u8?token=abc",
+            headers: ["Authorization": "Bearer sample", "Referer": "https://example.org/"]
+        )))
+        XCTAssertNotNil(NativeCloudPlaybackValidation.validated(playback("http://192.168.1.2/video.mp4")))
+    }
+
+    func testRejectsUnsafeSchemesAndEmbeddedCredentials() {
+        for url in ["file:///etc/passwd", "javascript:alert(1)", "smb://nas/video.mp4",
+                    "https://user:secret@example.org/video.mp4", "https://example.org/video.mp4#secret",
+                    "https://example.org/video.mp4\nInjected", "https://"] {
+            XCTAssertNil(NativeCloudPlaybackValidation.validated(playback(url)), url)
+        }
+    }
+
+    func testRejectsMalformedHeadersAndPreservesValidValues() {
+        for headers in [["X-Unsafe\nName": "value"], ["Authorization": "abc\r\nInjected: true"],
+                        ["Bad Header": "value"], ["X-Large": String(repeating: "x", count: 4097)]] {
+            XCTAssertNil(NativeCloudPlaybackValidation.validated(playback("https://example.org/video.mp4", headers: headers)))
+        }
+        XCTAssertNotNil(NativeCloudPlaybackValidation.validated(playback(
+            "https://example.org/video.mp4", headers: ["X-Client": "TV-Next"]
+        )))
+    }
 }
