@@ -33,6 +33,7 @@ struct SubscriptionSection: View {
     @State private var crossSiteWarnings: [String] = []
     @State private var crossSiteWarningState = NativeSearchWarningState.empty
     @State private var crossSiteCompleted = false
+    @State private var pageJump = ""
     @State private var line = 0
     @State private var lastPlayedEpisode: Int?
     @State private var autoAdvance = false
@@ -198,7 +199,7 @@ struct SubscriptionSection: View {
         run { api, id in
             let result: NativeMediaPage = try await api.request("subscriptions/" + operation, body: r)
             guard generation == id, !Task.isCancelled else { return }
-            page = result; detail = nil; ownedPlayerItem = nil; siteKey = key; mode = operation; category = operation=="home" ? nil:r.categoryId;clearCrossSiteSearch()
+            page = result; pageJump = String(result.page); detail = nil; ownedPlayerItem = nil; siteKey = key; mode = operation; category = operation=="home" ? nil:r.categoryId;clearCrossSiteSearch()
             appliedSearchQuery = operation == "search" ? r.query : nil
             filterCatalog=same ? filterCatalog.merging(result.filters ?? [:],uniquingKeysWith:{ _,new in new }):result.filters ?? [:]
             appliedFilters=operation=="category" ? choices:[:]
@@ -389,10 +390,25 @@ struct SubscriptionSection: View {
             Button(item.name + (item.remarks.map { " · " + $0 } ?? "")) { inspect(item) }.disabled(busy).padding(.vertical,5)
         } }
         if mode=="search",session != nil { Button("刷新搜索结果") { browse(siteKey,operation:"search",number:page.page,bypassCache:true,reuseSearchQuery:true) }.disabled(busy) }
+        pageJumpView(page)
         HStack {
             Button("上一页") { browse(siteKey,operation:mode,number:page.page-1,reuseSearchQuery:true) }.disabled(busy || page.page <= 1)
             Spacer(); Text("第 \(page.page) 页").font(.caption); Spacer()
-            Button("下一页") { browse(siteKey,operation:mode,number:page.page+1,reuseSearchQuery:true) }.disabled(busy || !page.hasMore)
+            Button("下一页") { browse(siteKey,operation:mode,number:page.page+1,reuseSearchQuery:true) }.disabled(busy || !page.hasMore || page.page >= NativeFongMiPageJump.maximumPage)
+        }
+    }
+    @ViewBuilder private func pageJumpView(_ page: NativeMediaPage) -> some View {
+        HStack {
+            TextField("跳转页码", text: $pageJump)
+                .keyboardType(.numberPad)
+                .textFieldStyle(.roundedBorder)
+                .accessibilityIdentifier("fongmi-page-jump-input")
+            Button("跳转") {
+                guard let target = NativeFongMiPageJump.parse(pageJump), target != page.page else { return }
+                browse(siteKey, operation: mode, number: target, reuseSearchQuery: true)
+            }
+            .disabled(busy || NativeFongMiPageJump.parse(pageJump) == nil || NativeFongMiPageJump.parse(pageJump) == page.page)
+            .accessibilityIdentifier("fongmi-page-jump-submit")
         }
     }
     @ViewBuilder private func detailView(_ detail: NativeMediaDetail) -> some View {
