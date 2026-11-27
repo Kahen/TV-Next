@@ -92,8 +92,11 @@ struct CloudSection: View {
                 } else {
                     let result: NativeCloudPage = try await api.request("cloud/list",body:payload)
                     guard revision == id, !Task.isCancelled else { return }
-                    if result.path != page?.path { listingQuery = "" }
-                    page = result
+                    guard let path = NativeCloudPath.normalizedDirectory(result.path) else {
+                        throw NativeRequestError.message("网盘返回了无效的目录路径")
+                    }
+                    if path != page?.path { listingQuery = "" }
+                    page = NativeCloudPage(path: path, entries: result.entries, page: result.page, hasMore: result.hasMore)
                 }
             } catch { if revision == id && !Task.isCancelled { self.error = error.localizedDescription } }
             if revision == id { busy = false }

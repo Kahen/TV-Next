@@ -15,4 +15,14 @@ final class NativeCloudPathTests: XCTestCase {
             XCTAssertNil(NativeCloudPath.child(named: name, in: "/影视"), name)
         }
     }
+
+    func testValidatesAndNormalizesServerDirectoryPaths() {
+        XCTAssertEqual(NativeCloudPath.normalizedDirectory("/影视//剧集/"), "/影视/剧集")
+        XCTAssertEqual(NativeCloudPath.normalizedDirectory("/"), "/")
+        for path in ["relative", "/../outside", "/safe/./film", "/a\\b", "/a\u{202E}b", "/a\u{2029}b"] {
+            XCTAssertNil(NativeCloudPath.normalizedDirectory(path), path)
+            XCTAssertNil(NativeCloudPath.child(named: "film", in: path), path)
+            XCTAssertEqual(NativeCloudPath.parent(of: path), "/")
+        }
+    }
 }
