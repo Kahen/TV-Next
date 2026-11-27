@@ -22,32 +22,40 @@ struct CloudSection: View {
                 SecureField("目录密码（可选）",text:$password).textFieldStyle(.roundedBorder)
                 HStack {
                     Button("打开网盘") { open("/") }.disabled(busy || server.isEmpty)
-                    Button("断开并清除凭据") { task?.cancel(); revision = UUID(); token = ""; password = ""; page = nil; busy = false }
+                    Button("刷新当前目录") { if let page { open(page.path, number: page.page) } }.disabled(busy || page == nil)
+                    Button("断开并清除凭据") { disconnect(clearCredentials: true) }
                 }.buttonStyle(.bordered)
                 if let error { Text(error).font(.caption).foregroundStyle(.red) }
                 if let page { listing(page) }
             }
-        }.onDisappear { task?.cancel(); token = ""; password = "" }
+        }.onChange(of: server) { _, _ in disconnect(clearCredentials: false) }
+         .onChange(of: token) { _, _ in disconnect(clearCredentials: false) }
+         .onChange(of: password) { _, _ in disconnect(clearCredentials: false) }
+         .onDisappear { disconnect(clearCredentials: true) }
     }
     @ViewBuilder private func listing(_ p: NativeCloudPage) -> some View {
-        Text(p.path).font(.caption)
+        Text(p.path + " · 第 \(p.page) 页").font(.caption)
         TextField("筛选当前页文件和文件夹", text: $listingQuery)
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
             .textFieldStyle(.roundedBorder)
         Text("当前页显示 \(NativeCloudListingFilter.entries(p.entries, query: listingQuery).count) / \(p.entries.count) 项 · 仅筛选已加载页")
             .font(.caption).foregroundStyle(.secondary)
-        Button("上级目录") { open((p.path as NSString).deletingLastPathComponent) }.disabled(busy || p.path == "/")
+        Button("上级目录") { open(NativeCloudPath.parent(of: p.path)) }.disabled(busy || p.path == "/")
         ForEach(NativeCloudListingFilter.entries(p.entries, query: listingQuery)) { item in
             Button((item.directory ? "📁 " : "▶ ") + item.name) {
-                open((p.path == "/" ? "" : p.path) + "/" + item.name,play:!item.directory)
-            }.disabled(busy)
+                if let path = NativeCloudPath.child(named: item.name, in: p.path) { open(path,play:!item.directory) }
+            }.disabled(busy || NativeCloudPath.child(named: item.name, in: p.path) == nil)
         }
         HStack {
-            Button("上一页") { open(p.path,number:p.page-1) }.disabled(busy || p.page <= 1)
+            Button("上一页") { if let number = NativeCloudPageNavigation.previous(p.page) { open(p.path,number:number) } }.disabled(busy || NativeCloudPageNavigation.previous(p.page) == nil)
             Spacer()
-            Button("下一页") { open(p.path,number:p.page+1) }.disabled(busy || !p.hasMore)
+            Button("下一页") { if let number = NativeCloudPageNavigation.next(p.page, hasMore:p.hasMore) { open(p.path,number:number) } }.disabled(busy || NativeCloudPageNavigation.next(p.page, hasMore:p.hasMore) == nil)
         }
+    }
+    private func disconnect(clearCredentials: Bool) {
+        task?.cancel(); task = nil; revision = UUID(); page = nil; listingQuery = ""; error = nil; busy = false
+        if clearCredentials { token = ""; password = "" }
     }
     private func open(_ path: String, number: Int = 1, play: Bool = false) {
         task?.cancel(); let id = UUID(); revision = id; busy = true; error = nil
@@ -59,7 +67,10 @@ struct CloudSection: View {
                 if play {
                     let result: NativeCloudPlayback = try await api.request("cloud/play",body:payload)
                     guard revision == id, !Task.isCancelled else { return }
-                    onPlay(TVChannel(name:result.name,url:result.url,group:"网盘",logo:nil,tvgId:nil,headers:result.headers))
+                    guard let safe = NativeCloudPlaybackValidation.validated(result) else {
+                        throw NativeRequestError.message("网盘返回了不安全的播放地址或 HTTP 请求头")
+                    }
+                    onPlay(TVChannel(name:safe.name,url:safe.url,group:"网盘",logo:nil,tvgId:nil,headers:safe.headers))
                 } else {
                     let result: NativeCloudPage = try await api.request("cloud/list",body:payload)
                     guard revision == id, !Task.isCancelled else { return }
