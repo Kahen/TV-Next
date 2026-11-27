@@ -2,7 +2,7 @@ import Foundation
 
 /// A presentation-only filter. Provider provenance remains attached to each hit,
 /// and changing the filter never alters the underlying search/retry snapshot.
-enum NativeCrossSiteResultFilter {
+extension NativeCrossSiteResultFilter {
     static func visible<Item>(
         _ hits: [NativeSearchHit<Item>],
         selectedKey: String,

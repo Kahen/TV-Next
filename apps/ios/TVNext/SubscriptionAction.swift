@@ -13,6 +13,25 @@ struct NativeSubscriptionAction: Decodable {
         let mode: String?
         let cookie: [Cookie]?
 
+        /// FongMi providers may return either {"web":"https://..."} or
+        /// {"web":{"url":"https://...","mode":"browser"}}.
+        /// Both forms remain explicit user-initiated external navigation.
+        init(from decoder: Decoder) throws {
+            let single = try decoder.singleValueContainer()
+            if let address = try? single.decode(String.self) {
+                url = address
+                mode = nil
+                cookie = nil
+                return
+            }
+            let fields = try decoder.container(keyedBy: CodingKeys.self)
+            url = try fields.decode(String.self, forKey: .url)
+            mode = try fields.decodeIfPresent(String.self, forKey: .mode)
+            cookie = try fields.decodeIfPresent([Cookie].self, forKey: .cookie)
+        }
+
+        private enum CodingKeys: String, CodingKey { case url, mode, cookie }
+
         var externalURL: URL? {
             guard url.utf8.count <= 4096, !url.isEmpty else { return nil }
             let lower = url.lowercased()
