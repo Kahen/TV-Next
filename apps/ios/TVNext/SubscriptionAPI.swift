@@ -89,3 +89,26 @@ struct NativeCloudPlayback: Decodable { let url: String; let name: String; let h
 
 struct NativeLiveRequest: Encodable { let content: String; let url: String; let liveIndex: Int }
 struct NativeLiveResponse: Decodable { let channels: [TVChannel]; let warnings: [String] }
+
+enum NativeCloudPlaybackValidation {
+    /// Cloud URLs are returned by a self-hosted service, not by the user-facing URL field.
+    /// Reject non-network schemes and URL-embedded credentials before handing them to AVPlayer.
+    static func validated(_ playback: NativeCloudPlayback) -> NativeCloudPlayback? {
+        let raw = playback.url
+        guard !raw.isEmpty, raw.utf8.count <= 8192,
+              !raw.unicodeScalars.contains(where: { CharacterSet.whitespacesAndNewlines.contains($0) || CharacterSet.controlCharacters.contains($0) }),
+              let url = URLComponents(string: raw),
+              let scheme = url.scheme?.lowercased(), ["http", "https"].contains(scheme),
+              let host = url.host, !host.isEmpty,
+              url.user == nil, url.password == nil, url.fragment == nil,
+              playback.headers.count <= 32 else { return nil }
+        let tokenCharacters = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!#$%&'*+-.^_`|~")
+        for (name, value) in playback.headers {
+            guard !name.isEmpty, name.utf8.count <= 128,
+                  name.unicodeScalars.allSatisfy({ tokenCharacters.contains($0) }),
+                  value.utf8.count <= 4096,
+                  !value.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else { return nil }
+        }
+        return playback
+    }
+}
