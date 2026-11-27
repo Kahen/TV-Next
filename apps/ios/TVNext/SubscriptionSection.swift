@@ -308,10 +308,11 @@ struct SubscriptionSection: View {
         }
     }
     private func performAction(site: String, action: String) {
-        guard let document, let context = NativeActionRetryContext(
+        guard let document else { return }
+        let context = NativeActionRetryContext(
             siteKey: site, action: action, subscriptionContent: document.content,
             subscriptionURL: document.url
-        ) else { return }
+        )
         var r = request(site); r.action = action
         run { api, id in
             let result: NativeSubscriptionAction = try await api.request("subscriptions/action", body: r)
