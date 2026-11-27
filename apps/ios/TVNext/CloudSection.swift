@@ -52,7 +52,10 @@ struct CloudSection: View {
                 if play {
                     let result: NativeCloudPlayback = try await api.request("cloud/play",body:payload)
                     guard revision == id, !Task.isCancelled else { return }
-                    onPlay(TVChannel(name:result.name,url:result.url,group:"网盘",logo:nil,tvgId:nil,headers:result.headers))
+                    guard let safe = NativeCloudPlaybackValidation.validated(result) else {
+                        throw NativeRequestError.message("网盘返回了不安全的播放地址或 HTTP 请求头")
+                    }
+                    onPlay(TVChannel(name:safe.name,url:safe.url,group:"网盘",logo:nil,tvgId:nil,headers:safe.headers))
                 } else {
                     let result: NativeCloudPage = try await api.request("cloud/list",body:payload)
                     guard revision == id, !Task.isCancelled else { return }
