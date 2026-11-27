@@ -147,9 +147,9 @@ struct CaptionSmoke {
                     CaptionCue(start: 1, end: 4, text: String(repeating: "乙", count: 1_500))]
         precondition(CaptionParser.activeText(long, at: 2).count == 2_000)
 
-        let entities = "WEBVTT\n00:00:00.000 --> 00:00:01.000\n&#x1F642; &#X41; &#66; &#0; &quot;word&quot;"
+        let entities = "WEBVTT\n00:00:00.000 --> 00:00:01.000\n&#x1F642; &#X41; &#66; &#0; &quot;word&quot; &amp;#65; &amp;lt;"
         let decoded = try CaptionParser.parse(Data(entities.utf8))
-        precondition(decoded.first?.text == "🙂 A B &#0; \"word\"")
+        precondition(decoded.first?.text == "🙂 A B &#0; \"word\" &#65; &lt;")
         print("TV-Next caption parser smoke tests passed")
     }
 }
