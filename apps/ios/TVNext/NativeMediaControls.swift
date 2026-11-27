@@ -4,6 +4,14 @@ import MediaPlayer
 enum NativePlaybackCommand {
     case play, pause, toggle, seek(TimeInterval), skip(TimeInterval), rate(Float)
 
+    /// Match the exact rates advertised to Control Center. An injected or
+    /// stale remote event must not silently set an unadvertised speed.
+    static let supportedRemoteRates: [Float] = [0.75, 1, 1.25, 1.5, 2]
+
+    static func acceptsRemoteRate(_ rate: Float) -> Bool {
+        rate.isFinite && supportedRemoteRates.contains(rate)
+    }
+
     /// Pure target calculation for finite VOD. The actual AVPlayer seek may
     /// report a different timestamp at EOF (some codecs reset to zero).
     static func boundedSkipTarget(current: TimeInterval, interval: TimeInterval, duration: TimeInterval) -> TimeInterval? {
@@ -70,7 +78,7 @@ final class NativeMediaControls {
         center.skipBackwardCommand.preferredIntervals = [15]
         register(center.skipForwardCommand) { _ in .skip(15) }
         register(center.skipBackwardCommand) { _ in .skip(-15) }
-        center.changePlaybackRateCommand.supportedPlaybackRates = [0.75,1,1.25,1.5,2]
+        center.changePlaybackRateCommand.supportedPlaybackRates = NativePlaybackCommand.supportedRemoteRates.map { NSNumber(value: $0) }
         register(center.changePlaybackRateCommand) { event in
             (event as? MPChangePlaybackRateCommandEvent).map { .rate($0.playbackRate) }
         }

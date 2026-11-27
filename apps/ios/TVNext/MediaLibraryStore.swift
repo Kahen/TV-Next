@@ -1008,7 +1008,7 @@ final class MediaLibraryStore: ObservableObject {
             return handleSystemPlaybackCommand(.seek(target))
         case .rate(let rate):
             let duration=item.duration.seconds
-            guard rate.isFinite,(0.75...2).contains(rate),duration.isFinite,duration>0,duration<604_800 else { return false }
+            guard NativePlaybackCommand.acceptsRemoteRate(rate),duration.isFinite,duration>0,duration<604_800 else { return false }
             setPlaybackSpeed(rate)
         }
         updateSystemMetadata()
