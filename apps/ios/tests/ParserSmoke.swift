@@ -39,6 +39,40 @@ struct ParserSmoke {
             // Expected.
         }
 
+        // A leading UTF-8 BOM must not hide playlist-wide catchup defaults.
+        let bomPlaylist = "\u{FEFF}#EXTM3U catchup=\"append\" catchup-source=\"https://example.org/replay/{start}\"\n#EXTINF:-1,News\nhttps://example.org/live.m3u8"
+        let bomChannels = try M3UParser.parse(bomPlaylist)
+        precondition(bomChannels.count == 1)
+        precondition(bomChannels[0].name == "News")
+        precondition(bomChannels[0].catchup?.source == "https://example.org/replay/{start}")
+        // An embedded BOM is not a valid URL prefix and must not be silently removed.
+        let embeddedBOM = "#EXTM3U\n#EXTINF:-1,Invalid\n\u{FEFF}https://example.org/live.m3u8"
+        let embeddedChannels = try M3UParser.parse(embeddedBOM)
+        precondition(embeddedChannels.isEmpty)
+
+        // Some IPTV exports put EXTGRP before EXTINF instead of after it.
+        let grouped = try M3UParser.parse("""
+        #EXTM3U
+        #EXTGRP:Documentaries
+        #EXTINF:-1,First
+        https://example.org/first.m3u8
+        #EXTINF:-1,Second
+        https://example.org/second.m3u8
+        #EXTGRP:Fallback
+        #EXTINF:-1 group-title="Explicit",Third
+        https://example.org/third.m3u8
+        #EXTGRP:Pending
+        #EXTINF:-1,Invalid
+        javascript:alert(1)
+        #EXTINF:-1,After Invalid
+        https://example.org/fourth.m3u8
+        """)
+        precondition(grouped.count == 4)
+        precondition(grouped[0].group == "Documentaries", "EXTGRP before EXTINF must apply")
+        precondition(grouped[1].group == "Uncategorized", "Group must not leak into next channel")
+        precondition(grouped[2].group == "Explicit", "Explicit group-title must override EXTGRP")
+        precondition(grouped[3].group == "Uncategorized", "Invalid media line must clear pending group")
+
         // Some authorized IPTV exports use single-quoted EXTINF metadata.
         // A comma inside either quote style must not become the channel title.
         let quoted = try M3UParser.parse("""

@@ -53,7 +53,11 @@ enum M3UParser {
         for raw in text.components(separatedBy: .newlines) {
             lineCount += 1
             if lineCount > 20_000 { throw PlaylistError.tooManyLines }
-            let line = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            // A UTF-8 BOM is valid only at the start of the playlist, before #EXTM3U.
+            // Do not strip BOMs from later lines or stream URLs.
+            let normalized = lineCount == 1 && raw.hasPrefix("\u{FEFF}")
+                ? String(raw.dropFirst()) : raw
+            let line = normalized.trimmingCharacters(in: .whitespacesAndNewlines)
             if line.lowercased().hasPrefix("#extm3u") {
                 defaultCatchup = parseCatchup(attributes(in:line))
             } else if line.lowercased().hasPrefix("#extinf") {
@@ -62,7 +66,8 @@ enum M3UParser {
                 nextName = title(in: line).flatMap { $0.isEmpty ? nil : $0 }
                     ?? attrs["tvg-name"].flatMap { $0.isEmpty ? nil : $0 }
                     ?? "Unnamed"
-                group = attrs["group-title"].flatMap { $0.isEmpty ? nil : $0 } ?? "Uncategorized"
+                // EXTGRP may precede EXTINF; only an explicit group-title overrides it.
+                group = attrs["group-title"].flatMap { $0.isEmpty ? nil : $0 } ?? group
                 logo = attrs["tvg-logo"]
                 tvgId = attrs["tvg-id"].flatMap { $0.isEmpty ? nil : $0 }
             } else if line.lowercased().hasPrefix("#extgrp:") {

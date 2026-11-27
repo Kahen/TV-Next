@@ -1,9 +1,12 @@
 import SwiftUI
+import AVFoundation
 
 struct SubscriptionSection: View {
     let serverURL: String
     var session: NativeHomeSession? = nil
     let onPlay: (NativeMediaPlayback, String) -> Void
+    /// Read the actual active player item after onPlay has installed it.
+    var activePlayerItem: () -> AVPlayerItem? = { nil }
     var onImport: (([TVChannel]) -> Void)? = nil
     @State private var address = ""
     @State private var content = ""
@@ -20,6 +23,7 @@ struct SubscriptionSection: View {
     @State private var actionResult: NativeSubscriptionAction?
     @State private var detail: NativeMediaDetail?
     @State private var crossSiteResults: [NativeSearchHit<NativeMediaItem>] = []
+    @State private var crossSiteResultQuery = ""
     @State private var crossSiteFailures: [String] = []
     @State private var crossSiteFailedKeys: [String] = []
     @State private var crossSiteSearchKeyword: String?
@@ -29,6 +33,9 @@ struct SubscriptionSection: View {
     @State private var crossSiteWarningState = NativeSearchWarningState.empty
     @State private var crossSiteCompleted = false
     @State private var line = 0
+    @State private var lastPlayedEpisode: Int?
+    @State private var autoAdvance = false
+    @State private var ownedPlayerItem: AVPlayerItem?
     @State private var error: String?
     @State private var busy = false
     @State private var pending: Task<Void,Never>?
@@ -88,8 +95,13 @@ struct SubscriptionSection: View {
                 if !crossSiteResults.isEmpty {
                     LazyVStack(alignment: .leading) {
                         Text("跨站搜索结果").font(.headline)
-                        ForEach(crossSiteResults.indices, id: \.self) { index in
-                            let hit = crossSiteResults[index]
+                        TextField("筛选已加载的跨站结果", text: $crossSiteResultQuery)
+                            .textFieldStyle(.roundedBorder)
+                            .accessibilityIdentifier("cross-site-result-filter")
+                        Text("显示 \(filteredCrossSiteResults.count) / \(crossSiteResults.count) 条")
+                            .font(.caption).foregroundStyle(.secondary)
+                        ForEach(filteredCrossSiteResults.indices, id: \.self) { index in
+                            let hit = filteredCrossSiteResults[index]
                             Button(hit.item.name + " · " + (crossSiteSourceNames[hit.siteKey] ?? hit.siteKey)) {
                                 inspect(hit.item, from: hit.siteKey)
                             }.disabled(busy).padding(.vertical, 4)
@@ -105,9 +117,20 @@ struct SubscriptionSection: View {
                 rememberURL = true
             }
         }
-        .onDisappear { pending?.cancel(); actionResult = nil; clearCrossSiteSearch() }
-        .onChange(of:serverURL) { _,_ in pending?.cancel();generation=UUID();busy=false;document=nil;page=nil;detail=nil;actionResult=nil;filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;siteKey="";clearCrossSiteSearch() }
-        .onChange(of:session?.token) { _,_ in pending?.cancel();generation=UUID();busy=false;actionResult=nil;clearCrossSiteSearch() }
+        .onReceive(NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime)) { event in
+            guard autoAdvance, !busy, let finished = event.object as? AVPlayerItem,
+                  finished === ownedPlayerItem, finished === activePlayerItem(),
+                  let detail, detail.lines.indices.contains(line) else { return }
+            let playable = detail.lines[line].episodes.map(\.playable)
+            if let next = NativeEpisodeNavigation.adjacent(to: lastPlayedEpisode, playable: playable, direction: 1) {
+                // Invalidate before the asynchronous request to avoid duplicate EOF events.
+                ownedPlayerItem = nil
+                play(next)
+            }
+        }
+        .onDisappear { pending?.cancel(); ownedPlayerItem = nil; actionResult = nil; clearCrossSiteSearch() }
+        .onChange(of:serverURL) { _,_ in pending?.cancel();generation=UUID();busy=false;ownedPlayerItem=nil;lastPlayedEpisode=nil;document=nil;page=nil;detail=nil;lastPlayedEpisode=nil;actionResult=nil;filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;siteKey="";clearCrossSiteSearch() }
+        .onChange(of:session?.token) { _,_ in pending?.cancel();generation=UUID();busy=false;ownedPlayerItem=nil;lastPlayedEpisode=nil;actionResult=nil;clearCrossSiteSearch() }
     }
     private func run(_ operation: @escaping (TVNextAPI, UUID) async throws -> Void) {
         pending?.cancel()
@@ -120,7 +143,11 @@ struct SubscriptionSection: View {
             if generation == id { busy = false }
         }
     }
+    private var filteredCrossSiteResults: [NativeSearchHit<NativeMediaItem>] {
+        NativeCrossSiteResultFilter.apply(crossSiteResults, query: crossSiteResultQuery, names: crossSiteSourceNames)
+    }
     private func clearCrossSiteSearch() {
+        crossSiteResultQuery = ""
         crossSiteResults = []; crossSiteFailures = []; crossSiteFailedKeys = []
         crossSiteSearchKeyword = nil; crossSiteSourceOrder = []; crossSiteSourceNames = [:]; crossSiteWarnings = []; crossSiteWarningState = .empty; crossSiteCompleted = false
     }
@@ -142,7 +169,7 @@ struct SubscriptionSection: View {
         run { api, id in
             let result: NativeSubscription = try await api.request("subscriptions/load", body: NativeSubscriptionRequest(content: inlineContent, url: targetURL))
             guard generation == id, !Task.isCancelled else { return }
-            document = result; page = nil; detail = nil; siteKey = "";filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;clearCrossSiteSearch()
+            document = result; page = nil; detail = nil; lastPlayedEpisode = nil; ownedPlayerItem = nil; siteKey = "";filterCatalog=[:];filters=[:];appliedFilters=[:];category=nil;clearCrossSiteSearch()
             // URL is only saved after a successful, current-generation remote load.
             // Never save pasted configurations or a URL on a failed/canceled request.
             if shouldSaveURL && rememberURL && !NativeSubscriptionURLStore().save(targetURL) {
@@ -164,7 +191,7 @@ struct SubscriptionSection: View {
         run { api, id in
             let result: NativeMediaPage = try await api.request("subscriptions/" + operation, body: r)
             guard generation == id, !Task.isCancelled else { return }
-            page = result; detail = nil; siteKey = key; mode = operation; category = operation=="home" ? nil:r.categoryId;clearCrossSiteSearch()
+            page = result; detail = nil; ownedPlayerItem = nil; siteKey = key; mode = operation; category = operation=="home" ? nil:r.categoryId;clearCrossSiteSearch()
             filterCatalog=same ? filterCatalog.merging(result.filters ?? [:],uniquingKeysWith:{ _,new in new }):result.filters ?? [:]
             appliedFilters=operation=="category" ? choices:[:]
             // Keep unsaved Picker edits local; paging uses only the last applied values.
@@ -175,8 +202,10 @@ struct SubscriptionSection: View {
     }
     private func searchAll() {
         guard let document else { return }
-        let keyword = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !keyword.isEmpty else { return }
+        guard let keyword = NativeFongMiSearchInput.validated(query) else {
+            error = "搜索词不能为空、包含控制字符或超过 256 个字符。"
+            return
+        }
         let sources = document.sites.filter { $0.searchable && !$0.hidden && $0.supported && ($0.type != 3 || session != nil) }
             .map { NativeSearchSource(key: $0.key, name: $0.name) }
         clearCrossSiteSearch(); page = nil; detail = nil
@@ -269,7 +298,7 @@ struct SubscriptionSection: View {
                 let result: NativeSubscriptionAction = try await api.request("subscriptions/action",body:r)
                 guard generation == id, !Task.isCancelled else { return }
                 switchDetailSite(targetKey)
-                detail = nil; actionResult = result
+                detail = nil; ownedPlayerItem = nil; actionResult = result
             }
             return
         }
@@ -278,7 +307,7 @@ struct SubscriptionSection: View {
             let result: NativeMediaDetail = try await api.request("subscriptions/detail",body:r)
             guard generation == id, !Task.isCancelled else { return }
             switchDetailSite(targetKey)
-            detail = result; line = 0
+            detail = result; line = 0; lastPlayedEpisode = nil; ownedPlayerItem = nil
         }
     }
     private func play(_ index: Int) {
@@ -287,7 +316,9 @@ struct SubscriptionSection: View {
         run { api, id in
             let result: NativeMediaPlayback = try await api.request("subscriptions/play",body:r)
             guard generation == id, !Task.isCancelled else { return }
+            lastPlayedEpisode = index
             onPlay(result, detail.item.name)
+            ownedPlayerItem = activePlayerItem()
         }
     }
     @ViewBuilder private func actionView(_ result: NativeSubscriptionAction) -> some View {
@@ -321,8 +352,8 @@ struct SubscriptionSection: View {
         }
         HStack {
             TextField("搜索当前站点",text:$query).textFieldStyle(.roundedBorder)
-            Button("搜索") { browse(siteKey,operation:"search") }.disabled(busy || siteKey.isEmpty || query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            Button("跨站搜索") { searchAll() }.disabled(busy || query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            Button("搜索") { browse(siteKey,operation:"search") }.disabled(busy || siteKey.isEmpty || NativeFongMiSearchInput.validated(query) == nil)
+            Button("跨站搜索") { searchAll() }.disabled(busy || NativeFongMiSearchInput.validated(query) == nil)
         }
     }
     @ViewBuilder private func pageView(_ page: NativeMediaPage) -> some View {
@@ -360,13 +391,42 @@ struct SubscriptionSection: View {
         Text(detail.item.name).font(.headline)
         if let text = detail.description { Text(text).font(.caption) }
         ScrollView(.horizontal) { HStack { ForEach(detail.lines.indices,id:\.self) { i in
-            Button(detail.lines[i].name) { line = i }.buttonStyle(.bordered)
+            Button(detail.lines[i].name) { line = i; lastPlayedEpisode = nil; ownedPlayerItem = nil }.buttonStyle(.bordered)
         } } }
         if detail.lines.indices.contains(line) {
+            let playable = detail.lines[line].episodes.map(\.playable)
+            Toggle("播放结束自动下一集", isOn: $autoAdvance)
+                .accessibilityIdentifier("subscription-auto-next")
+            HStack {
+                Button("上一集") {
+                    if let index = NativeEpisodeNavigation.adjacent(to: lastPlayedEpisode, playable: playable, direction: -1) { play(index) }
+                }
+                .disabled(busy || NativeEpisodeNavigation.adjacent(to: lastPlayedEpisode, playable: playable, direction: -1) == nil)
+                .accessibilityIdentifier("previous-subscription-episode")
+                if let lastPlayedEpisode { Text("已播放第 \(lastPlayedEpisode + 1) 集").font(.caption) }
+                Button("下一集") {
+                    if let index = NativeEpisodeNavigation.adjacent(to: lastPlayedEpisode, playable: playable, direction: 1) { play(index) }
+                }
+                .disabled(busy || NativeEpisodeNavigation.adjacent(to: lastPlayedEpisode, playable: playable, direction: 1) == nil)
+                .accessibilityIdentifier("next-subscription-episode")
+            }
             ForEach(detail.lines[line].episodes.indices,id:\.self) { i in
                 let episode = detail.lines[line].episodes[i]
                 Button(episode.name) { play(i) }.disabled(busy || !episode.playable)
             }
+        }
+    }
+}
+
+
+/// Local-only view filtering. Provider keys and original hit identity are unchanged.
+enum NativeCrossSiteResultFilter {
+    static func apply(_ hits: [NativeSearchHit<NativeMediaItem>], query: String, names: [String: String]) -> [NativeSearchHit<NativeMediaItem>] {
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !needle.isEmpty else { return hits }
+        return hits.filter { hit in
+            hit.item.name.localizedStandardContains(needle) ||
+            (names[hit.siteKey] ?? hit.siteKey).localizedStandardContains(needle)
         }
     }
 }
