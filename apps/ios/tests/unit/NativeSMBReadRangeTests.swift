@@ -3,10 +3,12 @@ import XCTest
 
 final class NativeSMBReadRangeTests: XCTestCase {
     func testValidStartAndFinalByte() {
-        XCTAssertEqual(NativeSMBReadRange(offset: 0, length: 1024, fileSize: 1024),
-                       .bytes(offset: 0, length: 1024))
-        XCTAssertEqual(NativeSMBReadRange(offset: 1023, length: 1, fileSize: 1024),
-                       .bytes(offset: 1023, length: 1))
+        let start = NativeSMBReadRange(offset: 0, length: 1024, fileSize: 1024)
+        XCTAssertEqual(start?.offset, 0)
+        XCTAssertEqual(start?.length, 1024)
+        let finalByte = NativeSMBReadRange(offset: 1023, length: 1, fileSize: 1024)
+        XCTAssertEqual(finalByte?.offset, 1023)
+        XCTAssertEqual(finalByte?.length, 1)
     }
 
     func testRejectsInvalidBoundsAndOversizedChunks() {
